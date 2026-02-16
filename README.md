@@ -107,8 +107,18 @@ The app uses three Supabase Edge Functions (Deno/TypeScript). You need the [Supa
 
 ### Install the CLI (if you haven't)
 
+See the [official install docs](https://supabase.com/docs/guides/cli/getting-started) for the latest instructions. Common methods:
+
 ```bash
-npm install -g supabase
+# macOS
+brew install supabase/tap/supabase
+
+# Windows (Scoop)
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+scoop install supabase
+
+# npm (via the npx wrapper — no global install needed)
+npx supabase <command>
 ```
 
 ### Link to your project
