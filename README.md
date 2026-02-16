@@ -32,10 +32,12 @@ npm install
 
 ### Find your keys
 
-Once the project is ready, go to **Project Settings > API** (in the left sidebar). You need two values:
+Once the project is ready, go to **Project Settings > API Keys** (in the left sidebar). You need two values:
 
-- **Project URL** — looks like `https://abcdefghijk.supabase.co`
-- **anon / public key** — the long `eyJ...` string under "Project API keys"
+- **Project URL** — looks like `https://abcdefghijk.supabase.co` (found in **Project Settings > General**)
+- **Publishable key** — starts with `sb_publishable_...`. If you don't have one yet, click **Create new API Keys** on the API Keys page. This is the client-side key that's safe to include in app code.
+
+> **Legacy keys:** If your project still shows the older JWT-based keys (`anon` starting with `eyJ...`), those work too but Supabase recommends migrating to the new publishable/secret key format. See [Supabase API Keys docs](https://supabase.com/docs/guides/api/api-keys) for details.
 
 ---
 
@@ -51,10 +53,10 @@ Edit `.env`:
 
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://abcdefghijk.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 ```
 
-The `EXPO_PUBLIC_` prefix makes these available to the app at build time. Do not commit this file (it is in `.gitignore`).
+Use your **publishable key** here (or the legacy `anon` key if your project hasn't migrated yet — both work). The `EXPO_PUBLIC_` prefix makes these available to the app at build time. Do not commit this file (it is in `.gitignore`).
 
 ---
 
@@ -132,13 +134,15 @@ Your project ref is the `abcdefghijk` part of your Supabase URL (`https://abcdef
 
 ### Deploy the functions
 
-From the `events-app` directory:
+The two cleanup functions are called server-side (from cron), not from the app. Deploy them with `--no-verify-jwt` so they can be called with a secret key instead of a legacy JWT:
 
 ```bash
 supabase functions deploy og-metadata
-supabase functions deploy cleanup-people
-supabase functions deploy cleanup-events
+supabase functions deploy cleanup-people --no-verify-jwt
+supabase functions deploy cleanup-events --no-verify-jwt
 ```
+
+`og-metadata` is called from the app (which sends the publishable key), so it keeps the default JWT verification.
 
 ### What each function does
 
@@ -152,8 +156,9 @@ supabase functions deploy cleanup-events
 
 The two cleanup functions should run on a schedule. In the Supabase Dashboard:
 
-1. Go to **Database > Extensions** and enable the `pg_cron` extension if it isn't already.
-2. Go to **SQL Editor** and run:
+1. Go to **Database > Extensions** and enable the `pg_cron` and `pg_net` extensions if they aren't already.
+2. Go to **Project Settings > API Keys** and create a **secret key** (`sb_secret_...`) if you don't have one. This key has elevated privileges and is used to authorize the cron calls.
+3. Go to **SQL Editor** and run:
 
 ```sql
 -- Run people cleanup weekly (Sunday at 3am UTC)
@@ -163,7 +168,7 @@ SELECT cron.schedule(
   $$SELECT net.http_post(
     url := 'https://abcdefghijk.supabase.co/functions/v1/cleanup-people',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || 'your-service-role-key'
+      'apikey', 'sb_secret_...'
     )
   );$$
 );
@@ -175,13 +180,17 @@ SELECT cron.schedule(
   $$SELECT net.http_post(
     url := 'https://abcdefghijk.supabase.co/functions/v1/cleanup-events',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || 'your-service-role-key'
+      'apikey', 'sb_secret_...'
     )
   );$$
 );
 ```
 
-Replace `abcdefghijk` with your project ref and `your-service-role-key` with the **service_role** key from **Project Settings > API**. The service role key is required because these functions use `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS.
+Replace `abcdefghijk` with your project ref and `sb_secret_...` with your **secret key** from **Project Settings > API Keys**.
+
+> **Why a secret key?** The cleanup functions use `SUPABASE_SERVICE_ROLE_KEY` internally (auto-injected by Supabase) to bypass RLS when deleting old data. The secret key in the cron header authorizes the HTTP call to invoke the function. Since the cleanup functions were deployed with `--no-verify-jwt`, they accept the new-format secret key in the `apikey` header.
+>
+> **Legacy alternative:** If your project hasn't migrated to the new key format, you can use the `service_role` JWT key instead — pass it as `'Authorization', 'Bearer ' || 'your-service-role-key'` and skip the `--no-verify-jwt` flag when deploying.
 
 ---
 
