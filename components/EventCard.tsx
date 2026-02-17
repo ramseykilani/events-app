@@ -22,9 +22,7 @@ export function EventCard({ event, onPress }: Props) {
           style={styles.image}
           resizeMode="cover"
         />
-      ) : (
-        <View style={styles.imagePlaceholder} />
-      )}
+      ) : null}
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={2}>
           {event.title ?? 'Untitled event'}
@@ -46,19 +44,19 @@ export function EventCard({ event, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   image: {
     width: 80,
     height: 80,
-  },
-  imagePlaceholder: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#e0e0e0',
   },
   content: {
     flex: 1,
@@ -69,6 +67,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+    color: '#333',
   },
   meta: {
     fontSize: 14,

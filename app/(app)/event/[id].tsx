@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useSession } from '../../context/SessionContext';
@@ -114,58 +115,58 @@ export default function EventDetailScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {event.image_url ? (
-        <Image
-          source={{ uri: event.image_url }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={styles.imagePlaceholder} />
-      )}
-      <View style={styles.content}>
-        <Text style={styles.title}>{event.title ?? 'Untitled event'}</Text>
-        <Text style={styles.meta}>
-          {event.event_date}
-          {timeStr ? ` · ${timeStr}` : ''}
-        </Text>
-        {event.description ? (
-          <Text style={styles.description}>{event.description}</Text>
-        ) : null}
-        {event.url ? (
-          <TouchableOpacity
-            style={styles.link}
-            onPress={() => Linking.openURL(event.url!)}
-          >
-            <Text style={styles.linkText}>Open link</Text>
-          </TouchableOpacity>
-        ) : null}
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-            <Text style={styles.shareButtonText}>Share</Text>
-          </TouchableOpacity>
-          {userEventId && (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.innerContent}>
+          {event.image_url ? (
+            <Image
+              source={{ uri: event.image_url }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          ) : null}
+          <Text style={styles.title}>{event.title ?? 'Untitled event'}</Text>
+          <Text style={styles.meta}>
+            {event.event_date}
+            {timeStr ? ` · ${timeStr}` : ''}
+          </Text>
+          {event.description ? (
+            <Text style={styles.description}>{event.description}</Text>
+          ) : null}
+          {event.url ? (
             <TouchableOpacity
-              style={styles.editButton}
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/edit-event',
-                  params: { eventId: id, userEventId },
-                })
-              }
+              style={styles.link}
+              onPress={() => Linking.openURL(event.url!)}
             >
-              <Text style={styles.editButtonText}>Edit</Text>
+              <Text style={styles.linkText}>Open link</Text>
             </TouchableOpacity>
-          )}
-          {event.created_by_user_id === session?.user?.id && (
-            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-              <Text style={styles.deleteButtonText}>Delete Event</Text>
+          ) : null}
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+              <Text style={styles.shareButtonText}>Share</Text>
             </TouchableOpacity>
-          )}
+            {userEventId && (
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/edit-event',
+                    params: { eventId: id, userEventId },
+                  })
+                }
+              >
+                <Text style={styles.editButtonText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+            {event.created_by_user_id === session?.user?.id && (
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+                <Text style={styles.deleteButtonText}>Delete Event</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -174,79 +175,90 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  innerContent: {
+    padding: 24,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
   loading: {
     padding: 24,
     fontSize: 16,
   },
   image: {
     width: '100%',
-    height: 200,
-  },
-  imagePlaceholder: {
-    width: '100%',
-    height: 200,
-    backgroundColor: '#e0e0e0',
-  },
-  content: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  meta: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 16,
-  },
-  link: {
+    height: 300,
+    borderRadius: 12,
     marginBottom: 24,
   },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  meta: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 18,
+    lineHeight: 28,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  link: {
+    marginBottom: 32,
+  },
   linkText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#0066cc',
     textDecorationLine: 'underline',
+    textAlign: 'center',
   },
   actions: {
-    gap: 12,
+    gap: 16,
+    width: '100%',
+    maxWidth: 400,
   },
   shareButton: {
     backgroundColor: '#000',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     alignItems: 'center',
   },
   shareButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
   },
   editButton: {
     backgroundColor: '#f0f0f0',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     alignItems: 'center',
   },
   editButtonText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
   },
   deleteButton: {
     backgroundColor: '#fee2e2',
-    padding: 16,
-    borderRadius: 12,
+    padding: 20,
+    borderRadius: 16,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 16,
   },
   deleteButtonText: {
     color: '#dc2626',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
   },
 });
