@@ -6,7 +6,78 @@ Built with Expo (managed workflow) and Supabase (Postgres, Auth, Edge Functions)
 
 ---
 
-## Prerequisites
+## Why This Exists
+
+Most event apps try to be social networks. This one doesn't. The idea is simple: you find something you want to go to, you add it, and you share it with the right people. When they share something back, it shows up on your calendar. That's it.
+
+There's no public profile, no follower count, no algorithmic feed. You pick up to 50 people from your contacts, group them into circles, and share events with whoever makes sense. If someone you know is also on the app, their events appear on your calendar automatically.
+
+---
+
+## Features
+
+- **Calendar view** — Your home screen is a calendar. Tap a day to see events. Pull to refresh.
+- **Add from a link** — Paste a URL and the title, description, and image fill in automatically via Open Graph metadata. Or create an event from scratch.
+- **Share with people and circles** — After creating an event, pick who sees it. Select individuals, tap a circle to select a whole group, or mix and match.
+- **My People** — Import up to 50 people from your phone contacts. The app stores their phone number and resolves it to a user account if they sign up later.
+- **Circles** — Named groups of your people (e.g. "Close friends", "Work", "Basketball"). Makes sharing faster.
+- **Event detail** — View full event info, open the original link, reshare to more people, edit your copy, or delete events you created.
+- **Onboarding** — A short walkthrough for new users explaining how the app works.
+- **Phone auth** — Sign in with your phone number via SMS OTP. No passwords, no email.
+- **Data retention** — Automated weekly cleanup removes events older than 6 months and people you haven't shared with in 6 months.
+
+---
+
+## How It Works
+
+### Data Model
+
+The database has seven tables:
+
+| Table | Purpose |
+|-------|---------|
+| `users` | Extends Supabase `auth.users` with a phone number |
+| `my_people` | Your curated contact list (max 50). Each row is a phone number you've imported, optionally resolved to a `users` row |
+| `circles` | Named groups of your people |
+| `circle_members` | Join table between circles and people |
+| `events` | Immutable event snapshots (URL, title, description, image, date, time). Deduplicated by URL + title + date + time |
+| `user_events` | Ownership — links a user to an event they've added to their calendar |
+| `event_shares` | Routing — links a `user_event` to a person it was shared with |
+
+### Sharing Flow
+
+1. You create an event (or the app deduplicates against an existing one).
+2. A `user_events` row is created linking you to that event.
+3. You pick people/circles on the share screen. An `event_shares` row is created for each person.
+4. When that person opens their calendar, `get_calendar_events` finds shares targeting them (via `my_people.user_id`) and returns those events.
+
+### Security
+
+Every table has Row-Level Security (RLS) enabled. Policies ensure:
+
+- You can only read/write your own people, circles, and events.
+- You can only see events that were shared with you or that you created.
+- Sensitive operations (user creation, calendar queries) use `SECURITY DEFINER` functions to avoid RLS recursion.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Mobile app | [React Native](https://reactnative.dev/) via [Expo](https://expo.dev/) (managed workflow) |
+| Routing | [Expo Router](https://docs.expo.dev/router/introduction/) (file-based) |
+| Backend | [Supabase](https://supabase.com/) (Postgres, Auth, Edge Functions) |
+| Auth | Phone number + SMS OTP via Supabase Auth |
+| Database | PostgreSQL with RLS, triggers, and RPC functions |
+| Edge Functions | Deno/TypeScript (link preview fetching, scheduled cleanup) |
+| Language | TypeScript throughout |
+
+---
+
+## Getting Started
+
+### Prerequisites
 
 - **Node.js 18+** — [nodejs.org](https://nodejs.org)
 - **Expo CLI** — comes with `npx`, no global install needed
@@ -15,7 +86,7 @@ Built with Expo (managed workflow) and Supabase (Postgres, Auth, Edge Functions)
 
 ---
 
-## 1. Install Dependencies
+### 1. Install Dependencies
 
 ```bash
 cd events-app
@@ -24,13 +95,13 @@ npm install
 
 ---
 
-## 2. Create a Supabase Project
+### 2. Create a Supabase Project
 
 1. Go to [supabase.com/dashboard](https://supabase.com/dashboard) and create a new project.
 2. Pick a name, set a database password, and choose a region close to your users.
 3. Wait for the project to finish provisioning (usually under a minute).
 
-### Find your keys
+#### Find your keys
 
 Once the project is ready, go to **Project Settings > API Keys** (in the left sidebar). You need two values:
 
@@ -39,7 +110,7 @@ Once the project is ready, go to **Project Settings > API Keys** (in the left si
 
 ---
 
-## 3. Configure Environment Variables
+### 3. Configure Environment Variables
 
 Copy the example env file and fill in your keys:
 
@@ -58,7 +129,7 @@ The `EXPO_PUBLIC_` prefix makes these available to the app at build time. Do not
 
 ---
 
-## 4. Enable Phone Auth
+### 4. Enable Phone Auth
 
 1. In the Supabase Dashboard, go to **Authentication > Providers** (left sidebar).
 2. Find **Phone** in the provider list and enable it.
@@ -67,11 +138,11 @@ The `EXPO_PUBLIC_` prefix makes these available to the app at build time. Do not
 
 ---
 
-## 5. Run Database Migrations
+### 5. Run Database Migrations
 
 The app's database schema, security policies, triggers, and functions are defined in SQL migration files. Run them **in order**.
 
-### Option A: Supabase SQL Editor (no CLI needed)
+#### Option A: Supabase SQL Editor (no CLI needed)
 
 1. In the Supabase Dashboard, go to **SQL Editor** (left sidebar).
 2. Open each file below (from `supabase/migrations/`), paste its contents into the editor, and click **Run**. Do them one at a time, in order:
@@ -86,10 +157,15 @@ The app's database schema, security policies, triggers, and functions are define
 | `20240216000006_cleanup_functions.sql` | Creates the `cleanup_old_events` SQL function for data retention |
 | `20240216000007_events_public_select.sql` | Corrects the events SELECT policy so events are only readable by their creator, owner, or share recipient |
 | `20240216000008_find_or_create_event.sql` | Creates the `find_or_create_event` RPC that handles event dedup server-side |
+| `20240216000009_ensure_user_rpc.sql` | Creates the `ensure_user_exists` RPC for reliable user-row creation on first sign-in, and fixes RLS recursion on `event_shares` SELECT |
+| `20240216000010_fix_event_shares_insert_delete_recursion.sql` | Breaks remaining RLS recursion between `event_shares` and `user_events` using a `SECURITY DEFINER` helper; replaces SELECT/INSERT/DELETE policies on `event_shares` |
+| `20240216000011_fix_calendar_events_owned.sql` | Rewrites `get_calendar_events` RPC to also return events the user owns (not just events shared with them) |
+| `20260217000000_allow_event_delete.sql` | Adds an RLS policy allowing users to delete events they created |
+| `20260217000001_fix_delete_cascade.sql` | Adds RLS policies so the event creator can cascade-delete related `user_events` and `event_shares` rows |
 
 If any migration fails, check the error message — it usually means a previous migration wasn't run, or was run out of order.
 
-### Option B: Supabase CLI
+#### Option B: Supabase CLI
 
 If you have the [Supabase CLI](https://supabase.com/docs/guides/cli) installed and linked to your project:
 
@@ -101,11 +177,11 @@ This runs all migrations in the `supabase/migrations/` folder in order.
 
 ---
 
-## 6. Deploy Edge Functions
+### 6. Deploy Edge Functions
 
 The app uses three Supabase Edge Functions (Deno/TypeScript). You need the [Supabase CLI](https://supabase.com/docs/guides/cli) to deploy them.
 
-### Install the CLI (if you haven't)
+#### Install the CLI (if you haven't)
 
 See the [official install docs](https://supabase.com/docs/guides/cli/getting-started) for the latest instructions. Common methods:
 
@@ -121,7 +197,7 @@ scoop install supabase
 npx supabase <command>
 ```
 
-### Link to your project
+#### Link to your project
 
 ```bash
 supabase login
@@ -130,7 +206,7 @@ supabase link --project-ref your-project-ref
 
 Your project ref is the `abcdefghijk` part of your Supabase URL (`https://abcdefghijk.supabase.co`). You can also find it in **Project Settings > General**.
 
-### Deploy the functions
+#### Deploy the functions
 
 The two cleanup functions are called server-side (from cron), not from the app. Deploy them with `--no-verify-jwt` so they can be invoked with a secret key:
 
@@ -140,7 +216,7 @@ supabase functions deploy cleanup-people --no-verify-jwt
 supabase functions deploy cleanup-events --no-verify-jwt
 ```
 
-### What each function does
+#### What each function does
 
 | Function | Purpose | When it runs |
 |----------|---------|-------------|
@@ -148,7 +224,7 @@ supabase functions deploy cleanup-events --no-verify-jwt
 | `cleanup-people` | Removes people from `my_people` who haven't been shared with in 6 months | Scheduled via cron (see below) |
 | `cleanup-events` | Deletes event shares, user_events, and events older than 6 months | Scheduled via cron (see below) |
 
-### Schedule the cleanup cron jobs
+#### Schedule the cleanup cron jobs
 
 The two cleanup functions should run on a schedule. In the Supabase Dashboard:
 
@@ -186,7 +262,7 @@ Replace `abcdefghijk` with your project ref and `sb_secret_...` with your secret
 
 ---
 
-## 7. Start the App
+### 7. Start the App
 
 ```bash
 npm start
@@ -198,13 +274,13 @@ This launches the Expo dev server. You'll see a QR code and several options:
 - **Press `a`** to open in the Android Emulator (requires Android Studio)
 - **Scan the QR code** with Expo Go on your phone to run on a real device
 
-### Testing on a real device
+#### Testing on a real device
 
 1. Make sure your phone and computer are on the same Wi-Fi network.
 2. Open Expo Go and scan the QR code from the terminal.
 3. The app will load over the network. Changes you save will hot-reload automatically.
 
-### Testing phone auth
+#### Testing phone auth
 
 If you set up a test OTP in step 4, use that phone number and code to sign in. On a real device with a real SMS provider configured, you'll receive an actual SMS.
 
@@ -216,10 +292,14 @@ If you set up a test OTP in step 4, use that phone number and code to sign in. O
 events-app/
 ├── app/                           Expo Router file-based routing
 │   ├── (auth)/                    Auth screens (unauthenticated)
+│   │   ├── _layout.tsx            Auth stack layout
 │   │   ├── sign-in.tsx            Phone number entry
-│   │   └── verify.tsx             OTP code verification
+│   │   ├── verify.tsx             OTP code verification
+│   │   └── setup-people.tsx       Import contacts during onboarding
 │   ├── (app)/                     Main app screens (authenticated)
+│   │   ├── _layout.tsx            App stack layout
 │   │   ├── index.tsx              Calendar — the main screen
+│   │   ├── onboarding.tsx         Welcome walkthrough for new users
 │   │   ├── add-event.tsx          Create a new event (URL or manual)
 │   │   ├── edit-event.tsx         Edit an event (creates a fork)
 │   │   ├── event/[id].tsx         Event detail view
@@ -236,6 +316,7 @@ events-app/
 ├── lib/
 │   ├── supabase.ts                Supabase client initialization
 │   ├── contacts.ts                Device contacts access + E.164 normalization
+│   ├── showError.ts               Verbose error dialog for debugging
 │   └── types.ts                   TypeScript types matching the DB schema
 ├── supabase/
 │   ├── migrations/                SQL migrations (schema, RLS, RPCs, triggers)

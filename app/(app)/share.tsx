@@ -8,13 +8,14 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showError } from '../../lib/showError';
 import { useSession } from '../context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
 import type { MyPerson, Circle, CircleMember } from '../../lib/types';
 
 type ShareParams = {
-  eventId: string;
-  userEventId?: string;
+  eventId?: string | string[];
+  userEventId?: string | string[];
 };
 
 export default function ShareScreen() {
@@ -28,6 +29,9 @@ export default function ShareScreen() {
     new Set()
   );
   const [loading, setLoading] = useState(false);
+
+  const firstParamValue = (value?: string | string[]) =>
+    Array.isArray(value) ? value[0] : value;
 
   useFocusEffect(
     useCallback(() => {
@@ -70,12 +74,12 @@ export default function ShareScreen() {
       return;
     }
 
-    const eventId = params.eventId;
+    const eventId = firstParamValue(params.eventId);
     if (!eventId || !userId) return;
 
     setLoading(true);
     try {
-      let userEventId = params.userEventId;
+      let userEventId = firstParamValue(params.userEventId);
 
       if (!userEventId) {
         const { data: existing } = await supabase
@@ -97,9 +101,24 @@ export default function ShareScreen() {
             .select('id')
             .single();
 
-          if (insertErr) throw insertErr;
-          userEventId = inserted!.id;
+          if (insertErr && insertErr.code !== '23505') throw insertErr;
+          userEventId = inserted?.id;
+
+          if (!userEventId) {
+            const { data: afterConflict, error: fetchErr } = await supabase
+              .from('user_events')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('event_id', eventId)
+              .single();
+            if (fetchErr) throw fetchErr;
+            userEventId = afterConflict?.id;
+          }
         }
+      }
+
+      if (!userEventId) {
+        throw new Error('Could not find event ownership for sharing');
       }
 
       const shares = Array.from(selectedPersonIds).map((person_id) => ({
@@ -123,10 +142,7 @@ export default function ShareScreen() {
 
       router.back();
     } catch (err: unknown) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'Failed to share'
-      );
+      showError('Error', err);
     } finally {
       setLoading(false);
     }

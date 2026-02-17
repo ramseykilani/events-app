@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showError } from '../../lib/showError';
 import { useSession } from '../context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
 import { requestContactsPermission } from '../../lib/contacts';
@@ -26,9 +27,10 @@ export default function PeopleScreen() {
   const [newCircleName, setNewCircleName] = useState('');
   const [editingCircle, setEditingCircle] = useState<Circle | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const hasRequestedContacts = useRef(false);
 
-  const loadData = useCallback(async () => {
-    if (!userId) return;
+  const loadData = useCallback(async (): Promise<MyPerson[]> => {
+    if (!userId) return [];
 
     const { data: peopleData } = await supabase
       .from('my_people')
@@ -41,7 +43,8 @@ export default function PeopleScreen() {
       .select('*')
       .eq('owner_id', userId);
 
-    setPeople(peopleData ?? []);
+    const peopleList = peopleData ?? [];
+    setPeople(peopleList);
     setCircles(circlesData ?? []);
 
     const circleIds = (circlesData ?? []).map((c) => c.id);
@@ -54,12 +57,22 @@ export default function PeopleScreen() {
     } else {
       setCircleMembers([]);
     }
+    return peopleList;
   }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [loadData])
+      if (!userId) return;
+      loadData().then((peopleList) => {
+        if (hasRequestedContacts.current) return;
+        hasRequestedContacts.current = true;
+        requestContactsPermission().then((granted) => {
+          if (granted && (!peopleList || peopleList.length === 0)) {
+            setShowPicker(true);
+          }
+        });
+      });
+    }, [loadData, userId])
   );
 
   const handleAddPeople = async () => {
@@ -181,7 +194,7 @@ export default function PeopleScreen() {
       }));
       const { error } = await supabase.from('circle_members').insert(rows);
       if (error) {
-        Alert.alert('Error', error.message);
+        showError('Error', error);
         return;
       }
     }

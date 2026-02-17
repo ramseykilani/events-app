@@ -1,0 +1,57 @@
+---
+description: Project context and conventions for the Events app
+alwaysApply: true
+---
+
+# Events App — Agent Context
+
+## What this is
+
+A React Native (Expo) app for sharing events between people. No feeds, no notifications — just a calendar of events shared person-to-person.
+
+Read `Documentation/events-technical-architecture.md` (one level up from `events-app/`) for the full architecture, data model, and flows. That document is the source of truth for how the app should behave.
+
+## Stack
+
+- **Frontend:** React Native, Expo SDK 54, Expo Router v6 (file-based routing), TypeScript
+- **Backend:** Supabase — Postgres, Auth (phone OTP), Edge Functions (Deno), RLS
+- **Key libraries:** react-native-calendars, libphonenumber-js, @react-native-async-storage/async-storage
+
+## Key architectural rules
+
+- **Events are immutable.** Never UPDATE an events row. Edits create a new row (fork). The user's `user_events` row is updated to point to the new event_id.
+- **Sharing is person-to-person.** Circles are a UI shortcut — at the data level, `event_shares` always reference individual `my_people` rows.
+- **No forced onboarding.** Users go straight to the calendar after sign-up. Contacts permission is only requested when they tap Share or navigate to My People.
+- **Dedup is server-side.** Use the `find_or_create_event` RPC to create events. Don't do insert-then-query dedup from the client.
+- **RLS enforces access.** Every table has Row-Level Security. Users can only see their own data or data shared with them. Never use `USING (true)` on events.
+- **Pull, not push.** The app fetches fresh data on screen focus. No real-time subscriptions, no push notifications.
+
+## Project layout
+
+```
+app/(auth)/          Sign-in and OTP verification
+app/(app)/           Authenticated screens (calendar, events, sharing, people)
+app/context/         SessionContext (auth session provider)
+components/          Calendar, EventCard, ShareSheet, PeoplePicker
+lib/                 supabase.ts, types.ts, contacts.ts
+supabase/migrations/ SQL migrations (schema, RLS, triggers, RPCs) — run in order
+supabase/functions/  Edge Functions (og-metadata, cleanup-people, cleanup-events)
+```
+
+## Data flow cheat sheet
+
+- **Calendar query:** `get_calendar_events` RPC — finds events shared with the current user via `my_people → event_shares → user_events → events`
+- **Create event:** `find_or_create_event` RPC → insert `user_events` → navigate to share screen → insert `event_shares`
+- **Edit event:** `find_or_create_event` RPC (new snapshot) → UPDATE `user_events.event_id` → old snapshot untouched
+- **Share existing event:** insert `user_events` (adopt snapshot) → insert `event_shares`
+
+## Conventions
+
+- Screens use `useFocusEffect` (not `useEffect`) for data fetching so lists refresh on navigation.
+- Phone numbers are always stored in E.164 format (`+14165551234`).
+- Supabase client is initialized in `lib/supabase.ts` with AsyncStorage for session persistence.
+- All Supabase queries from the client go through RLS. Server-side operations use `SECURITY DEFINER` functions.
+
+## When you finish a task
+
+Update this file if your changes affect the architecture, data flow, conventions, or project layout described above. Keep it accurate for the next agent.

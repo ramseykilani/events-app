@@ -18,14 +18,11 @@ export function SessionContextProvider({ children }: { children: React.ReactNode
 
   const ensureUserRow = async (currentSession: Session) => {
     const user = currentSession.user;
-    const phone = user.phone || user.user_metadata?.phone || '';
+    const phone = (user as { phone?: string }).phone || user.user_metadata?.phone || '';
 
-    if (!phone) return;
-
-    const { error } = await supabase.from('users').upsert(
-      { id: currentSession.user.id, phone_number: phone },
-      { onConflict: 'id' }
-    );
+    const { error } = await supabase.rpc('ensure_user_exists', {
+      p_phone: phone,
+    });
 
     if (error) {
       console.error('Failed to ensure user row:', error);

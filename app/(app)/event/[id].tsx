@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Linking,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
@@ -55,8 +56,44 @@ export default function EventDetailScreen() {
   const handleShare = () => {
     router.push({
       pathname: '/(app)/share',
-      params: { eventId: id },
+      params: {
+        eventId: id,
+        ...(userEventId ? { userEventId } : {}),
+      },
     });
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            const { error } = await supabase.from('events').delete().eq('id', id);
+
+            if (error) {
+              console.error('Failed to delete event:', error);
+              Alert.alert('Error', 'Failed to delete event');
+              setLoading(false);
+            } else {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(app)/');
+              }
+            }
+          },
+        },
+      ]
+    );
   };
 
   const timeStr = event?.event_time
@@ -119,6 +156,11 @@ export default function EventDetailScreen() {
               }
             >
               <Text style={styles.editButtonText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+          {event.created_by_user_id === session?.user?.id && (
+            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+              <Text style={styles.deleteButtonText}>Delete Event</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -192,6 +234,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    backgroundColor: '#fee2e2',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  deleteButtonText: {
+    color: '#dc2626',
     fontSize: 18,
     fontWeight: '600',
   },

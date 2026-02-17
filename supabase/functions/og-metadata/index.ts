@@ -2,11 +2,64 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_RESPONSE_SIZE = 1024 * 1024; // 1MB
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
 interface OgMetadata {
   title: string | null;
   description: string | null;
   image_url: string | null;
+}
+
+const REDIRECT_HOSTS = new Set([
+  'l.facebook.com',
+  'lm.facebook.com',
+  'l.messenger.com',
+]);
+
+const REDIRECT_QUERY_KEYS = ['u', 'url', 'q', 'target'];
+
+function unwrapRedirectUrl(inputUrl: string): string {
+  let current = inputUrl;
+
+  // Handle nested redirect wrappers safely with a small hop limit.
+  for (let i = 0; i < 3; i += 1) {
+    let parsed: URL;
+    try {
+      parsed = new URL(current);
+    } catch {
+      return current;
+    }
+
+    if (!REDIRECT_HOSTS.has(parsed.hostname)) return current;
+
+    const next = REDIRECT_QUERY_KEYS
+      .map((key) => parsed.searchParams.get(key))
+      .find((value): value is string => Boolean(value));
+
+    if (!next) return current;
+
+    try {
+      current = decodeURIComponent(next);
+    } catch {
+      current = next;
+    }
+  }
+
+  return current;
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...CORS_HEADERS,
+    },
+  });
 }
 
 function extractOgMetadata(html: string): OgMetadata {
@@ -38,72 +91,67 @@ function extractOgMetadata(html: string): OgMetadata {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      },
-    });
+    return new Response(null, { headers: CORS_HEADERS });
   }
 
   if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ error: 'Method not allowed' }, 405);
   }
 
   try {
     const { url } = await req.json();
     if (!url || typeof url !== 'string') {
-      return new Response(
-        JSON.stringify({ error: 'URL is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: 'URL is required' }, 400);
     }
 
-    const parsed = new URL(url);
+    const normalizedUrl = unwrapRedirectUrl(url.trim());
+    const parsed = new URL(normalizedUrl);
     if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid URL protocol' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: 'Invalid URL protocol' }, 400);
     }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    const response = await fetch(url, {
+    const response = await fetch(parsed.toString(), {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'EventsApp/1.0 (Link Preview)',
+        // Use a browser-like UA because many sites block unknown bots.
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
       },
     });
 
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return new Response(
-        JSON.stringify({ error: `Failed to fetch: ${response.status}` }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({
+        title: null,
+        description: null,
+        image_url: null,
+        warning: `Source returned status ${response.status}`,
+      });
     }
 
     const contentType = response.headers.get('content-type') ?? '';
     if (!contentType.includes('text/html')) {
-      return new Response(
-        JSON.stringify({ error: 'URL does not point to HTML' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({
+        title: null,
+        description: null,
+        image_url: null,
+        warning: 'URL did not return HTML content',
+      });
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      return new Response(
-        JSON.stringify({ error: 'No response body' }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({
+        title: null,
+        description: null,
+        image_url: null,
+        warning: 'No response body',
+      });
     }
 
     let html = '';
@@ -120,19 +168,14 @@ serve(async (req) => {
 
     const metadata = extractOgMetadata(html);
 
-    return new Response(JSON.stringify(metadata), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
-    });
+    return jsonResponse(metadata);
   } catch (err) {
     console.error('og-metadata error:', err);
-    return new Response(
-      JSON.stringify({
-        error: err instanceof Error ? err.message : 'Unknown error',
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({
+      title: null,
+      description: null,
+      image_url: null,
+      warning: err instanceof Error ? err.message : 'Unknown error',
+    });
   }
 });

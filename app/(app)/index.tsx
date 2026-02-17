@@ -1,15 +1,27 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar } from '../../components/Calendar';
 import { useSession } from '../context/SessionContext';
 import { supabase } from '../../lib/supabase';
 import type { CalendarEvent } from '../../lib/types';
 
+const ONBOARDING_KEY = 'onboarding_complete';
+
 export default function CalendarScreen() {
   const { session } = useSession();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY).then((value) => {
+      if (value !== 'true') {
+        router.replace('/(app)/onboarding');
+      }
+    });
+  }, []);
 
   const doFetch = useCallback(
     async (startDate: string, endDate: string) => {
@@ -44,6 +56,14 @@ export default function CalendarScreen() {
     [session?.user?.id]
   );
 
+  const handleRefresh = useCallback(async () => {
+    if (lastRangeRef.current) {
+      setRefreshing(true);
+      await doFetch(lastRangeRef.current.start, lastRangeRef.current.end);
+      setRefreshing(false);
+    }
+  }, [doFetch]);
+
   const handleMonthChange = useCallback(
     (startDate: string, endDate: string) => {
       lastRangeRef.current = { start: startDate, end: endDate };
@@ -62,7 +82,12 @@ export default function CalendarScreen() {
 
   return (
     <View style={styles.container}>
-      <Calendar events={events} onMonthChange={handleMonthChange} />
+      <Calendar
+        events={events}
+        onMonthChange={handleMonthChange}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      />
     </View>
   );
 }

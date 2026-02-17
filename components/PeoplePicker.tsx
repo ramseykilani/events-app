@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   TouchableOpacity,
   FlatList,
@@ -22,10 +23,27 @@ export function PeoplePicker({
   existingPhones,
 }: Props) {
   const [contacts, setContacts] = useState<ContactWithPhone[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const existingSet = new Set(existingPhones);
+
+  const filteredContacts = contacts.filter((c) => {
+    const q = searchQuery.trim();
+    if (!q) return true;
+    const qLower = q.toLowerCase();
+    const name = (c.name ?? '').toLowerCase();
+    const phoneDigits = c.normalized.replace(/\D/g, '');
+    const queryDigits = q.replace(/\D/g, '');
+    const matchesName = name.includes(qLower);
+    const matchesPhone =
+      queryDigits.length > 0 && phoneDigits.includes(queryDigits);
+    return (
+      matchesName ||
+      matchesPhone
+    );
+  });
 
   useEffect(() => {
     getContactsWithPhones().then((data) => {
@@ -76,9 +94,21 @@ export function PeoplePicker({
         {loading ? (
           <Text style={styles.loading}>Loading contacts...</Text>
         ) : (
-          <FlatList
-            data={contacts}
-            keyExtractor={(item) => item.id}
+          <>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search contacts..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <FlatList
+              data={filteredContacts}
+              extraData={searchQuery}
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(item) => item.id}
             renderItem={({ item }) => {
               const isSelected = selected.has(item.normalized);
               return (
@@ -93,7 +123,8 @@ export function PeoplePicker({
                 </TouchableOpacity>
               );
             }}
-          />
+            />
+          </>
         )}
       </View>
     </Modal>
@@ -132,6 +163,16 @@ const styles = StyleSheet.create({
   },
   loading: {
     padding: 24,
+    fontSize: 16,
+  },
+  searchInput: {
+    marginHorizontal: 20,
+    marginVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
     fontSize: 16,
   },
   row: {

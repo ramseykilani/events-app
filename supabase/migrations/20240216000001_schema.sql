@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS public.my_people (
   UNIQUE(owner_id, phone_number)
 );
 
-CREATE INDEX idx_my_people_owner_id ON public.my_people(owner_id);
-CREATE INDEX idx_my_people_user_id ON public.my_people(user_id);
+CREATE INDEX IF NOT EXISTS idx_my_people_owner_id ON public.my_people(owner_id);
+CREATE INDEX IF NOT EXISTS idx_my_people_user_id ON public.my_people(user_id);
 
 -- Circles (saved groups)
 CREATE TABLE IF NOT EXISTS public.circles (
@@ -53,11 +53,11 @@ CREATE TABLE IF NOT EXISTS public.events (
   CONSTRAINT events_url_or_title CHECK (url IS NOT NULL OR title IS NOT NULL)
 );
 
-CREATE INDEX idx_events_event_date ON public.events(event_date);
-CREATE INDEX idx_events_url ON public.events(url) WHERE url IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_events_event_date ON public.events(event_date);
+CREATE INDEX IF NOT EXISTS idx_events_url ON public.events(url) WHERE url IS NOT NULL;
 
 -- Unique for dedup: same url+title+date+time = same snapshot
-CREATE UNIQUE INDEX idx_events_dedup ON public.events(
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup ON public.events(
   COALESCE(url, ''), COALESCE(title, ''), event_date, COALESCE(event_time::text, '')
 );
 
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS public.user_events (
   UNIQUE(user_id, event_id)
 );
 
-CREATE INDEX idx_user_events_user_id ON public.user_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_events_user_id ON public.user_events(user_id);
 
 -- Event shares (routing)
 CREATE TABLE IF NOT EXISTS public.event_shares (
@@ -81,4 +81,4 @@ CREATE TABLE IF NOT EXISTS public.event_shares (
   UNIQUE(user_event_id, person_id)
 );
 
-CREATE INDEX idx_event_shares_person_id ON public.event_shares(person_id);
+CREATE INDEX IF NOT EXISTS idx_event_shares_person_id ON public.event_shares(person_id);

@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
+import { showError } from '../../lib/showError';
 import { useSession } from '../context/SessionContext';
 import type { Event } from '../../lib/types';
 
@@ -49,7 +50,8 @@ export default function EditEventScreen() {
       setDescription(e.description ?? '');
       setUrl(e.url ?? '');
       setImageUrl(e.image_url ?? '');
-      setEventDate(new Date(e.event_date));
+      const [y, m, d] = e.event_date.split('-').map(Number);
+      setEventDate(new Date(y, m - 1, d));
       setEventTime(
         e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null
       );
@@ -72,6 +74,11 @@ export default function EditEventScreen() {
         ? eventTime.toTimeString().slice(0, 8)
         : null;
 
+      const year = eventDate.getFullYear();
+      const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+      const day = String(eventDate.getDate()).padStart(2, '0');
+      const localDate = `${year}-${month}-${day}`;
+
       const { data: eventId, error: eventErr } = await supabase.rpc(
         'find_or_create_event',
         {
@@ -79,7 +86,7 @@ export default function EditEventScreen() {
           p_title: title.trim() || null,
           p_description: description.trim() || null,
           p_image_url: imageUrl.trim() || null,
-          p_event_date: eventDate.toISOString().slice(0, 10),
+          p_event_date: localDate,
           p_event_time: timeStr,
         }
       );
@@ -110,13 +117,46 @@ export default function EditEventScreen() {
 
       router.replace(`/(app)/event/${eventId}`);
     } catch (err: unknown) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'Failed to save'
-      );
+      showError('Error', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            const { error } = await supabase
+              .from('events')
+              .delete()
+              .eq('id', params.eventId);
+
+            if (error) {
+              console.error('Failed to delete event:', error);
+              Alert.alert('Error', 'Failed to delete event');
+              setLoading(false);
+            } else {
+              // Navigate back to the calendar (or root)
+              // If we came from event detail, we need to go back twice or dismiss
+              // But since we deleted the event, going back to event detail is bad.
+              // So we should navigate to root.
+              router.replace('/(app)/');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (!event) {
@@ -216,6 +256,9 @@ export default function EditEventScreen() {
             }}
           />
         )}
+        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+          <Text style={styles.deleteButtonText}>Delete Event</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -274,5 +317,18 @@ const styles = StyleSheet.create({
   },
   textArea: {
     minHeight: 80,
+  },
+  deleteButton: {
+    backgroundColor: '#fee2e2',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 32,
+    marginBottom: 32,
+  },
+  deleteButtonText: {
+    color: '#dc2626',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

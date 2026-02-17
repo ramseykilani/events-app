@@ -1,14 +1,31 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  RefreshControl,
+} from 'react-native';
 import { Calendar as RNCalendar, DateData } from 'react-native-calendars';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EventCard } from './EventCard';
 import type { CalendarEvent } from '../lib/types';
 
 type Props = {
   events: CalendarEvent[];
   onMonthChange: (startDate: string, endDate: string) => void;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
+
+function toLocalDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function getMonthRange(date: Date): { start: string; end: string } {
   const year = date.getFullYear();
@@ -16,14 +33,19 @@ function getMonthRange(date: Date): { start: string; end: string } {
   const start = new Date(year, month, 1);
   const end = new Date(year, month + 1, 0);
   return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
+    start: toLocalDateString(start),
+    end: toLocalDateString(end),
   };
 }
 
-export function Calendar({ events, onMonthChange }: Props) {
+export function Calendar({
+  events,
+  onMonthChange,
+  refreshing = false,
+  onRefresh,
+}: Props) {
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().slice(0, 10)
+    toLocalDateString(new Date())
   );
   const [lastFetchedMonth, setLastFetchedMonth] = useState<string>('');
 
@@ -55,6 +77,15 @@ export function Calendar({ events, onMonthChange }: Props) {
       <View style={styles.header}>
         <Text style={styles.title}>Events</Text>
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={async () => {
+              await AsyncStorage.removeItem('onboarding_complete');
+              router.push('/(app)/onboarding');
+            }}
+          >
+            <Text style={styles.helpButtonText}>?</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.peopleButton}
             onPress={() => router.push('/(app)/people')}
@@ -90,7 +121,14 @@ export function Calendar({ events, onMonthChange }: Props) {
           arrowColor: '#000',
         }}
       />
-      <View style={styles.eventsList}>
+      <ScrollView
+        style={styles.eventsList}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          ) : undefined
+        }
+      >
         <Text style={styles.sectionTitle}>
           {dayEvents.length === 0
             ? 'No events'
@@ -103,7 +141,7 @@ export function Calendar({ events, onMonthChange }: Props) {
             onPress={() => router.push(`/(app)/event/${event.event_id}`)}
           />
         ))}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -128,6 +166,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  helpButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
   },
   peopleButton: {
     paddingHorizontal: 12,

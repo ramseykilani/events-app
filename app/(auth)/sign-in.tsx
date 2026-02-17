@@ -12,6 +12,7 @@ import {
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showError } from '../../lib/showError';
 
 export default function SignInScreen() {
   const [phone, setPhone] = useState('');
@@ -46,10 +47,7 @@ export default function SignInScreen() {
         params: { phone: normalized },
       });
     } catch (err: unknown) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'Failed to send verification code'
-      );
+      showError('Error', err);
     } finally {
       setLoading(false);
     }

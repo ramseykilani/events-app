@@ -12,6 +12,7 @@ import {
 import { router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
+import { showError } from '../../lib/showError';
 import { useSession } from '../context/SessionContext';
 
 export default function AddEventScreen() {
@@ -36,13 +37,17 @@ export default function AddEventScreen() {
         body: { url: url.trim() },
       });
 
-      if (error) throw error;
+      if (error) {
+        // OG metadata is best-effort; URL entry should not fail if preview fetch fails.
+        console.warn('OG fetch skipped:', error.message);
+        return;
+      }
 
       if (data?.title) setTitle(data.title);
       if (data?.description) setDescription(data.description ?? '');
       if (data?.image_url) setImageUrl(data.image_url ?? '');
     } catch (err) {
-      console.error('OG fetch failed:', err);
+      console.warn('OG fetch failed:', err);
     } finally {
       setLoadingOg(false);
     }
@@ -90,17 +95,41 @@ export default function AddEventScreen() {
       if (existing && existing.length > 0) {
         const eventId = await chooseExistingEvent(existing);
         if (eventId) {
-          const { error: ueErr } = await supabase.from('user_events').insert({
-            user_id: session.user.id,
-            event_id: eventId,
-          });
-          if (ueErr) {
-            Alert.alert('Error', ueErr.message);
+          let userEventId: string | null = null;
+          const { data: inserted, error: ueErr } = await supabase
+            .from('user_events')
+            .insert({
+              user_id: session.user.id,
+              event_id: eventId,
+            })
+            .select('id')
+            .single();
+
+          // If the user already has this event, reuse that ownership row.
+          if (ueErr && ueErr.code !== '23505') {
+            showError('Error', ueErr);
             return;
           }
+
+          userEventId = inserted?.id ?? null;
+          if (!userEventId) {
+            const { data: existingUserEvent, error: fetchErr } = await supabase
+              .from('user_events')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .eq('event_id', eventId)
+              .single();
+
+            if (fetchErr || !existingUserEvent?.id) {
+              showError('Error', fetchErr ?? new Error('Failed to prepare sharing'));
+              return;
+            }
+            userEventId = existingUserEvent.id;
+          }
+
           router.replace({
             pathname: '/(app)/share',
-            params: { eventId },
+            params: { eventId, userEventId },
           });
           return;
         }
@@ -113,6 +142,11 @@ export default function AddEventScreen() {
         ? eventTime.toTimeString().slice(0, 8)
         : null;
 
+      const year = eventDate.getFullYear();
+      const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+      const day = String(eventDate.getDate()).padStart(2, '0');
+      const localDate = `${year}-${month}-${day}`;
+
       const { data: eventId, error: eventErr } = await supabase.rpc(
         'find_or_create_event',
         {
@@ -120,7 +154,7 @@ export default function AddEventScreen() {
           p_title: title.trim() || null,
           p_description: description.trim() || null,
           p_image_url: imageUrl.trim() || null,
-          p_event_date: eventDate.toISOString().slice(0, 10),
+          p_event_date: localDate,
           p_event_time: timeStr,
         }
       );
@@ -128,23 +162,38 @@ export default function AddEventScreen() {
       if (eventErr) throw eventErr;
       if (!eventId) throw new Error('Failed to create event');
 
-      const { error: ueErr } = await supabase.from('user_events').insert({
-        user_id: session.user.id,
-        event_id: eventId,
-      });
+      const { data: insertedUserEvent, error: ueErr } = await supabase
+        .from('user_events')
+        .insert({
+          user_id: session.user.id,
+          event_id: eventId,
+        })
+        .select('id')
+        .single();
 
       // Ignore duplicate user_event (user already has this event)
       if (ueErr && ueErr.code !== '23505') throw ueErr;
 
+      let userEventId = insertedUserEvent?.id ?? null;
+      if (!userEventId) {
+        const { data: existingUserEvent, error: fetchErr } = await supabase
+          .from('user_events')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('event_id', eventId)
+          .single();
+        if (fetchErr || !existingUserEvent?.id) {
+          throw fetchErr ?? new Error('Failed to prepare sharing');
+        }
+        userEventId = existingUserEvent.id;
+      }
+
       router.replace({
         pathname: '/(app)/share',
-        params: { eventId },
+        params: { eventId, userEventId },
       });
     } catch (err: unknown) {
-      Alert.alert(
-        'Error',
-        err instanceof Error ? err.message : 'Failed to create event'
-      );
+      showError('Error', err);
     } finally {
       setLoading(false);
     }

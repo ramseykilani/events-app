@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showError } from '../../lib/showError';
 
 export default function VerifyScreen() {
   const params = useLocalSearchParams<{ phone?: string }>();
@@ -42,10 +43,7 @@ export default function VerifyScreen() {
 
       // Auth state change will trigger navigation via root layout
     } catch (err: unknown) {
-      Alert.alert(
-        'Verification failed',
-        err instanceof Error ? err.message : 'Invalid or expired code'
-      );
+      showError('Verification failed', err);
       setLoading(false);
     }
   };
