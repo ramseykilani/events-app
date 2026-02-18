@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,17 +10,25 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { useSession } from '../../context/SessionContext';
 import type { Event } from '../../../lib/types';
+
+type SharedWithPerson = {
+  id: string;
+  contact_name: string | null;
+  phone_number: string;
+};
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useSession();
   const [event, setEvent] = useState<Event | null>(null);
   const [userEventId, setUserEventId] = useState<string | null>(null);
+  const [sharedWith, setSharedWith] = useState<SharedWithPerson[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessRevoked, setAccessRevoked] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -33,10 +41,15 @@ export default function EventDetailScreen() {
         .single();
 
       if (error) {
-        console.error('Failed to load event:', error);
+        if (error.code === 'PGRST116') {
+          setAccessRevoked(true);
+        } else {
+          console.error('Failed to load event:', error);
+        }
         setEvent(null);
       } else {
         setEvent(data as Event);
+        setAccessRevoked(false);
       }
 
       if (session?.user?.id) {
@@ -47,12 +60,52 @@ export default function EventDetailScreen() {
           .eq('event_id', id)
           .single();
         setUserEventId(ue?.id ?? null);
+
+        if (ue?.id) {
+          const { data: shares } = await supabase
+            .from('event_shares')
+            .select('person_id')
+            .eq('user_event_id', ue.id);
+          const personIds = (shares ?? []).map((s) => s.person_id);
+          if (personIds.length > 0) {
+            const { data: people } = await supabase
+              .from('my_people')
+              .select('id, contact_name, phone_number')
+              .in('id', personIds);
+            setSharedWith((people ?? []) as SharedWithPerson[]);
+          } else {
+            setSharedWith([]);
+          }
+        }
       }
       setLoading(false);
     }
 
     load();
   }, [id, session?.user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!userEventId) return;
+      async function refreshSharedWith() {
+        const { data: shares } = await supabase
+          .from('event_shares')
+          .select('person_id')
+          .eq('user_event_id', userEventId);
+        const personIds = (shares ?? []).map((s) => s.person_id);
+        if (personIds.length > 0) {
+          const { data: people } = await supabase
+            .from('my_people')
+            .select('id, contact_name, phone_number')
+            .in('id', personIds);
+          setSharedWith((people ?? []) as SharedWithPerson[]);
+        } else {
+          setSharedWith([]);
+        }
+      }
+      refreshSharedWith();
+    }, [userEventId])
+  );
 
   const handleShare = () => {
     router.push({
@@ -104,12 +157,32 @@ export default function EventDetailScreen() {
       })
     : null;
 
-  if (loading || !event) {
+  if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loading}>
-          {loading ? 'Loading...' : 'Event not found'}
-        </Text>
+        <Text style={styles.loading}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (accessRevoked) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.revokedContainer}>
+          <Text style={styles.revokedTitle}>Access removed</Text>
+          <Text style={styles.revokedMessage}>
+            You no longer have access to this event. The person who shared it may
+            have removed you from their contacts.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!event) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loading}>Event not found</Text>
       </View>
     );
   }
@@ -140,6 +213,20 @@ export default function EventDetailScreen() {
             >
               <Text style={styles.linkText}>Open link</Text>
             </TouchableOpacity>
+          ) : null}
+          {userEventId && sharedWith.length > 0 ? (
+            <View style={styles.sharedWithSection}>
+              <Text style={styles.sharedWithTitle}>Shared with</Text>
+              {sharedWith.map((p) => (
+                <Text key={p.id} style={styles.sharedWithItem}>
+                  {p.contact_name ?? p.phone_number}
+                </Text>
+              ))}
+              <Text style={styles.sharedWithNote}>
+                Removing someone from My People also removes them from this
+                event.
+              </Text>
+            </View>
           ) : null}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
@@ -222,6 +309,49 @@ const styles = StyleSheet.create({
     color: '#0066cc',
     textDecorationLine: 'underline',
     textAlign: 'center',
+  },
+  sharedWithSection: {
+    width: '100%',
+    marginBottom: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+  sharedWithTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  sharedWithItem: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  sharedWithNote: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 12,
+    fontStyle: 'italic',
+  },
+  revokedContainer: {
+    flex: 1,
+    padding: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  revokedTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  revokedMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   actions: {
     gap: 16,

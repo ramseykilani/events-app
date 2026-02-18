@@ -19,7 +19,7 @@ There's no public profile, no follower count, no algorithmic feed. You pick up t
 - **Calendar view** — Your home screen is a calendar. Tap a day to see events. Pull to refresh.
 - **Add from a link** — Paste a URL and the title, description, and image fill in automatically via Open Graph metadata. Or create an event from scratch.
 - **Share with people and circles** — After creating an event, pick who sees it. Select individuals, tap a circle to select a whole group, or mix and match.
-- **My People** — Import up to 50 people from your phone contacts. The app stores their phone number and resolves it to a user account if they sign up later.
+- **My People** — Import up to 50 people from your phone contacts. The app stores their phone number and resolves it to a user account automatically — both when you add the contact and when that person signs up.
 - **Circles** — Named groups of your people (e.g. "Close friends", "Work", "Basketball"). Makes sharing faster.
 - **Event detail** — View full event info, open the original link, reshare to more people, edit your copy, or delete events you created.
 - **Onboarding** — A short walkthrough for new users explaining how the app works.
@@ -50,6 +50,15 @@ The database has seven tables:
 2. A `user_events` row is created linking you to that event.
 3. You pick people/circles on the share screen. An `event_shares` row is created for each person.
 4. When that person opens their calendar, `get_calendar_events` finds shares targeting them (via `my_people.user_id`) and returns those events.
+
+### Phone Number Resolution
+
+Sharing relies on linking `my_people` rows to actual user accounts via `my_people.user_id`. This is resolved in two directions:
+
+- **When a contact is added** — A BEFORE INSERT trigger on `my_people` looks up `users` by phone number and sets `user_id` immediately if the person is already registered.
+- **When a user signs up** — An AFTER INSERT trigger on `users` finds any `my_people` rows with a matching phone number and sets their `user_id`.
+
+Both triggers use flexible phone matching (ignoring a leading `+`) to handle format differences between Supabase Auth and `libphonenumber-js` E.164 normalization.
 
 ### Security
 
@@ -162,6 +171,8 @@ The app's database schema, security policies, triggers, and functions are define
 | `20240216000011_fix_calendar_events_owned.sql` | Rewrites `get_calendar_events` RPC to also return events the user owns (not just events shared with them) |
 | `20260217000000_allow_event_delete.sql` | Adds an RLS policy allowing users to delete events they created |
 | `20260217000001_fix_delete_cascade.sql` | Adds RLS policies so the event creator can cascade-delete related `user_events` and `event_shares` rows |
+| `20260218000000_resolve_my_people_user_id_on_insert.sql` | Adds a BEFORE INSERT trigger on `my_people` to resolve `user_id` immediately when a contact is added for an existing user, and updates `ensure_user_exists` to correct placeholder phone numbers |
+| `20260218000001_fix_user_phone_and_rebackfill.sql` | Syncs `users.phone_number` from `auth.users.phone`, re-resolves `my_people.user_id` with flexible phone matching (handles `+` prefix differences), and updates all phone-matching triggers and functions |
 
 If any migration fails, check the error message — it usually means a previous migration wasn't run, or was run out of order.
 

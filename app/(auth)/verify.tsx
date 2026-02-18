@@ -13,17 +13,49 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 export default function VerifyScreen() {
   const params = useLocalSearchParams<{ phone?: string }>();
   const phone = params.phone ?? '';
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (!phone) {
       router.replace('/(auth)/sign-in');
     }
   }, [phone]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || resending) return;
+
+    setResending(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone,
+      });
+
+      if (error) throw error;
+
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      Alert.alert('Code sent', 'A new verification code has been sent to your phone.');
+    } catch (err: unknown) {
+      showError('Failed to resend', err);
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleVerify = async () => {
     if (!code.trim()) {
@@ -79,6 +111,22 @@ export default function VerifyScreen() {
             {loading ? 'Verifying...' : 'Verify'}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.resendButton,
+            (resendCooldown > 0 || resending || loading) && styles.resendButtonDisabled,
+          ]}
+          onPress={handleResend}
+          disabled={resendCooldown > 0 || resending || loading}
+        >
+          <Text style={styles.resendButtonText}>
+            {resending
+              ? 'Sending...'
+              : resendCooldown > 0
+                ? `Resend code in ${resendCooldown}s`
+                : "Didn't receive it? Try again"}
+          </Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -126,5 +174,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  resendButton: {
+    marginTop: 16,
+    padding: 12,
+    alignItems: 'center',
+  },
+  resendButtonDisabled: {
+    opacity: 0.5,
+  },
+  resendButtonText: {
+    color: '#666',
+    fontSize: 16,
   },
 });

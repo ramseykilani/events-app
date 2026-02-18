@@ -225,60 +225,76 @@ export default function PeopleScreen() {
       <Text style={styles.count}>
         {people.length} / 50 people
       </Text>
-      <View style={styles.circlesSection}>
-        <Text style={styles.sectionTitle}>Circles</Text>
-        {circles.map((circle) => (
-          <View key={circle.id} style={styles.circleRow}>
-            <View style={styles.circleInfo}>
-              <Text style={styles.circleName}>{circle.name}</Text>
-              <Text style={styles.circleMeta}>
-                {getCircleMemberIds(circle.id).length} members
-              </Text>
-            </View>
-            <View style={styles.circleActions}>
-              <TouchableOpacity onPress={() => handleEditCircleMembers(circle)}>
-                <Text style={styles.manage}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleRemoveCircle(circle)}>
-                <Text style={styles.remove}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-        <View style={styles.addCircleRow}>
-          <TextInput
-            style={styles.circleInput}
-            placeholder="New circle name"
-            placeholderTextColor="#999"
-            value={newCircleName}
-            onChangeText={setNewCircleName}
-          />
-          <TouchableOpacity
-            style={styles.addCircleBtn}
-            onPress={handleAddCircle}
-            disabled={!newCircleName.trim()}
-          >
-            <Text style={styles.addCircleBtnText}>Add</Text>
+      {people.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>👥</Text>
+          <Text style={styles.emptyTitle}>No people yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Add people from your contacts to organize them into circles and
+            invite them to events.
+          </Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={handleAddPeople}>
+            <Text style={styles.emptyButtonText}>Add from Contacts</Text>
           </TouchableOpacity>
         </View>
-      </View>
-      <View style={styles.peopleSection}>
-        <Text style={styles.sectionTitle}>People</Text>
-        <FlatList
-        data={people}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.personRow}>
-            <Text style={styles.personName}>
-              {item.contact_name ?? item.phone_number}
-            </Text>
-            <TouchableOpacity onPress={() => handleRemovePerson(item)}>
-              <Text style={styles.remove}>Remove</Text>
-            </TouchableOpacity>
+      ) : (
+        <>
+          <View style={styles.circlesSection}>
+            <Text style={styles.sectionTitle}>Circles</Text>
+            {circles.map((circle) => (
+              <View key={circle.id} style={styles.circleRow}>
+                <View style={styles.circleInfo}>
+                  <Text style={styles.circleName}>{circle.name}</Text>
+                  <Text style={styles.circleMeta}>
+                    {getCircleMemberIds(circle.id).length} members
+                  </Text>
+                </View>
+                <View style={styles.circleActions}>
+                  <TouchableOpacity onPress={() => handleEditCircleMembers(circle)}>
+                    <Text style={styles.manage}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleRemoveCircle(circle)}>
+                    <Text style={styles.remove}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+            <View style={styles.addCircleRow}>
+              <TextInput
+                style={styles.circleInput}
+                placeholder="New circle name"
+                placeholderTextColor="#999"
+                value={newCircleName}
+                onChangeText={setNewCircleName}
+              />
+              <TouchableOpacity
+                style={styles.addCircleBtn}
+                onPress={handleAddCircle}
+                disabled={!newCircleName.trim()}
+              >
+                <Text style={styles.addCircleBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
-        />
-      </View>
+          <View style={styles.peopleSection}>
+            <Text style={styles.sectionTitle}>People</Text>
+            <FlatList
+              data={people}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.personRow}>
+                  <Text style={styles.personName}>
+                    {item.contact_name ?? item.phone_number}
+                  </Text>
+                  <TouchableOpacity onPress={() => handleRemovePerson(item)}>
+                    <Text style={styles.remove}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          </View>
+        </>
+      )}
       {showPicker && (
         <PeoplePicker
           onSelect={handleSelectContacts}
@@ -443,6 +459,39 @@ const styles = StyleSheet.create({
   remove: {
     fontSize: 14,
     color: '#c00',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  emptyButton: {
+    backgroundColor: '#000',
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 10,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,

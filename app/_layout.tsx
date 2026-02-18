@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
+import { LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SessionContextProvider, useSession } from './context/SessionContext';
+
+LogBox.ignoreLogs(['unable to keep activate awake']);
 
 function RootLayoutNav() {
   const { session, isLoading } = useSession();

@@ -65,28 +65,45 @@ export function ShareSheet({
       <View style={styles.peopleSection}>
         <View style={styles.peopleHeader}>
           <Text style={styles.sectionTitle}>People</Text>
-          <TouchableOpacity onPress={() => router.push('/(app)/people')}>
-            <Text style={styles.manageLink}>Manage</Text>
-          </TouchableOpacity>
+          {people.length > 0 && (
+            <TouchableOpacity onPress={() => router.push('/(app)/people')}>
+              <Text style={styles.manageLink}>Manage</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        <FlatList
-          data={people}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
-            const selected = selectedPersonIds.has(item.id);
-            return (
-              <TouchableOpacity
-                style={[styles.personRow, selected && styles.personRowSelected]}
-                onPress={() => togglePerson(item.id)}
-              >
-                <Text style={styles.personName}>
-                  {item.contact_name ?? item.phone_number}
-                </Text>
-                {selected && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-            );
-          }}
-        />
+        {people.length === 0 ? (
+          <View style={styles.emptyPeople}>
+            <Text style={styles.emptyPeopleText}>
+              No people added yet. Add contacts to your people list so you can
+              invite them to events.
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyPeopleButton}
+              onPress={() => router.push('/(app)/people')}
+            >
+              <Text style={styles.emptyPeopleButtonText}>Add People</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={people}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => {
+              const selected = selectedPersonIds.has(item.id);
+              return (
+                <TouchableOpacity
+                  style={[styles.personRow, selected && styles.personRowSelected]}
+                  onPress={() => togglePerson(item.id)}
+                >
+                  <Text style={styles.personName}>
+                    {item.contact_name ?? item.phone_number}
+                  </Text>
+                  {selected && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        )}
       </View>
     </View>
   );
@@ -134,6 +151,29 @@ const styles = StyleSheet.create({
   manageLink: {
     fontSize: 14,
     color: '#0066cc',
+  },
+  emptyPeople: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+  },
+  emptyPeopleText: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  emptyPeopleButton: {
+    backgroundColor: '#000',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  emptyPeopleButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   personRow: {
     flexDirection: 'row',
