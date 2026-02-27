@@ -9,7 +9,10 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:manual": "bash ./scripts/manual-test-suite.sh",
+    "test:manual:strict": "bash ./scripts/manual-test-suite.sh --strict",
+    "test:manual:start": "bash ./scripts/manual-test-suite.sh --strict --start"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.1.0",
