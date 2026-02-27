@@ -23,6 +23,16 @@ The app requires a `.env` file at the repo root with two values (see `.env.examp
 
 Without real Supabase credentials the UI renders but auth/data calls fail with network errors. To test end-to-end auth flows, real credentials and a configured Supabase project are needed.
 
+If `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are available as environment variables (injected via Cursor Secrets), create the `.env` file from them:
+
+```bash
+printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_PUBLIC_SUPABASE_URL" "$EXPO_PUBLIC_SUPABASE_ANON_KEY" > .env
+```
+
+### Signing in (test OTP)
+
+A test OTP is configured on the Supabase project: phone `+15555550100`, code `123456` (expires March 31, 2026). Use this to sign in without a real SMS provider. After sign-in the app shows an onboarding walkthrough, then the main calendar.
+
 ### Linting / type checking
 
 There is no ESLint configuration. The only static check available is TypeScript:
