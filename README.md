@@ -366,3 +366,51 @@ events-app/
 2. Start app in web mode (`npx expo start --web --port 8081`) if not already running.
 3. Execute scenarios in `manual-tests/cloud_manual_regression.md`.
 4. Record results in `manual-tests/manual_test_report_template.md`.
+
+---
+
+## Testing in Cursor Cloud (with copy/paste prompts)
+
+### A) Run automated regression tests
+
+From repo root:
+
+```bash
+npm test -- --runInBand
+```
+
+Optional:
+
+```bash
+npm run test:coverage
+```
+
+**Prompt for a new agent (automated tests):**
+
+```text
+Run the automated regression suite for this repo. Execute `npm test -- --runInBand` and report failures with root-cause analysis. If tests fail, fix issues and re-run until green, then summarize what changed.
+```
+
+### B) Run manual regression tests (agent + computer-use)
+
+1. Run strict preflight:
+
+```bash
+npm run test:manual:strict
+```
+
+2. Start the app for manual testing:
+
+```bash
+npm run test:manual:start
+```
+
+3. Execute scenarios in `manual-tests/cloud_manual_regression.md`.
+4. Record outcomes in `manual-tests/manual_test_report_template.md`.
+5. Attach screenshots/videos for executed scenarios.
+
+**Prompt for a new agent (manual suite):**
+
+```text
+Run the manual regression suite for this repo. Start with `npm run test:manual:strict`, then run `npm run test:manual:start` to launch Expo web on port 8081. Execute all Core scenarios in `manual-tests/cloud_manual_regression.md` using computer-use, capture a demo video plus key screenshots, and fill `manual-tests/manual_test_report_template.md` with pass/fail + artifact paths. Then summarize results and blockers.
+```
