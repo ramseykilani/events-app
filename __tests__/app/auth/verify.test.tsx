@@ -4,21 +4,21 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import VerifyScreen from '../../../app/(auth)/verify';
 
-const verifyOtpMock = jest.fn();
-const signInWithOtpMock = jest.fn();
-const showErrorMock = jest.fn();
+const mockVerifyOtp = jest.fn();
+const mockSignInWithOtp = jest.fn();
+const mockShowError = jest.fn();
 
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     auth: {
-      verifyOtp: (...args: unknown[]) => verifyOtpMock(...args),
-      signInWithOtp: (...args: unknown[]) => signInWithOtpMock(...args),
+      verifyOtp: (...args: unknown[]) => mockVerifyOtp(...args),
+      signInWithOtp: (...args: unknown[]) => mockSignInWithOtp(...args),
     },
   },
 }));
 
 jest.mock('../../../lib/showError', () => ({
-  showError: (...args: unknown[]) => showErrorMock(...args),
+  showError: (...args: unknown[]) => mockShowError(...args),
 }));
 
 describe('app/(auth)/verify', () => {
@@ -49,25 +49,25 @@ describe('app/(auth)/verify', () => {
     useLocalSearchParamsMock.mockReturnValue({ phone: '+14165550001' });
     const screen = render(<VerifyScreen />);
 
-    fireEvent.press(screen.getByText('Verify'));
+    fireEvent.press(screen.getAllByText('Verify')[1]);
 
     expect(Alert.alert).toHaveBeenCalledWith(
       'Enter code',
       'Please enter the verification code.'
     );
-    expect(verifyOtpMock).not.toHaveBeenCalled();
+    expect(mockVerifyOtp).not.toHaveBeenCalled();
   });
 
   it('submits trimmed OTP codes', async () => {
     useLocalSearchParamsMock.mockReturnValue({ phone: '+14165550001' });
-    verifyOtpMock.mockResolvedValueOnce({ error: null });
+    mockVerifyOtp.mockResolvedValueOnce({ error: null });
 
     const screen = render(<VerifyScreen />);
     fireEvent.changeText(screen.getByPlaceholderText('000000'), ' 123456 ');
-    fireEvent.press(screen.getByText('Verify'));
+    fireEvent.press(screen.getAllByText('Verify')[1]);
 
     await waitFor(() => {
-      expect(verifyOtpMock).toHaveBeenCalledWith({
+      expect(mockVerifyOtp).toHaveBeenCalledWith({
         phone: '+14165550001',
         token: '123456',
         type: 'sms',
@@ -78,13 +78,13 @@ describe('app/(auth)/verify', () => {
   it('resends OTP with cooldown messaging', async () => {
     jest.useFakeTimers();
     useLocalSearchParamsMock.mockReturnValue({ phone: '+14165550001' });
-    signInWithOtpMock.mockResolvedValueOnce({ error: null });
+    mockSignInWithOtp.mockResolvedValueOnce({ error: null });
 
     const screen = render(<VerifyScreen />);
     fireEvent.press(screen.getByText("Didn't receive it? Try again"));
 
     await waitFor(() => {
-      expect(signInWithOtpMock).toHaveBeenCalledWith({ phone: '+14165550001' });
+      expect(mockSignInWithOtp).toHaveBeenCalledWith({ phone: '+14165550001' });
     });
     expect(Alert.alert).toHaveBeenCalledWith(
       'Code sent',
@@ -93,8 +93,8 @@ describe('app/(auth)/verify', () => {
     expect(screen.getByText('Resend code in 60s')).toBeTruthy();
 
     await act(async () => {
-      jest.advanceTimersByTime(1000);
+      jest.advanceTimersByTime(1100);
     });
-    expect(screen.getByText('Resend code in 59s')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Resend code in 59s')).toBeTruthy());
   });
 });

@@ -6,10 +6,10 @@ import {
   useSession,
 } from '../../../app/context/SessionContext';
 
-const getSessionMock = jest.fn();
-const onAuthStateChangeMock = jest.fn();
-const rpcMock = jest.fn();
-const unsubscribeMock = jest.fn();
+const mockGetSession = jest.fn();
+const mockOnAuthStateChange = jest.fn();
+const mockRpc = jest.fn();
+const mockUnsubscribe = jest.fn();
 let authStateCallback:
   | ((event: string, session: unknown) => unknown)
   | null = null;
@@ -17,10 +17,10 @@ let authStateCallback:
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     auth: {
-      getSession: (...args: unknown[]) => getSessionMock(...args),
-      onAuthStateChange: (...args: unknown[]) => onAuthStateChangeMock(...args),
+      getSession: (...args: unknown[]) => mockGetSession(...args),
+      onAuthStateChange: (...args: unknown[]) => mockOnAuthStateChange(...args),
     },
-    rpc: (...args: unknown[]) => rpcMock(...args),
+    rpc: (...args: unknown[]) => mockRpc(...args),
   },
 }));
 
@@ -38,14 +38,14 @@ describe('SessionContextProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     authStateCallback = null;
-    rpcMock.mockResolvedValue({ error: null });
-    onAuthStateChangeMock.mockImplementation(
+    mockRpc.mockResolvedValue({ error: null });
+    mockOnAuthStateChange.mockImplementation(
       (callback: (event: string, session: unknown) => void) => {
         authStateCallback = callback;
         return {
           data: {
             subscription: {
-              unsubscribe: unsubscribeMock,
+              unsubscribe: mockUnsubscribe,
             },
           },
         };
@@ -54,7 +54,7 @@ describe('SessionContextProvider', () => {
   });
 
   it('loads existing session and ensures user row', async () => {
-    getSessionMock.mockResolvedValueOnce({
+    mockGetSession.mockResolvedValueOnce({
       data: {
         session: {
           user: {
@@ -74,13 +74,13 @@ describe('SessionContextProvider', () => {
 
     await waitFor(() => expect(screen.getByTestId('loading').props.children).toBe('false'));
     expect(screen.getByTestId('user-id').props.children).toBe('user-1');
-    expect(rpcMock).toHaveBeenCalledWith('ensure_user_exists', {
+    expect(mockRpc).toHaveBeenCalledWith('ensure_user_exists', {
       p_phone: '+14165550001',
     });
   });
 
   it('reacts to auth state changes and unsubscribes on unmount', async () => {
-    getSessionMock.mockResolvedValueOnce({
+    mockGetSession.mockResolvedValueOnce({
       data: {
         session: null,
       },
@@ -106,11 +106,11 @@ describe('SessionContextProvider', () => {
     });
 
     await waitFor(() => expect(screen.getByTestId('user-id').props.children).toBe('user-2'));
-    expect(rpcMock).toHaveBeenCalledWith('ensure_user_exists', {
+    expect(mockRpc).toHaveBeenCalledWith('ensure_user_exists', {
       p_phone: '+14165550002',
     });
 
     screen.unmount();
-    expect(unsubscribeMock).toHaveBeenCalledTimes(1);
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   });
 });

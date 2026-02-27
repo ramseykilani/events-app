@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { Calendar } from '../../components/Calendar';
@@ -100,8 +100,12 @@ describe('components/Calendar', () => {
     const screen = render(<Calendar events={events} onMonthChange={onMonthChange} />);
 
     fireEvent.press(screen.getByText('?'));
-    expect(AsyncStorage.removeItem).toHaveBeenCalledWith('onboarding_complete');
-    expect(router.push).toHaveBeenCalledWith('/(app)/onboarding');
+    await waitFor(() =>
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('onboarding_complete')
+    );
+    await waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith('/(app)/onboarding')
+    );
 
     fireEvent.press(screen.getByText('People'));
     expect(router.push).toHaveBeenCalledWith('/(app)/people');

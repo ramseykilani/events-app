@@ -4,19 +4,19 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import SignInScreen from '../../../app/(auth)/sign-in';
 
-const signInWithOtpMock = jest.fn();
-const showErrorMock = jest.fn();
+const mockSignInWithOtp = jest.fn();
+const mockShowError = jest.fn();
 
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     auth: {
-      signInWithOtp: (...args: unknown[]) => signInWithOtpMock(...args),
+      signInWithOtp: (...args: unknown[]) => mockSignInWithOtp(...args),
     },
   },
 }));
 
 jest.mock('../../../lib/showError', () => ({
-  showError: (...args: unknown[]) => showErrorMock(...args),
+  showError: (...args: unknown[]) => mockShowError(...args),
 }));
 
 describe('app/(auth)/sign-in', () => {
@@ -39,18 +39,18 @@ describe('app/(auth)/sign-in', () => {
       'Invalid phone number',
       'Please enter a valid phone number.'
     );
-    expect(signInWithOtpMock).not.toHaveBeenCalled();
+    expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 
   it('normalizes phone number and navigates to verify on success', async () => {
-    signInWithOtpMock.mockResolvedValueOnce({ error: null });
+    mockSignInWithOtp.mockResolvedValueOnce({ error: null });
     const screen = render(<SignInScreen />);
 
     fireEvent.changeText(screen.getByPlaceholderText('+1 (555) 123-4567'), '416-555-1234');
     fireEvent.press(screen.getByText('Send code'));
 
     await waitFor(() => {
-      expect(signInWithOtpMock).toHaveBeenCalledWith({
+      expect(mockSignInWithOtp).toHaveBeenCalledWith({
         phone: '+14165551234',
       });
     });
@@ -62,7 +62,7 @@ describe('app/(auth)/sign-in', () => {
   });
 
   it('surfaces OTP request failures via showError', async () => {
-    signInWithOtpMock.mockResolvedValueOnce({
+    mockSignInWithOtp.mockResolvedValueOnce({
       error: { message: 'sms_send_failed' },
     });
 
@@ -71,7 +71,7 @@ describe('app/(auth)/sign-in', () => {
     fireEvent.press(screen.getByText('Send code'));
 
     await waitFor(() => {
-      expect(showErrorMock).toHaveBeenCalledWith('Error', {
+      expect(mockShowError).toHaveBeenCalledWith('Error', {
         message: 'sms_send_failed',
       });
     });

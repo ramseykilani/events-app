@@ -3,18 +3,18 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import ShareScreen from '../../../app/(app)/share';
 
-const myPeopleOrderMock = jest.fn();
-const myPeopleEqMock = jest.fn();
-const myPeopleSelectMock = jest.fn();
-const myPeopleInMock = jest.fn();
-const myPeopleUpdateMock = jest.fn();
+const mockMyPeopleOrder = jest.fn();
+const mockMyPeopleEq = jest.fn();
+const mockMyPeopleSelect = jest.fn();
+const mockMyPeopleIn = jest.fn();
+const mockMyPeopleUpdate = jest.fn();
 
-const circlesEqMock = jest.fn();
-const circlesSelectMock = jest.fn();
+const mockCirclesEq = jest.fn();
+const mockCirclesSelect = jest.fn();
 
-const eventSharesUpsertMock = jest.fn();
+const mockEventSharesUpsert = jest.fn();
 
-const fromMock = jest.fn();
+const mockFrom = jest.fn();
 
 jest.mock('../../../app/context/SessionContext', () => ({
   useSession: () => ({
@@ -26,7 +26,7 @@ jest.mock('../../../app/context/SessionContext', () => ({
 
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
-    from: (...args: unknown[]) => fromMock(...args),
+    from: (...args: unknown[]) => mockFrom(...args),
   },
 }));
 
@@ -63,7 +63,7 @@ describe('app/(app)/share', () => {
     jest.clearAllMocks();
     useLocalSearchParamsMock.mockReturnValue({ eventId: 'e1', userEventId: 'ue1' });
 
-    myPeopleOrderMock.mockResolvedValue({
+    mockMyPeopleOrder.mockResolvedValue({
       data: [
         {
           id: 'p1',
@@ -86,32 +86,32 @@ describe('app/(app)/share', () => {
       ],
       error: null,
     });
-    myPeopleEqMock.mockReturnValue({ order: myPeopleOrderMock });
-    myPeopleSelectMock.mockReturnValue({ eq: myPeopleEqMock });
+    mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
+    mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
 
-    myPeopleInMock.mockResolvedValue({ error: null });
-    myPeopleUpdateMock.mockReturnValue({ in: myPeopleInMock });
+    mockMyPeopleIn.mockResolvedValue({ error: null });
+    mockMyPeopleUpdate.mockReturnValue({ in: mockMyPeopleIn });
 
-    circlesEqMock.mockResolvedValue({ data: [], error: null });
-    circlesSelectMock.mockReturnValue({ eq: circlesEqMock });
+    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
-    eventSharesUpsertMock.mockResolvedValue({ error: null });
+    mockEventSharesUpsert.mockResolvedValue({ error: null });
 
-    fromMock.mockImplementation((table: string) => {
+    mockFrom.mockImplementation((table: string) => {
       if (table === 'my_people') {
         return {
-          select: myPeopleSelectMock,
-          update: myPeopleUpdateMock,
+          select: mockMyPeopleSelect,
+          update: mockMyPeopleUpdate,
         };
       }
       if (table === 'circles') {
         return {
-          select: circlesSelectMock,
+          select: mockCirclesSelect,
         };
       }
       if (table === 'event_shares') {
         return {
-          upsert: eventSharesUpsertMock,
+          upsert: mockEventSharesUpsert,
         };
       }
       return {};
@@ -125,7 +125,7 @@ describe('app/(app)/share', () => {
     fireEvent.press(screen.getByText('Done'));
 
     await waitFor(() => {
-      expect(eventSharesUpsertMock).toHaveBeenCalledWith(
+      expect(mockEventSharesUpsert).toHaveBeenCalledWith(
         [
           { user_event_id: 'ue1', person_id: 'p1' },
           { user_event_id: 'ue1', person_id: 'p2' },
@@ -137,10 +137,10 @@ describe('app/(app)/share', () => {
       );
     });
 
-    expect(myPeopleUpdateMock).toHaveBeenCalledWith({
+    expect(mockMyPeopleUpdate).toHaveBeenCalledWith({
       last_shared_at: expect.any(String),
     });
-    expect(myPeopleInMock).toHaveBeenCalledWith('id', ['p1', 'p2']);
+    expect(mockMyPeopleIn).toHaveBeenCalledWith('id', ['p1', 'p2']);
     expect(router.back).toHaveBeenCalled();
   });
 });
