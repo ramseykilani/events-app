@@ -351,3 +351,18 @@ events-app/
 | `npm run ios` | Start and open in iOS Simulator |
 | `npm run android` | Start and open in Android Emulator |
 | `npm run web` | Start and open in the browser |
+| `npm test -- --runInBand` | Run automated regression tests |
+| `npm run test:watch` | Run Jest in watch mode |
+| `npm run test:coverage` | Generate test coverage report |
+| `npm run test:manual` | Run manual-suite preflight and print instructions |
+| `npm run test:manual:strict` | Manual-suite preflight with strict failure checks |
+| `npm run test:manual:start` | Manual-suite preflight then start Expo web server |
+
+---
+
+## Manual Regression (for cloud agents)
+
+1. Run `npm run test:manual`.
+2. Start app in web mode (`npx expo start --web --port 8081`) if not already running.
+3. Execute scenarios in `manual-tests/cloud_manual_regression.md`.
+4. Record results in `manual-tests/manual_test_report_template.md`.

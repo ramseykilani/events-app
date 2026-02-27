@@ -50,7 +50,22 @@ There are pre-existing TS errors in `app/(app)/onboarding.tsx` and `lib/showErro
 
 ### Tests
 
-No automated test framework is configured in this project.
+Automated regression tests are configured with Jest + React Native Testing Library:
+
+```bash
+npm test -- --runInBand
+```
+
+Manual regression suite for cloud agents:
+
+```bash
+npm run test:manual
+```
+
+Then follow:
+
+- `manual-tests/cloud_manual_regression.md`
+- `manual-tests/manual_test_report_template.md`
 
 ### Key gotchas
 
