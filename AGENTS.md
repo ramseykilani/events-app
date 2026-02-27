@@ -43,3 +43,6 @@ No automated test framework is configured in this project.
 - The Expo dev server reads `.env` automatically — no `dotenv` setup needed.
 - Supabase migrations in `supabase/migrations/` must be applied in filename order against the Supabase project before the app functions end-to-end.
 - Edge Functions in `supabase/functions/` are Deno/TypeScript (excluded from the main `tsconfig.json`).
+- Phone auth requires a real SMS provider (Twilio) configured in the Supabase project. Fake/test phone numbers like `+15555550100` are rejected by Twilio with `sms_send_failed`. To test sign-in without real SMS, configure a "Test OTP" phone/code pair in the Supabase Dashboard under **Authentication > Settings**.
+- When the `.env` file changes, the Expo dev server must be restarted to pick up new values (Metro does not hot-reload env vars).
+- The app's sign-in error handling silently fails in the console — no user-facing alert is shown for SMS send failures.
