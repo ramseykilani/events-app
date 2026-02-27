@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { SessionContextProvider, useSession } from './context/SessionContext';
+import { SessionContextProvider, useSession } from './_context/SessionContext';
 
 LogBox.ignoreLogs(['unable to keep activate awake']);
 

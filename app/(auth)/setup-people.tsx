@@ -10,7 +10,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
-import { useSession } from '../context/SessionContext';
+import { useSession } from '../_context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
 import { requestContactsPermission } from '../../lib/contacts';
 import type { MyPerson } from '../../lib/types';

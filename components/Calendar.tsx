@@ -27,14 +27,14 @@ function toLocalDateString(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function getMonthRange(date: Date): { start: string; end: string } {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const start = new Date(year, month, 1);
-  const end = new Date(year, month + 1, 0);
+function getMonthRange(dateString: string): { start: string; end: string } {
+  const [yearStr, monthStr] = dateString.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const lastDay = new Date(year, month, 0).getDate();
   return {
-    start: toLocalDateString(start),
-    end: toLocalDateString(end),
+    start: `${yearStr}-${monthStr}-01`,
+    end: `${yearStr}-${monthStr}-${String(lastDay).padStart(2, '0')}`,
   };
 }
 
@@ -50,13 +50,10 @@ export function Calendar({
   const [lastFetchedMonth, setLastFetchedMonth] = useState<string>('');
 
   useEffect(() => {
-    const date = new Date(selectedDate);
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const monthKey = `${year}-${month}`;
+    const monthKey = selectedDate.slice(0, 7);
 
     if (monthKey !== lastFetchedMonth) {
-      const { start, end } = getMonthRange(date);
+      const { start, end } = getMonthRange(selectedDate);
       onMonthChange(start, end);
       setLastFetchedMonth(monthKey);
     }

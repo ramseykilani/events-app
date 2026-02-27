@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { useSession } from '../../context/SessionContext';
+import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
 
 type SharedWithPerson = {

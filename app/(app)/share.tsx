@@ -9,7 +9,7 @@ import {
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
-import { useSession } from '../context/SessionContext';
+import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
 import type { MyPerson, Circle, CircleMember } from '../../lib/types';
 
@@ -62,10 +62,23 @@ export default function ShareScreen() {
           membersData = data ?? [];
         }
         setCircleMembers(membersData);
+
+        // Load existing shares so already-shared people appear selected
+        const ueId = firstParamValue(params.userEventId);
+        if (ueId) {
+          const { data: shares } = await supabase
+            .from('event_shares')
+            .select('person_id')
+            .eq('user_event_id', ueId);
+          const ids = (shares ?? []).map((s) => s.person_id);
+          setSelectedPersonIds(new Set(ids));
+        } else {
+          setSelectedPersonIds(new Set());
+        }
       }
 
       load();
-    }, [userId])
+    }, [userId, params.userEventId])
   );
 
   const handleConfirm = async () => {

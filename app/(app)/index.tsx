@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar } from '../../components/Calendar';
-import { useSession } from '../context/SessionContext';
+import { useSession } from '../_context/SessionContext';
 import { supabase } from '../../lib/supabase';
 import type { CalendarEvent } from '../../lib/types';
 
@@ -27,19 +27,31 @@ export default function CalendarScreen() {
     async (startDate: string, endDate: string) => {
       if (!session?.user?.id) return;
 
-      const { data, error } = await supabase.rpc('get_calendar_events', {
-        p_user_id: session.user.id,
-        p_start_date: startDate,
-        p_end_date: endDate,
-      });
+      const [rpcResult, ownedResult] = await Promise.all([
+        supabase.rpc('get_calendar_events', {
+          p_user_id: session.user.id,
+          p_start_date: startDate,
+          p_end_date: endDate,
+        }),
+        supabase
+          .from('user_events')
+          .select(
+            'id, events!inner(id, title, description, image_url, url, event_date, event_time)'
+          )
+          .eq('user_id', session.user.id)
+          .gte('events.event_date', startDate)
+          .lte('events.event_date', endDate),
+      ]);
 
-      if (error) {
-        console.error('Failed to fetch calendar events:', error);
-        return;
+      if (rpcResult.error) {
+        console.error('get_calendar_events RPC error:', rpcResult.error);
+      }
+      if (ownedResult.error) {
+        console.error('owned events query error:', ownedResult.error);
       }
 
-      setEvents(
-        (data ?? []).map((row: Record<string, unknown>) => ({
+      const sharedEvents: CalendarEvent[] = (rpcResult.data ?? []).map(
+        (row: Record<string, unknown>) => ({
           id: row.id as string,
           event_id: row.event_id as string,
           title: row.title as string | null,
@@ -50,8 +62,33 @@ export default function CalendarScreen() {
           event_time: row.event_time as string | null,
           sharer_contact_name: row.sharer_contact_name as string | null,
           sharer_user_id: row.sharer_user_id as string,
-        }))
+        })
       );
+
+      const seenEventIds = new Set(sharedEvents.map((e) => e.event_id));
+
+      const ownedEvents: CalendarEvent[] = (ownedResult.data ?? [])
+        .filter(
+          (row: Record<string, unknown>) =>
+            row.events && !seenEventIds.has((row.events as Record<string, unknown>).id as string)
+        )
+        .map((row: Record<string, unknown>) => {
+          const evt = row.events as Record<string, unknown>;
+          return {
+            id: row.id as string,
+            event_id: evt.id as string,
+            title: (evt.title as string) ?? null,
+            description: (evt.description as string) ?? null,
+            image_url: (evt.image_url as string) ?? null,
+            url: (evt.url as string) ?? null,
+            event_date: evt.event_date as string,
+            event_time: (evt.event_time as string) ?? null,
+            sharer_contact_name: null,
+            sharer_user_id: session.user.id,
+          };
+        });
+
+      setEvents([...sharedEvents, ...ownedEvents]);
     },
     [session?.user?.id]
   );

@@ -12,7 +12,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
-import { useSession } from '../context/SessionContext';
+import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
 
 export default function EditEventScreen() {
