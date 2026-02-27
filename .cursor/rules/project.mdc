@@ -34,6 +34,8 @@ app/(app)/           Authenticated screens (calendar, events, sharing, people)
 app/context/         SessionContext (auth session provider)
 components/          Calendar, EventCard, ShareSheet, PeoplePicker
 lib/                 supabase.ts, types.ts, contacts.ts
+manual-tests/        Cloud manual regression suite + report template
+scripts/             Helper scripts (e.g. manual test preflight runner)
 supabase/migrations/ SQL migrations (schema, RLS, triggers, RPCs) — run in order
 supabase/functions/  Edge Functions (og-metadata, cleanup-people, cleanup-events)
 ```
@@ -51,6 +53,8 @@ supabase/functions/  Edge Functions (og-metadata, cleanup-people, cleanup-events
 - Phone numbers are always stored in E.164 format (`+14165551234`).
 - Supabase client is initialized in `lib/supabase.ts` with AsyncStorage for session persistence.
 - All Supabase queries from the client go through RLS. Server-side operations use `SECURITY DEFINER` functions.
+- Automated regression tests use Jest + React Native Testing Library (`npm test -- --runInBand`).
+- Cloud manual testing should follow `manual-tests/cloud_manual_regression.md` (preflight via `npm run test:manual`).
 
 ## When you finish a task
 
