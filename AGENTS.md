@@ -31,7 +31,12 @@ printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_
 
 ### Signing in (test OTP)
 
-A test OTP is configured on the Supabase project: phone `+15555550100`, code `123456` (expires March 31, 2026). Use this to sign in without a real SMS provider. After sign-in the app shows an onboarding walkthrough, then the main calendar.
+Two test OTPs are configured on the Supabase project (both expire March 31, 2026):
+
+- Phone `+15555550100`, code `123456`
+- Phone `+15555550101`, code `123456`
+
+Use either to sign in without a real SMS provider. The second number is useful for testing multi-user scenarios (e.g. sharing events between two accounts). After sign-in the app shows an onboarding walkthrough, then the main calendar.
 
 ### Linting / type checking
 
