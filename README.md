@@ -297,6 +297,48 @@ If you set up a test OTP in step 4, use that phone number and code to sign in. O
 
 ---
 
+## EAS Builds (Android / iOS)
+
+EAS (Expo Application Services) produces native APK/AAB/IPA builds that run without Expo Go.
+
+### Prerequisites
+
+- [EAS CLI](https://docs.expo.dev/eas/): `npm install -g eas-cli`
+- An [Expo](https://expo.dev/) account
+
+### Login and build
+
+```bash
+eas login
+
+# Internal APK for testing (Android)
+eas build --profile preview --platform android
+
+# Production build
+eas build --profile production --platform android
+```
+
+### Required for native builds
+
+The following are needed in EAS builds but not in Expo Go (which bundles them itself). If the app crashes instantly on launch, one of these is the likely cause:
+
+| Requirement | Why | Fix |
+|------------|-----|-----|
+| `expo-splash-screen` | Expo Router uses it to control when the splash screen hides. Missing = instant crash. | `npx expo install expo-splash-screen` |
+| `edgeToEdgeEnabled: true` in `app.json` | Requires `react-native-edge-to-edge` in native builds. Expo Go ignores it. | Install `react-native-edge-to-edge` or remove the flag |
+| New architecture (`newArchEnabled: true`) | Third-party libraries must support the new arch. Expo Go uses the old arch and may mask issues. | Verify any new library supports the new arch before adding it |
+
+### Getting crash logs without ADB
+
+If the APK crashes silently, the easiest way to see the error is to build a **development build** instead, which shows a red error screen:
+
+```bash
+npx expo install expo-dev-client
+eas build --profile development --platform android
+```
+
+---
+
 ## Project Structure
 
 ```
