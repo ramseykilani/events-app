@@ -61,6 +61,7 @@ export default function CalendarScreen() {
           event_date: row.event_date as string,
           event_time: row.event_time as string | null,
           sharer_contact_name: row.sharer_contact_name as string | null,
+          sharer_person_id: row.sharer_person_id as string | null,
           sharer_user_id: row.sharer_user_id as string,
         })
       );
@@ -84,6 +85,7 @@ export default function CalendarScreen() {
             event_date: evt.event_date as string,
             event_time: (evt.event_time as string) ?? null,
             sharer_contact_name: null,
+            sharer_person_id: null,
             sharer_user_id: session.user.id,
           };
         });

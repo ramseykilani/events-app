@@ -15,7 +15,7 @@ import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
 import { requestContactsPermission } from '../../lib/contacts';
-import type { MyPerson, Circle, CircleMember } from '../../lib/types';
+import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
 
 export default function PeopleScreen() {
   const { session } = useSession();
@@ -27,6 +27,7 @@ export default function PeopleScreen() {
   const [newCircleName, setNewCircleName] = useState('');
   const [editingCircle, setEditingCircle] = useState<Circle | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [hiddenPeople, setHiddenPeople] = useState<(HiddenPerson & { contact_name: string | null; phone_number: string })[]>([]);
   const hasRequestedContacts = useRef(false);
 
   const loadData = useCallback(async (): Promise<MyPerson[]> => {
@@ -43,9 +44,27 @@ export default function PeopleScreen() {
       .select('*')
       .eq('owner_id', userId);
 
+    const { data: hiddenData } = await supabase
+      .from('hidden_people')
+      .select('id, owner_id, person_id, hidden_at, my_people(contact_name, phone_number)')
+      .eq('owner_id', userId);
+
     const peopleList = peopleData ?? [];
     setPeople(peopleList);
     setCircles(circlesData ?? []);
+    setHiddenPeople(
+      (hiddenData ?? []).map((row: Record<string, unknown>) => {
+        const person = row.my_people as Record<string, unknown> | null;
+        return {
+          id: row.id as string,
+          owner_id: row.owner_id as string,
+          person_id: row.person_id as string,
+          hidden_at: row.hidden_at as string,
+          contact_name: (person?.contact_name as string | null) ?? null,
+          phone_number: (person?.phone_number as string) ?? '',
+        };
+      })
+    );
 
     const circleIds = (circlesData ?? []).map((c) => c.id);
     if (circleIds.length > 0) {
@@ -159,6 +178,11 @@ export default function PeopleScreen() {
         },
       ]
     );
+  };
+
+  const handleUnhide = async (hiddenId: string) => {
+    await supabase.from('hidden_people').delete().eq('id', hiddenId);
+    loadData();
   };
 
   const getCircleMemberIds = (circleId: string) =>
@@ -291,6 +315,23 @@ export default function PeopleScreen() {
                   </TouchableOpacity>
                 </View>
               )}
+              ListFooterComponent={
+                hiddenPeople.length > 0 ? (
+                  <View style={styles.hiddenSection}>
+                    <Text style={styles.sectionTitle}>Hidden</Text>
+                    {hiddenPeople.map((item) => (
+                      <View key={item.id} style={styles.personRow}>
+                        <Text style={styles.personName}>
+                          {item.contact_name ?? item.phone_number}
+                        </Text>
+                        <TouchableOpacity onPress={() => handleUnhide(item.id)}>
+                          <Text style={styles.unhide}>Unhide</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                ) : null
+              }
             />
           </View>
         </>
@@ -459,6 +500,16 @@ const styles = StyleSheet.create({
   remove: {
     fontSize: 14,
     color: '#c00',
+  },
+  hiddenSection: {
+    marginTop: 8,
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  unhide: {
+    fontSize: 14,
+    color: '#0066cc',
   },
   emptyState: {
     flex: 1,

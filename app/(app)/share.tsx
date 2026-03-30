@@ -153,6 +153,11 @@ export default function ShareScreen() {
         .update({ last_shared_at: new Date().toISOString() })
         .in('id', Array.from(selectedPersonIds));
 
+      // Fire-and-forget: send push notifications to newly added recipients
+      supabase.functions
+        .invoke('send-notification', { body: { userEventId } })
+        .catch((err) => console.error('send-notification error:', err));
+
       router.back();
     } catch (err: unknown) {
       showError('Error', err);

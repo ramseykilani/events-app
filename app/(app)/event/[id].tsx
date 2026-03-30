@@ -22,13 +22,15 @@ type SharedWithPerson = {
 };
 
 export default function EventDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, sharedByPersonId } = useLocalSearchParams<{ id: string; sharedByPersonId?: string }>();
   const { session } = useSession();
   const [event, setEvent] = useState<Event | null>(null);
   const [userEventId, setUserEventId] = useState<string | null>(null);
   const [sharedWith, setSharedWith] = useState<SharedWithPerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessRevoked, setAccessRevoked] = useState(false);
+  const [sharerName, setSharerName] = useState<string | null>(null);
+  const [isHidden, setIsHidden] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -76,6 +78,23 @@ export default function EventDetailScreen() {
           } else {
             setSharedWith([]);
           }
+        }
+
+        if (sharedByPersonId && session?.user?.id) {
+          const { data: person } = await supabase
+            .from('my_people')
+            .select('contact_name, phone_number')
+            .eq('id', sharedByPersonId)
+            .single();
+          setSharerName(person?.contact_name ?? person?.phone_number ?? null);
+
+          const { data: hidden } = await supabase
+            .from('hidden_people')
+            .select('id')
+            .eq('owner_id', session.user.id)
+            .eq('person_id', sharedByPersonId)
+            .maybeSingle();
+          setIsHidden(!!hidden);
         }
       }
       setLoading(false);
@@ -148,6 +167,25 @@ export default function EventDetailScreen() {
         },
       ]
     );
+  };
+
+  const handleToggleHide = async () => {
+    if (!sharedByPersonId || !session?.user?.id) return;
+    if (isHidden) {
+      await supabase
+        .from('hidden_people')
+        .delete()
+        .eq('owner_id', session.user.id)
+        .eq('person_id', sharedByPersonId);
+      setIsHidden(false);
+    } else {
+      await supabase.from('hidden_people').insert({
+        owner_id: session.user.id,
+        person_id: sharedByPersonId,
+      });
+      setIsHidden(true);
+      router.back();
+    }
   };
 
   const timeStr = event?.event_time
@@ -248,6 +286,15 @@ export default function EventDetailScreen() {
             {event.created_by_user_id === session?.user?.id && (
               <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
                 <Text style={styles.deleteButtonText}>Delete Event</Text>
+              </TouchableOpacity>
+            )}
+            {sharedByPersonId && !userEventId && (
+              <TouchableOpacity style={styles.hideButton} onPress={handleToggleHide}>
+                <Text style={styles.hideButtonText}>
+                  {isHidden
+                    ? `Unhide ${sharerName ?? 'this person'}`
+                    : `Hide ${sharerName ?? 'this person'}`}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -390,5 +437,17 @@ const styles = StyleSheet.create({
     color: '#dc2626',
     fontSize: 20,
     fontWeight: '600',
+  },
+  hideButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 20,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  hideButtonText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#444',
   },
 });

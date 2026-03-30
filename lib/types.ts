@@ -63,7 +63,15 @@ export interface CalendarEvent {
   event_date: string;
   event_time: string | null;
   sharer_contact_name: string | null;
+  sharer_person_id: string | null;
   sharer_user_id: string;
+}
+
+export interface HiddenPerson {
+  id: string;
+  owner_id: string;
+  person_id: string;
+  hidden_at: string;
 }
 
 export interface OgMetadata {

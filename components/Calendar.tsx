@@ -135,7 +135,17 @@ export function Calendar({
           <EventCard
             key={event.id}
             event={event}
-            onPress={() => router.push(`/(app)/event/${event.event_id}`)}
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/event/[id]',
+                params: {
+                  id: event.event_id,
+                  ...(event.sharer_person_id
+                    ? { sharedByPersonId: event.sharer_person_id }
+                    : {}),
+                },
+              })
+            }
           />
         ))}
       </ScrollView>
