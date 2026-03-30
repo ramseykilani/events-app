@@ -31,7 +31,7 @@ printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_
 
 ### Signing in (test OTP)
 
-Two test OTPs are configured on the Supabase project (both expire March 31, 2026):
+Two test OTPs are configured on the Supabase project (both expire March 31, 2027):
 
 - Phone `+15555550100`, code `123456`
 - Phone `+15555550101`, code `123456`
