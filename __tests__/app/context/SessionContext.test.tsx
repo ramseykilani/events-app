@@ -4,7 +4,7 @@ import { act, render, waitFor } from '@testing-library/react-native';
 import {
   SessionContextProvider,
   useSession,
-} from '../../../app/context/SessionContext';
+} from '../../../app/_context/SessionContext';
 
 const mockGetSession = jest.fn();
 const mockOnAuthStateChange = jest.fn();
@@ -72,6 +72,8 @@ describe('SessionContextProvider', () => {
       </SessionContextProvider>
     );
 
+    // Flush getSession() + nested ensureUserRow() promise chain before asserting
+    await act(async () => {});
     await waitFor(() => expect(screen.getByTestId('loading').props.children).toBe('false'));
     expect(screen.getByTestId('user-id').props.children).toBe('user-1');
     expect(mockRpc).toHaveBeenCalledWith('ensure_user_exists', {

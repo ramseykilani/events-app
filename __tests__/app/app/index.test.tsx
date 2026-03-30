@@ -5,8 +5,13 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import CalendarScreen from '../../../app/(app)/index';
 
 const mockRpc = jest.fn();
+const mockUserEventsLte = jest.fn();
+const mockUserEventsGte = jest.fn();
+const mockUserEventsEq = jest.fn();
+const mockUserEventsSelect = jest.fn();
+const mockFrom = jest.fn();
 
-jest.mock('../../../app/context/SessionContext', () => ({
+jest.mock('../../../app/_context/SessionContext', () => ({
   useSession: () => ({
     session: {
       user: { id: 'u1' },
@@ -17,6 +22,7 @@ jest.mock('../../../app/context/SessionContext', () => ({
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     rpc: (...args: unknown[]) => mockRpc(...args),
+    from: (...args: unknown[]) => mockFrom(...args),
   },
 }));
 
@@ -55,6 +61,12 @@ describe('app/(app)/index', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue('true');
+
+    mockUserEventsSelect.mockReturnValue({ eq: mockUserEventsEq });
+    mockUserEventsEq.mockReturnValue({ gte: mockUserEventsGte });
+    mockUserEventsGte.mockReturnValue({ lte: mockUserEventsLte });
+    mockFrom.mockReturnValue({ select: mockUserEventsSelect });
+    mockUserEventsLte.mockResolvedValue({ data: [], error: null });
   });
 
   it('redirects to onboarding when onboarding is incomplete', async () => {
@@ -101,5 +113,63 @@ describe('app/(app)/index', () => {
 
     fireEvent.press(screen.getByTestId('trigger-refresh'));
     await waitFor(() => expect(mockRpc).toHaveBeenCalledTimes(2));
+  });
+
+  it('deduplicates owned events already present in shared events', async () => {
+    mockRpc.mockResolvedValue({
+      data: [
+        {
+          id: 'ce-shared',
+          event_id: 'e-shared',
+          title: 'Shared Concert',
+          description: null,
+          image_url: null,
+          url: null,
+          event_date: '2026-04-20',
+          event_time: null,
+          sharer_contact_name: 'Alice',
+          sharer_user_id: 'u2',
+        },
+      ],
+      error: null,
+    });
+
+    mockUserEventsLte.mockResolvedValue({
+      data: [
+        {
+          id: 'ue-dup',
+          events: {
+            id: 'e-shared',
+            title: 'Shared Concert',
+            description: null,
+            image_url: null,
+            url: null,
+            event_date: '2026-04-20',
+            event_time: null,
+          },
+        },
+        {
+          id: 'ue-unique',
+          events: {
+            id: 'e-owned',
+            title: 'My Private Event',
+            description: null,
+            image_url: null,
+            url: null,
+            event_date: '2026-04-25',
+            event_time: null,
+          },
+        },
+      ],
+      error: null,
+    });
+
+    const screen = render(<CalendarScreen />);
+    fireEvent.press(screen.getByTestId('trigger-month'));
+
+    await waitFor(() => {
+      // 1 shared + 1 unique owned = 2 total; the duplicate owned event is filtered out
+      expect(screen.getByTestId('events-count')).toHaveTextContent('2');
+    });
   });
 });

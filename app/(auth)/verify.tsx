@@ -106,6 +106,7 @@ export default function VerifyScreen() {
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleVerify}
           disabled={loading}
+          testID="verify-button"
         >
           <Text style={styles.buttonText}>
             {loading ? 'Verifying...' : 'Verify'}

@@ -49,7 +49,7 @@ describe('app/(auth)/verify', () => {
     useLocalSearchParamsMock.mockReturnValue({ phone: '+14165550001' });
     const screen = render(<VerifyScreen />);
 
-    fireEvent.press(screen.getAllByText('Verify')[1]);
+    fireEvent.press(screen.getByTestId('verify-button'));
 
     expect(Alert.alert).toHaveBeenCalledWith(
       'Enter code',
@@ -64,7 +64,7 @@ describe('app/(auth)/verify', () => {
 
     const screen = render(<VerifyScreen />);
     fireEvent.changeText(screen.getByPlaceholderText('000000'), ' 123456 ');
-    fireEvent.press(screen.getAllByText('Verify')[1]);
+    fireEvent.press(screen.getByTestId('verify-button'));
 
     await waitFor(() => {
       expect(mockVerifyOtp).toHaveBeenCalledWith({
