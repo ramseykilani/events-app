@@ -34,9 +34,9 @@ yarn-error.*
 .env
 .env*.local
 
-# Firebase — contains API keys, must not be committed
-google-services.json
-GoogleService-Info.plist
+# Firebase config (these are public identifiers, not secrets — security comes from Firebase Security Rules)
+# google-services.json
+# GoogleService-Info.plist
 
 # typescript
 *.tsbuildinfo
