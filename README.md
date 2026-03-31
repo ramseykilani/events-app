@@ -339,7 +339,7 @@ The following are needed in EAS builds but not in Expo Go (which bundles them it
 |------------|-----|-----|
 | `expo-splash-screen` | Expo Router uses it to control when the splash screen hides. Missing = instant crash. | `npx expo install expo-splash-screen` |
 | `edgeToEdgeEnabled: true` in `app.config.js` | Requires `react-native-edge-to-edge` in native builds. Expo Go ignores it. | Install `react-native-edge-to-edge` or remove the flag |
-| New architecture (`newArchEnabled: true`) | Third-party libraries must support the new arch. Expo Go uses the old arch and may mask issues. | Verify any new library supports the new arch before adding it |
+| New architecture (`newArchEnabled`) | **Currently set to `false`** — disabled due to a `react-native-screens` bug ([`ScreenStack.getChildDrawingOrder()` off-by-one](https://github.com/software-mansion/react-native-screens/issues)) that causes an instant crash on Android in native builds. Re-enable once `react-native-screens` ships a fix. When re-enabling, test with a development build on Android first. | Set `newArchEnabled: true` in `app.config.js` and rebuild |
 
 ### Getting crash logs without ADB
 

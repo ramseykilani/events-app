@@ -98,6 +98,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     marginBottom: 8,
+    color: '#000',
   },
   subtitle: {
     fontSize: 16,
@@ -111,6 +112,7 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 18,
     marginBottom: 16,
+    color: '#000',
   },
   button: {
     backgroundColor: '#000',
