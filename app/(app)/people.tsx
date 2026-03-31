@@ -8,13 +8,14 @@ import {
   FlatList,
   Alert,
   Modal,
+  Linking,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
-import { requestContactsPermission } from '../../lib/contacts';
+import { requestContactsPermission, getContactsPermissionDetails, getContactsPermissionStatus } from '../../lib/contacts';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -87,7 +88,9 @@ export default function PeopleScreen() {
       loadData().then((peopleList) => {
         if (hasRequestedContacts.current) return;
         hasRequestedContacts.current = true;
-        requestContactsPermission().then((granted) => {
+        // Only auto-open picker if permission is already granted — never silently
+        // trigger the OS dialog here; the user can tap Add to go through that flow.
+        getContactsPermissionStatus().then((granted) => {
           if (granted && (!peopleList || peopleList.length === 0)) {
             setShowPicker(true);
           }
@@ -97,15 +100,51 @@ export default function PeopleScreen() {
   );
 
   const handleAddPeople = async () => {
-    const granted = await requestContactsPermission();
-    if (!granted) {
+    const status = await getContactsPermissionDetails();
+
+    if (status === 'granted') {
+      setShowPicker(true);
+      return;
+    }
+
+    if (status === 'denied' || status === 'restricted') {
       Alert.alert(
-        'Permission needed',
-        'Events needs access to your contacts to add people.'
+        'Contacts Access Disabled',
+        'Events uses your contacts so you can quickly add people to share events with. Please enable contacts access in Settings.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
       );
       return;
     }
-    setShowPicker(true);
+
+    // undetermined — explain why before triggering the OS dialog
+    Alert.alert(
+      'Access Your Contacts?',
+      'Events uses your contacts so you can easily add people to share events with. Your contacts are never uploaded or stored on our servers.',
+      [
+        { text: 'Not Now', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: async () => {
+            const granted = await requestContactsPermission();
+            if (granted) {
+              setShowPicker(true);
+            } else {
+              Alert.alert(
+                'Contacts Access Disabled',
+                'To add people from your contacts, please enable contacts access in Settings.',
+                [
+                  { text: 'Not Now', style: 'cancel' },
+                  { text: 'Open Settings', onPress: () => Linking.openSettings() },
+                ]
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSelectContacts = async (

@@ -6,13 +6,14 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
-import { requestContactsPermission } from '../../lib/contacts';
+import { requestContactsPermission, getContactsPermissionDetails } from '../../lib/contacts';
 import type { MyPerson } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -38,15 +39,51 @@ export default function SetupPeopleScreen() {
   }, [userId]);
 
   const handleAddPeople = async () => {
-    const granted = await requestContactsPermission();
-    if (!granted) {
+    const status = await getContactsPermissionDetails();
+
+    if (status === 'granted') {
+      setShowPicker(true);
+      return;
+    }
+
+    if (status === 'denied' || status === 'restricted') {
       Alert.alert(
-        'Permission needed',
-        'Events needs access to your contacts to set up your people list.'
+        'Contacts Access Disabled',
+        'Events uses your contacts so you can quickly add people to share events with. Please enable contacts access in Settings.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
       );
       return;
     }
-    setShowPicker(true);
+
+    // undetermined — explain why before triggering the OS dialog
+    Alert.alert(
+      'Access Your Contacts?',
+      'Events uses your contacts so you can easily add people to share events with. Your contacts are never uploaded or stored on our servers.',
+      [
+        { text: 'Not Now', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: async () => {
+            const granted = await requestContactsPermission();
+            if (granted) {
+              setShowPicker(true);
+            } else {
+              Alert.alert(
+                'Contacts Access Disabled',
+                'To add people from your contacts, please enable contacts access in Settings.',
+                [
+                  { text: 'Not Now', style: 'cancel' },
+                  { text: 'Open Settings', onPress: () => Linking.openSettings() },
+                ]
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSelectContacts = async (

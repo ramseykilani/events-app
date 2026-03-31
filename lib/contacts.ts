@@ -25,6 +25,15 @@ export async function getContactsPermissionStatus(): Promise<boolean> {
 }
 
 /**
+ * Get the raw contacts permission status string.
+ * Returns 'granted' | 'denied' | 'undetermined' | 'restricted'
+ */
+export async function getContactsPermissionDetails(): Promise<string> {
+  const { status } = await Contacts.getPermissionsAsync();
+  return status;
+}
+
+/**
  * Normalize phone number to E.164 format.
  * Returns null if the number cannot be parsed.
  */
