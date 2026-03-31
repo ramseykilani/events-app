@@ -9,6 +9,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 
@@ -39,7 +40,7 @@ const pages: Page[] = [
   {
     title: 'You choose who\'s in',
     lines: [
-      'Add up to 50 people from your contacts. These are the only people who can see your events or share theirs with you.',
+      'Add up to 50 people from your contacts. These are the people you can share your events with.',
       'Group them into circles so sharing with the right crowd is one tap.',
     ],
   },
@@ -48,6 +49,7 @@ const pages: Page[] = [
 export default function OnboardingScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const insets = useSafeAreaInsets();
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -96,7 +98,7 @@ export default function OnboardingScreen() {
         )}
       />
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: 48 + insets.bottom }]}>
         <View style={styles.dots}>
           {pages.map((_, i) => (
             <View
