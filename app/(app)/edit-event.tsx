@@ -14,10 +14,12 @@ import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function EditEventScreen() {
   const params = useLocalSearchParams<{ eventId: string; userEventId: string }>();
   const { session } = useSession();
+  const theme = useTheme();
   const [event, setEvent] = useState<Event | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -108,7 +110,7 @@ export default function EditEventScreen() {
             .from('user_events')
             .delete()
             .eq('id', params.userEventId);
-          
+
           if (delErr) throw delErr;
         } else {
           throw ueErr;
@@ -147,10 +149,6 @@ export default function EditEventScreen() {
               Alert.alert('Error', 'Failed to delete event');
               setLoading(false);
             } else {
-              // Navigate back to the calendar (or root)
-              // If we came from event detail, we need to go back twice or dismiss
-              // But since we deleted the event, going back to event detail is bad.
-              // So we should navigate to root.
               router.replace('/(app)/');
             }
           },
@@ -161,19 +159,19 @@ export default function EditEventScreen() {
 
   if (!event) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loading}>Loading...</Text>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <Text style={[styles.loading, { color: theme.textPrimary }]}>Loading...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.cancel}>Cancel</Text>
+          <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Edit event</Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Edit event</Text>
         <TouchableOpacity
           onPress={handleSave}
           disabled={loading || (!title.trim() && !url.trim())}
@@ -181,7 +179,8 @@ export default function EditEventScreen() {
           <Text
             style={[
               styles.save,
-              (loading || (!title.trim() && !url.trim())) && styles.saveDisabled,
+              { color: theme.textPrimary },
+              (loading || (!title.trim() && !url.trim())) && { color: theme.textTertiary },
             ]}
           >
             Save
@@ -189,38 +188,38 @@ export default function EditEventScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.form}>
-        <Text style={styles.label}>URL (optional)</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>URL (optional)</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="https://..."
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textTertiary}
           value={url}
           onChangeText={setUrl}
           editable={false}
         />
-        <Text style={styles.label}>Title</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Title</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="Event title"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textTertiary}
           value={title}
           onChangeText={setTitle}
         />
-        <Text style={styles.label}>Description (optional)</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Description (optional)</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.textArea, { borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="Description"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textTertiary}
           value={description}
           onChangeText={setDescription}
           multiline
         />
-        <Text style={styles.label}>Date</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Date</Text>
         <TouchableOpacity
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border }]}
           onPress={() => setShowDatePicker(true)}
         >
-          <Text>{eventDate.toLocaleDateString()}</Text>
+          <Text style={{ color: theme.textPrimary }}>{eventDate.toLocaleDateString()}</Text>
         </TouchableOpacity>
         {showDatePicker && (
           <DateTimePicker
@@ -232,12 +231,12 @@ export default function EditEventScreen() {
             }}
           />
         )}
-        <Text style={styles.label}>Time (optional)</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Time (optional)</Text>
         <TouchableOpacity
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border }]}
           onPress={() => setShowTimePicker(true)}
         >
-          <Text>
+          <Text style={{ color: theme.textPrimary }}>
             {eventTime
               ? eventTime.toLocaleTimeString([], {
                   hour: 'numeric',
@@ -256,8 +255,11 @@ export default function EditEventScreen() {
             }}
           />
         )}
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <Text style={styles.deleteButtonText}>Delete Event</Text>
+        <TouchableOpacity
+          style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
+          onPress={handleDelete}
+        >
+          <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Delete Event</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -267,7 +269,6 @@ export default function EditEventScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   loading: {
     padding: 24,
@@ -281,11 +282,9 @@ const styles = StyleSheet.create({
     paddingTop: 48,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   cancel: {
     fontSize: 16,
-    color: '#666',
   },
   title: {
     fontSize: 18,
@@ -295,22 +294,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  saveDisabled: {
-    color: '#999',
-  },
   form: {
     padding: 20,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
     marginBottom: 8,
     marginTop: 16,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
@@ -319,7 +313,6 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   deleteButton: {
-    backgroundColor: '#fee2e2',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -327,7 +320,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   deleteButtonText: {
-    color: '#dc2626',
     fontSize: 16,
     fontWeight: '600',
   },

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { getContactsWithPhones } from '../lib/contacts';
 import type { ContactWithPhone } from '../lib/contacts';
+import { useTheme } from '../hooks/useTheme';
 
 type Props = {
   onSelect: (contacts: { phoneNumber: string; name: string | null }[]) => void;
@@ -22,6 +23,7 @@ export function PeoplePicker({
   onCancel,
   existingPhones,
 }: Props) {
+  const theme = useTheme();
   const [contacts, setContacts] = useState<ContactWithPhone[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -74,17 +76,18 @@ export function PeoplePicker({
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet">
-      <View style={styles.container}>
-        <View style={styles.header}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
           <TouchableOpacity onPress={onCancel}>
-            <Text style={styles.cancel}>Cancel</Text>
+            <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Add people</Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>Add people</Text>
           <TouchableOpacity onPress={handleConfirm}>
             <Text
               style={[
                 styles.done,
-                selected.size === 0 && styles.doneDisabled,
+                { color: theme.textPrimary },
+                selected.size === 0 && { color: theme.textTertiary },
               ]}
             >
               Add {selected.size > 0 ? `(${selected.size})` : ''}
@@ -92,13 +95,13 @@ export function PeoplePicker({
           </TouchableOpacity>
         </View>
         {loading ? (
-          <Text style={styles.loading}>Loading contacts...</Text>
+          <Text style={[styles.loading, { color: theme.textPrimary }]}>Loading contacts...</Text>
         ) : (
           <>
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { borderColor: theme.border, color: theme.textPrimary }]}
               placeholder="Search contacts..."
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.textTertiary}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="none"
@@ -109,20 +112,24 @@ export function PeoplePicker({
               extraData={searchQuery}
               keyboardShouldPersistTaps="handled"
               keyExtractor={(item) => item.id}
-            renderItem={({ item }) => {
-              const isSelected = selected.has(item.normalized);
-              return (
-                <TouchableOpacity
-                  style={[styles.row, isSelected && styles.rowSelected]}
-                  onPress={() => toggle(item)}
-                >
-                  <Text style={styles.name}>
-                    {item.name ?? item.phoneNumber}
-                  </Text>
-                  {isSelected && <Text style={styles.check}>✓</Text>}
-                </TouchableOpacity>
-              );
-            }}
+              renderItem={({ item }) => {
+                const isSelected = selected.has(item.normalized);
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.row,
+                      { borderBottomColor: theme.surfaceSecondary },
+                      isSelected && { backgroundColor: theme.selectedBg },
+                    ]}
+                    onPress={() => toggle(item)}
+                  >
+                    <Text style={[styles.name, { color: theme.textPrimary }]}>
+                      {item.name ?? item.phoneNumber}
+                    </Text>
+                    {isSelected && <Text style={[styles.check, { color: theme.textPrimary }]}>✓</Text>}
+                  </TouchableOpacity>
+                );
+              }}
             />
           </>
         )}
@@ -134,7 +141,6 @@ export function PeoplePicker({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingTop: 48,
   },
   header: {
@@ -144,11 +150,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   cancel: {
     fontSize: 16,
-    color: '#666',
   },
   title: {
     fontSize: 18,
@@ -157,9 +161,6 @@ const styles = StyleSheet.create({
   done: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  doneDisabled: {
-    color: '#999',
   },
   loading: {
     padding: 24,
@@ -171,7 +172,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 10,
     fontSize: 16,
   },
@@ -182,17 +182,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  rowSelected: {
-    backgroundColor: '#f5f5f5',
   },
   name: {
     fontSize: 16,
   },
   check: {
     fontSize: 18,
-    color: '#000',
     fontWeight: '600',
   },
 });

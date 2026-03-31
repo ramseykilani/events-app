@@ -6,7 +6,7 @@ export default {
     scheme: "events-app",
     orientation: "portrait",
     icon: "./assets/icon.png",
-    userInterfaceStyle: "light",
+    userInterfaceStyle: "automatic",
     newArchEnabled: false,
     splash: {
       image: "./assets/splash-icon.png",

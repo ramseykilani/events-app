@@ -12,6 +12,7 @@ import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
 import type { MyPerson, Circle, CircleMember } from '../../lib/types';
+import { useTheme } from '../../hooks/useTheme';
 
 type ShareParams = {
   eventId?: string | string[];
@@ -21,6 +22,7 @@ type ShareParams = {
 export default function ShareScreen() {
   const params = useLocalSearchParams<ShareParams>();
   const { session } = useSession();
+  const theme = useTheme();
   const userId = session?.user?.id;
   const [people, setPeople] = useState<MyPerson[]>([]);
   const [circles, setCircles] = useState<Circle[]>([]);
@@ -167,12 +169,12 @@ export default function ShareScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.cancel}>Cancel</Text>
+          <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Share with</Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
         <TouchableOpacity
           onPress={handleConfirm}
           disabled={loading || selectedPersonIds.size === 0}
@@ -180,7 +182,8 @@ export default function ShareScreen() {
           <Text
             style={[
               styles.done,
-              (loading || selectedPersonIds.size === 0) && styles.doneDisabled,
+              { color: theme.textPrimary },
+              (loading || selectedPersonIds.size === 0) && { color: theme.textTertiary },
             ]}
           >
             Done
@@ -201,7 +204,6 @@ export default function ShareScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingTop: 48,
   },
   header: {
@@ -211,11 +213,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   cancel: {
     fontSize: 16,
-    color: '#666',
   },
   title: {
     fontSize: 18,
@@ -224,9 +224,5 @@ const styles = StyleSheet.create({
   done: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
-  },
-  doneDisabled: {
-    color: '#999',
   },
 });

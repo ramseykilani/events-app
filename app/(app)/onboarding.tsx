@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { useTheme } from '../../hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
@@ -50,6 +51,7 @@ export default function OnboardingScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -75,7 +77,7 @@ export default function OnboardingScreen() {
   const isLastPage = currentPage === pages.length - 1;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <FlatList
         ref={flatListRef}
         data={pages}
@@ -87,9 +89,9 @@ export default function OnboardingScreen() {
         renderItem={({ item }) => (
           <View style={styles.page}>
             <View style={styles.content}>
-              <Text style={styles.title}>{item.title}</Text>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>{item.title}</Text>
               {item.lines.map((line, i) => (
-                <Text key={i} style={styles.body}>
+                <Text key={i} style={[styles.body, { color: theme.textSecondary }]}>
                   {line}
                 </Text>
               ))}
@@ -103,7 +105,11 @@ export default function OnboardingScreen() {
           {pages.map((_, i) => (
             <View
               key={i}
-              style={[styles.dot, i === currentPage && styles.dotActive]}
+              style={[
+                styles.dot,
+                { backgroundColor: theme.border },
+                i === currentPage && { backgroundColor: theme.textPrimary, width: 24 },
+              ]}
             />
           ))}
         </View>
@@ -111,11 +117,11 @@ export default function OnboardingScreen() {
         <View style={styles.buttons}>
           {!isLastPage && (
             <TouchableOpacity onPress={handleFinish}>
-              <Text style={styles.skip}>Skip</Text>
+              <Text style={[styles.skip, { color: theme.textSecondary }]}>Skip</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextText}>
+          <TouchableOpacity style={[styles.nextButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleNext}>
+            <Text style={[styles.nextText, { color: theme.primaryButtonText }]}>
               {isLastPage ? 'Get Started' : 'Next'}
             </Text>
           </TouchableOpacity>
@@ -128,7 +134,6 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   page: {
     width,
@@ -147,7 +152,6 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#444',
   },
   footer: {
     paddingHorizontal: 24,
@@ -162,11 +166,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ddd',
-  },
-  dotActive: {
-    backgroundColor: '#000',
-    width: 24,
   },
   buttons: {
     flexDirection: 'row',
@@ -175,17 +174,14 @@ const styles = StyleSheet.create({
   },
   skip: {
     fontSize: 16,
-    color: '#666',
   },
   nextButton: {
-    backgroundColor: '#000',
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 32,
     marginLeft: 'auto',
   },
   nextText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { LogBox, Platform } from 'react-native';
+import { LogBox, Platform, StatusBar, useColorScheme } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -44,6 +44,7 @@ async function registerForPushNotifications(): Promise<string | null> {
 
 function RootLayoutNav() {
   const { session, isLoading } = useSession();
+  const colorScheme = useColorScheme();
   const segments = useSegments();
   const router = useRouter();
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
@@ -104,10 +105,13 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(app)" />
-    </Stack>
+    <>
+      <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(app)" />
+      </Stack>
+    </>
   );
 }
 

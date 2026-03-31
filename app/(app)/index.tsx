@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
+import { useTheme } from '../../hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar } from '../../components/Calendar';
 import { useSession } from '../_context/SessionContext';
@@ -11,6 +12,7 @@ const ONBOARDING_KEY = 'onboarding_complete';
 
 export default function CalendarScreen() {
   const { session } = useSession();
+  const theme = useTheme();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
@@ -120,7 +122,7 @@ export default function CalendarScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Calendar
         events={events}
         onMonthChange={handleMonthChange}
@@ -134,6 +136,5 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
 });

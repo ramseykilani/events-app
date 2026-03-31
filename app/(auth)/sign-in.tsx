@@ -13,10 +13,12 @@ import { parsePhoneNumber } from 'libphonenumber-js';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function SignInScreen() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const theme = useTheme();
 
   const normalizePhone = (input: string): string | null => {
     try {
@@ -56,15 +58,15 @@ export default function SignInScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background }]}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Events</Text>
-        <Text style={styles.subtitle}>Enter your phone number to continue</Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Events</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Enter your phone number to continue</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="+1 (555) 123-4567"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textTertiary}
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"
@@ -72,11 +74,11 @@ export default function SignInScreen() {
           editable={!loading}
         />
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[styles.button, { backgroundColor: theme.primaryButtonBg }, loading && styles.buttonDisabled]}
           onPress={handleSignIn}
           disabled={loading}
         >
-          <Text style={styles.buttonText}>
+          <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
             {loading ? 'Sending...' : 'Send code'}
           </Text>
         </TouchableOpacity>
@@ -88,7 +90,6 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     justifyContent: 'center',
   },
   content: {
@@ -98,24 +99,19 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     marginBottom: 8,
-    color: '#000',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 24,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 12,
     padding: 16,
     fontSize: 18,
     marginBottom: 16,
-    color: '#000',
   },
   button: {
-    backgroundColor: '#000',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -124,7 +120,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: '600',
   },

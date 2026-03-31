@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EventCard } from './EventCard';
 import type { CalendarEvent } from '../lib/types';
+import { useTheme } from '../hooks/useTheme';
 
 type Props = {
   events: CalendarEvent[];
@@ -44,6 +45,7 @@ export function Calendar({
   refreshing = false,
   onRefresh,
 }: Props) {
+  const theme = useTheme();
   const [selectedDate, setSelectedDate] = useState<string>(
     toLocalDateString(new Date())
   );
@@ -72,28 +74,28 @@ export function Calendar({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Events</Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Events</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity
-            style={styles.helpButton}
+            style={[styles.helpButton, { borderColor: theme.border }]}
             onPress={async () => {
               await AsyncStorage.removeItem('onboarding_complete');
               router.push('/(app)/onboarding');
             }}
           >
-            <Text style={styles.helpButtonText}>?</Text>
+            <Text style={[styles.helpButtonText, { color: theme.textSecondary }]}>?</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.peopleButton}
             onPress={() => router.push('/(app)/people')}
           >
-            <Text style={styles.peopleButtonText}>People</Text>
+            <Text style={[styles.peopleButtonText, { color: theme.textPrimary }]}>People</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.fab}
+            style={[styles.fab, { backgroundColor: theme.primaryButtonBg }]}
             onPress={() => router.push('/(app)/add-event')}
           >
-            <Text style={styles.fabText}>+</Text>
+            <Text style={[styles.fabText, { color: theme.primaryButtonText }]}>+</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -108,14 +110,20 @@ export function Calendar({
           [selectedDate]: {
             ...markedDates[selectedDate],
             selected: true,
-            selectedColor: '#000',
+            selectedColor: theme.calendarSelected,
           },
         }}
         theme={{
-          todayTextColor: '#000',
-          selectedDayBackgroundColor: '#000',
-          selectedDayTextColor: '#fff',
-          arrowColor: '#000',
+          backgroundColor: theme.background,
+          calendarBackground: theme.background,
+          dayTextColor: theme.textPrimary,
+          todayTextColor: theme.calendarTodayText,
+          selectedDayBackgroundColor: theme.calendarSelected,
+          selectedDayTextColor: theme.calendarSelectedText,
+          arrowColor: theme.textPrimary,
+          monthTextColor: theme.textPrimary,
+          textDisabledColor: theme.textTertiary,
+          dotColor: theme.textPrimary,
         }}
       />
       <ScrollView
@@ -126,7 +134,7 @@ export function Calendar({
           ) : undefined
         }
       >
-        <Text style={styles.sectionTitle}>
+        <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
           {dayEvents.length === 0
             ? 'No events'
             : `${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}`}
@@ -179,14 +187,12 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ccc',
     alignItems: 'center',
     justifyContent: 'center',
   },
   helpButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
   },
   peopleButton: {
     paddingHorizontal: 12,
@@ -200,12 +206,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
   },
   fabText: {
-    color: '#fff',
     fontSize: 28,
     fontWeight: '300',
     lineHeight: 32,
@@ -218,6 +222,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
-    color: '#666',
   },
 });

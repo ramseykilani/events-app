@@ -16,9 +16,11 @@ import { useSession } from '../_context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
 import { requestContactsPermission } from '../../lib/contacts';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function PeopleScreen() {
   const { session } = useSession();
+  const theme = useTheme();
   const userId = session?.user?.id;
   const [people, setPeople] = useState<MyPerson[]>([]);
   const [circles, setCircles] = useState<Circle[]>([]);
@@ -229,103 +231,104 @@ export default function PeopleScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.back}>Back</Text>
+          <Text style={[styles.back, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>My People</Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>My People</Text>
         <TouchableOpacity onPress={handleAddPeople} disabled={people.length >= 50}>
           <Text
             style={[
               styles.add,
-              people.length >= 50 && styles.addDisabled,
+              { color: theme.textPrimary },
+              people.length >= 50 && { color: theme.textTertiary },
             ]}
           >
             Add
           </Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.count}>
+      <Text style={[styles.count, { color: theme.textSecondary }]}>
         {people.length} / 50 people
       </Text>
       {people.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>👥</Text>
-          <Text style={styles.emptyTitle}>No people yet</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No people yet</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
             Add people from your contacts to organize them into circles and
             invite them to events.
           </Text>
-          <TouchableOpacity style={styles.emptyButton} onPress={handleAddPeople}>
-            <Text style={styles.emptyButtonText}>Add from Contacts</Text>
+          <TouchableOpacity style={[styles.emptyButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleAddPeople}>
+            <Text style={[styles.emptyButtonText, { color: theme.primaryButtonText }]}>Add from Contacts</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <>
-          <View style={styles.circlesSection}>
-            <Text style={styles.sectionTitle}>Circles</Text>
+          <View style={[styles.circlesSection, { borderBottomColor: theme.borderLight }]}>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Circles</Text>
             {circles.map((circle) => (
               <View key={circle.id} style={styles.circleRow}>
                 <View style={styles.circleInfo}>
-                  <Text style={styles.circleName}>{circle.name}</Text>
-                  <Text style={styles.circleMeta}>
+                  <Text style={[styles.circleName, { color: theme.textPrimary }]}>{circle.name}</Text>
+                  <Text style={[styles.circleMeta, { color: theme.textSecondary }]}>
                     {getCircleMemberIds(circle.id).length} members
                   </Text>
                 </View>
                 <View style={styles.circleActions}>
                   <TouchableOpacity onPress={() => handleEditCircleMembers(circle)}>
-                    <Text style={styles.manage}>Edit</Text>
+                    <Text style={[styles.manage, { color: theme.linkText }]}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => handleRemoveCircle(circle)}>
-                    <Text style={styles.remove}>Delete</Text>
+                    <Text style={[styles.remove, { color: theme.destructiveLink }]}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ))}
             <View style={styles.addCircleRow}>
               <TextInput
-                style={styles.circleInput}
+                style={[styles.circleInput, { borderColor: theme.border, color: theme.textPrimary }]}
                 placeholder="New circle name"
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.textTertiary}
                 value={newCircleName}
                 onChangeText={setNewCircleName}
               />
               <TouchableOpacity
-                style={styles.addCircleBtn}
+                style={[styles.addCircleBtn, { backgroundColor: theme.primaryButtonBg }]}
                 onPress={handleAddCircle}
                 disabled={!newCircleName.trim()}
               >
-                <Text style={styles.addCircleBtnText}>Add</Text>
+                <Text style={[styles.addCircleBtnText, { color: theme.primaryButtonText }]}>Add</Text>
               </TouchableOpacity>
             </View>
           </View>
           <View style={styles.peopleSection}>
-            <Text style={styles.sectionTitle}>People</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>People</Text>
             <FlatList
               data={people}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View style={styles.personRow}>
-                  <Text style={styles.personName}>
+                <View style={[styles.personRow, { borderBottomColor: theme.surfaceSecondary }]}>
+                  <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? item.phone_number}
                   </Text>
                   <TouchableOpacity onPress={() => handleRemovePerson(item)}>
-                    <Text style={styles.remove}>Remove</Text>
+                    <Text style={[styles.remove, { color: theme.destructiveLink }]}>Remove</Text>
                   </TouchableOpacity>
                 </View>
               )}
               ListFooterComponent={
                 hiddenPeople.length > 0 ? (
-                  <View style={styles.hiddenSection}>
-                    <Text style={styles.sectionTitle}>Hidden</Text>
+                  <View style={[styles.hiddenSection, { borderTopColor: theme.borderLight }]}>
+                    <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Hidden</Text>
                     {hiddenPeople.map((item) => (
-                      <View key={item.id} style={styles.personRow}>
-                        <Text style={styles.personName}>
+                      <View key={item.id} style={[styles.personRow, { borderBottomColor: theme.surfaceSecondary }]}>
+                        <Text style={[styles.personName, { color: theme.textPrimary }]}>
                           {item.contact_name ?? item.phone_number}
                         </Text>
                         <TouchableOpacity onPress={() => handleUnhide(item.id)}>
-                          <Text style={styles.unhide}>Unhide</Text>
+                          <Text style={[styles.unhide, { color: theme.linkText }]}>Unhide</Text>
                         </TouchableOpacity>
                       </View>
                     ))}
@@ -344,14 +347,14 @@ export default function PeopleScreen() {
         />
       )}
       <Modal visible={!!editingCircle} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+        <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
             <TouchableOpacity onPress={() => setEditingCircle(null)}>
-              <Text style={styles.back}>Cancel</Text>
+              <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>{editingCircle?.name ?? 'Circle'}</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>{editingCircle?.name ?? 'Circle'}</Text>
             <TouchableOpacity onPress={handleSaveCircleMembers}>
-              <Text style={styles.add}>Save</Text>
+              <Text style={[styles.add, { color: theme.textPrimary }]}>Save</Text>
             </TouchableOpacity>
           </View>
           <FlatList
@@ -361,13 +364,17 @@ export default function PeopleScreen() {
               const selected = selectedMemberIds.has(item.id);
               return (
                 <TouchableOpacity
-                  style={[styles.personRow, selected && styles.personRowSelected]}
+                  style={[
+                    styles.personRow,
+                    { borderBottomColor: theme.surfaceSecondary },
+                    selected && { backgroundColor: theme.selectedBg },
+                  ]}
                   onPress={() => toggleMember(item.id)}
                 >
-                  <Text style={styles.personName}>
+                  <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? item.phone_number}
                   </Text>
-                  {selected && <Text style={styles.checkmark}>✓</Text>}
+                  {selected && <Text style={[styles.checkmark, { color: theme.textPrimary }]}>✓</Text>}
                 </TouchableOpacity>
               );
             }}
@@ -381,7 +388,6 @@ export default function PeopleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingTop: 48,
   },
   header: {
@@ -391,11 +397,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   back: {
     fontSize: 16,
-    color: '#666',
   },
   title: {
     fontSize: 18,
@@ -405,12 +409,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  addDisabled: {
-    color: '#999',
-  },
   count: {
     fontSize: 14,
-    color: '#666',
     paddingHorizontal: 20,
     paddingVertical: 8,
   },
@@ -418,7 +418,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   peopleSection: {
     flex: 1,
@@ -427,7 +426,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
     marginBottom: 8,
     paddingTop: 12,
   },
@@ -445,7 +443,6 @@ const styles = StyleSheet.create({
   },
   circleMeta: {
     fontSize: 12,
-    color: '#666',
   },
   circleActions: {
     flexDirection: 'row',
@@ -453,7 +450,6 @@ const styles = StyleSheet.create({
   },
   manage: {
     fontSize: 14,
-    color: '#0066cc',
   },
   addCircleRow: {
     flexDirection: 'row',
@@ -463,7 +459,6 @@ const styles = StyleSheet.create({
   circleInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -471,11 +466,9 @@ const styles = StyleSheet.create({
   addCircleBtn: {
     paddingHorizontal: 16,
     justifyContent: 'center',
-    backgroundColor: '#000',
     borderRadius: 8,
   },
   addCircleBtnText: {
-    color: '#fff',
     fontWeight: '600',
   },
   personRow: {
@@ -484,32 +477,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   personName: {
     fontSize: 16,
   },
-  personRowSelected: {
-    backgroundColor: '#f5f5f5',
-  },
   checkmark: {
     fontSize: 18,
-    color: '#000',
     fontWeight: '600',
   },
   remove: {
     fontSize: 14,
-    color: '#c00',
   },
   hiddenSection: {
     marginTop: 8,
     paddingTop: 4,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   unhide: {
     fontSize: 14,
-    color: '#0066cc',
   },
   emptyState: {
     flex: 1,
@@ -528,25 +513,21 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 15,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
   },
   emptyButton: {
-    backgroundColor: '#000',
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 10,
   },
   emptyButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingTop: 48,
   },
   modalHeader: {
@@ -556,6 +537,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
 });

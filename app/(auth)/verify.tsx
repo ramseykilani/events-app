@@ -12,6 +12,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
+import { useTheme } from '../../hooks/useTheme';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -22,6 +23,7 @@ export default function VerifyScreen() {
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resending, setResending] = useState(false);
+  const theme = useTheme();
 
   useEffect(() => {
     if (!phone) {
@@ -85,17 +87,17 @@ export default function VerifyScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.background }]}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Verify</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Verify</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           Enter the 6-digit code sent to {phone}
         </Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="000000"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textTertiary}
           value={code}
           onChangeText={setCode}
           keyboardType="number-pad"
@@ -103,12 +105,12 @@ export default function VerifyScreen() {
           editable={!loading}
         />
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[styles.button, { backgroundColor: theme.primaryButtonBg }, loading && styles.buttonDisabled]}
           onPress={handleVerify}
           disabled={loading}
           testID="verify-button"
         >
-          <Text style={styles.buttonText}>
+          <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
             {loading ? 'Verifying...' : 'Verify'}
           </Text>
         </TouchableOpacity>
@@ -120,7 +122,7 @@ export default function VerifyScreen() {
           onPress={handleResend}
           disabled={resendCooldown > 0 || resending || loading}
         >
-          <Text style={styles.resendButtonText}>
+          <Text style={[styles.resendButtonText, { color: theme.textSecondary }]}>
             {resending
               ? 'Sending...'
               : resendCooldown > 0
@@ -136,7 +138,6 @@ export default function VerifyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     justifyContent: 'center',
   },
   content: {
@@ -146,26 +147,21 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     marginBottom: 8,
-    color: '#000',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 24,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 12,
     padding: 16,
     fontSize: 24,
     letterSpacing: 8,
     textAlign: 'center',
     marginBottom: 16,
-    color: '#000',
   },
   button: {
-    backgroundColor: '#000',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -174,7 +170,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: '600',
   },
@@ -187,7 +182,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   resendButtonText: {
-    color: '#666',
     fontSize: 16,
   },
 });

@@ -14,9 +14,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function AddEventScreen() {
   const { session } = useSession();
+  const theme = useTheme();
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -200,12 +202,12 @@ export default function AddEventScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.cancel}>Cancel</Text>
+          <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Add event</Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Add event</Text>
         <TouchableOpacity
           onPress={handleCreate}
           disabled={loading || (!title.trim() && !url.trim())}
@@ -213,7 +215,8 @@ export default function AddEventScreen() {
           <Text
             style={[
               styles.save,
-              (loading || (!title.trim() && !url.trim())) && styles.saveDisabled,
+              { color: theme.textPrimary },
+              (loading || (!title.trim() && !url.trim())) && { color: theme.textTertiary },
             ]}
           >
             Save
@@ -221,12 +224,12 @@ export default function AddEventScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.form}>
-        <Text style={styles.label}>URL (optional)</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>URL (optional)</Text>
         <View style={styles.urlRow}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
             placeholder="https://..."
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.textTertiary}
             value={url}
             onChangeText={setUrl}
             onBlur={fetchOgMetadata}
@@ -235,29 +238,29 @@ export default function AddEventScreen() {
           />
           {loadingOg && <ActivityIndicator size="small" />}
         </View>
-        <Text style={styles.label}>Title</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Title</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="Event title"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textTertiary}
           value={title}
           onChangeText={setTitle}
         />
-        <Text style={styles.label}>Description (optional)</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Description (optional)</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.textArea, { borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="Description"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textTertiary}
           value={description}
           onChangeText={setDescription}
           multiline
         />
-        <Text style={styles.label}>Date</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Date</Text>
         <TouchableOpacity
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border }]}
           onPress={() => setShowDatePicker(true)}
         >
-          <Text>{eventDate.toLocaleDateString()}</Text>
+          <Text style={{ color: theme.textPrimary }}>{eventDate.toLocaleDateString()}</Text>
         </TouchableOpacity>
         {showDatePicker && (
           <DateTimePicker
@@ -269,12 +272,12 @@ export default function AddEventScreen() {
             }}
           />
         )}
-        <Text style={styles.label}>Time (optional)</Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Time (optional)</Text>
         <TouchableOpacity
-          style={styles.input}
+          style={[styles.input, { borderColor: theme.border }]}
           onPress={() => setShowTimePicker(true)}
         >
-          <Text>
+          <Text style={{ color: theme.textPrimary }}>
             {eventTime
               ? eventTime.toLocaleTimeString([], {
                   hour: 'numeric',
@@ -301,7 +304,6 @@ export default function AddEventScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
@@ -311,11 +313,9 @@ const styles = StyleSheet.create({
     paddingTop: 48,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   cancel: {
     fontSize: 16,
-    color: '#666',
   },
   title: {
     fontSize: 18,
@@ -325,22 +325,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  saveDisabled: {
-    color: '#999',
-  },
   form: {
     padding: 20,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
     marginBottom: 8,
     marginTop: 16,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,

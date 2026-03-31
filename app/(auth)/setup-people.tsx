@@ -14,12 +14,14 @@ import { useSession } from '../_context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
 import { requestContactsPermission } from '../../lib/contacts';
 import type { MyPerson } from '../../lib/types';
+import { useTheme } from '../../hooks/useTheme';
 
 export default function SetupPeopleScreen() {
   const { session } = useSession();
   const userId = session?.user?.id;
   const [people, setPeople] = useState<MyPerson[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const theme = useTheme();
 
   const loadPeople = async () => {
     if (!userId) return;
@@ -103,22 +105,22 @@ export default function SetupPeopleScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Set Up Your People</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Set Up Your People</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           Add contacts you want to share events with. You can add up to 50.
         </Text>
       </View>
 
-      <View style={styles.topRow}>
-        <Text style={styles.count}>{people.length} / 50 people</Text>
+      <View style={[styles.topRow, { borderBottomColor: theme.borderLight }]}>
+        <Text style={[styles.count, { color: theme.textSecondary }]}>{people.length} / 50 people</Text>
         <TouchableOpacity
-          style={[styles.addButton, people.length >= 50 && styles.disabledButton]}
+          style={[styles.addButton, { backgroundColor: theme.primaryButtonBg }, people.length >= 50 && styles.disabledButton]}
           onPress={handleAddPeople}
           disabled={people.length >= 50}
         >
-          <Text style={styles.addButtonText}>Add from Contacts</Text>
+          <Text style={[styles.addButtonText, { color: theme.primaryButtonText }]}>Add from Contacts</Text>
         </TouchableOpacity>
       </View>
 
@@ -127,30 +129,31 @@ export default function SetupPeopleScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <View style={styles.personRow}>
-            <Text style={styles.personName}>
+          <View style={[styles.personRow, { borderBottomColor: theme.surfaceSecondary }]}>
+            <Text style={[styles.personName, { color: theme.textPrimary }]}>
               {item.contact_name ?? item.phone_number}
             </Text>
             <TouchableOpacity onPress={() => handleRemovePerson(item)}>
-              <Text style={styles.remove}>Remove</Text>
+              <Text style={[styles.remove, { color: theme.destructiveLink }]}>Remove</Text>
             </TouchableOpacity>
           </View>
         )}
         ListEmptyComponent={
-          <Text style={styles.emptyState}>No people added yet.</Text>
+          <Text style={[styles.emptyState, { color: theme.textSecondary }]}>No people added yet.</Text>
         }
       />
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { borderTopColor: theme.borderLight }]}>
         <TouchableOpacity
           style={[
             styles.continueButton,
+            { backgroundColor: theme.primaryButtonBg },
             people.length === 0 && styles.disabledButton,
           ]}
           onPress={handleContinue}
           disabled={people.length === 0}
         >
-          <Text style={styles.continueText}>Continue</Text>
+          <Text style={[styles.continueText, { color: theme.primaryButtonText }]}>Continue</Text>
         </TouchableOpacity>
       </View>
 
@@ -168,7 +171,6 @@ export default function SetupPeopleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingTop: 56,
   },
   header: {
@@ -182,28 +184,23 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 15,
-    color: '#666',
   },
   topRow: {
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   count: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 10,
   },
   addButton: {
-    backgroundColor: '#000',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
   },
   addButtonText: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -217,34 +214,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   personName: {
     fontSize: 16,
   },
   remove: {
-    color: '#c00',
     fontSize: 14,
   },
   emptyState: {
-    color: '#666',
     fontSize: 15,
     paddingVertical: 24,
   },
   footer: {
     borderTopWidth: 1,
-    borderTopColor: '#eee',
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
   continueButton: {
-    backgroundColor: '#000',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
   },
   continueText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

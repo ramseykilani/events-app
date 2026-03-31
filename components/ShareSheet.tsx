@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import type { MyPerson, Circle } from '../lib/types';
+import { useTheme } from '../hooks/useTheme';
 
 type Props = {
   people: MyPerson[];
@@ -17,6 +18,8 @@ export function ShareSheet({
   selectedPersonIds,
   onSelectionChange,
 }: Props) {
+  const theme = useTheme();
+
   const getCirclePersonIds = (circleId: string): string[] =>
     circleMembers
       .filter((m) => m.circle_id === circleId)
@@ -47,16 +50,16 @@ export function ShareSheet({
   return (
     <View style={styles.container}>
       {circles.length > 0 && (
-        <View style={styles.circlesSection}>
-          <Text style={styles.sectionTitle}>Circles</Text>
+        <View style={[styles.circlesSection, { borderBottomColor: theme.borderLight }]}>
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Circles</Text>
           <View style={styles.circleChips}>
             {circles.map((circle) => (
               <TouchableOpacity
                 key={circle.id}
-                style={styles.chip}
+                style={[styles.chip, { backgroundColor: theme.surfaceSecondary }]}
                 onPress={() => toggleCircle(circle)}
               >
-                <Text style={styles.chipText}>{circle.name}</Text>
+                <Text style={[styles.chipText, { color: theme.textPrimary }]}>{circle.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -64,24 +67,24 @@ export function ShareSheet({
       )}
       <View style={styles.peopleSection}>
         <View style={styles.peopleHeader}>
-          <Text style={styles.sectionTitle}>People</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>People</Text>
           {people.length > 0 && (
             <TouchableOpacity onPress={() => router.push('/(app)/people')}>
-              <Text style={styles.manageLink}>Manage</Text>
+              <Text style={[styles.manageLink, { color: theme.linkText }]}>Manage</Text>
             </TouchableOpacity>
           )}
         </View>
         {people.length === 0 ? (
           <View style={styles.emptyPeople}>
-            <Text style={styles.emptyPeopleText}>
+            <Text style={[styles.emptyPeopleText, { color: theme.textSecondary }]}>
               No people added yet. Add contacts to your people list so you can
               invite them to events.
             </Text>
             <TouchableOpacity
-              style={styles.emptyPeopleButton}
+              style={[styles.emptyPeopleButton, { backgroundColor: theme.primaryButtonBg }]}
               onPress={() => router.push('/(app)/people')}
             >
-              <Text style={styles.emptyPeopleButtonText}>Add People</Text>
+              <Text style={[styles.emptyPeopleButtonText, { color: theme.primaryButtonText }]}>Add People</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -92,13 +95,17 @@ export function ShareSheet({
               const selected = selectedPersonIds.has(item.id);
               return (
                 <TouchableOpacity
-                  style={[styles.personRow, selected && styles.personRowSelected]}
+                  style={[
+                    styles.personRow,
+                    { borderBottomColor: theme.surfaceSecondary },
+                    selected && { backgroundColor: theme.selectedBg },
+                  ]}
                   onPress={() => togglePerson(item.id)}
                 >
-                  <Text style={styles.personName}>
+                  <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? item.phone_number}
                   </Text>
-                  {selected && <Text style={styles.checkmark}>✓</Text>}
+                  {selected && <Text style={[styles.checkmark, { color: theme.textPrimary }]}>✓</Text>}
                 </TouchableOpacity>
               );
             }}
@@ -116,12 +123,10 @@ const styles = StyleSheet.create({
   circlesSection: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
     marginBottom: 12,
   },
   circleChips: {
@@ -130,7 +135,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: '#f0f0f0',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -150,7 +154,6 @@ const styles = StyleSheet.create({
   },
   manageLink: {
     fontSize: 14,
-    color: '#0066cc',
   },
   emptyPeople: {
     alignItems: 'center',
@@ -159,19 +162,16 @@ const styles = StyleSheet.create({
   },
   emptyPeopleText: {
     fontSize: 15,
-    color: '#666',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 16,
   },
   emptyPeopleButton: {
-    backgroundColor: '#000',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 10,
   },
   emptyPeopleButtonText: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -182,17 +182,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  personRowSelected: {
-    backgroundColor: '#f5f5f5',
   },
   personName: {
     fontSize: 16,
   },
   checkmark: {
     fontSize: 18,
-    color: '#000',
     fontWeight: '600',
   },
 });
