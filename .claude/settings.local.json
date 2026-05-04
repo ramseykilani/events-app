@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /f/Code/Events/events-app -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.js\" \\\\\\) -exec grep -l \"firebase\\\\|twilio\\\\|sendgrid\\\\|expo.*notification\" {} \\\\;)"
+    ]
+  }
+}

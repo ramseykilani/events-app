@@ -6,14 +6,15 @@ A running list of planned and in-progress features. Each section contains a full
 
 | Feature | Status |
 |---------|--------|
-| [Notifications](#notifications) | In Progress |
+| [Notifications](#notifications) | Implemented |
+| [SMS Invitations](#sms-invitations) | Implemented |
 | [Hide](#hide) | Implemented |
 
 ---
 
 ## Notifications
 
-**Status:** In Progress
+**Status:** Implemented
 
 ### Problem
 
@@ -39,11 +40,55 @@ When a user shares an event with someone, the recipient receives a push notifica
 
 ### Acceptance Criteria
 
-- [ ] Recipient receives a push notification when added to an event on a physical device
-- [ ] Notification shows event title and date (and time if present)
-- [ ] Tapping the notification opens the event detail screen
-- [ ] No notification is sent if the sharer is hidden by the recipient
-- [ ] No notification is sent if the recipient has no push token
+- [x] Recipient receives a push notification when added to an event on a physical device
+- [x] Notification shows event title and date (and time if present)
+- [x] Tapping the notification opens the event detail screen
+- [x] No notification is sent if the sharer is hidden by the recipient
+- [x] No notification is sent if the recipient has no push token
+
+### Open Questions
+
+- None
+
+---
+
+## SMS Invitations
+
+**Status:** Implemented
+
+### Problem
+
+Push notifications only reach users who have installed the app. Non-app users (contacts in `my_people` who haven't signed up) previously received no notification at all when an event was shared with them — they had no way to know they'd been included. This limits the app's usefulness to groups where everyone has already downloaded it.
+
+### Solution
+
+When an event is shared, the `send-notification` Edge Function also sends an SMS via Twilio to every recipient:
+
+- **Non-app users:** SMS with event details (title, date, time), the sharer's phone number as display identity, and App Store / Play Store download links
+- **App users:** SMS with event details and a deep link (`events-app://event/[eventId]`) that opens directly to the event, in addition to their existing push notification
+
+This means the only person who needs the app is the one sending events. Friends can receive invitations and decide to download the app from there.
+
+### Technical Notes
+
+- No SDK dependency: Twilio REST API called directly via `fetch` with Basic auth in `supabase/functions/send-notification/index.ts`
+- Five new Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `IOS_APP_STORE_URL`, `ANDROID_PLAY_STORE_URL`
+- Graceful degradation: if any Twilio secret is missing (or both store URLs are absent for non-app-user path), SMS is silently skipped — push notifications are unaffected
+- SMS failures use `.catch(console.error)` and never propagate to the caller
+- SMS sends are collected as `Promise<void>[]` and flushed with `Promise.all` after the Expo push batch — concurrent, non-blocking
+- Hidden-person check applies to SMS as well: if the sharer is hidden by the recipient, neither push nor SMS is sent
+- STOP opt-out language appended to non-app-user SMS per CASL requirements
+- `phone_number` for recipients comes from `my_people.phone_number` (E.164); sharer's display identifier comes from `users.phone_number`
+- Returns `{ sent: number, sms: number }` (push messages queued, SMS sends dispatched)
+
+### Acceptance Criteria
+
+- [x] Non-app users receive an SMS with event title, date/time, sharer phone, and app download links when shared an event
+- [x] App users receive both a push notification and an SMS deep link when shared an event
+- [x] SMS is skipped silently when Twilio secrets are not configured
+- [x] SMS is skipped when the recipient has no phone number in `my_people`
+- [x] SMS is not sent to app users when the sharer is hidden by the recipient
+- [x] SMS failures never cause the Edge Function to return an error response
 
 ### Open Questions
 

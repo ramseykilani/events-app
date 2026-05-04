@@ -32,6 +32,27 @@ function formatTime(time: string): string {
   });
 }
 
+async function sendSms(
+  to: string,
+  body: string,
+  accountSid: string,
+  authToken: string,
+  fromNumber: string,
+): Promise<void> {
+  const credentials = btoa(`${accountSid}:${authToken}`);
+  await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
+    },
+  );
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: CORS_HEADERS });
@@ -45,6 +66,20 @@ serve(async (req) => {
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse({ error: 'Server misconfigured' }, 500);
   }
+
+  // Twilio config — all three core secrets plus at least one store URL must be
+  // present or SMS is silently skipped (push notifications are unaffected)
+  const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+  const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+  const twilioFromNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+  const iosStoreUrl = Deno.env.get('IOS_APP_STORE_URL');
+  const androidStoreUrl = Deno.env.get('ANDROID_PLAY_STORE_URL');
+  const smsEnabled = !!(
+    twilioAccountSid &&
+    twilioAuthToken &&
+    twilioFromNumber &&
+    (iosStoreUrl || androidStoreUrl)
+  );
 
   const db = createClient(supabaseUrl, serviceRoleKey);
 
@@ -74,14 +109,23 @@ serve(async (req) => {
 
     if (!event) return jsonResponse({ error: 'event not found' }, 404);
 
-    // Load all shares for this user_event
+    // Fetch the sharer's phone number once — used as display identifier in SMS
+    // to non-app users who don't have a contact name for the sharer
+    const { data: sharerUser } = await db
+      .from('users')
+      .select('phone_number')
+      .eq('id', sharerUserId)
+      .single();
+    const sharerPhone = sharerUser?.phone_number ?? 'Someone';
+
+    // Load all shares for this user_event, including each recipient's phone number
     const { data: shares, error: sharesErr } = await db
       .from('event_shares')
-      .select('person_id, my_people(user_id, owner_id)')
+      .select('person_id, my_people(user_id, owner_id, phone_number)')
       .eq('user_event_id', userEventId);
 
     if (sharesErr || !shares?.length) {
-      return jsonResponse({ sent: 0 });
+      return jsonResponse({ sent: 0, sms: 0 });
     }
 
     interface PushMessage {
@@ -92,16 +136,51 @@ serve(async (req) => {
     }
 
     const messages: PushMessage[] = [];
+    const smsSends: Promise<void>[] = [];
+
+    const eventTitle = event.title ?? 'an event';
+    const dateStr = formatDate(event.event_date);
+    const timeStr = event.event_time ? ` · ${formatTime(event.event_time)}` : '';
+    const eventId = userEvent.event_id;
 
     for (const share of shares) {
       const person = share.my_people as {
         user_id: string | null;
         owner_id: string;
+        phone_number: string | null;
       } | null;
 
-      // Skip if the recipient isn't an app user (no user_id means no account)
-      if (!person?.user_id) continue;
+      if (!person) continue;
 
+      // ── Non-app user: SMS only ──────────────────────────────────────────────
+      if (!person.user_id) {
+        if (!smsEnabled || !person.phone_number) continue;
+
+        const storeLines = [
+          iosStoreUrl ? `iOS: ${iosStoreUrl}` : null,
+          androidStoreUrl ? `Android: ${androidStoreUrl}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        const smsBody =
+          `${sharerPhone} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
+          `Get the Events app:\n${storeLines}\n\n` +
+          `Reply STOP to unsubscribe.`;
+
+        smsSends.push(
+          sendSms(
+            person.phone_number,
+            smsBody,
+            twilioAccountSid!,
+            twilioAuthToken!,
+            twilioFromNumber!,
+          ).catch(console.error),
+        );
+        continue;
+      }
+
+      // ── App user: push notification + SMS ──────────────────────────────────
       const recipientUserId = person.user_id;
       const recipientOwnerId = person.owner_id;
 
@@ -131,7 +210,7 @@ serve(async (req) => {
           .eq('person_id', sharerInRecipientContacts.id)
           .maybeSingle();
 
-        if (hidden) continue; // sharer is hidden — skip notification
+        if (hidden) continue; // sharer is hidden — skip both push and SMS
       }
 
       // Get the sharer's display name in the recipient's contacts
@@ -147,47 +226,63 @@ serve(async (req) => {
 
       const displayName =
         sharerName?.contact_name ?? sharerName?.phone_number ?? 'Someone';
-      const eventTitle = event.title ?? 'an event';
-      const dateStr = formatDate(event.event_date);
-      const timeStr = event.event_time ? ` · ${formatTime(event.event_time)}` : '';
 
+      // Queue push notification
       messages.push({
         to: recipientUser.expo_push_token,
         title: `${displayName} added you to ${eventTitle}`,
         body: `${dateStr}${timeStr}`,
-        data: { eventId: userEvent.event_id },
+        data: { eventId },
       });
+
+      // Queue SMS with deep link (skipped gracefully if Twilio not configured)
+      if (smsEnabled && person.phone_number) {
+        const smsBody =
+          `${displayName} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
+          `events-app://event/${eventId}`;
+
+        smsSends.push(
+          sendSms(
+            person.phone_number,
+            smsBody,
+            twilioAccountSid!,
+            twilioAuthToken!,
+            twilioFromNumber!,
+          ).catch(console.error),
+        );
+      }
     }
 
-    if (messages.length === 0) {
-      return jsonResponse({ sent: 0 });
-    }
+    // ── Send push notifications ─────────────────────────────────────────────
+    if (messages.length > 0) {
+      const pushResponse = await fetch(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(messages),
+      });
 
-    // Send to Expo Push API
-    const pushResponse = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(messages),
-    });
+      const pushResult = await pushResponse.json();
 
-    const pushResult = await pushResponse.json();
-
-    // Clear stale tokens for any DeviceNotRegistered receipts
-    if (Array.isArray(pushResult.data)) {
-      for (let i = 0; i < pushResult.data.length; i++) {
-        if (pushResult.data[i]?.details?.error === 'DeviceNotRegistered') {
-          const token = messages[i]?.to;
-          if (token) {
-            await db
-              .from('users')
-              .update({ expo_push_token: null })
-              .eq('expo_push_token', token);
+      // Clear stale tokens for any DeviceNotRegistered receipts
+      if (Array.isArray(pushResult.data)) {
+        for (let i = 0; i < pushResult.data.length; i++) {
+          if (pushResult.data[i]?.details?.error === 'DeviceNotRegistered') {
+            const token = messages[i]?.to;
+            if (token) {
+              await db
+                .from('users')
+                .update({ expo_push_token: null })
+                .eq('expo_push_token', token);
+            }
           }
         }
       }
     }
 
-    return jsonResponse({ sent: messages.length });
+    // ── Fire all SMS sends (already non-throwing via .catch) ────────────────
+    await Promise.all(smsSends);
+
+    return jsonResponse({ sent: messages.length, sms: smsSends.length });
   } catch (err) {
     console.error('send-notification error:', err);
     return jsonResponse({ error: err instanceof Error ? err.message : 'Unknown error' }, 500);

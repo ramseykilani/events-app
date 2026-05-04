@@ -11,6 +11,7 @@ A mid-level architecture overview.
 - **Auth:** Supabase Phone Auth (SMS OTP)
 - **Link Previews:** Supabase Edge Function that fetches Open Graph metadata from pasted URLs
 - **Push Notifications:** Expo Push Notifications (via `expo-notifications`)
+- **SMS Notifications:** Twilio REST API (called directly from the `send-notification` Edge Function — no SDK)
 
 ---
 
@@ -54,7 +55,7 @@ Unique constraint on (owner_id, phone_number).
 
 This is the user's in-app contact list — up to 50 people they've chosen to share events with. Not their full phone contact list. A curated subset.
 
-**Identity resolution:** `phone_number` is only used at two moments: when inserting a new person (dedup) and when a new user signs up (the onboarding trigger populates `user_id` across all matching my_people rows). All runtime queries use `user_id`, never `phone_number`.
+**Identity resolution:** `phone_number` is only used at two moments: when inserting a new person (dedup) and when a new user signs up (the onboarding trigger populates `user_id` across all matching my_people rows). Most runtime queries use `user_id`, never `phone_number`. The one exception is `send-notification`, which reads `my_people.phone_number` to deliver SMS to both app users and non-app users.
 
 **Enforcing the 50-person cap:** A Postgres function (trigger or RPC) checks the count of my_people rows for a user before allowing inserts. Simple count.
 
@@ -268,20 +269,32 @@ Retain only future events and the past 6 months (based on event_date, not create
 
 ---
 
-## Push Notifications
+## Notifications (Push + SMS)
 
-The `send-notification` Edge Function sends a push notification to each recipient when an event is shared with them.
+The `send-notification` Edge Function sends a push notification and/or SMS to each recipient when an event is shared with them.
 
-**Registration:** On authenticated app launch, the app requests notification permissions, obtains the Expo push token, and upserts it to `users.expo_push_token`.
+**Registration (push):** On authenticated app launch, the app requests notification permissions, obtains the Expo push token, and upserts it to `users.expo_push_token`.
 
 **Sending flow:**
 1. `share.tsx` calls the Edge Function fire-and-forget after event_shares are created, passing `userEventId`
-2. Function queries all event_shares for that userEventId
-3. For each recipient: looks up their push token, checks hidden_people (skips if the sharer is hidden by the recipient), sends via Expo Push API
-4. Notification body: `{ title: "[Name] added you to [Event Title]", body: "[date] · [time]", data: { eventId } }`
-5. `DeviceNotRegistered` errors from Expo Push API clear the stale token
+2. Function queries all event_shares for that userEventId, including `my_people.phone_number`
+3. Fetches the sharer's `users.phone_number` once (used as display identifier in SMS to non-app users)
+4. For each recipient:
+   - **Non-app user** (`my_people.user_id IS NULL`): sends an SMS with event info and App Store / Play Store download links
+   - **App user** (`my_people.user_id IS NOT NULL`): looks up their push token, checks hidden_people (skips both push and SMS if the sharer is hidden), then queues a push notification and an SMS containing a deep link (`events-app://event/[eventId]`)
+5. Push messages are batch-sent to the Expo Push API; SMS messages are fired concurrently via the Twilio REST API
+6. `DeviceNotRegistered` errors from Expo Push API clear the stale token
+7. SMS failures are logged via `console.error` and never propagate — missing Twilio credentials silently disable SMS
 
-**Tap handler:** Configured in `app/_layout.tsx` — tapping a notification navigates to `/(app)/event/[eventId]`.
+**Push notification body:** `{ title: "[Name] added you to [Event Title]", body: "[date] · [time]", data: { eventId } }`
+
+**SMS body (app user):** `"[DisplayName] added you to [EventTitle] on [DateStr][· TimeStr]\nevents-app://event/[eventId]"`
+
+**SMS body (non-app user):** `"[SharerPhone] added you to [EventTitle] on [DateStr][· TimeStr]\nGet the Events app:\niOS: [IOS_APP_STORE_URL]\nAndroid: [ANDROID_PLAY_STORE_URL]\n\nReply STOP to unsubscribe."`
+
+**Tap handler (push):** Configured in `app/_layout.tsx` — tapping a notification navigates to `/(app)/event/[eventId]`.
+
+**Required Supabase secrets:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `IOS_APP_STORE_URL` (optional), `ANDROID_PLAY_STORE_URL` (optional — at least one store URL must be set for SMS to non-app users)
 
 ---
 
