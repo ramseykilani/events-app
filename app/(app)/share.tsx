@@ -1,12 +1,9 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  // #region agent log
-  useColorScheme,
-  // #endregion
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,18 +14,6 @@ import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
 import type { MyPerson, Circle, CircleMember } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
-// #region agent log
-import {
-  dbgLog,
-  dbgUrl,
-  dbgKnob,
-  dbgSleep,
-  nextMountId,
-  startHeartbeat,
-  scheduleDomProbes,
-  probeScreenTexts,
-} from '../../lib/debugInstrumentation';
-// #endregion
 
 type ShareParams = {
   eventId?: string | string[];
@@ -53,80 +38,11 @@ export default function ShareScreen() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
-  // #region agent log
-  const dbgMountId = useMemo(() => nextMountId(), []);
-  const dbgScheme = useColorScheme();
-  dbgLog(
-    'share.tsx:render',
-    'ShareScreen render',
-    {
-      scheme: dbgScheme,
-      mount: dbgMountId,
-      tPerf: Math.round(globalThis.performance?.now() ?? 0),
-      insets: { top: insets.top, bottom: insets.bottom },
-      peopleCount: people.length,
-      alreadySharedCount: alreadySharedIds.size,
-      theme: {
-        background: theme.background,
-        textPrimary: theme.textPrimary,
-        textSecondary: theme.textSecondary,
-        textTertiary: theme.textTertiary,
-      },
-      url: dbgUrl(),
-    },
-    'D'
-  );
-  // Mount-time probes: capture the transition window itself (before people
-  // data lands). Heartbeat records frame cadence for stall detection.
-  useEffect(() => {
-    startHeartbeat(3000);
-    dbgLog(
-      'share.tsx:mount',
-      'ShareScreen mounted',
-      {
-        mount: dbgMountId,
-        url: dbgUrl(),
-        tPerf: Math.round(globalThis.performance?.now() ?? 0),
-        shareDelayMs: dbgKnob('dbgShareDelayMs'),
-      },
-      'E'
-    );
-    scheduleDomProbes((phase) =>
-      probeScreenTexts({
-        screen: 'share-mount',
-        phase,
-        targets: ['Share with', 'Cancel'],
-        controls: [],
-        hypothesisId: 'E',
-        mount: dbgMountId,
-      })
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  // #endregion
-
   const firstParamValue = (value?: string | string[]) =>
     Array.isArray(value) ? value[0] : value;
 
   const loadData = useCallback(async () => {
     if (!userId) return;
-
-    // #region agent log
-    // Artificial data-arrival delay knob (debug only, default 0): forces the
-    // people query to land at a controlled offset after navigation so the
-    // transition race can be reproduced deterministically.
-    const dbgDelayMs = dbgKnob('dbgShareDelayMs');
-    dbgLog(
-      'share.tsx:loadData',
-      'loadData start',
-      {
-        delayMs: dbgDelayMs,
-        tPerf: Math.round(globalThis.performance?.now() ?? 0),
-      },
-      'E'
-    );
-    if (dbgDelayMs > 0) await dbgSleep(dbgDelayMs);
-    // #endregion
 
     const { data: peopleData, error: peopleErr } = await supabase
       .from('my_people')
@@ -175,21 +91,6 @@ export default function ShareScreen() {
       console.error('share load error:', peopleErr ?? circlesErr);
     }
     setLoadError(failed);
-    // #region agent log
-    dbgLog(
-      'share.tsx:loadData',
-      'loadData completed',
-      {
-        failed,
-        peopleCount: (peopleData ?? []).length,
-        alreadySharedCount: ueId ? undefined : 0,
-        userEventId: ueId ?? null,
-        delayMs: dbgDelayMs,
-        tPerf: Math.round(globalThis.performance?.now() ?? 0),
-      },
-      'C'
-    );
-    // #endregion
   }, [userId, params.userEventId]);
 
   useFocusEffect(
@@ -291,23 +192,9 @@ export default function ShareScreen() {
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-          <Text
-            style={[styles.cancel, { color: theme.textSecondary }]}
-            // #region agent log
-            testID="dbg-share-cancel"
-            // #endregion
-          >
-            Cancel
-          </Text>
+          <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
-        <Text
-          style={[styles.title, { color: theme.textPrimary }]}
-          // #region agent log
-          testID="dbg-share-title"
-          // #endregion
-        >
-          Share with
-        </Text>
+        <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
         <TouchableOpacity
           onPress={handleConfirm}
           disabled={loading || selectedPersonIds.size === 0}
