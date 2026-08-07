@@ -10,6 +10,8 @@ A running list of planned and in-progress features. Each section contains a full
 | [SMS Invitations](#sms-invitations) | Implemented |
 | [Hide](#hide) | Implemented |
 | [Forwarding Shares](#forwarding-shares) | Implemented |
+| [Sign Out](#sign-out) | Planned |
+| [Web Support](#web-support) | Planned |
 
 ---
 
@@ -182,3 +184,73 @@ This app shares public event listings, not private hosted events — closer to f
 ### Open Questions
 
 - None
+
+---
+
+## Sign Out
+
+**Status:** Planned
+
+### Problem
+
+There is no way to sign out. The session persists in AsyncStorage indefinitely, so anyone with the device (or browser profile) stays signed in forever, and there is no way to switch accounts.
+
+### Proposed Solution
+
+A deliberately low-prominence sign-out action — this should not be easy to tap by accident. Put it at the bottom of the People screen (or behind a small menu on the calendar header), labeled "Sign out", and gate it behind a `showConfirm` dialog ("Sign out of [phone number]?").
+
+### Technical Notes
+
+- Call `supabase.auth.signOut()`; `SessionContext` already reacts to the auth state change and routes back to `/(auth)/sign-in` — no extra navigation code needed
+- Works on web too (AsyncStorage is backed by localStorage there); today testers work around the missing button with `localStorage.clear()` in the console
+- Manual regression: signing out and back in must not duplicate data (sessions are stateless server-side)
+
+### Acceptance Criteria
+
+- [ ] Sign-out control exists but is not prominent (bottom of People screen or behind a menu)
+- [ ] Tapping it requires confirming a dialog
+- [ ] After sign-out the app lands on the sign-in screen and protected screens are unreachable
+- [ ] Signing back in restores the calendar exactly as before
+
+### Open Questions
+
+- Exact placement (People screen footer vs. a calendar header menu that could later hold more settings)
+
+---
+
+## Web Support
+
+**Status:** Planned
+
+### Problem
+
+The app already runs in the browser (`npx expo start --web`) — the entire manual regression suite runs against the web build — but it is only a local dev server, and two gaps block real web usage: there is no contacts API on the web (so My People can't be populated), and the date/time pickers don't open (`@react-native-community/datetimepicker` is native-only).
+
+### Philosophy
+
+A web-first beta is attractive: nobody has to install anything, and notifications arrive by SMS — which the backend already does. Web users never register an Expo push token, and `send-notification` sends app users an SMS regardless of whether they have a push token, so "website + SMS" is the de facto behavior once Twilio function secrets are configured. The web app never requests browser notification permission.
+
+### Proposed Solution
+
+1. **Manual add person.** An "Add manually" form (name + phone number) alongside "Add from Contacts" on the People screen. Normalize to E.164 with `libphonenumber-js` and upsert into `my_people` — the same code path contacts import already uses, so `user_id` resolution and pending-share delivery work unchanged.
+2. **Web date/time input.** Fall back to HTML `date`/`time` inputs (or a simple custom picker) when `Platform.OS === 'web'`.
+3. **Deploy the web build.** `npx expo export --platform web` produces a static bundle suitable for any static host (Vercel/Netlify/Cloudflare Pages). The bundle uses the public anon key — safe to ship because all data access goes through RLS. Auth (SMS OTP) already works on web.
+4. **SMS links for a web beta.** Non-app-user SMS is currently gated on App Store / Play Store URLs; for a web beta the message should link the website instead (small `send-notification` change: accept a `WEB_APP_URL` secret and prefer it over store links).
+
+### Technical Notes
+
+- Web gaps found during 2026-08-07 live regression: contacts permission flow is a dead end on web (explainer dialog only); date picker silently doesn't open; fixed already: Alert dialogs and edge-function CORS headers
+- `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are bundled into the static build at export time
+- The forwarded-copy model means a recipient who later installs the native app sees the same calendar — web and native are interchangeable frontends over the same account
+
+### Acceptance Criteria
+
+- [ ] A person can be added on web with name + phone number (E.164), and sharing to them works end-to-end
+- [ ] Event date/time can be chosen on web
+- [ ] A production web build is deployed at a stable URL and sign-in via SMS OTP works there
+- [ ] Sharing to a non-user sends an SMS containing the website URL
+
+### Open Questions
+
+- Hosting provider and domain
+- Whether the browser build should show any "install the app" prompt once native builds exist
