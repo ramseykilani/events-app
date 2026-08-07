@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   Linking,
   ScrollView,
   ActivityIndicator,
+  // #region agent log
+  useColorScheme,
+  // #endregion
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -18,6 +21,14 @@ import { formatEventDate, formatPhoneDisplay } from '../../../lib/format';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
 import { useTheme } from '../../../hooks/useTheme';
+// #region agent log
+import {
+  dbgLog,
+  dbgUrl,
+  scheduleDomProbes,
+  probeScreenTexts,
+} from '../../../lib/debugInstrumentation';
+// #endregion
 
 type SharedWithPerson = {
   id: string;
@@ -115,6 +126,45 @@ export default function EventDetailScreen() {
       load();
     }, [load])
   );
+
+  // #region agent log
+  const dbgScheme = useColorScheme();
+  dbgLog(
+    'event/[id].tsx:render',
+    'EventDetail render',
+    {
+      scheme: dbgScheme,
+      loading,
+      hasEvent: !!event,
+      title: event?.title ?? null,
+      theme: {
+        background: theme.background,
+        textPrimary: theme.textPrimary,
+        textSecondary: theme.textSecondary,
+      },
+      url: dbgUrl(),
+    },
+    'D'
+  );
+  useEffect(() => {
+    if (loading || !event) return;
+    dbgLog(
+      'event/[id].tsx:effect',
+      'content visible, scheduling DOM probes',
+      { title: event.title ?? null },
+      'A'
+    );
+    scheduleDomProbes((phase) =>
+      probeScreenTexts({
+        screen: 'event-detail',
+        phase,
+        targets: ['Back'],
+        controls: [event.title ?? 'Untitled event', 'Share'],
+        hypothesisId: 'A',
+      })
+    );
+  }, [loading, event]);
+  // #endregion
 
   const handleShare = () => {
     router.push({
@@ -257,7 +307,14 @@ export default function EventDetailScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.navRow}>
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+          <Text
+            style={[styles.navBack, { color: theme.textSecondary }]}
+            // #region agent log
+            testID="dbg-event-back"
+            // #endregion
+          >
+            Back
+          </Text>
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -270,7 +327,14 @@ export default function EventDetailScreen() {
               accessibilityLabel={event.title ? `${event.title} image` : 'Event image'}
             />
           ) : null}
-          <Text style={[styles.title, { color: theme.textPrimary }]}>{event.title ?? 'Untitled event'}</Text>
+          <Text
+            style={[styles.title, { color: theme.textPrimary }]}
+            // #region agent log
+            testID="dbg-event-title"
+            // #endregion
+          >
+            {event.title ?? 'Untitled event'}
+          </Text>
           <Text style={[styles.meta, { color: theme.textSecondary }]}>
             {formatEventDate(event.event_date)}
             {timeStr ? ` · ${timeStr}` : ''}
@@ -302,7 +366,14 @@ export default function EventDetailScreen() {
           ) : null}
           <View style={styles.actions}>
             <TouchableOpacity style={[styles.shareButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleShare} activeOpacity={0.7} accessibilityRole="button">
-              <Text style={[styles.shareButtonText, { color: theme.primaryButtonText }]}>Share</Text>
+              <Text
+                style={[styles.shareButtonText, { color: theme.primaryButtonText }]}
+                // #region agent log
+                testID="dbg-event-share-btn"
+                // #endregion
+              >
+                Share
+              </Text>
             </TouchableOpacity>
             {userEventId && (
               <TouchableOpacity

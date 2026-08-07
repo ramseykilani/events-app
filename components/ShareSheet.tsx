@@ -1,8 +1,17 @@
+import { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import type { MyPerson, Circle } from '../lib/types';
 import { formatPhoneDisplay } from '../lib/format';
 import { useTheme } from '../hooks/useTheme';
+// #region agent log
+import {
+  dbgLog,
+  scheduleDomProbes,
+  probeScreenTexts,
+  probeOnceLater,
+} from '../lib/debugInstrumentation';
+// #endregion
 
 type Props = {
   people: MyPerson[];
@@ -27,6 +36,51 @@ export function ShareSheet({
   const theme = useTheme();
   const shared = sharedPersonIds ?? new Set<string>();
 
+  // #region agent log
+  dbgLog(
+    'ShareSheet.tsx:render',
+    'ShareSheet render',
+    {
+      peopleCount: people.length,
+      circlesCount: circles.length,
+      selectedCount: selectedPersonIds.size,
+      sharedCount: shared.size,
+      theme: {
+        background: theme.background,
+        textPrimary: theme.textPrimary,
+        textTertiary: theme.textTertiary,
+      },
+      people: people.map((p) => ({
+        id: p.id,
+        contact_name: p.contact_name,
+        phone_number: p.phone_number,
+      })),
+    },
+    'C'
+  );
+  useEffect(() => {
+    if (people.length === 0) return;
+    const targets = people.map(
+      (p) => p.contact_name ?? formatPhoneDisplay(p.phone_number)
+    );
+    dbgLog(
+      'ShareSheet.tsx:effect',
+      'people loaded, scheduling DOM probes',
+      { targets },
+      'A'
+    );
+    scheduleDomProbes((phase) =>
+      probeScreenTexts({
+        screen: 'share',
+        phase,
+        targets,
+        controls: ['Share with', 'People', 'Manage', 'Cancel'],
+        hypothesisId: 'A',
+      })
+    );
+  }, [people]);
+  // #endregion
+
   const getCirclePersonIds = (circleId: string): string[] =>
     circleMembers
       .filter((m) => m.circle_id === circleId)
@@ -41,6 +95,30 @@ export function ShareSheet({
       next.add(id);
     }
     onSelectionChange(next);
+    // #region agent log
+    const tapped = people.find((p) => p.id === id);
+    dbgLog(
+      'ShareSheet.tsx:togglePerson',
+      'person row tapped',
+      { id, nowSelected: next.has(id), display: tapped?.contact_name ?? null },
+      'A'
+    );
+    // Re-probe after the selection commit: if the name text becomes painted
+    // only after interaction, that points at a browser paint stall (A).
+    if (tapped) {
+      const display =
+        tapped.contact_name ?? formatPhoneDisplay(tapped.phone_number);
+      probeOnceLater(400, (phase) =>
+        probeScreenTexts({
+          screen: 'share',
+          phase: `after-toggle-${phase}`,
+          targets: [display, '✓'],
+          controls: ['People'],
+          hypothesisId: 'A',
+        })
+      );
+    }
+    // #endregion
   };
 
   const toggleCircle = (circle: Circle) => {
@@ -106,7 +184,14 @@ export function ShareSheet({
       )}
       <View style={styles.peopleSection}>
         <View style={styles.peopleHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>People</Text>
+          <Text
+            style={[styles.sectionTitle, { color: theme.textSecondary }]}
+            // #region agent log
+            testID="dbg-share-people-title"
+            // #endregion
+          >
+            People
+          </Text>
           {people.length > 0 && (
             <TouchableOpacity
               onPress={() => router.push('/(app)/people')}
@@ -139,6 +224,16 @@ export function ShareSheet({
             renderItem={({ item }) => {
               const isShared = shared.has(item.id);
               const selected = selectedPersonIds.has(item.id);
+              // #region agent log
+              const dbgDisplay =
+                item.contact_name ?? formatPhoneDisplay(item.phone_number);
+              dbgLog(
+                'ShareSheet.tsx:renderItem',
+                'person row render',
+                { id: item.id, display: dbgDisplay, isShared, selected },
+                'C'
+              );
+              // #endregion
               return (
                 <TouchableOpacity
                   disabled={isShared}
@@ -151,17 +246,28 @@ export function ShareSheet({
                   activeOpacity={0.6}
                   accessibilityRole="button"
                   accessibilityState={{ selected, disabled: isShared }}
+                  // #region agent log
+                  testID="dbg-share-person-row"
+                  // #endregion
                 >
                   <Text
                     style={[
                       styles.personName,
                       { color: isShared ? theme.textTertiary : theme.textPrimary },
                     ]}
+                    // #region agent log
+                    testID="dbg-share-person-name"
+                    // #endregion
                   >
                     {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                   </Text>
                   {isShared ? (
-                    <Text style={[styles.sharedLabel, { color: theme.textTertiary }]}>
+                    <Text
+                      style={[styles.sharedLabel, { color: theme.textTertiary }]}
+                      // #region agent log
+                      testID="dbg-share-shared-label"
+                      // #endregion
+                    >
                       ✓ Shared
                     </Text>
                   ) : (

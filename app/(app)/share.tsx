@@ -4,6 +4,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  // #region agent log
+  useColorScheme,
+  // #endregion
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +17,9 @@ import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
 import type { MyPerson, Circle, CircleMember } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
+// #region agent log
+import { dbgLog, dbgUrl } from '../../lib/debugInstrumentation';
+// #endregion
 
 type ShareParams = {
   eventId?: string | string[];
@@ -37,6 +43,28 @@ export default function ShareScreen() {
   );
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+
+  // #region agent log
+  const dbgScheme = useColorScheme();
+  dbgLog(
+    'share.tsx:render',
+    'ShareScreen render',
+    {
+      scheme: dbgScheme,
+      insets: { top: insets.top, bottom: insets.bottom },
+      peopleCount: people.length,
+      alreadySharedCount: alreadySharedIds.size,
+      theme: {
+        background: theme.background,
+        textPrimary: theme.textPrimary,
+        textSecondary: theme.textSecondary,
+        textTertiary: theme.textTertiary,
+      },
+      url: dbgUrl(),
+    },
+    'D'
+  );
+  // #endregion
 
   const firstParamValue = (value?: string | string[]) =>
     Array.isArray(value) ? value[0] : value;
@@ -91,6 +119,19 @@ export default function ShareScreen() {
       console.error('share load error:', peopleErr ?? circlesErr);
     }
     setLoadError(failed);
+    // #region agent log
+    dbgLog(
+      'share.tsx:loadData',
+      'loadData completed',
+      {
+        failed,
+        peopleCount: (peopleData ?? []).length,
+        alreadySharedCount: ueId ? undefined : 0,
+        userEventId: ueId ?? null,
+      },
+      'C'
+    );
+    // #endregion
   }, [userId, params.userEventId]);
 
   useFocusEffect(
@@ -192,9 +233,23 @@ export default function ShareScreen() {
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
+          <Text
+            style={[styles.cancel, { color: theme.textSecondary }]}
+            // #region agent log
+            testID="dbg-share-cancel"
+            // #endregion
+          >
+            Cancel
+          </Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
+        <Text
+          style={[styles.title, { color: theme.textPrimary }]}
+          // #region agent log
+          testID="dbg-share-title"
+          // #endregion
+        >
+          Share with
+        </Text>
         <TouchableOpacity
           onPress={handleConfirm}
           disabled={loading || selectedPersonIds.size === 0}
