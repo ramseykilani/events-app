@@ -33,12 +33,12 @@ printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_
 
 Two test OTPs are configured on the Supabase project (both expire March 31, 2027):
 
-- Phone `+15555550100`, code `123456`
-- Phone `+16462655565`, code `666666`
+- Phone `+15555550100`, code `123456` (account A)
+- Phone `+15555550103`, code `123456` (account B)
 
 Use either to sign in without a real SMS provider. The second number is useful for testing multi-user scenarios (e.g. sharing events between two accounts). After sign-in the app goes straight to the calendar; the onboarding walkthrough auto-shows only when the user has no events at all, and can be reopened via the `?` button.
 
-Note: `+15555550101` is **not** a configured test number — Twilio rejects it with `sms_send_failed`. For a truly fresh account (e.g. M-003 onboarding auto-show), temporarily add a third test OTP via the Management API (`PATCH /v1/projects/{ref}/config/auth` with both `sms_test_otp` and `sms_test_otp_valid_until`), then remove it when done. There is no sign-out button in the app UI; on web, sign out with `localStorage.clear(); location.reload();` in the browser console.
+Note: account B was re-pointed from `+16462655565` (a real-format Manhattan number that would receive real texts) to the reserved fictional 555 range — never point test accounts at real-format numbers. `+15555550101` is **not** a configured test number — Twilio rejects it with `sms_send_failed`. For a truly fresh account (e.g. M-003 onboarding auto-show), temporarily add a third test OTP via the Management API (`PATCH /v1/projects/{ref}/config/auth` with both `sms_test_otp` and `sms_test_otp_valid_until`), then remove it when done. There is no sign-out button in the app UI; on web, sign out with `localStorage.clear(); location.reload();` in the browser console.
 
 ### Linting / type checking
 
