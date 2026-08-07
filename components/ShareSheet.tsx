@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import type { MyPerson, Circle } from '../lib/types';
+import { formatPhoneDisplay } from '../lib/format';
 import { useTheme } from '../hooks/useTheme';
 
 type Props = {
@@ -85,6 +86,7 @@ export function ShareSheet({
                     allShared && { opacity: 0.5 },
                   ]}
                   onPress={() => toggleCircle(circle)}
+                  activeOpacity={0.7}
                 >
                   <Text
                     style={[
@@ -104,7 +106,7 @@ export function ShareSheet({
         <View style={styles.peopleHeader}>
           <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>People</Text>
           {people.length > 0 && (
-            <TouchableOpacity onPress={() => router.push('/(app)/people')}>
+            <TouchableOpacity onPress={() => router.push('/(app)/people')} activeOpacity={0.6}>
               <Text style={[styles.manageLink, { color: theme.linkText }]}>Manage</Text>
             </TouchableOpacity>
           )}
@@ -118,6 +120,7 @@ export function ShareSheet({
             <TouchableOpacity
               style={[styles.emptyPeopleButton, { backgroundColor: theme.primaryButtonBg }]}
               onPress={() => router.push('/(app)/people')}
+              activeOpacity={0.7}
             >
               <Text style={[styles.emptyPeopleButtonText, { color: theme.primaryButtonText }]}>Add People</Text>
             </TouchableOpacity>
@@ -138,6 +141,7 @@ export function ShareSheet({
                     selected && { backgroundColor: theme.selectedBg },
                   ]}
                   onPress={() => togglePerson(item.id)}
+                  activeOpacity={0.6}
                 >
                   <Text
                     style={[
@@ -145,7 +149,7 @@ export function ShareSheet({
                       { color: isShared ? theme.textTertiary : theme.textPrimary },
                     ]}
                   >
-                    {item.contact_name ?? item.phone_number}
+                    {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                   </Text>
                   {isShared ? (
                     <Text style={[styles.sharedLabel, { color: theme.textTertiary }]}>

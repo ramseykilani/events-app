@@ -8,6 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Calendar as RNCalendar, DateData } from 'react-native-calendars';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { EventCard } from './EventCard';
 import type { CalendarEvent } from '../lib/types';
@@ -45,6 +46,7 @@ export function Calendar({
   onRefresh,
 }: Props) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<string>(
     toLocalDateString(new Date())
   );
@@ -71,25 +73,28 @@ export function Calendar({
   const dayEvents = events.filter((e) => e.event_date === selectedDate);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Events</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={[styles.helpButton, { borderColor: theme.border }]}
             onPress={() => router.push('/(app)/onboarding')}
+            activeOpacity={0.6}
           >
             <Text style={[styles.helpButtonText, { color: theme.textSecondary }]}>?</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.peopleButton}
             onPress={() => router.push('/(app)/people')}
+            activeOpacity={0.6}
           >
             <Text style={[styles.peopleButtonText, { color: theme.textPrimary }]}>People</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.fab, { backgroundColor: theme.primaryButtonBg }]}
             onPress={() => router.push('/(app)/add-event')}
+            activeOpacity={0.7}
           >
             <Text style={[styles.fabText, { color: theme.primaryButtonText }]}>+</Text>
           </TouchableOpacity>
@@ -130,11 +135,23 @@ export function Calendar({
           ) : undefined
         }
       >
-        <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-          {dayEvents.length === 0
-            ? 'No events'
-            : `${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}`}
-        </Text>
+        {dayEvents.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+              Nothing on this day.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(app)/add-event')}
+              activeOpacity={0.6}
+            >
+              <Text style={[styles.emptyAction, { color: theme.linkText }]}>Add an event</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+            {`${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}`}
+          </Text>
+        )}
         {dayEvents.map((event) => (
           <EventCard
             key={event.id}
@@ -160,7 +177,6 @@ export function Calendar({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 48,
   },
   header: {
     flexDirection: 'row',
@@ -218,5 +234,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 16,
+  },
+  emptyAction: {
+    fontSize: 16,
+    fontWeight: '600',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
 });

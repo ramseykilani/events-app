@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   FlatList,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getContactsWithPhones } from '../lib/contacts';
 import type { ContactWithPhone } from '../lib/contacts';
+import { formatPhoneDisplay } from '../lib/format';
 import { useTheme } from '../hooks/useTheme';
 
 type Props = {
@@ -24,6 +27,7 @@ export function PeoplePicker({
   existingPhones,
 }: Props) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [contacts, setContacts] = useState<ContactWithPhone[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -93,13 +97,18 @@ export function PeoplePicker({
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: theme.background, paddingTop: insets.top + 12 },
+        ]}
+      >
         <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-          <TouchableOpacity onPress={onCancel}>
+          <TouchableOpacity onPress={onCancel} activeOpacity={0.6}>
             <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: theme.textPrimary }]}>Add people</Text>
-          <TouchableOpacity onPress={handleConfirm} disabled={selected.size === 0}>
+          <TouchableOpacity onPress={handleConfirm} disabled={selected.size === 0} activeOpacity={0.6}>
             <Text
               style={[
                 styles.done,
@@ -112,13 +121,18 @@ export function PeoplePicker({
           </TouchableOpacity>
         </View>
         {loading ? (
-          <Text style={[styles.loading, { color: theme.textPrimary }]}>Loading contacts...</Text>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator color={theme.textPrimary} />
+            <Text style={[styles.loading, { color: theme.textSecondary }]}>
+              Loading contacts...
+            </Text>
+          </View>
         ) : loadError ? (
           <View style={styles.errorContainer}>
             <Text style={[styles.errorText, { color: theme.textSecondary }]}>
               Couldn't load your contacts.
             </Text>
-            <TouchableOpacity onPress={() => setRetryKey((k) => k + 1)}>
+            <TouchableOpacity onPress={() => setRetryKey((k) => k + 1)} activeOpacity={0.6}>
               <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -148,10 +162,18 @@ export function PeoplePicker({
                       isSelected && { backgroundColor: theme.selectedBg },
                     ]}
                     onPress={() => toggle(item)}
+                    activeOpacity={0.6}
                   >
-                    <Text style={[styles.name, { color: theme.textPrimary }]}>
-                      {item.name ?? item.phoneNumber}
-                    </Text>
+                    <View style={styles.rowText}>
+                      <Text style={[styles.name, { color: theme.textPrimary }]}>
+                        {item.name ?? formatPhoneDisplay(item.normalized)}
+                      </Text>
+                      {item.name ? (
+                        <Text style={[styles.phone, { color: theme.textSecondary }]}>
+                          {formatPhoneDisplay(item.normalized)}
+                        </Text>
+                      ) : null}
+                    </View>
                     {isSelected && <Text style={[styles.check, { color: theme.textPrimary }]}>✓</Text>}
                   </TouchableOpacity>
                 );
@@ -167,7 +189,6 @@ export function PeoplePicker({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 48,
   },
   header: {
     flexDirection: 'row',
@@ -188,8 +209,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  loading: {
+  loadingContainer: {
     padding: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loading: {
     fontSize: 16,
   },
   errorContainer: {
@@ -221,8 +246,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
   },
+  rowText: {
+    flex: 1,
+    paddingRight: 12,
+  },
   name: {
     fontSize: 16,
+  },
+  phone: {
+    fontSize: 13,
+    marginTop: 2,
   },
   check: {
     fontSize: 18,

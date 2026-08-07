@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
@@ -23,6 +24,7 @@ export default function ShareScreen() {
   const params = useLocalSearchParams<ShareParams>();
   const { session } = useSession();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const userId = session?.user?.id;
   const [people, setPeople] = useState<MyPerson[]>([]);
   const [circles, setCircles] = useState<Circle[]>([]);
@@ -182,15 +184,21 @@ export default function ShareScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.background, paddingTop: insets.top + 12 },
+      ]}
+    >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
           <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
         <TouchableOpacity
           onPress={handleConfirm}
           disabled={loading || selectedPersonIds.size === 0}
+          activeOpacity={0.6}
         >
           <Text
             style={[
@@ -212,7 +220,7 @@ export default function ShareScreen() {
         onSelectionChange={setSelectedPersonIds}
       />
       {loadError ? (
-        <TouchableOpacity onPress={loadData}>
+        <TouchableOpacity onPress={loadData} activeOpacity={0.6}>
           <Text style={[styles.loadError, { color: theme.textSecondary }]}>
             Could not load people. Tap to retry.
           </Text>
@@ -230,7 +238,6 @@ export default function ShareScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 48,
   },
   header: {
     flexDirection: 'row',

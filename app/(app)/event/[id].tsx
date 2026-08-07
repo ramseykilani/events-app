@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   Linking,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { showAlert, showConfirm } from '../../../lib/dialogs';
 import { showError } from '../../../lib/showError';
+import { formatEventDate, formatPhoneDisplay } from '../../../lib/format';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
 import { useTheme } from '../../../hooks/useTheme';
@@ -193,8 +195,8 @@ export default function EventDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Text style={[styles.loading, { color: theme.textPrimary }]}>Loading...</Text>
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.textPrimary} />
       </View>
     );
   }
@@ -203,7 +205,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
             <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -222,7 +224,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
             <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -230,7 +232,7 @@ export default function EventDetailScreen() {
           <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
             Could not load this event.
           </Text>
-          <TouchableOpacity onPress={load}>
+          <TouchableOpacity onPress={load} activeOpacity={0.6}>
             <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -242,7 +244,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
             <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -254,7 +256,7 @@ export default function EventDetailScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.navRow}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
           <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
       </View>
@@ -269,7 +271,7 @@ export default function EventDetailScreen() {
           ) : null}
           <Text style={[styles.title, { color: theme.textPrimary }]}>{event.title ?? 'Untitled event'}</Text>
           <Text style={[styles.meta, { color: theme.textSecondary }]}>
-            {event.event_date}
+            {formatEventDate(event.event_date)}
             {timeStr ? ` · ${timeStr}` : ''}
           </Text>
           {event.description ? (
@@ -279,6 +281,7 @@ export default function EventDetailScreen() {
             <TouchableOpacity
               style={styles.link}
               onPress={() => Linking.openURL(event.url!)}
+              activeOpacity={0.6}
             >
               <Text style={[styles.linkText, { color: theme.linkText }]}>Open link</Text>
             </TouchableOpacity>
@@ -288,7 +291,7 @@ export default function EventDetailScreen() {
               <Text style={[styles.sharedWithTitle, { color: theme.textSecondary }]}>Shared with</Text>
               {sharedWith.map((p) => (
                 <Text key={p.id} style={[styles.sharedWithItem, { color: theme.textPrimary }]}>
-                  {p.contact_name ?? p.phone_number}
+                  {p.contact_name ?? formatPhoneDisplay(p.phone_number)}
                 </Text>
               ))}
               <Text style={[styles.sharedWithNote, { color: theme.textTertiary }]}>
@@ -297,7 +300,7 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
           <View style={styles.actions}>
-            <TouchableOpacity style={[styles.shareButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleShare}>
+            <TouchableOpacity style={[styles.shareButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleShare} activeOpacity={0.7}>
               <Text style={[styles.shareButtonText, { color: theme.primaryButtonText }]}>Share</Text>
             </TouchableOpacity>
             {userEventId && (
@@ -309,6 +312,7 @@ export default function EventDetailScreen() {
                     params: { eventId: id, userEventId },
                   })
                 }
+                activeOpacity={0.7}
               >
                 <Text style={[styles.editButtonText, { color: theme.textPrimary }]}>Edit</Text>
               </TouchableOpacity>
@@ -317,6 +321,7 @@ export default function EventDetailScreen() {
               <TouchableOpacity
                 style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
                 onPress={handleDelete}
+                activeOpacity={0.7}
               >
                 <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
               </TouchableOpacity>
@@ -325,6 +330,7 @@ export default function EventDetailScreen() {
               <TouchableOpacity
                 style={[styles.hideButton, { backgroundColor: theme.surfaceSecondary }]}
                 onPress={handleToggleHide}
+                activeOpacity={0.7}
               >
                 <Text style={[styles.hideButtonText, { color: theme.textSecondary }]}>
                   {isHidden
@@ -343,6 +349,10 @@ export default function EventDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContent: {
     flexGrow: 1,

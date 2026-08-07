@@ -1,5 +1,6 @@
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import type { CalendarEvent } from '../lib/types';
+import { formatEventDate } from '../lib/format';
 import { useTheme } from '../hooks/useTheme';
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
 
 export function EventCard({ event, onPress }: Props) {
   const theme = useTheme();
+  const cardShadow = { shadowColor: theme.shadow };
 
   const timeStr = event.event_time
     ? new Date(`1970-01-01T${event.event_time}`).toLocaleTimeString([], {
@@ -19,7 +21,7 @@ export function EventCard({ event, onPress }: Props) {
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: theme.surface }]}
+      style={[styles.card, cardShadow, { backgroundColor: theme.surface }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -35,7 +37,7 @@ export function EventCard({ event, onPress }: Props) {
           {event.title ?? 'Untitled event'}
         </Text>
         <Text style={[styles.meta, { color: theme.textSecondary }]}>
-          {event.event_date}
+          {formatEventDate(event.event_date)}
           {timeStr ? ` · ${timeStr}` : ''}
         </Text>
         {event.sharer_contact_name && (
@@ -54,7 +56,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
