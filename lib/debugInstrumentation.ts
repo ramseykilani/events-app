@@ -15,6 +15,16 @@
 //       D: theme/color-scheme flip making text same color as background
 //       E: ancestor hidden/opacity-0/display:none (screen transition state)
 //       F: webfont not loaded (document.fonts)
+// Iteration 2 additions:
+//   - Artificial data-arrival delay knobs (dbgShareDelayMs / dbgEventDelayMs),
+//     seedable via URL query param (persisted to sessionStorage) or console.
+//   - Navigation event logging (pushState/replaceState/popstate) so data
+//     landing can be timed against the screen transition.
+//   - Dense probe phases incl. mount-time probes (pre-data) to capture the
+//     transition window itself.
+//   - Scene-stack dump per probe (aria-hidden/display/opacity/transform/inline
+//     style of every stacked screen) + rAF heartbeat (main-thread/raster
+//     stall detection) + mount ids.
 // Everything is a no-op off-web so Jest (Platform.OS='ios') is unaffected.
 
 import { Appearance, Platform } from 'react-native';
@@ -23,6 +33,143 @@ const SINK_URL = 'http://localhost:9100/log';
 
 function isWeb(): boolean {
   return Platform.OS === 'web' && typeof document !== 'undefined';
+}
+
+function tNow(): number {
+  try {
+    return Math.round(globalThis.performance?.now() ?? Date.now());
+  } catch {
+    return Date.now();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Delay knobs. Set once via URL query param on any full page load, e.g.
+//   http://localhost:8081/?dbgShareDelayMs=400&dbgEventDelayMs=800
+// (persisted into sessionStorage so client-side navigations keep it), or at
+// any time from devtools: sessionStorage.setItem('dbgShareDelayMs','400').
+// Knobs are re-read on every data load, so console changes take effect on the
+// next navigation without a reload.
+// ---------------------------------------------------------------------------
+function initKnobsFromUrl() {
+  if (!isWeb()) return;
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    sp.forEach((value, key) => {
+      if (key.startsWith('dbg')) {
+        sessionStorage.setItem(key, value);
+      }
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+export function dbgKnob(name: string): number {
+  if (!isWeb()) return 0;
+  try {
+    const v = sessionStorage.getItem(name) ?? localStorage.getItem(name);
+    const n = v ? parseInt(v, 10) : 0;
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function dbgSleep(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
+}
+
+// ---------------------------------------------------------------------------
+// Mount ids: correlate all logs belonging to one screen mount.
+// ---------------------------------------------------------------------------
+let mountCounter = 0;
+export function nextMountId(): number {
+  mountCounter += 1;
+  return mountCounter;
+}
+
+// ---------------------------------------------------------------------------
+// rAF heartbeat: while active (started per screen mount for ~3s), records
+// frame timestamps. If text is computed-visible but frames stalled, that is
+// evidence for a raster/main-thread stall (hypothesis A).
+// ---------------------------------------------------------------------------
+let heartbeatFrames: number[] = [];
+let heartbeatUntil = 0;
+let heartbeatRunning = false;
+
+export function startHeartbeat(ms: number) {
+  if (!isWeb()) return;
+  try {
+    heartbeatUntil = Math.max(heartbeatUntil, performance.now() + ms);
+    if (heartbeatRunning) return;
+    heartbeatRunning = true;
+    const tick = (t: number) => {
+      heartbeatFrames.push(t);
+      if (heartbeatFrames.length > 240) heartbeatFrames.shift();
+      if (performance.now() < heartbeatUntil) {
+        requestAnimationFrame(tick);
+      } else {
+        heartbeatRunning = false;
+      }
+    };
+    requestAnimationFrame(tick);
+  } catch {
+    /* ignore */
+  }
+}
+
+function heartbeatSummary() {
+  const frames = heartbeatFrames.slice(-180);
+  let maxGap = 0;
+  for (let i = 1; i < frames.length; i++) {
+    maxGap = Math.max(maxGap, frames[i] - frames[i - 1]);
+  }
+  const last = frames.length > 0 ? frames[frames.length - 1] : null;
+  return {
+    count: frames.length,
+    maxGapMs: Math.round(maxGap),
+    lastFrameAgoMs: last != null ? Math.round(performance.now() - last) : -1,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Navigation logging: exact URL-change timestamps = transition start times.
+// ---------------------------------------------------------------------------
+let navPatched = false;
+function initNavLogging() {
+  if (!isWeb() || navPatched) return;
+  navPatched = true;
+  try {
+    const wrap =
+      (fn: History['pushState'], tag: string): History['pushState'] =>
+      function (this: History, ...args: Parameters<History['pushState']>) {
+        const before = dbgUrl();
+        const ret = fn.apply(this, args);
+        const after = dbgUrl();
+        if (after !== before) {
+          dbgLog(
+            'debugInstrumentation:nav',
+            `url ${tag}`,
+            { from: before, to: after, tPerf: tNow() },
+            'E'
+          );
+        }
+        return ret;
+      };
+    history.pushState = wrap(history.pushState, 'pushState');
+    history.replaceState = wrap(history.replaceState, 'replaceState');
+    window.addEventListener('popstate', () => {
+      dbgLog(
+        'debugInstrumentation:nav',
+        'url popstate',
+        { to: dbgUrl(), tPerf: tNow() },
+        'E'
+      );
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 export function dbgUrl(): string {
@@ -46,6 +193,7 @@ export function dbgLog(
   data: Record<string, unknown>,
   hypothesisId: string
 ) {
+  initNavLogging();
   const line = JSON.stringify({
     id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     timestamp: Date.now(),
@@ -132,10 +280,18 @@ function describeElement(el: Element, allCssText: string) {
       ariaHidden: node.getAttribute('aria-hidden') || undefined,
       inert: node.hasAttribute('inert') || undefined,
       display: cs.display,
+      position: cs.position !== 'static' ? cs.position : undefined,
+      zIndex: cs.zIndex !== 'auto' ? cs.zIndex : undefined,
       opacity: cs.opacity !== '1' ? cs.opacity : undefined,
       visibility: cs.visibility !== 'visible' ? cs.visibility : undefined,
       transform: cs.transform !== 'none' ? cs.transform.slice(0, 60) : undefined,
+      transition:
+        cs.transitionProperty && cs.transitionProperty !== 'none'
+          ? `${cs.transitionProperty} ${cs.transitionDuration}`.slice(0, 60)
+          : undefined,
       anims: (node.getAnimations ? node.getAnimations().length : 0) || undefined,
+      // Animated-driven transitions on web mutate inline styles; capture them.
+      inline: (node.getAttribute('style') || '').slice(0, 140) || undefined,
     });
     node = node.parentElement;
     depth += 1;
@@ -200,12 +356,60 @@ function findTextHosts(needle: string): Element[] {
   return out;
 }
 
+// Dump the stacked screen containers (expo-router keeps previous screens
+// mounted, toggling aria-hidden/display and animating inline styles). At each
+// probe phase this shows whether the active scene is mid-transition.
+function dumpScenes(): unknown[] {
+  const out: unknown[] = [];
+  try {
+    const root = document.getElementById('root') ?? document.body;
+    let node: Element | null = root;
+    let hops = 0;
+    while (node && hops < 9 && out.length < 3) {
+      const kids: Element[] = Array.from(node.children);
+      if (kids.length > 1) {
+        out.push({
+          parentClass: (node.className || '').toString().slice(0, 60),
+          scenes: kids.slice(0, 8).map((k: Element) => {
+            const cs = window.getComputedStyle(k);
+            return {
+              class: (k.className || '').toString().slice(0, 70),
+              ariaHidden: k.getAttribute('aria-hidden') || undefined,
+              display: cs.display,
+              opacity: cs.opacity,
+              transform:
+                cs.transform !== 'none' ? cs.transform.slice(0, 50) : undefined,
+              transition:
+                cs.transitionProperty && cs.transitionProperty !== 'none'
+                  ? `${cs.transitionProperty} ${cs.transitionDuration}`.slice(
+                      0,
+                      50
+                    )
+                  : undefined,
+              textChars: (k.textContent || '').length,
+              inline: (k.getAttribute('style') || '').slice(0, 120) || undefined,
+            };
+          }),
+        });
+        node = kids[kids.length - 1];
+      } else {
+        node = kids[0] ?? null;
+      }
+      hops += 1;
+    }
+  } catch {
+    /* ignore */
+  }
+  return out;
+}
+
 export function probeScreenTexts(spec: {
   screen: string;
   phase: string;
   targets: string[];
   controls: string[];
   hypothesisId: string;
+  mount?: number;
 }) {
   if (!isWeb()) return;
   try {
@@ -233,10 +437,12 @@ export function probeScreenTexts(spec: {
       {
         screen: spec.screen,
         phase: spec.phase,
+        mount: spec.mount,
         url:
           typeof window !== 'undefined'
             ? window.location.pathname + window.location.search
             : '',
+        tPerf: tNow(),
         colorScheme: Appearance.getColorScheme(),
         fontsStatus:
           typeof document.fonts !== 'undefined' ? document.fonts.status : 'n/a',
@@ -247,6 +453,8 @@ export function probeScreenTexts(spec: {
           typeof document.getAnimations === 'function'
             ? document.getAnimations().length
             : -1,
+        heartbeat: heartbeatSummary(),
+        scenes: dumpScenes(),
         dpr: window.devicePixelRatio,
         results: [
           ...spec.targets.map((t) => probeOne(t, 'target')),
@@ -260,15 +468,16 @@ export function probeScreenTexts(spec: {
   }
 }
 
-// Run the probe right after first paint (double rAF) and twice later, so we
-// can tell a permanent paint failure from a delayed recovery. Diagnostic
-// sampling only.
+// Run probes right after paint and at dense offsets afterwards, so transient
+// transition-window states are captured, not just settled end states.
 export function scheduleDomProbes(run: (phase: string) => void) {
   if (!isWeb()) return;
   try {
+    requestAnimationFrame(() => run('raf1'));
     requestAnimationFrame(() => requestAnimationFrame(() => run('raf2')));
-    setTimeout(() => run('t600'), 600);
-    setTimeout(() => run('t2500'), 2500);
+    [150, 350, 600, 1200, 2500].forEach((ms) =>
+      setTimeout(() => run(`t${ms}`), ms)
+    );
   } catch {
     /* ignore */
   }
@@ -282,4 +491,6 @@ export function probeOnceLater(ms: number, run: (phase: string) => void) {
     /* ignore */
   }
 }
+
+initKnobsFromUrl();
 // #endregion

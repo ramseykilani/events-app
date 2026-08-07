@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,10 @@ import { useTheme } from '../../../hooks/useTheme';
 import {
   dbgLog,
   dbgUrl,
+  dbgKnob,
+  dbgSleep,
+  nextMountId,
+  startHeartbeat,
   scheduleDomProbes,
   probeScreenTexts,
 } from '../../../lib/debugInstrumentation';
@@ -51,6 +55,22 @@ export default function EventDetailScreen() {
 
   const load = useCallback(async () => {
     if (!id || !session?.user?.id) return;
+
+    // #region agent log
+    // Artificial data-arrival delay knob (debug only, default 0): forces the
+    // event query to land at a controlled offset after navigation.
+    const dbgDelayMs = dbgKnob('dbgEventDelayMs');
+    dbgLog(
+      'event/[id].tsx:load',
+      'load start',
+      {
+        delayMs: dbgDelayMs,
+        tPerf: Math.round(globalThis.performance?.now() ?? 0),
+      },
+      'E'
+    );
+    if (dbgDelayMs > 0) await dbgSleep(dbgDelayMs);
+    // #endregion
 
     const { data, error } = await supabase
       .from('events')
@@ -128,12 +148,15 @@ export default function EventDetailScreen() {
   );
 
   // #region agent log
+  const dbgMountId = useMemo(() => nextMountId(), []);
   const dbgScheme = useColorScheme();
   dbgLog(
     'event/[id].tsx:render',
     'EventDetail render',
     {
       scheme: dbgScheme,
+      mount: dbgMountId,
+      tPerf: Math.round(globalThis.performance?.now() ?? 0),
       loading,
       hasEvent: !!event,
       title: event?.title ?? null,
@@ -146,12 +169,43 @@ export default function EventDetailScreen() {
     },
     'D'
   );
+  // Mount-time probes: capture the transition window itself (content usually
+  // still loading; probes still dump scene-stack + heartbeat state).
+  useEffect(() => {
+    startHeartbeat(3000);
+    dbgLog(
+      'event/[id].tsx:mount',
+      'EventDetail mounted',
+      {
+        mount: dbgMountId,
+        url: dbgUrl(),
+        tPerf: Math.round(globalThis.performance?.now() ?? 0),
+        eventDelayMs: dbgKnob('dbgEventDelayMs'),
+      },
+      'E'
+    );
+    scheduleDomProbes((phase) =>
+      probeScreenTexts({
+        screen: 'event-detail-mount',
+        phase,
+        targets: ['Back'],
+        controls: [],
+        hypothesisId: 'E',
+        mount: dbgMountId,
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (loading || !event) return;
     dbgLog(
       'event/[id].tsx:effect',
       'content visible, scheduling DOM probes',
-      { title: event.title ?? null },
+      {
+        title: event.title ?? null,
+        mount: dbgMountId,
+        tPerf: Math.round(globalThis.performance?.now() ?? 0),
+      },
       'A'
     );
     scheduleDomProbes((phase) =>
@@ -161,6 +215,7 @@ export default function EventDetailScreen() {
         targets: ['Back'],
         controls: [event.title ?? 'Untitled event', 'Share'],
         hypothesisId: 'A',
+        mount: dbgMountId,
       })
     );
   }, [loading, event]);

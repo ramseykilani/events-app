@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,16 @@ import { ShareSheet } from '../../components/ShareSheet';
 import type { MyPerson, Circle, CircleMember } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 // #region agent log
-import { dbgLog, dbgUrl } from '../../lib/debugInstrumentation';
+import {
+  dbgLog,
+  dbgUrl,
+  dbgKnob,
+  dbgSleep,
+  nextMountId,
+  startHeartbeat,
+  scheduleDomProbes,
+  probeScreenTexts,
+} from '../../lib/debugInstrumentation';
 // #endregion
 
 type ShareParams = {
@@ -45,12 +54,15 @@ export default function ShareScreen() {
   const [loadError, setLoadError] = useState(false);
 
   // #region agent log
+  const dbgMountId = useMemo(() => nextMountId(), []);
   const dbgScheme = useColorScheme();
   dbgLog(
     'share.tsx:render',
     'ShareScreen render',
     {
       scheme: dbgScheme,
+      mount: dbgMountId,
+      tPerf: Math.round(globalThis.performance?.now() ?? 0),
       insets: { top: insets.top, bottom: insets.bottom },
       peopleCount: people.length,
       alreadySharedCount: alreadySharedIds.size,
@@ -64,6 +76,33 @@ export default function ShareScreen() {
     },
     'D'
   );
+  // Mount-time probes: capture the transition window itself (before people
+  // data lands). Heartbeat records frame cadence for stall detection.
+  useEffect(() => {
+    startHeartbeat(3000);
+    dbgLog(
+      'share.tsx:mount',
+      'ShareScreen mounted',
+      {
+        mount: dbgMountId,
+        url: dbgUrl(),
+        tPerf: Math.round(globalThis.performance?.now() ?? 0),
+        shareDelayMs: dbgKnob('dbgShareDelayMs'),
+      },
+      'E'
+    );
+    scheduleDomProbes((phase) =>
+      probeScreenTexts({
+        screen: 'share-mount',
+        phase,
+        targets: ['Share with', 'Cancel'],
+        controls: [],
+        hypothesisId: 'E',
+        mount: dbgMountId,
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // #endregion
 
   const firstParamValue = (value?: string | string[]) =>
@@ -71,6 +110,23 @@ export default function ShareScreen() {
 
   const loadData = useCallback(async () => {
     if (!userId) return;
+
+    // #region agent log
+    // Artificial data-arrival delay knob (debug only, default 0): forces the
+    // people query to land at a controlled offset after navigation so the
+    // transition race can be reproduced deterministically.
+    const dbgDelayMs = dbgKnob('dbgShareDelayMs');
+    dbgLog(
+      'share.tsx:loadData',
+      'loadData start',
+      {
+        delayMs: dbgDelayMs,
+        tPerf: Math.round(globalThis.performance?.now() ?? 0),
+      },
+      'E'
+    );
+    if (dbgDelayMs > 0) await dbgSleep(dbgDelayMs);
+    // #endregion
 
     const { data: peopleData, error: peopleErr } = await supabase
       .from('my_people')
@@ -128,6 +184,8 @@ export default function ShareScreen() {
         peopleCount: (peopleData ?? []).length,
         alreadySharedCount: ueId ? undefined : 0,
         userEventId: ueId ?? null,
+        delayMs: dbgDelayMs,
+        tPerf: Math.round(globalThis.performance?.now() ?? 0),
       },
       'C'
     );

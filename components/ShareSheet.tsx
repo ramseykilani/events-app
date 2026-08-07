@@ -66,7 +66,10 @@ export function ShareSheet({
     dbgLog(
       'ShareSheet.tsx:effect',
       'people loaded, scheduling DOM probes',
-      { targets },
+      {
+        targets,
+        tPerf: Math.round(globalThis.performance?.now() ?? 0),
+      },
       'A'
     );
     scheduleDomProbes((phase) =>
