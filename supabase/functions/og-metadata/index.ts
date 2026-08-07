@@ -3,10 +3,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_RESPONSE_SIZE = 1024 * 1024; // 1MB
+// supabase-js always sends apikey and x-client-info alongside Authorization;
+// all four must be allowed or the browser preflight blocks the call.
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface OgMetadata {
