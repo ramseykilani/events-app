@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   phone_number: string;
+  expo_push_token: string | null;
   created_at: string;
 }
 
