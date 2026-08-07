@@ -154,16 +154,18 @@ Add indexes on the following columns to prevent the calendar query from degradin
 
 ### "Show me my calendar" (`get_calendar_events` RPC)
 
-This is the main query the app runs. It finds all events that have been shared with the current user, excluding events from hidden people:
+This is the main query the app runs. It returns the union of events shared with the current user (excluding events from hidden people) and the user's own events, deduplicated by `event_id`:
 
 ```
 Given: current user's user_id, start_date, end_date
+→ Guard: raise unless p_user_id = auth.uid() (the function is SECURITY DEFINER)
 → Find all my_people rows where user_id = current_user_id (i.e. where other users have added me)
 → Join: event_shares.person_id → my_people.id
 → Join: event_shares.user_event_id → user_events → events
 → LEFT JOIN hidden_people on (owner_id = current_user_id AND person_id = sharer's my_people.id)
 → WHERE hp.id IS NULL (exclude hidden)
-→ Return: event details + sharer_contact_name + sharer_person_id + sharer_user_id
+→ UNION ALL: the user's own user_events → events (excluding event_ids already returned above)
+→ Return: event details + sharer_contact_name + sharer_person_id + sharer_user_id (null sharer fields for owned events)
 → Filter by date range
 ```
 
@@ -191,19 +193,17 @@ When a user sees an event on their calendar and wants to share it with their own
 3. User enters code → Supabase creates auth user
 4. User record created in users table
 5. Database trigger runs: matches phone number against all my_people rows, populates user_id where matched
-6. App navigates to the setup-people screen (see flow 2)
+6. App lands on the main calendar. Because the trigger already linked matching my_people rows, events shared with this phone number are visible immediately — no setup step required.
+7. If the user has no events at all and hasn't seen the walkthrough yet, the onboarding walkthrough (`app/(app)/onboarding.tsx`) is shown once. It is always reopenable via the `?` button in the calendar header.
 
 ### 2. Setting Up Your People
 
-The setup-people screen lives in the `(auth)` group — it runs immediately after sign-up, before the user reaches the main calendar. Contact permission is requested here for the first time.
+People are added from the People screen (or when tapping Share) — there is no forced setup step after sign-up.
 
-1. App requests access to device contacts (Expo Contacts API)
+1. App requests access to device contacts (Expo Contacts API), with an explainer dialog first
 2. User selects up to 50 contacts from their phone — these become their in-app people list
 3. Phone numbers are normalized to E.164 and stored in my_people
-4. App checks which phone numbers already exist in users table and shows a subtle indicator for contacts already on the app
-5. User proceeds to the main calendar
-
-Contact permission can also be triggered later from the People screen or when the user taps "Share" — users who skip setup can still add people later. Circles can be set up at any point from the People screen.
+4. Circles can be set up at any point from the People screen
 
 ### 3. Share an Event (New)
 
@@ -227,6 +227,8 @@ Contact permission can also be triggered later from the People screen or when th
 4. **Sharing screen (mandatory):** User must select at least one person before confirming
 5. event_shares rows created, last_shared_at updated, notifications sent
 
+The sharing screen diffs the selection against existing shares: newly selected people get new event_shares rows (and notifications), and deselected people have their event_shares rows deleted (unshare). Clearing the whole selection is allowed when editing existing shares.
+
 ### 5. Edit an Event (Fork, Not Mutate)
 
 Events are immutable snapshots. Editing creates a fork:
@@ -237,7 +239,13 @@ Events are immutable snapshots. Editing creates a fork:
 4. The old event row remains completely untouched
 5. Anyone who previously re-shared the old version still has their version — no propagation, no shared mutation
 
+If the edited fields exactly match a snapshot the user already owns (unique constraint on user_events), the app merges into that existing copy: shares the old copy had that the target lacks are moved over, then the old user_events row is deleted.
+
 This means each user's view of an event is their own. Nobody can change your data.
+
+### 5a. Remove an Event
+
+Removing an event from your calendar deletes only your own user_events row (your event_shares cascade with it). The events row itself is never deleted by the app — other users may have adopted the same snapshot, and deleting it would destroy their copies. Snapshots with no remaining user_events are reclaimed by the `cleanup-events` cron job.
 
 ### 6. Hide / Unhide a Person
 
@@ -277,24 +285,25 @@ The `send-notification` Edge Function sends a push notification and/or SMS to ea
 
 **Sending flow:**
 1. `share.tsx` calls the Edge Function fire-and-forget after event_shares are created, passing `userEventId`
-2. Function queries all event_shares for that userEventId, including `my_people.phone_number`
-3. Fetches the sharer's `users.phone_number` once (used as display identifier in SMS to non-app users)
-4. For each recipient:
-   - **Non-app user** (`my_people.user_id IS NULL`): sends an SMS with event info and App Store / Play Store download links
-   - **App user** (`my_people.user_id IS NOT NULL`): looks up their push token, checks hidden_people (skips both push and SMS if the sharer is hidden), then queues a push notification and an SMS containing a deep link (`events-app://event/[eventId]`)
-5. Push messages are batch-sent to the Expo Push API; SMS messages are fired concurrently via the Twilio REST API
-6. `DeviceNotRegistered` errors from Expo Push API clear the stale token
-7. SMS failures are logged via `console.error` and never propagate — missing Twilio credentials silently disable SMS
+2. The function requires a valid user JWT and verifies the caller owns that user_events row — otherwise 401/403
+3. Function queries all event_shares for that userEventId, including `my_people.phone_number`, and fetches the event's `url`
+4. Fetches the sharer's `users.phone_number` once (used as display identifier in SMS to non-app users)
+5. For each recipient:
+   - **Non-app user** (`my_people.user_id IS NULL`): sends an SMS with event info, the event URL (when present), and App Store / Play Store download links
+   - **App user** (`my_people.user_id IS NOT NULL`): checks whether the sharer is in the recipient's hidden_people (lookup is by the recipient's my_people; skips both push and SMS if hidden), then queues a push notification when a token exists and an SMS containing the event URL (when present) plus a deep link (`events-app://event/[eventId]`). A missing push token never suppresses the SMS.
+6. Push messages are batch-sent to the Expo Push API; SMS messages are fired concurrently via the Twilio REST API
+7. `DeviceNotRegistered` errors from Expo Push API clear the stale token
+8. SMS failures are logged via `console.error` and never propagate — missing Twilio credentials silently disable SMS
 
 **Push notification body:** `{ title: "[Name] added you to [Event Title]", body: "[date] · [time]", data: { eventId } }`
 
-**SMS body (app user):** `"[DisplayName] added you to [EventTitle] on [DateStr][· TimeStr]\nevents-app://event/[eventId]"`
+**SMS body (app user):** `"[DisplayName] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]\nevents-app://event/[eventId]"` — the event URL line is omitted for linkless events.
 
-**SMS body (non-app user):** `"[SharerPhone] added you to [EventTitle] on [DateStr][· TimeStr]\nGet the Events app:\niOS: [IOS_APP_STORE_URL]\nAndroid: [ANDROID_PLAY_STORE_URL]\n\nReply STOP to unsubscribe."`
+**SMS body (non-app user):** `"[SharerPhone] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]\nGet the Events app:\niOS: [IOS_APP_STORE_URL]\nAndroid: [ANDROID_PLAY_STORE_URL]\n\nReply STOP to unsubscribe."` — the event URL line is omitted for linkless events.
 
 **Tap handler (push):** Configured in `app/_layout.tsx` — tapping a notification navigates to `/(app)/event/[eventId]`.
 
-**Required Supabase secrets:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `IOS_APP_STORE_URL` (optional), `ANDROID_PLAY_STORE_URL` (optional — at least one store URL must be set for SMS to non-app users)
+**Required Supabase secrets:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `IOS_APP_STORE_URL` (optional), `ANDROID_PLAY_STORE_URL` (optional). Store URLs gate only SMS to non-app users (who are told where to get the app); app-user SMS needs just the Twilio credentials.
 
 ---
 
@@ -316,12 +325,12 @@ Only fetch OG metadata when a URL is present and when the URL changes during an 
 
 Supabase RLS policies ensure users can only access data they should see. Key policies:
 
-- **users:** Users can read their own row. Phone number lookups restricted to server-side functions.
+- **users:** Users can read and update their own row (update exists so the app can persist `expo_push_token`). Phone number lookups restricted to server-side functions.
 - **circles:** Users can only CRUD their own circles.
 - **circle_members:** Users can only CRUD members of their own circles.
-- **events:** Readable only if the user created the event (via user_events) or has been shared the event (via event_shares). No global public read access.
-- **user_events:** Users can create/delete their own. Readable if the viewer has been shared the event.
-- **event_shares:** Creatable by the user_event owner. Readable by the person the event was shared with.
+- **events:** Readable only if the user created the event (via user_events) or has been shared the event (via event_shares). No global public read access. No delete policy — the app never deletes events rows (see "Remove an Event"); orphaned rows are reclaimed by the cleanup cron.
+- **user_events:** Users can create/update/delete their own. Readable if the viewer has been shared the event.
+- **event_shares:** Creatable and deletable by the user_event owner. Readable by the person the event was shared with.
 - **hidden_people:** Owner-only CRUD.
 
 ---
@@ -336,15 +345,14 @@ events-app/
 │   │   ├── index.tsx               # Calendar (main screen)
 │   │   ├── add-event.tsx           # Paste URL or enter details, set date/time
 │   │   ├── edit-event.tsx          # Edit screen — creates a fork, not a mutation
-│   │   ├── event/[id].tsx          # Event detail — who shared it, share/hide button
-│   │   ├── onboarding.tsx          # Walkthrough shown after first sign-up
+│   │   ├── event/[id].tsx          # Event detail — who shared it, share/hide/remove buttons
+│   │   ├── onboarding.tsx          # Optional walkthrough — auto-shows once when the calendar is empty
 │   │   ├── people.tsx              # My People — manage list, circles, hidden people
-│   │   └── share.tsx               # Sharing screen — select people/circles
+│   │   └── share.tsx               # Sharing screen — select people/circles (also unshare)
 │   ├── (auth)/                     # Unauthenticated screens
 │   │   ├── _layout.tsx
 │   │   ├── sign-in.tsx
-│   │   ├── verify.tsx
-│   │   └── setup-people.tsx        # Contact selection — runs immediately after sign-up
+│   │   └── verify.tsx
 │   ├── _context/
 │   │   └── SessionContext.tsx      # Auth session state
 │   └── _layout.tsx                 # Root layout — push notification registration + tap handler

@@ -64,8 +64,8 @@ Push notifications only reach users who have installed the app. Non-app users (c
 
 When an event is shared, the `send-notification` Edge Function also sends an SMS via Twilio to every recipient:
 
-- **Non-app users:** SMS with event details (title, date, time), the sharer's phone number as display identity, and App Store / Play Store download links
-- **App users:** SMS with event details and a deep link (`events-app://event/[eventId]`) that opens directly to the event, in addition to their existing push notification
+- **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, the sharer's phone number as display identity, and App Store / Play Store download links
+- **App users:** SMS with event details, the event URL when one exists, and a deep link (`events-app://event/[eventId]`) that opens directly to the event, in addition to their existing push notification. A missing push token does not suppress the SMS.
 
 This means the only person who needs the app is the one sending events. Friends can receive invitations and decide to download the app from there.
 

@@ -36,7 +36,7 @@ Two test OTPs are configured on the Supabase project (both expire March 31, 2027
 - Phone `+15555550100`, code `123456`
 - Phone `+15555550101`, code `123456`
 
-Use either to sign in without a real SMS provider. The second number is useful for testing multi-user scenarios (e.g. sharing events between two accounts). After sign-in the app shows an onboarding walkthrough, then the main calendar.
+Use either to sign in without a real SMS provider. The second number is useful for testing multi-user scenarios (e.g. sharing events between two accounts). After sign-in the app goes straight to the calendar; the onboarding walkthrough auto-shows only when the user has no events at all, and can be reopened via the `?` button.
 
 ### Linting / type checking
 
@@ -75,4 +75,4 @@ Then follow:
 - Edge Functions in `supabase/functions/` are Deno/TypeScript (excluded from the main `tsconfig.json`).
 - Phone auth requires a real SMS provider (Twilio) configured in the Supabase project. Fake/test phone numbers like `+15555550100` are rejected by Twilio with `sms_send_failed`. To test sign-in without real SMS, configure a "Test OTP" phone/code pair in the Supabase Dashboard under **Authentication > Settings**.
 - When the `.env` file changes, the Expo dev server must be restarted to pick up new values (Metro does not hot-reload env vars).
-- The app's sign-in error handling silently fails in the console — no user-facing alert is shown for SMS send failures.
+- Sign-in surfaces SMS send failures to the user via `showError` (detailed alert with code/details) — check that dialog when auth testing fails.
