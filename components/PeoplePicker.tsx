@@ -104,11 +104,17 @@ export function PeoplePicker({
         ]}
       >
         <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-          <TouchableOpacity onPress={onCancel} activeOpacity={0.6}>
+          <TouchableOpacity onPress={onCancel} activeOpacity={0.6} accessibilityRole="button">
             <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: theme.textPrimary }]}>Add people</Text>
-          <TouchableOpacity onPress={handleConfirm} disabled={selected.size === 0} activeOpacity={0.6}>
+          <TouchableOpacity
+            onPress={handleConfirm}
+            disabled={selected.size === 0}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: selected.size === 0 }}
+          >
             <Text
               style={[
                 styles.done,
@@ -146,6 +152,7 @@ export function PeoplePicker({
               onChangeText={setSearchQuery}
               autoCapitalize="none"
               autoCorrect={false}
+              accessibilityLabel="Search contacts"
             />
             <FlatList
               data={filteredContacts}
@@ -163,6 +170,8 @@ export function PeoplePicker({
                     ]}
                     onPress={() => toggle(item)}
                     activeOpacity={0.6}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
                   >
                     <View style={styles.rowText}>
                       <Text style={[styles.name, { color: theme.textPrimary }]}>

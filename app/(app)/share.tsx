@@ -191,7 +191,7 @@ export default function ShareScreen() {
       ]}
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
@@ -199,6 +199,8 @@ export default function ShareScreen() {
           onPress={handleConfirm}
           disabled={loading || selectedPersonIds.size === 0}
           activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loading || selectedPersonIds.size === 0 }}
         >
           <Text
             style={[

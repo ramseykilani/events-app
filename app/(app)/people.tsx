@@ -325,11 +325,17 @@ export default function PeopleScreen() {
       ]}
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.back, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>My People</Text>
-        <TouchableOpacity onPress={handleAddPeople} disabled={people.length >= 50} activeOpacity={0.6}>
+        <TouchableOpacity
+          onPress={handleAddPeople}
+          disabled={people.length >= 50}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: people.length >= 50 }}
+        >
           <Text
             style={[
               styles.add,
@@ -359,7 +365,7 @@ export default function PeopleScreen() {
             Add people from your contacts to organize them into circles and
             invite them to events.
           </Text>
-          <TouchableOpacity style={[styles.emptyButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleAddPeople} activeOpacity={0.7}>
+          <TouchableOpacity style={[styles.emptyButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleAddPeople} activeOpacity={0.7} accessibilityRole="button">
             <Text style={[styles.emptyButtonText, { color: theme.primaryButtonText }]}>Add from Contacts</Text>
           </TouchableOpacity>
         </View>
@@ -376,10 +382,10 @@ export default function PeopleScreen() {
                   </Text>
                 </View>
                 <View style={styles.circleActions}>
-                  <TouchableOpacity onPress={() => handleEditCircleMembers(circle)} activeOpacity={0.6}>
+                  <TouchableOpacity onPress={() => handleEditCircleMembers(circle)} activeOpacity={0.6} accessibilityRole="button">
                     <Text style={[styles.manage, { color: theme.linkText }]}>Edit</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleRemoveCircle(circle)} activeOpacity={0.6}>
+                  <TouchableOpacity onPress={() => handleRemoveCircle(circle)} activeOpacity={0.6} accessibilityRole="button">
                     <Text style={[styles.remove, { color: theme.destructiveLink }]}>Delete</Text>
                   </TouchableOpacity>
                 </View>
@@ -413,7 +419,7 @@ export default function PeopleScreen() {
                   <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                   </Text>
-                  <TouchableOpacity onPress={() => handleRemovePerson(item)} activeOpacity={0.6}>
+                  <TouchableOpacity onPress={() => handleRemovePerson(item)} activeOpacity={0.6} accessibilityRole="button">
                     <Text style={[styles.remove, { color: theme.destructiveLink }]}>Remove</Text>
                   </TouchableOpacity>
                 </View>
@@ -427,7 +433,7 @@ export default function PeopleScreen() {
                         <Text style={[styles.personName, { color: theme.textPrimary }]}>
                           {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                         </Text>
-                        <TouchableOpacity onPress={() => handleUnhide(item.id)} activeOpacity={0.6}>
+                        <TouchableOpacity onPress={() => handleUnhide(item.id)} activeOpacity={0.6} accessibilityRole="button">
                           <Text style={[styles.unhide, { color: theme.linkText }]}>Unhide</Text>
                         </TouchableOpacity>
                       </View>
@@ -454,11 +460,11 @@ export default function PeopleScreen() {
           ]}
         >
           <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
-            <TouchableOpacity onPress={() => setEditingCircle(null)} activeOpacity={0.6}>
+            <TouchableOpacity onPress={() => setEditingCircle(null)} activeOpacity={0.6} accessibilityRole="button">
               <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[styles.title, { color: theme.textPrimary }]}>{editingCircle?.name ?? 'Circle'}</Text>
-            <TouchableOpacity onPress={handleSaveCircleMembers} activeOpacity={0.6}>
+            <TouchableOpacity onPress={handleSaveCircleMembers} activeOpacity={0.6} accessibilityRole="button">
               <Text style={[styles.add, { color: theme.textPrimary }]}>Save</Text>
             </TouchableOpacity>
           </View>
@@ -476,6 +482,8 @@ export default function PeopleScreen() {
                   ]}
                   onPress={() => toggleMember(item.id)}
                   activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
                 >
                   <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? formatPhoneDisplay(item.phone_number)}

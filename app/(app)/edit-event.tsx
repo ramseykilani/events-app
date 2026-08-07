@@ -232,7 +232,7 @@ export default function EditEventScreen() {
     >
       <ScrollView keyboardShouldPersistTaps="handled">
         <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Edit event</Text>
@@ -240,6 +240,8 @@ export default function EditEventScreen() {
           onPress={handleSave}
           disabled={loading || (!title.trim() && !url.trim())}
           activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loading || (!title.trim() && !url.trim()) }}
         >
           <Text
             style={[

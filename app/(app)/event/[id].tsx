@@ -205,7 +205,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
             <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -224,7 +224,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
             <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -244,7 +244,7 @@ export default function EventDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
             <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -256,7 +256,7 @@ export default function EventDetailScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.navRow}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
       </View>
@@ -267,6 +267,7 @@ export default function EventDetailScreen() {
               source={{ uri: event.image_url }}
               style={styles.image}
               resizeMode="cover"
+              accessibilityLabel={event.title ? `${event.title} image` : 'Event image'}
             />
           ) : null}
           <Text style={[styles.title, { color: theme.textPrimary }]}>{event.title ?? 'Untitled event'}</Text>
@@ -300,7 +301,7 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
           <View style={styles.actions}>
-            <TouchableOpacity style={[styles.shareButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleShare} activeOpacity={0.7}>
+            <TouchableOpacity style={[styles.shareButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleShare} activeOpacity={0.7} accessibilityRole="button">
               <Text style={[styles.shareButtonText, { color: theme.primaryButtonText }]}>Share</Text>
             </TouchableOpacity>
             {userEventId && (

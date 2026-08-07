@@ -87,6 +87,8 @@ export function ShareSheet({
                   ]}
                   onPress={() => toggleCircle(circle)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: allSelected, disabled: allShared }}
                 >
                   <Text
                     style={[
@@ -106,7 +108,11 @@ export function ShareSheet({
         <View style={styles.peopleHeader}>
           <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>People</Text>
           {people.length > 0 && (
-            <TouchableOpacity onPress={() => router.push('/(app)/people')} activeOpacity={0.6}>
+            <TouchableOpacity
+              onPress={() => router.push('/(app)/people')}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+            >
               <Text style={[styles.manageLink, { color: theme.linkText }]}>Manage</Text>
             </TouchableOpacity>
           )}
@@ -121,6 +127,7 @@ export function ShareSheet({
               style={[styles.emptyPeopleButton, { backgroundColor: theme.primaryButtonBg }]}
               onPress={() => router.push('/(app)/people')}
               activeOpacity={0.7}
+              accessibilityRole="button"
             >
               <Text style={[styles.emptyPeopleButtonText, { color: theme.primaryButtonText }]}>Add People</Text>
             </TouchableOpacity>
@@ -142,6 +149,8 @@ export function ShareSheet({
                   ]}
                   onPress={() => togglePerson(item.id)}
                   activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected, disabled: isShared }}
                 >
                   <Text
                     style={[

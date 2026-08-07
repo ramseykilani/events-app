@@ -81,6 +81,8 @@ export function Calendar({
             style={[styles.helpButton, { borderColor: theme.border }]}
             onPress={() => router.push('/(app)/onboarding')}
             activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityLabel="Help"
           >
             <Text style={[styles.helpButtonText, { color: theme.textSecondary }]}>?</Text>
           </TouchableOpacity>
@@ -88,6 +90,7 @@ export function Calendar({
             style={styles.peopleButton}
             onPress={() => router.push('/(app)/people')}
             activeOpacity={0.6}
+            accessibilityRole="button"
           >
             <Text style={[styles.peopleButtonText, { color: theme.textPrimary }]}>People</Text>
           </TouchableOpacity>
@@ -95,6 +98,8 @@ export function Calendar({
             style={[styles.fab, { backgroundColor: theme.primaryButtonBg }]}
             onPress={() => router.push('/(app)/add-event')}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Add event"
           >
             <Text style={[styles.fabText, { color: theme.primaryButtonText }]}>+</Text>
           </TouchableOpacity>
@@ -195,9 +200,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   helpButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

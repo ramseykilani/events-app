@@ -24,6 +24,8 @@ export function EventCard({ event, onPress }: Props) {
       style={[styles.card, cardShadow, { backgroundColor: theme.surface }]}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={event.title ?? 'Untitled event'}
     >
       {event.image_url ? (
         <Image

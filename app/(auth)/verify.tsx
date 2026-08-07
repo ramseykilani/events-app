@@ -114,12 +114,15 @@ export default function VerifyScreen() {
           keyboardType="number-pad"
           maxLength={6}
           editable={!loading}
+          accessibilityLabel="Verification code"
         />
         <TouchableOpacity
           style={[styles.button, { backgroundColor: theme.primaryButtonBg }, loading && styles.buttonDisabled]}
           onPress={handleVerify}
           disabled={loading}
           testID="verify-button"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loading }}
         >
           <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
             {loading ? 'Verifying...' : 'Verify'}
@@ -132,6 +135,8 @@ export default function VerifyScreen() {
           ]}
           onPress={handleResend}
           disabled={resendCooldown > 0 || resending || loading}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: resendCooldown > 0 || resending || loading }}
         >
           <Text style={[styles.resendButtonText, { color: theme.textSecondary }]}>
             {resending
