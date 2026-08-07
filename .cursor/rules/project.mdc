@@ -20,12 +20,13 @@ Read `docs/events-technical-architecture.md` for the full architecture, data mod
 ## Key architectural rules
 
 - **Events are immutable.** Never UPDATE an events row. Edits create a new row (fork). The user's `user_events` row is updated to point to the new event_id.
+- **Sharing is forwarding.** The `share_event` RPC delivers each recipient their own `user_events` copy at share time (contacts without accounts get theirs on sign-up via the `deliver_pending_shares` trigger). A share is a completed action — there is no unshare, and removing your copy never affects anyone else's calendar. `event_shares` is the share record (attribution, notifications, pending delivery), not the visibility mechanism.
 - **Sharing is person-to-person.** Circles are a UI shortcut — at the data level, `event_shares` always reference individual `my_people` rows.
 - **No forced onboarding.** Users land on the calendar immediately after sign-up; someone who was shared an event sees it right away. The walkthrough (`app/(app)/onboarding.tsx`) auto-shows at most once and only when the user has no events at all; it can be reopened anytime via the `?` button in the calendar header. Contacts permission is only requested when they tap Share or navigate to My People.
 - **Dedup is server-side.** Use the `find_or_create_event` RPC to create events. Don't do insert-then-query dedup from the client.
 - **RLS enforces access.** Every table has Row-Level Security. Users can only see their own data or data shared with them. Never use `USING (true)` on events.
 - **Pull, not push.** The app fetches fresh data on screen focus. No real-time subscriptions. Notifications are person-triggered only (a share action calls `send-notification`) — never broadcasts or marketing pushes.
-- **Delete means remove.** Deleting an event deletes only the caller's own `user_events` row (their `event_shares` cascade). The app never deletes `events` rows — other users may have adopted the snapshot. Orphaned snapshots are reclaimed by the `cleanup-events` edge function (cron, `CRON_SECRET` header).
+- **Delete means remove.** Deleting an event deletes only the caller's own `user_events` row (their `event_shares` records cascade). The app never deletes `events` rows; `cleanup-events` (cron, `CRON_SECRET` header) reclaims only snapshots with zero remaining owners — it must never delete `user_events`/`event_shares`.
 - **Don't withhold to drive opens.** SMS messages include the event URL (plus store links for non-app users) so recipients can act without installing the app.
 
 ## Project layout
@@ -46,12 +47,12 @@ supabase/functions/  Edge Functions (send-notification, og-metadata, cleanup-peo
 
 ## Data flow cheat sheet
 
-- **Calendar query:** `get_calendar_events` RPC (requires `p_user_id = auth.uid()`; enforced server-side) — returns events shared with the user via `my_people → event_shares → user_events → events`, excluding hidden people, UNION the user's own `user_events`, deduped by `event_id`.
-- **Create event:** `find_or_create_event` RPC → insert `user_events` → navigate to share screen → insert `event_shares` → `send-notification` (push + SMS) for new recipients.
+- **Calendar query:** `get_calendar_events` RPC (requires `p_user_id = auth.uid()`; enforced server-side) — returns the caller's own `user_events → events` (every event on your calendar is your copy), with "Shared by X" attribution via the most recent non-hidden incoming share, and a hide filter that suppresses events whose only incoming shares are from hidden people.
+- **Create event:** `find_or_create_event` RPC → insert `user_events` → navigate to share screen → `share_event` RPC → `send-notification` (push + SMS) for new recipients.
 - **Edit event:** `find_or_create_event` RPC (new snapshot) → UPDATE `user_events.event_id` → old snapshot untouched. On unique conflict (user already owns the target snapshot), merge shares onto the existing row and delete the old one.
-- **Share existing event:** insert `user_events` (adopt snapshot) → insert `event_shares`. The share screen diffs selection vs existing shares: new selections insert, deselections delete (unshare).
-- **Remove event:** delete own `user_events` row (shares cascade).
-- **Hide a person:** insert `hidden_people` → their shared events disappear from the calendar and their shares no longer notify.
+- **Share event:** `share_event` RPC with the selected person ids — records `event_shares` and delivers each app-user recipient their own `user_events` copy; pending contacts get copies on sign-up. The share sheet is additive-only: existing shares render as "✓ Shared" and can't be deselected.
+- **Remove event:** delete own `user_events` row (share records cascade). Purely personal — recipients keep their copies.
+- **Hide a person:** insert `hidden_people` → events they shared disappear from the calendar and their shares no longer notify.
 
 ## Conventions
 
@@ -62,6 +63,7 @@ supabase/functions/  Edge Functions (send-notification, og-metadata, cleanup-peo
 - Edge functions are locked down: `send-notification` and `og-metadata` require a valid user JWT (send-notification also verifies caller ownership of the `user_event`); `cleanup-people`/`cleanup-events` require the `CRON_SECRET` header and fail closed when unset.
 - User-facing failures surface via `showError` or inline error + retry banners — not console-only.
 - Automated regression tests use Jest + React Native Testing Library (`npm test -- --runInBand`).
+- Database semantics are tested by SQL tests: `bash supabase/tests/run_local.sh` spins up a scratch PostgreSQL with a mocked auth schema, applies every migration in order, and runs `supabase/tests/*.sql` assertions.
 - Cloud manual testing should follow `manual-tests/cloud_manual_regression.md` (preflight via `npm run test:manual`).
 
 ## When you finish a task

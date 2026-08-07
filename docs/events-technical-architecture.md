@@ -111,13 +111,17 @@ Unique constraint on (user_id, event_id).
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid (PK) | |
-| user_event_id | uuid (FK → user_events) | |
-| person_id | uuid (FK → my_people) | The individual person this event is shared with |
-| created_at | timestamptz | |
+| user_event_id | uuid (FK → user_events) | The sharer's copy the share was made from |
+| person_id | uuid (FK → my_people) | The individual person this event was shared with |
+| created_at | timestamptz | When the share happened |
 
 Unique constraint on (user_event_id, person_id).
 
-When you share an event, the app resolves your selection (circles and/or individuals) into individual person rows. Circles are a UI shortcut — at the data level, sharing is always person-to-person. This also updates last_shared_at on the relevant my_people rows.
+**Sharing is forwarding.** Sharing an event with someone delivers them their own `user_events` copy of the same snapshot at share time (via the `share_event` RPC) — like forwarding a text. A share is a completed action and cannot be unsent; removing your own copy never affects anyone else's calendar.
+
+`event_shares` is the *record* of that action, not the delivery mechanism. It drives the "Shared with" list, notification sends, "Shared by X" attribution, and pending delivery for contacts without an account (their copies arrive on sign-up via the `deliver_pending_shares` trigger). Recipients' calendar visibility does NOT depend on `event_shares`.
+
+When you share an event, the app resolves your selection (circles and/or individuals) into individual person rows. Circles are a UI shortcut — at the data level, sharing is always person-to-person. The RPC also updates last_shared_at on the relevant my_people rows.
 
 **hidden_people**
 | Column | Type | Notes |
@@ -154,19 +158,21 @@ Add indexes on the following columns to prevent the calendar query from degradin
 
 ### "Show me my calendar" (`get_calendar_events` RPC)
 
-This is the main query the app runs. It returns the union of events shared with the current user (excluding events from hidden people) and the user's own events, deduplicated by `event_id`:
+This is the main query the app runs. Every row it returns is one of the caller's own `user_events` copies — sharing delivers copies, so visibility never depends on someone else's rows. `event_shares` is only consulted for attribution and the hide filter:
 
 ```
 Given: current user's user_id, start_date, end_date
 → Guard: raise unless p_user_id = auth.uid() (the function is SECURITY DEFINER)
-→ Find all my_people rows where user_id = current_user_id (i.e. where other users have added me)
-→ Join: event_shares.person_id → my_people.id
-→ Join: event_shares.user_event_id → user_events → events
-→ LEFT JOIN hidden_people on (owner_id = current_user_id AND person_id = sharer's my_people.id)
-→ WHERE hp.id IS NULL (exclude hidden)
-→ UNION ALL: the user's own user_events → events (excluding event_ids already returned above)
-→ Return: event details + sharer_contact_name + sharer_person_id + sharer_user_id (null sharer fields for owned events)
-→ Filter by date range
+→ Base: the caller's own user_events → events, filtered by date range
+→ Attribution: for each event, the most recent incoming share of the same
+  snapshot (event_shares → sharer's user_events where the share's my_people
+  contact resolves to the caller) from a person the caller has NOT hidden
+→ Hide filter: suppress an event only if it has at least one incoming share
+  and ALL incoming shares are from hidden people; events with no incoming
+  shares (added by the caller) always show
+→ Return: event details + sharer_contact_name + sharer_person_id +
+  sharer_user_id (null sharer name/person for self-added events;
+  sharer_user_id falls back to the caller)
 ```
 
 `sharer_person_id` is the sharer's `my_people.id` in the recipient's contact list. It is returned so the event detail screen can offer a hide/unhide action without a separate lookup.
@@ -177,10 +183,10 @@ All joins use user_id, never phone_number. Implemented as a Supabase RPC (Postgr
 
 When a user sees an event on their calendar and wants to share it with their own people:
 
-1. Create a user_events row linking the user to that exact event row (same snapshot — all details inherited as-is)
+1. Ensure the user has their own user_events row for that exact event row (they normally do already — received events arrive as copies)
 2. User must select who to share with (mandatory)
-3. event_shares rows are created (resolved to individual people)
-4. last_shared_at updated on relevant my_people rows
+3. The `share_event` RPC records event_shares rows (resolved to individual people) and delivers each recipient who has an account their own user_events copy
+4. last_shared_at updated on relevant my_people rows (inside the RPC)
 
 ---
 
@@ -192,8 +198,8 @@ When a user sees an event on their calendar and wants to share it with their own
 2. Supabase sends SMS OTP
 3. User enters code → Supabase creates auth user
 4. User record created in users table
-5. Database trigger runs: matches phone number against all my_people rows, populates user_id where matched
-6. App lands on the main calendar. Because the trigger already linked matching my_people rows, events shared with this phone number are visible immediately — no setup step required.
+5. Database trigger runs: matches phone number against all my_people rows, populates user_id where matched — and the `deliver_pending_shares` trigger delivers the new user their own copies of every event that was shared with them while they were off the app
+6. App lands on the main calendar. Because the triggers already linked matching my_people rows and delivered copies, events shared with this phone number are visible immediately — no setup step required.
 7. If the user has no events at all and hasn't seen the walkthrough yet, the onboarding walkthrough (`app/(app)/onboarding.tsx`) is shown once. It is always reopenable via the `?` button in the calendar header.
 
 ### 2. Setting Up Your People
@@ -215,19 +221,19 @@ People are added from the People screen (or when tapping Share) — there is no 
 4. Event row is created (or matched to an existing row if URL, title, date, and time all exactly match)
 5. user_events row is created
 6. **Sharing screen (mandatory):** Shows the user's people list (up to 50). Circles appear as quick-select buttons at the top — tapping one selects everyone in that group. The user can also tap individual people. Any combination works.
-7. event_shares rows are created (one per person, circles resolved to individuals)
-8. last_shared_at updated on relevant my_people rows
+7. The `share_event` RPC records event_shares rows (one per person, circles resolved to individuals) and delivers each recipient who has an account their own user_events copy — contacts without an account get theirs on sign-up
+8. last_shared_at updated on relevant my_people rows (inside the RPC)
 9. `send-notification` Edge Function is called fire-and-forget to notify recipients
 
 ### 4. Share an Existing Event (From Calendar)
 
-1. User sees an event on their calendar that someone shared with them
+1. User sees an event on their calendar that someone shared with them — it is already their own copy (forwarding)
 2. User taps the event, taps "Share"
-3. user_events row is created linking the user to that same event row — all details inherited as-is
-4. **Sharing screen (mandatory):** User must select at least one person before confirming
-5. event_shares rows created, last_shared_at updated, notifications sent
+3. If the user somehow has no user_events row for the snapshot yet, one is created (adopt)
+4. **Sharing screen (mandatory):** User must select at least one person before confirming. People the event was already shared with render as completed actions ("✓ Shared") and cannot be deselected — a share delivers the recipient their own copy, so it can't be unsent
+5. `share_event` records the new shares and delivers copies; notifications are sent to the newly shared people only
 
-The sharing screen diffs the selection against existing shares: newly selected people get new event_shares rows (and notifications), and deselected people have their event_shares rows deleted (unshare). Clearing the whole selection is allowed when editing existing shares.
+There is no unshare. The share sheet is additive: it shows existing shares as done and only offers people who don't have the event yet.
 
 ### 5. Edit an Event (Fork, Not Mutate)
 
@@ -245,7 +251,7 @@ This means each user's view of an event is their own. Nobody can change your dat
 
 ### 5a. Remove an Event
 
-Removing an event from your calendar deletes only your own user_events row (your event_shares cascade with it). The events row itself is never deleted by the app — other users may have adopted the same snapshot, and deleting it would destroy their copies. Snapshots with no remaining user_events are reclaimed by the `cleanup-events` cron job.
+Removing an event from your calendar deletes only your own user_events row (your event_shares share records cascade with it). Because sharing delivered everyone their own copy up front, this is purely personal — nobody else's calendar changes when you remove an event, whether you created it or re-shared it. The events row itself is never deleted by the app; snapshots with no remaining user_events are reclaimed by the `cleanup-events` cron job.
 
 ### 6. Hide / Unhide a Person
 
@@ -267,13 +273,11 @@ This keeps the user's people list clean and relevant. Users can always re-add so
 
 ### 8. Event Data Retention
 
-A scheduled Supabase Edge Function (`cleanup-events`, cron, runs daily or weekly):
+A scheduled Supabase Edge Function (`cleanup-events`, cron, runs daily or weekly) calls `cleanup_old_events()`, which does exactly one thing:
 
-1. Delete event_shares where the associated event's event_date is older than 6 months
-2. Delete user_events rows that have no remaining event_shares
-3. Delete events rows that have no remaining user_events
+1. Delete events rows that have no remaining user_events (orphaned snapshots)
 
-Retain only future events and the past 6 months (based on event_date, not created_at). Cascade rules handle orphaned rows. No historical hoarding.
+Under forwarding semantics every user_events row is someone's personal copy, so cleanup never deletes user_events or event_shares — only snapshots nobody owns anymore. Old events simply age off screens as dates pass; there is no hard expiry of anyone's data.
 
 ---
 
@@ -328,9 +332,9 @@ Supabase RLS policies ensure users can only access data they should see. Key pol
 - **users:** Users can read and update their own row (update exists so the app can persist `expo_push_token`). Phone number lookups restricted to server-side functions.
 - **circles:** Users can only CRUD their own circles.
 - **circle_members:** Users can only CRUD members of their own circles.
-- **events:** Readable only if the user created the event (via user_events) or has been shared the event (via event_shares). No global public read access. No delete policy — the app never deletes events rows (see "Remove an Event"); orphaned rows are reclaimed by the cleanup cron.
-- **user_events:** Users can create/update/delete their own. Readable if the viewer has been shared the event.
-- **event_shares:** Creatable and deletable by the user_event owner. Readable by the person the event was shared with.
+- **events:** Readable only if the user owns a copy (via user_events), created the snapshot, or has been shared the event (via event_shares). No global public read access. No delete policy — the app never deletes events rows (see "Remove an Event"); orphaned rows are reclaimed by the cleanup cron.
+- **user_events:** Users can create/delete their own. Copies for other users' recipients are created only by the `share_event` RPC (SECURITY DEFINER), which verifies the caller owns the user_event being shared.
+- **event_shares:** Creatable by the user_event owner (via `share_event`). Readable by the share owner and by the person the event was shared with.
 - **hidden_people:** Owner-only CRUD.
 
 ---
@@ -348,7 +352,7 @@ events-app/
 │   │   ├── event/[id].tsx          # Event detail — who shared it, share/hide/remove buttons
 │   │   ├── onboarding.tsx          # Optional walkthrough — auto-shows once when the calendar is empty
 │   │   ├── people.tsx              # My People — manage list, circles, hidden people
-│   │   └── share.tsx               # Sharing screen — select people/circles (also unshare)
+│   │   └── share.tsx               # Sharing screen — select people/circles; existing shares show as completed
 │   ├── (auth)/                     # Unauthenticated screens
 │   │   ├── _layout.tsx
 │   │   ├── sign-in.tsx

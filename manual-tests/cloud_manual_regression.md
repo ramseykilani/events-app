@@ -107,11 +107,11 @@ For each executed scenario:
 **Steps**
 1. In share screen, evaluate available state:
    - If no people exist, verify empty state and **Add People** CTA.
-   - If people exist, select at least one person and tap **Done**.
+   - If people exist, select at least one person and tap **Share**.
 
 **Expected**
 - Empty state copy and CTA appear when list is empty.
-- Done is enabled when selection exists and returns to previous screen.
+- Share is enabled when selection exists and returns to previous screen.
 
 ---
 
@@ -212,16 +212,31 @@ For each executed scenario:
 
 ---
 
-### E-108 Unshare revokes access
+### E-108 Sharing delivers the recipient their own copy (forwarding)
 **Steps**
-1. As account A, open an event already shared with B, tap **Share**.
-2. Deselect B (leave at least one other person selected, or clear all) and tap **Done**.
-3. As account B, refresh the calendar.
+1. As account A, create an event and share it with B (test OTP `+15555550101`).
+2. As account B, sign in and check the calendar — the event is there.
+3. In the Supabase dashboard, confirm B has their own `user_events` row for the same `event_id`.
+4. As account A, open the event, tap **Remove Event**, and confirm.
+5. As account B, refresh the calendar.
 
 **Expected**
-- Deselecting deletes B's `event_shares` row; the event disappears from B's calendar.
-- Clearing the entire selection is allowed when editing existing shares and removes all shares.
-- No notification is sent when only removing shares.
+- The event stays on B's calendar after A removes it — B owns a copy, A's removal is purely personal.
+- B's calendar entry survives A re-sharing chains too: if B re-shares to a third account and B then removes the event, the third account keeps it.
+- On A's side the event disappears; in the dashboard A's `event_shares` rows are gone but B's `user_events` row remains.
+
+---
+
+### E-109 Share sheet shows completed shares, no unshare
+**Steps**
+1. As account A, open an event already shared with B, tap **Share**.
+2. Observe B's row in the people list.
+3. Try tapping B's row.
+
+**Expected**
+- B's row shows "✓ Shared", is muted, and does not toggle — sharing is a completed action and can't be unsent.
+- The header action reads **Share** (not Done) and is disabled until at least one never-shared person is selected.
+- Only newly selected people trigger notifications when sharing again.
 
 ---
 
