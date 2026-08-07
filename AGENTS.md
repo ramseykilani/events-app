@@ -34,9 +34,11 @@ printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_
 Two test OTPs are configured on the Supabase project (both expire March 31, 2027):
 
 - Phone `+15555550100`, code `123456`
-- Phone `+15555550101`, code `123456`
+- Phone `+16462655565`, code `666666`
 
 Use either to sign in without a real SMS provider. The second number is useful for testing multi-user scenarios (e.g. sharing events between two accounts). After sign-in the app goes straight to the calendar; the onboarding walkthrough auto-shows only when the user has no events at all, and can be reopened via the `?` button.
+
+Note: `+15555550101` is **not** a configured test number — Twilio rejects it with `sms_send_failed`. For a truly fresh account (e.g. M-003 onboarding auto-show), temporarily add a third test OTP via the Management API (`PATCH /v1/projects/{ref}/config/auth` with both `sms_test_otp` and `sms_test_otp_valid_until`), then remove it when done. There is no sign-out button in the app UI; on web, sign out with `localStorage.clear(); location.reload();` in the browser console.
 
 ### Linting / type checking
 
@@ -69,15 +71,15 @@ Then follow:
 
 ### Deploying migrations & edge functions (runbook)
 
-The branch `cursor/robustness-onboarding-fixes-b4bc` contains migrations `20260807000001`–`20260807000008` and hardened edge functions that must be deployed **together with the client**: the new client expects the `share_event` RPC, and the new calendar RPC requires recipient copies that only exist after the backfill in `20260807000005`. Apply migrations first, then ship the client.
+Migrations `20260807000001`–`20260807000008` and the hardened edge functions were deployed to project `ijmwtjyuvdnvhblwwtpt` on 2026-08-07. For future migrations/functions the same flow applies: the client and backend must move together (e.g. the client expects the `share_event` RPC, and the calendar RPC assumes recipient copies exist).
 
-Prerequisites: `SUPABASE_ACCESS_TOKEN` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). If the CLI still asks for the database password, `SUPABASE_DB_PASSWORD` is needed too.
+Prerequisites: `SUPABASE_ACCESS_TOKEN` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). If the CLI fails at "Initialising login role..." (upstream bug supabase/cli#5091 — a stale `cli_login_postgres` role), either delete the role via `DELETE /v1/projects/{ref}/cli/login-role`, or rotate the DB password via `PATCH /v1/projects/{ref}/database/password` and export `SUPABASE_DB_PASSWORD` (setting it skips the login-role path entirely).
 
 ```bash
 npx supabase link --project-ref ijmwtjyuvdnvhblwwtpt
 npx supabase db push                 # applies all pending migrations in order
 npx supabase functions deploy send-notification cleanup-people cleanup-events og-metadata
-npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # reuse the same value on the cron trigger schedule
+npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # already set; pg_cron jobs send it as x-cron-secret
 ```
 
 Verify afterwards:
@@ -95,6 +97,10 @@ Then run the manual regression suite (`manual-tests/cloud_manual_regression.md`)
 - The Expo dev server reads `.env` automatically — no `dotenv` setup needed.
 - Supabase migrations in `supabase/migrations/` must be applied in filename order against the Supabase project before the app functions end-to-end.
 - Edge Functions in `supabase/functions/` are Deno/TypeScript (excluded from the main `tsconfig.json`).
+- Edge functions that browsers call must allow the headers supabase-js always sends: `Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type` — otherwise the CORS preflight fails with `net::ERR_FAILED` and calls silently never reach the function.
+- `cleanup-people`/`cleanup-events` are invoked weekly by pg_cron jobs that must send the `CRON_SECRET` edge-function secret as the `x-cron-secret` header. Check with `SELECT jobid, jobname, command FROM cron.job;` if they start 401ing.
 - Phone auth requires a real SMS provider (Twilio) configured in the Supabase project. Fake/test phone numbers like `+15555550100` are rejected by Twilio with `sms_send_failed`. To test sign-in without real SMS, configure a "Test OTP" phone/code pair in the Supabase Dashboard under **Authentication > Settings**.
 - When the `.env` file changes, the Expo dev server must be restarted to pick up new values (Metro does not hot-reload env vars).
 - Sign-in surfaces SMS send failures to the user via `showError` (detailed alert with code/details) — check that dialog when auth testing fails.
+- `Alert.alert` is a no-op on web. Use `showAlert`/`showConfirm` from `lib/dialogs.ts` (or `showError` for errors) for any user-facing dialog so it renders as `window.alert`/`window.confirm` in the browser.
+- `@react-native-community/datetimepicker` is not supported on web — the date/time pickers don't open in the browser, so web-created events use the default date. Test date-specific behavior with SQL seeding or on native.
