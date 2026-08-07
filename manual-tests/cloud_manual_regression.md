@@ -22,6 +22,7 @@ Use this when:
 Use these test credentials (if configured on Supabase):
 - Phone: `+15555550100`
 - OTP: `123456`
+- Second account (multi-user scenarios): `+15555550101`, OTP `123456`
 
 ---
 
@@ -62,12 +63,14 @@ For each executed scenario:
 
 ### M-003 Onboarding controls
 **Steps**
-1. Complete sign-in if needed.
-2. On onboarding, tap **Next** between pages.
-3. Verify final CTA changes to **Get Started**.
-4. Re-open onboarding from calendar `?` button, then tap **Skip**.
+1. Complete sign-in with a brand-new account (no events shared with it).
+2. The walkthrough should appear automatically because the calendar is empty.
+3. On onboarding, tap **Next** between pages.
+4. Verify final CTA changes to **Get Started**.
+5. Re-open onboarding from calendar `?` button, then tap **Skip**.
 
 **Expected**
+- Walkthrough auto-shows at most once, and only when the user has no events at all (an invited guest with a shared event lands directly on the calendar instead).
 - Page progression works.
 - `Get Started` and `Skip` both route back to calendar.
 
@@ -149,13 +152,76 @@ For each executed scenario:
 
 ---
 
-### E-103 Delete event
+### E-103 Remove event
 **Steps**
-1. Open event detail for event created by current user.
-2. Tap **Delete Event** and confirm.
+1. Open event detail for an event on the current user's calendar.
+2. Tap **Remove Event** and confirm.
 
 **Expected**
-- Event is deleted and user is navigated away from detail page.
+- The event disappears from the user's calendar and the user is navigated away from the detail page.
+- The underlying `events` row is untouched: anyone who re-shared the event still sees it (verify with the second test account if the event was shared onward).
+
+---
+
+### E-104 Multi-user share lands on recipient's calendar immediately
+**Steps**
+1. Signed in as `+15555550100` (account A), add `+15555550101` to My People, create an event, and share it with them.
+2. Sign out, then sign in as `+15555550101` (account B) — an account that has never opened the app.
+
+**Expected**
+- Account B lands directly on the calendar (no forced setup) and the shared event is visible on the correct date.
+- No walkthrough gate blocks the view (walkthrough only auto-shows when the calendar is completely empty).
+
+---
+
+### E-105 Hide suppresses calendar entries and notifications
+**Steps**
+1. As account B (with an event shared by A), open the shared event's detail and tap **Hide [name]**.
+2. Return to the calendar and confirm A's shared events are gone.
+3. As account A, share another event with B.
+4. As B, confirm no push notification (and no SMS, if Twilio is configured) arrives for the new share.
+5. From B's People screen, unhide A and confirm events reappear after refresh.
+
+**Expected**
+- Hidden person's events disappear from the calendar immediately.
+- New shares from a hidden person produce no push and no SMS.
+- Unhide restores visibility.
+
+---
+
+### E-106 Push token persists after sign-in
+**Steps**
+1. Sign in on a native build (or web, where supported) and accept notification permissions.
+2. In the Supabase dashboard, check the `users` row for the signed-in account.
+
+**Expected**
+- `expo_push_token` is set shortly after authenticated launch (requires the `users_update_own` RLS policy).
+- Signing out and back in keeps/refreshes the token without error.
+
+---
+
+### E-107 SMS contains the event URL
+**Steps**
+1. Requires Twilio credentials configured on the `send-notification` edge function and at least one store URL secret.
+2. As account A, create an event **with a URL** and share it with a phone number that is not an app user.
+3. Inspect the SMS delivered (or Twilio message logs).
+
+**Expected**
+- SMS body includes the event title, date/time, and the event URL itself — the recipient can act without installing the app.
+- Store links follow the event URL; message ends with `Reply STOP to unsubscribe.`
+
+---
+
+### E-108 Unshare revokes access
+**Steps**
+1. As account A, open an event already shared with B, tap **Share**.
+2. Deselect B (leave at least one other person selected, or clear all) and tap **Done**.
+3. As account B, refresh the calendar.
+
+**Expected**
+- Deselecting deletes B's `event_shares` row; the event disappears from B's calendar.
+- Clearing the entire selection is allowed when editing existing shares and removes all shares.
+- No notification is sent when only removing shares.
 
 ---
 
