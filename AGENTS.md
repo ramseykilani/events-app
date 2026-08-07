@@ -67,6 +67,28 @@ Then follow:
 - `manual-tests/cloud_manual_regression.md`
 - `manual-tests/manual_test_report_template.md`
 
+### Deploying migrations & edge functions (runbook)
+
+The branch `cursor/robustness-onboarding-fixes-b4bc` contains migrations `20260807000001`–`20260807000008` and hardened edge functions that must be deployed **together with the client**: the new client expects the `share_event` RPC, and the new calendar RPC requires recipient copies that only exist after the backfill in `20260807000005`. Apply migrations first, then ship the client.
+
+Prerequisites: `SUPABASE_ACCESS_TOKEN` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). If the CLI still asks for the database password, `SUPABASE_DB_PASSWORD` is needed too.
+
+```bash
+npx supabase link --project-ref ijmwtjyuvdnvhblwwtpt
+npx supabase db push                 # applies all pending migrations in order
+npx supabase functions deploy send-notification cleanup-people cleanup-events og-metadata
+npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # reuse the same value on the cron trigger schedule
+```
+
+Verify afterwards:
+
+```bash
+bash supabase/tests/run_local.sh     # SQL semantics suite (local scratch postgres)
+npm test -- --runInBand              # Jest suite
+```
+
+Then run the manual regression suite (`manual-tests/cloud_manual_regression.md`), especially E-108/E-109 (forwarding) and M-003.
+
 ### Key gotchas
 
 - `react-native-web` must be installed for web mode to work (`npx expo install react-native-web`). It is already in `package.json` dependencies.
