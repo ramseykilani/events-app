@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,7 +15,9 @@ export default function CalendarScreen() {
   const theme = useTheme();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
+  const fetchSeq = useRef(0);
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_KEY).then((value) => {
@@ -28,32 +30,25 @@ export default function CalendarScreen() {
   const doFetch = useCallback(
     async (startDate: string, endDate: string) => {
       if (!session?.user?.id) return;
+      const seq = ++fetchSeq.current;
 
-      const [rpcResult, ownedResult] = await Promise.all([
-        supabase.rpc('get_calendar_events', {
-          p_user_id: session.user.id,
-          p_start_date: startDate,
-          p_end_date: endDate,
-        }),
-        supabase
-          .from('user_events')
-          .select(
-            'id, events!inner(id, title, description, image_url, url, event_date, event_time)'
-          )
-          .eq('user_id', session.user.id)
-          .gte('events.event_date', startDate)
-          .lte('events.event_date', endDate),
-      ]);
+      const { data, error } = await supabase.rpc('get_calendar_events', {
+        p_user_id: session.user.id,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
 
-      if (rpcResult.error) {
-        console.error('get_calendar_events RPC error:', rpcResult.error);
-      }
-      if (ownedResult.error) {
-        console.error('owned events query error:', ownedResult.error);
+      if (seq !== fetchSeq.current) return;
+
+      if (error) {
+        console.error('get_calendar_events RPC error:', error);
+        setFetchError('Could not load events. Tap to retry.');
+        return;
       }
 
-      const sharedEvents: CalendarEvent[] = (rpcResult.data ?? []).map(
-        (row: Record<string, unknown>) => ({
+      setFetchError(null);
+      setEvents(
+        (data ?? []).map((row: Record<string, unknown>) => ({
           id: row.id as string,
           event_id: row.event_id as string,
           title: row.title as string | null,
@@ -65,34 +60,8 @@ export default function CalendarScreen() {
           sharer_contact_name: row.sharer_contact_name as string | null,
           sharer_person_id: row.sharer_person_id as string | null,
           sharer_user_id: row.sharer_user_id as string,
-        })
+        }))
       );
-
-      const seenEventIds = new Set(sharedEvents.map((e) => e.event_id));
-
-      const ownedEvents: CalendarEvent[] = (ownedResult.data ?? [])
-        .filter(
-          (row: Record<string, unknown>) =>
-            row.events && !seenEventIds.has((row.events as Record<string, unknown>).id as string)
-        )
-        .map((row: Record<string, unknown>) => {
-          const evt = row.events as Record<string, unknown>;
-          return {
-            id: row.id as string,
-            event_id: evt.id as string,
-            title: (evt.title as string) ?? null,
-            description: (evt.description as string) ?? null,
-            image_url: (evt.image_url as string) ?? null,
-            url: (evt.url as string) ?? null,
-            event_date: evt.event_date as string,
-            event_time: (evt.event_time as string) ?? null,
-            sharer_contact_name: null,
-            sharer_person_id: null,
-            sharer_user_id: session.user.id,
-          };
-        });
-
-      setEvents([...sharedEvents, ...ownedEvents]);
     },
     [session?.user?.id]
   );
@@ -123,6 +92,14 @@ export default function CalendarScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {fetchError ? (
+        <TouchableOpacity
+          style={[styles.errorBanner, { backgroundColor: theme.surface }]}
+          onPress={handleRefresh}
+        >
+          <Text style={[styles.errorText, { color: theme.textPrimary }]}>{fetchError}</Text>
+        </TouchableOpacity>
+      ) : null}
       <Calendar
         events={events}
         onMonthChange={handleMonthChange}
@@ -136,5 +113,13 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  errorBanner: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 14,
   },
 });
