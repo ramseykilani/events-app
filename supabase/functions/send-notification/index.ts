@@ -34,14 +34,24 @@ function formatTime(time: string): string {
   });
 }
 
+// Twilio accepts either MessagingServiceSid (sender pool, built-in STOP
+// opt-out handling) or a bare From number — never both.
 async function sendSms(
   to: string,
   body: string,
   accountSid: string,
   authToken: string,
-  fromNumber: string,
+  sender: { messagingServiceSid?: string; fromNumber?: string },
 ): Promise<void> {
   const credentials = btoa(`${accountSid}:${authToken}`);
+  const params = new URLSearchParams({ To: to, Body: body });
+  if (sender.messagingServiceSid) {
+    params.set('MessagingServiceSid', sender.messagingServiceSid);
+  } else if (sender.fromNumber) {
+    params.set('From', sender.fromNumber);
+  } else {
+    return;
+  }
   await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {
@@ -50,7 +60,7 @@ async function sendSms(
         Authorization: `Basic ${credentials}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
+      body: params,
     },
   );
 }
@@ -82,18 +92,24 @@ serve(async (req) => {
     return jsonResponse({ error: 'Unauthorized' }, 401);
   }
 
-  // Twilio config — all three core secrets plus at least one store URL must be
-  // present or SMS is silently skipped (push notifications are unaffected)
+  // Twilio config — account SID + auth token + a sender (messaging service SID
+  // preferred, phone number as fallback) must be present or SMS is silently
+  // skipped (push notifications are unaffected)
   const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
   const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+  const twilioMessagingServiceSid = Deno.env.get('TWILIO_MESSAGING_SERVICE_SID');
   const twilioFromNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
   const iosStoreUrl = Deno.env.get('IOS_APP_STORE_URL');
   const androidStoreUrl = Deno.env.get('ANDROID_PLAY_STORE_URL');
   const twilioConfigured = !!(
     twilioAccountSid &&
     twilioAuthToken &&
-    twilioFromNumber
+    (twilioMessagingServiceSid || twilioFromNumber)
   );
+  const twilioSender = {
+    messagingServiceSid: twilioMessagingServiceSid ?? undefined,
+    fromNumber: twilioFromNumber ?? undefined,
+  };
   // Non-app users are told where to get the app, so at least one store URL is
   // required. App users only need the event URL / deep link, so Twilio
   // credentials alone are enough for them.
@@ -200,7 +216,7 @@ serve(async (req) => {
             smsBody,
             twilioAccountSid!,
             twilioAuthToken!,
-            twilioFromNumber!,
+            twilioSender,
           ).catch(console.error),
         );
         continue;
@@ -275,7 +291,7 @@ serve(async (req) => {
             smsBody,
             twilioAccountSid!,
             twilioAuthToken!,
-            twilioFromNumber!,
+            twilioSender,
           ).catch(console.error),
         );
       }

@@ -75,7 +75,7 @@ This means the only person who needs the app is the one sending events. Friends 
 ### Technical Notes
 
 - No SDK dependency: Twilio REST API called directly via `fetch` with Basic auth in `supabase/functions/send-notification/index.ts`
-- Five new Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `IOS_APP_STORE_URL`, `ANDROID_PLAY_STORE_URL`
+- New Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender — `TWILIO_MESSAGING_SERVICE_SID` (preferred; built-in STOP opt-out handling) or `TWILIO_PHONE_NUMBER` — and `IOS_APP_STORE_URL`, `ANDROID_PLAY_STORE_URL` for the non-app-user path
 - Graceful degradation: if any Twilio secret is missing (or both store URLs are absent for non-app-user path), SMS is silently skipped — push notifications are unaffected
 - SMS failures use `.catch(console.error)` and never propagate to the caller
 - SMS sends are collected as `Promise<void>[]` and flushed with `Promise.all` after the Expo push batch — concurrent, non-blocking
@@ -236,18 +236,29 @@ A web-first beta is attractive: nobody has to install anything, and notification
 2. **Web date/time input.** Fall back to HTML `date`/`time` inputs (or a simple custom picker) when `Platform.OS === 'web'`.
 3. **Deploy the web build.** `npx expo export --platform web` produces a static bundle suitable for any static host (Vercel/Netlify/Cloudflare Pages). The bundle uses the public anon key — safe to ship because all data access goes through RLS. Auth (SMS OTP) already works on web.
 4. **SMS links for a web beta.** Non-app-user SMS is currently gated on App Store / Play Store URLs; for a web beta the message should link the website instead (small `send-notification` change: accept a `WEB_APP_URL` secret and prefer it over store links).
+5. **Turn on SMS sending.** `send-notification` needs its own Twilio function secrets (separate from the Supabase Auth SMS config): `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + a sender. A Messaging Service sender is supported (`TWILIO_MESSAGING_SERVICE_SID`, preferred — built-in STOP opt-out handling) with `TWILIO_PHONE_NUMBER` as fallback.
+
+### Rollout order (web beta)
+
+1. Manual add person + web date/time input (items 1–2)
+2. Set the Twilio function secrets (item 5), then verify one real SMS end-to-end against a real phone number (share an event to it from a test account; test OTP numbers never trigger real sends)
+3. Deploy the static web build at a stable URL (item 3) and set `WEB_APP_URL` (item 4)
+4. [Sign Out](#sign-out) and general polish
 
 ### Technical Notes
 
 - Web gaps found during 2026-08-07 live regression: contacts permission flow is a dead end on web (explainer dialog only); date picker silently doesn't open; fixed already: Alert dialogs and edge-function CORS headers
 - `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are bundled into the static build at export time
 - The forwarded-copy model means a recipient who later installs the native app sees the same calendar — web and native are interchangeable frontends over the same account
+- Status as of 2026-08-07: `send-notification` supports `TWILIO_MESSAGING_SERVICE_SID`; `TWILIO_ACCOUNT_SID` and `TWILIO_MESSAGING_SERVICE_SID` function secrets are set; `TWILIO_AUTH_TOKEN` is still pending (the raw token is not retrievable via the Management API — it must come from the Twilio console)
+- The test account B's number (`+16462655565`) is a real-format Manhattan number, not a reserved 555 number — once SMS is on, sharing to B in tests sends real texts to whoever holds that number. Consider moving test accounts to reserved `+1555555XXXX` numbers before heavy SMS-on testing.
 
 ### Acceptance Criteria
 
 - [ ] A person can be added on web with name + phone number (E.164), and sharing to them works end-to-end
 - [ ] Event date/time can be chosen on web
 - [ ] A production web build is deployed at a stable URL and sign-in via SMS OTP works there
+- [ ] `TWILIO_AUTH_TOKEN` function secret is set and a real SMS is received end-to-end (event title, date/time, event URL, STOP footer)
 - [ ] Sharing to a non-user sends an SMS containing the website URL
 
 ### Open Questions
