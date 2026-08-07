@@ -36,7 +36,7 @@ app/(auth)/          Sign-in and OTP verification
 app/(app)/           Authenticated screens (calendar, events, sharing, people, onboarding walkthrough)
 app/_context/        SessionContext (auth session provider)
 components/          Calendar, EventCard, ShareSheet, PeoplePicker
-docs/                Architecture, product, and philosophy docs
+docs/                Architecture, product, philosophy, and design-language docs
 hooks/               useTheme and other shared hooks
 lib/                 supabase.ts, types.ts, contacts.ts, showError.ts, dialogs.ts, format.ts
 manual-tests/        Cloud manual regression suite + report template
