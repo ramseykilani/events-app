@@ -1,8 +1,9 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { Calendar } from '../../components/Calendar';
+import { ThemeContextProvider } from '../../app/_context/ThemeContext';
 import type { CalendarEvent } from '../../lib/types';
 
 jest.mock('react-native-calendars', () => {
@@ -112,5 +113,33 @@ describe('components/Calendar', () => {
 
     fireEvent.press(screen.getByText('+'));
     expect(router.push).toHaveBeenCalledWith('/(app)/add-event');
+  });
+
+  it('renders the theme picker from the registry and persists a switch', async () => {
+    const onMonthChange = jest.fn();
+    const screen = render(
+      <ThemeContextProvider>
+        <Calendar events={events} onMonthChange={onMonthChange} />
+      </ThemeContextProvider>
+    );
+    await act(async () => {});
+
+    const paper = screen.getByLabelText('Paper theme');
+    const evening = screen.getByLabelText('Evening theme');
+    expect(paper.props.accessibilityState.selected).toBe(true);
+    expect(evening.props.accessibilityState.selected).toBe(false);
+
+    fireEvent.press(evening);
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      'theme_preference',
+      'evening'
+    );
+    expect(screen.getByLabelText('Evening theme').props.accessibilityState.selected).toBe(
+      true
+    );
+    expect(screen.getByLabelText('Paper theme').props.accessibilityState.selected).toBe(
+      false
+    );
   });
 });

@@ -13,6 +13,8 @@ import { router } from 'expo-router';
 import { EventCard } from './EventCard';
 import type { CalendarEvent } from '../lib/types';
 import { useTheme } from '../hooks/useTheme';
+import { useThemePreference } from '../app/_context/ThemeContext';
+import { THEME_REGISTRY } from '../constants/Colors';
 
 type Props = {
   events: CalendarEvent[];
@@ -46,6 +48,7 @@ export function Calendar({
   onRefresh,
 }: Props) {
   const theme = useTheme();
+  const { themeName, setTheme } = useThemePreference();
   const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<string>(
     toLocalDateString(new Date())
@@ -75,7 +78,18 @@ export function Calendar({
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Events</Text>
+        <Text
+          style={[
+            styles.title,
+            {
+              color: theme.textPrimary,
+              fontFamily: theme.titleFontFamily,
+              fontWeight: theme.titleFontWeight,
+            },
+          ]}
+        >
+          Events
+        </Text>
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={[styles.helpButton, { borderColor: theme.border }]}
@@ -105,7 +119,48 @@ export function Calendar({
           </TouchableOpacity>
         </View>
       </View>
+      <View
+        style={[
+          styles.themePicker,
+          { backgroundColor: theme.surfaceSecondary, borderColor: theme.border },
+        ]}
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Theme"
+      >
+        {THEME_REGISTRY.map((option) => {
+          const selected = option.name === themeName;
+          return (
+            <TouchableOpacity
+              key={option.name}
+              style={[
+                styles.themeOption,
+                selected && {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                },
+              ]}
+              onPress={() => setTheme(option.name)}
+              activeOpacity={0.7}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${option.label} theme`}
+            >
+              <Text
+                style={[
+                  styles.themeOptionText,
+                  { color: selected ? theme.textPrimary : theme.textSecondary },
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
       <RNCalendar
+        // Remount on theme switch: react-native-calendars caches computed
+        // styles internally, so a new theme object alone may not repaint.
+        key={themeName}
         current={selectedDate}
         onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
         onMonthChange={(date: DateData) => {
@@ -129,7 +184,7 @@ export function Calendar({
           arrowColor: theme.textPrimary,
           monthTextColor: theme.textPrimary,
           textDisabledColor: theme.textTertiary,
-          dotColor: theme.textPrimary,
+          dotColor: theme.accent,
         }}
       />
       <ScrollView
@@ -192,12 +247,33 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  themePicker: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 12,
+  },
+  themeOption: {
+    minHeight: 44,
+    minWidth: 96,
+    paddingHorizontal: 16,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   helpButton: {
     width: 44,

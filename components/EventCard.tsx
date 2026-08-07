@@ -43,7 +43,7 @@ export function EventCard({ event, onPress }: Props) {
           {timeStr ? ` · ${timeStr}` : ''}
         </Text>
         {event.sharer_contact_name && (
-          <Text style={[styles.sharer, { color: theme.textTertiary }]} numberOfLines={1}>
+          <Text style={[styles.sharer, { color: theme.accent }]} numberOfLines={1}>
             From {event.sharer_contact_name}
           </Text>
         )}

@@ -61,7 +61,18 @@ export default function SignInScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <View style={styles.content}>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Events</Text>
+        <Text
+          style={[
+            styles.title,
+            {
+              color: theme.textPrimary,
+              fontFamily: theme.titleFontFamily,
+              fontWeight: theme.titleFontWeight,
+            },
+          ]}
+        >
+          Events
+        </Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Enter your phone number to continue</Text>
         <TextInput
           style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
@@ -100,7 +111,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '700',
     marginBottom: 8,
   },
   subtitle: {
