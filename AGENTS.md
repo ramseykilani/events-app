@@ -46,7 +46,7 @@ There is no ESLint configuration. The only static check available is TypeScript:
 npx tsc --noEmit
 ```
 
-There are pre-existing TS errors in `app/(app)/onboarding.tsx` and `lib/showError.ts` — these do not block the app from running (Expo uses Babel/Metro for transpilation, not `tsc`).
+The tree is currently `tsc`-clean — keep it that way.
 
 ### Tests
 

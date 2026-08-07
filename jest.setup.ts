@@ -42,9 +42,10 @@ jest.mock('expo-router', () => {
 
 // Screens render outside a SafeAreaProvider in tests
 jest.mock('react-native-safe-area-context', () => {
-  const actual = jest.requireActual('react-native-safe-area-context');
+  const { View } = require('react-native');
   return {
-    ...actual,
+    SafeAreaView: View,
+    SafeAreaProvider: View,
     useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   };
 });

@@ -90,7 +90,7 @@ export default function OnboardingScreen() {
           <View style={styles.page}>
             <View style={styles.content}>
               <Text style={[styles.title, { color: theme.textPrimary }]}>{item.title}</Text>
-              {item.lines.map((line, i) => (
+              {item.lines.map((line: string, i: number) => (
                 <Text key={i} style={[styles.body, { color: theme.textSecondary }]}>
                   {line}
                 </Text>

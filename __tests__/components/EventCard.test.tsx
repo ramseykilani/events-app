@@ -16,6 +16,7 @@ describe('components/EventCard', () => {
       event_date: '2026-02-27',
       event_time: null,
       sharer_contact_name: null,
+      sharer_person_id: null,
       sharer_user_id: 'u-1',
     };
 
@@ -37,6 +38,7 @@ describe('components/EventCard', () => {
       event_date: '2026-02-27',
       event_time: '19:30:00',
       sharer_contact_name: 'Alice',
+      sharer_person_id: 'mp-1',
       sharer_user_id: 'u-2',
     };
 

@@ -13,9 +13,10 @@ describe('lib/showError', () => {
 
   it('formats Error instances with code/details/hint and stack', () => {
     const err = new Error('Something broke');
-    (err as Record<string, unknown>).code = 'XX01';
-    (err as Record<string, unknown>).details = 'row violated policy';
-    (err as Record<string, unknown>).hint = 'check RLS';
+    const rec = err as unknown as Record<string, unknown>;
+    rec.code = 'XX01';
+    rec.details = 'row violated policy';
+    rec.hint = 'check RLS';
     err.stack = 'stack trace';
 
     showError('Error', err);
