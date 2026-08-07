@@ -103,9 +103,47 @@ export default function EditEventScreen() {
         .eq('user_id', session.user.id);
 
       if (ueErr) {
-        // If update fails because user already has this event (duplicate user_event),
-        // delete the current user_event and switch to the existing one.
+        // If update fails because the user already owns the target snapshot,
+        // merge into that existing user_events row instead of duplicating it:
+        // carry over shares that aren't already there, then drop the old row
+        // (its remaining duplicate shares cascade away).
         if (ueErr.code === '23505') {
+          const { data: existingUe, error: findErr } = await supabase
+            .from('user_events')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .eq('event_id', eventId)
+            .single();
+          if (findErr || !existingUe) {
+            throw findErr ?? new Error('Failed to find the existing event copy');
+          }
+
+          const [{ data: targetShares }, { data: sourceShares }] = await Promise.all([
+            supabase
+              .from('event_shares')
+              .select('person_id')
+              .eq('user_event_id', existingUe.id),
+            supabase
+              .from('event_shares')
+              .select('person_id')
+              .eq('user_event_id', params.userEventId),
+          ]);
+
+          const alreadyShared = new Set((targetShares ?? []).map((s) => s.person_id));
+          const toMove = (sourceShares ?? [])
+            .map((s) => s.person_id)
+            .filter((pid) => !alreadyShared.has(pid));
+
+          if (toMove.length > 0) {
+            const { error: moveErr } = await supabase.from('event_shares').insert(
+              toMove.map((person_id) => ({
+                user_event_id: existingUe.id,
+                person_id,
+              }))
+            );
+            if (moveErr) throw moveErr;
+          }
+
           const { error: delErr } = await supabase
             .from('user_events')
             .delete()
