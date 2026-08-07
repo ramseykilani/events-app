@@ -127,26 +127,27 @@ export default function EditEventScreen() {
 
   const handleDelete = () => {
     Alert.alert(
-      'Delete Event',
-      'Are you sure you want to delete this event? This action cannot be undone.',
+      'Remove Event',
+      'Remove this event from your calendar? People you shared it with will lose access, but anyone who re-shared it keeps their own copy.',
       [
         {
           text: 'Cancel',
           style: 'cancel',
         },
         {
-          text: 'Delete',
+          text: 'Remove',
           style: 'destructive',
           onPress: async () => {
             setLoading(true);
             const { error } = await supabase
-              .from('events')
+              .from('user_events')
               .delete()
-              .eq('id', params.eventId);
+              .eq('id', params.userEventId)
+              .eq('user_id', session?.user?.id ?? '');
 
             if (error) {
-              console.error('Failed to delete event:', error);
-              Alert.alert('Error', 'Failed to delete event');
+              console.error('Failed to remove event:', error);
+              Alert.alert('Error', 'Failed to remove event');
               setLoading(false);
             } else {
               router.replace('/(app)/');
@@ -259,7 +260,7 @@ export default function EditEventScreen() {
           style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
           onPress={handleDelete}
         >
-          <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Delete Event</Text>
+          <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

@@ -139,24 +139,29 @@ export default function EventDetailScreen() {
   };
 
   const handleDelete = () => {
+    if (!userEventId) return;
     Alert.alert(
-      'Delete Event',
-      'Are you sure you want to delete this event? This action cannot be undone.',
+      'Remove Event',
+      'Remove this event from your calendar? People you shared it with will lose access, but anyone who re-shared it keeps their own copy.',
       [
         {
           text: 'Cancel',
           style: 'cancel',
         },
         {
-          text: 'Delete',
+          text: 'Remove',
           style: 'destructive',
           onPress: async () => {
             setLoading(true);
-            const { error } = await supabase.from('events').delete().eq('id', id);
+            const { error } = await supabase
+              .from('user_events')
+              .delete()
+              .eq('id', userEventId)
+              .eq('user_id', session?.user?.id ?? '');
 
             if (error) {
-              console.error('Failed to delete event:', error);
-              Alert.alert('Error', 'Failed to delete event');
+              console.error('Failed to remove event:', error);
+              Alert.alert('Error', 'Failed to remove event');
               setLoading(false);
             } else {
               if (router.canGoBack()) {
@@ -285,12 +290,12 @@ export default function EventDetailScreen() {
                 <Text style={[styles.editButtonText, { color: theme.textPrimary }]}>Edit</Text>
               </TouchableOpacity>
             )}
-            {event.created_by_user_id === session?.user?.id && (
+            {userEventId && (
               <TouchableOpacity
                 style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
                 onPress={handleDelete}
               >
-                <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Delete Event</Text>
+                <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
               </TouchableOpacity>
             )}
             {sharedByPersonId && !userEventId && (
