@@ -63,8 +63,21 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !serviceRoleKey) {
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
     return jsonResponse({ error: 'Server misconfigured' }, 500);
+  }
+
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return jsonResponse({ error: 'Unauthorized' }, 401);
+  }
+  const authClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user: caller }, error: authError } = await authClient.auth.getUser();
+  if (authError || !caller) {
+    return jsonResponse({ error: 'Unauthorized' }, 401);
   }
 
   // Twilio config — all three core secrets plus at least one store URL must be
@@ -98,6 +111,10 @@ serve(async (req) => {
 
     if (ueErr || !userEvent) {
       return jsonResponse({ error: 'user_event not found' }, 404);
+    }
+
+    if (userEvent.user_id !== caller.id) {
+      return jsonResponse({ error: 'Forbidden' }, 403);
     }
 
     const sharerUserId = userEvent.user_id;
