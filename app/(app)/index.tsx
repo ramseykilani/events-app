@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
@@ -18,14 +18,27 @@ export default function CalendarScreen() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
   const fetchSeq = useRef(0);
+  const onboardCheckedRef = useRef(false);
 
-  useEffect(() => {
-    AsyncStorage.getItem(ONBOARDING_KEY).then((value) => {
-      if (value !== 'true') {
-        router.replace('/(app)/onboarding');
-      }
+  // The walkthrough is shown automatically at most once, and only to users
+  // with no events at all — someone who was shared an event should land
+  // directly on their calendar. It can always be reopened via the ? button.
+  const maybeShowOnboarding = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const flag = await AsyncStorage.getItem(ONBOARDING_KEY);
+    if (flag === 'true') return;
+
+    const year = new Date().getFullYear();
+    const { data, error } = await supabase.rpc('get_calendar_events', {
+      p_user_id: session.user.id,
+      p_start_date: `${year - 1}-01-01`,
+      p_end_date: `${year + 1}-12-31`,
     });
-  }, []);
+    if (error || (data ?? []).length > 0) return;
+
+    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    router.push('/(app)/onboarding');
+  }, [session?.user?.id]);
 
   const doFetch = useCallback(
     async (startDate: string, endDate: string) => {
@@ -47,8 +60,8 @@ export default function CalendarScreen() {
       }
 
       setFetchError(null);
-      setEvents(
-        (data ?? []).map((row: Record<string, unknown>) => ({
+      const mapped: CalendarEvent[] = (data ?? []).map(
+        (row: Record<string, unknown>) => ({
           id: row.id as string,
           event_id: row.event_id as string,
           title: row.title as string | null,
@@ -60,10 +73,16 @@ export default function CalendarScreen() {
           sharer_contact_name: row.sharer_contact_name as string | null,
           sharer_person_id: row.sharer_person_id as string | null,
           sharer_user_id: row.sharer_user_id as string,
-        }))
+        })
       );
+      setEvents(mapped);
+
+      if (!onboardCheckedRef.current) {
+        onboardCheckedRef.current = true;
+        if (mapped.length === 0) maybeShowOnboarding();
+      }
     },
-    [session?.user?.id]
+    [session?.user?.id, maybeShowOnboarding]
   );
 
   const handleRefresh = useCallback(async () => {

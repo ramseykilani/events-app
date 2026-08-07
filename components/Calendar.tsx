@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { Calendar as RNCalendar, DateData } from 'react-native-calendars';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EventCard } from './EventCard';
 import type { CalendarEvent } from '../lib/types';
 import { useTheme } from '../hooks/useTheme';
@@ -78,10 +77,7 @@ export function Calendar({
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={[styles.helpButton, { borderColor: theme.border }]}
-            onPress={async () => {
-              await AsyncStorage.removeItem('onboarding_complete');
-              router.push('/(app)/onboarding');
-            }}
+            onPress={() => router.push('/(app)/onboarding')}
           >
             <Text style={[styles.helpButtonText, { color: theme.textSecondary }]}>?</Text>
           </TouchableOpacity>
