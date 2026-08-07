@@ -10,6 +10,8 @@ A running list of planned and in-progress features. Each section contains a full
 | [SMS Invitations](#sms-invitations) | Implemented |
 | [Hide](#hide) | Implemented |
 | [Forwarding Shares](#forwarding-shares) | Implemented |
+| [Sign Out](#sign-out) | Planned |
+| [Web Support](#web-support) | Planned |
 
 ---
 
@@ -73,7 +75,7 @@ This means the only person who needs the app is the one sending events. Friends 
 ### Technical Notes
 
 - No SDK dependency: Twilio REST API called directly via `fetch` with Basic auth in `supabase/functions/send-notification/index.ts`
-- Five new Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `IOS_APP_STORE_URL`, `ANDROID_PLAY_STORE_URL`
+- New Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender — `TWILIO_MESSAGING_SERVICE_SID` (preferred; built-in STOP opt-out handling) or `TWILIO_PHONE_NUMBER` — and `IOS_APP_STORE_URL`, `ANDROID_PLAY_STORE_URL` for the non-app-user path
 - Graceful degradation: if any Twilio secret is missing (or both store URLs are absent for non-app-user path), SMS is silently skipped — push notifications are unaffected
 - SMS failures use `.catch(console.error)` and never propagate to the caller
 - SMS sends are collected as `Promise<void>[]` and flushed with `Promise.all` after the Expo push batch — concurrent, non-blocking
@@ -182,3 +184,85 @@ This app shares public event listings, not private hosted events — closer to f
 ### Open Questions
 
 - None
+
+---
+
+## Sign Out
+
+**Status:** Planned
+
+### Problem
+
+There is no way to sign out. The session persists in AsyncStorage indefinitely, so anyone with the device (or browser profile) stays signed in forever, and there is no way to switch accounts.
+
+### Proposed Solution
+
+A deliberately low-prominence sign-out action — this should not be easy to tap by accident. Put it at the bottom of the People screen (or behind a small menu on the calendar header), labeled "Sign out", and gate it behind a `showConfirm` dialog ("Sign out of [phone number]?").
+
+### Technical Notes
+
+- Call `supabase.auth.signOut()`; `SessionContext` already reacts to the auth state change and routes back to `/(auth)/sign-in` — no extra navigation code needed
+- Works on web too (AsyncStorage is backed by localStorage there); today testers work around the missing button with `localStorage.clear()` in the console
+- Manual regression: signing out and back in must not duplicate data (sessions are stateless server-side)
+
+### Acceptance Criteria
+
+- [ ] Sign-out control exists but is not prominent (bottom of People screen or behind a menu)
+- [ ] Tapping it requires confirming a dialog
+- [ ] After sign-out the app lands on the sign-in screen and protected screens are unreachable
+- [ ] Signing back in restores the calendar exactly as before
+
+### Open Questions
+
+- Exact placement (People screen footer vs. a calendar header menu that could later hold more settings)
+
+---
+
+## Web Support
+
+**Status:** Planned
+
+### Problem
+
+The app already runs in the browser (`npx expo start --web`) — the entire manual regression suite runs against the web build — but it is only a local dev server, and two gaps block real web usage: there is no contacts API on the web (so My People can't be populated), and the date/time pickers don't open (`@react-native-community/datetimepicker` is native-only).
+
+### Philosophy
+
+A web-first beta is attractive: nobody has to install anything, and notifications arrive by SMS — which the backend already does. Web users never register an Expo push token, and `send-notification` sends app users an SMS regardless of whether they have a push token, so "website + SMS" is the de facto behavior once Twilio function secrets are configured. The web app never requests browser notification permission.
+
+### Proposed Solution
+
+1. **Manual add person.** An "Add manually" form (name + phone number) alongside "Add from Contacts" on the People screen. Normalize to E.164 with `libphonenumber-js` and upsert into `my_people` — the same code path contacts import already uses, so `user_id` resolution and pending-share delivery work unchanged.
+2. **Web date/time input.** Fall back to HTML `date`/`time` inputs (or a simple custom picker) when `Platform.OS === 'web'`.
+3. **Deploy the web build.** `npx expo export --platform web` produces a static bundle suitable for any static host (Vercel/Netlify/Cloudflare Pages). The bundle uses the public anon key — safe to ship because all data access goes through RLS. Auth (SMS OTP) already works on web.
+4. **SMS links for a web beta.** Non-app-user SMS is currently gated on App Store / Play Store URLs; for a web beta the message should link the website instead (small `send-notification` change: accept a `WEB_APP_URL` secret and prefer it over store links).
+5. **Universal https links in SMS.** App-user SMS currently appends a custom-scheme deep link (`events-app://event/[eventId]`), which SMS clients never linkify — it arrives as plain, untappable text — and which does nothing when the native app isn't installed. Once the web build lives at a stable URL, replace the deep link with a single https event link (`WEB_APP_URL/event/[eventId]`) that opens the event on web for anyone; hosting Apple's AASA and Android's assetlinks files on that domain upgrades the same link to open the native app directly when installed (universal links / App Links). Until then the custom scheme stays — it works on native installs, where the tappable notification path is push anyway.
+6. **Turn on SMS sending.** `send-notification` needs its own Twilio function secrets (separate from the Supabase Auth SMS config): `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + a sender. A Messaging Service sender is supported (`TWILIO_MESSAGING_SERVICE_SID`, preferred — built-in STOP opt-out handling) with `TWILIO_PHONE_NUMBER` as fallback.
+
+### Rollout order (web beta)
+
+1. Manual add person + web date/time input (items 1–2)
+2. Set the Twilio function secrets (item 6), then verify one real SMS end-to-end against a real phone number (share an event to it from a test account; test OTP numbers never trigger real sends)
+3. Deploy the static web build at a stable URL (item 3), set `WEB_APP_URL` (item 4), and switch app-user SMS to universal https links (item 5)
+4. [Sign Out](#sign-out) and general polish
+
+### Technical Notes
+
+- Web gaps found during 2026-08-07 live regression: contacts permission flow is a dead end on web (explainer dialog only); date picker silently doesn't open; fixed already: Alert dialogs and edge-function CORS headers
+- `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are bundled into the static build at export time
+- The forwarded-copy model means a recipient who later installs the native app sees the same calendar — web and native are interchangeable frontends over the same account
+- Status as of 2026-08-07: all three Twilio function secrets are set (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID`) and a real SMS was verified end-to-end (E-107: `send-notification` returned `{"sent":0,"sms":1}`; Twilio's message log confirms delivery from the Messaging Service pool number). Non-app-user SMS remains gated on a store URL until item 4 lands — a temporary `IOS_APP_STORE_URL=https://example.com/events` placeholder secret is set; remove it when `WEB_APP_URL` exists
+- Test accounts use reserved 555 numbers: A is `+15555550100`, B is `+15555550103` (moved off the real-format `+16462655565`). Sharing to test accounts never sends real SMS
+
+### Acceptance Criteria
+
+- [ ] A person can be added on web with name + phone number (E.164), and sharing to them works end-to-end
+- [ ] Event date/time can be chosen on web
+- [ ] A production web build is deployed at a stable URL and sign-in via SMS OTP works there
+- [ ] `TWILIO_AUTH_TOKEN` function secret is set and a real SMS is received end-to-end (event title, date/time, event URL, STOP footer)
+- [ ] Sharing to a non-user sends an SMS containing the website URL
+
+### Open Questions
+
+- Hosting provider and domain
+- Whether the browser build should show any "install the app" prompt once native builds exist
