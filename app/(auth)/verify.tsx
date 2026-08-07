@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,14 @@ export default function VerifyScreen() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resending, setResending] = useState(false);
   const theme = useTheme();
+  const loadingSafetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (loadingSafetyTimer.current) clearTimeout(loadingSafetyTimer.current);
+    },
+    []
+  );
 
   useEffect(() => {
     if (!phone) {
@@ -75,7 +83,10 @@ export default function VerifyScreen() {
 
       if (error) throw error;
 
-      // Auth state change will trigger navigation via root layout
+      // Auth state change will trigger navigation via root layout. If that
+      // redirect stalls (e.g. session persistence hiccup), re-enable the form
+      // after a grace period so the user isn't stranded on "Verifying...".
+      loadingSafetyTimer.current = setTimeout(() => setLoading(false), 10000);
     } catch (err: unknown) {
       showError('Verification failed', err);
       setLoading(false);

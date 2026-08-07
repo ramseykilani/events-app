@@ -99,7 +99,7 @@ export function PeoplePicker({
             <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: theme.textPrimary }]}>Add people</Text>
-          <TouchableOpacity onPress={handleConfirm}>
+          <TouchableOpacity onPress={handleConfirm} disabled={selected.size === 0}>
             <Text
               style={[
                 styles.done,

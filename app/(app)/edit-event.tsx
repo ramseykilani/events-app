@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -30,37 +31,40 @@ export default function EditEventScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!params.eventId) return;
 
-    async function load() {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', params.eventId)
-        .single();
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', params.eventId)
+      .single();
 
-      if (error) {
-        console.error('Failed to load event:', error);
-        return;
-      }
-
-      const e = data as Event;
-      setEvent(e);
-      setTitle(e.title ?? '');
-      setDescription(e.description ?? '');
-      setUrl(e.url ?? '');
-      setImageUrl(e.image_url ?? '');
-      const [y, m, d] = e.event_date.split('-').map(Number);
-      setEventDate(new Date(y, m - 1, d));
-      setEventTime(
-        e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null
-      );
+    if (error) {
+      console.error('Failed to load event:', error);
+      setLoadError(true);
+      return;
     }
 
-    load();
+    setLoadError(false);
+    const e = data as Event;
+    setEvent(e);
+    setTitle(e.title ?? '');
+    setDescription(e.description ?? '');
+    setUrl(e.url ?? '');
+    setImageUrl(e.image_url ?? '');
+    const [y, m, d] = e.event_date.split('-').map(Number);
+    setEventDate(new Date(y, m - 1, d));
+    setEventTime(
+      e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null
+    );
   }, [params.eventId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSave = async () => {
     if (!title.trim() && !url.trim()) {
@@ -190,10 +194,26 @@ export default function EditEventScreen() {
     );
   };
 
+  if (loadError && !event) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <Text style={[styles.loadErrorText, { color: theme.textSecondary }]}>
+          Could not load this event.
+        </Text>
+        <TouchableOpacity onPress={load} activeOpacity={0.6}>
+          <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+          <Text style={[styles.retry, { color: theme.textSecondary }]}>Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!event) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Text style={[styles.loading, { color: theme.textPrimary }]}>Loading...</Text>
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.textPrimary} />
       </View>
     );
   }
@@ -303,9 +323,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loading: {
-    padding: 24,
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadErrorText: {
     fontSize: 16,
+  },
+  retry: {
+    fontSize: 16,
+    fontWeight: '600',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
