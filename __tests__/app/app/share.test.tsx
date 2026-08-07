@@ -1,5 +1,4 @@
 import React from 'react';
-import { Alert } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import ShareScreen from '../../../app/(app)/share';
@@ -16,7 +15,11 @@ const mockCirclesSelect = jest.fn();
 const mockEventSharesEq = jest.fn();
 const mockEventSharesSelect = jest.fn();
 const mockEventSharesUpsert = jest.fn();
+const mockEventSharesDelete = jest.fn();
+const mockEventSharesDeleteEq = jest.fn();
+const mockEventSharesDeleteIn = jest.fn();
 
+const mockFunctionsInvoke = jest.fn();
 const mockFrom = jest.fn();
 
 jest.mock('../../../app/_context/SessionContext', () => ({
@@ -30,6 +33,9 @@ jest.mock('../../../app/_context/SessionContext', () => ({
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
+    functions: {
+      invoke: (...args: unknown[]) => mockFunctionsInvoke(...args),
+    },
   },
 }));
 
@@ -39,7 +45,7 @@ jest.mock('../../../lib/showError', () => ({
 
 jest.mock('../../../components/ShareSheet', () => {
   const React = require('react');
-  const { TouchableOpacity, Text } = require('react-native');
+  const { TouchableOpacity, Text, View } = require('react-native');
 
   return {
     ShareSheet: ({
@@ -47,12 +53,26 @@ jest.mock('../../../components/ShareSheet', () => {
     }: {
       onSelectionChange: (ids: Set<string>) => void;
     }) => (
-      <TouchableOpacity
-        testID="mock-share-sheet-select"
-        onPress={() => onSelectionChange(new Set(['p1', 'p2']))}
-      >
-        <Text>Select two people</Text>
-      </TouchableOpacity>
+      <View>
+        <TouchableOpacity
+          testID="mock-share-sheet-select"
+          onPress={() => onSelectionChange(new Set(['p1', 'p2']))}
+        >
+          <Text>Select two people</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="mock-share-sheet-select-one"
+          onPress={() => onSelectionChange(new Set(['p2']))}
+        >
+          <Text>Select only p2</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="mock-share-sheet-clear"
+          onPress={() => onSelectionChange(new Set())}
+        >
+          <Text>Clear selection</Text>
+        </TouchableOpacity>
+      </View>
     ),
   };
 });
@@ -65,6 +85,8 @@ describe('app/(app)/share', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useLocalSearchParamsMock.mockReturnValue({ eventId: 'e1', userEventId: 'ue1' });
+
+    mockFunctionsInvoke.mockResolvedValue({ data: null, error: null });
 
     mockMyPeopleOrder.mockResolvedValue({
       data: [
@@ -101,6 +123,9 @@ describe('app/(app)/share', () => {
     mockEventSharesUpsert.mockResolvedValue({ error: null });
     mockEventSharesEq.mockResolvedValue({ data: [], error: null });
     mockEventSharesSelect.mockReturnValue({ eq: mockEventSharesEq });
+    mockEventSharesDeleteIn.mockResolvedValue({ error: null });
+    mockEventSharesDeleteEq.mockReturnValue({ in: mockEventSharesDeleteIn });
+    mockEventSharesDelete.mockReturnValue({ eq: mockEventSharesDeleteEq });
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'my_people') {
@@ -118,6 +143,7 @@ describe('app/(app)/share', () => {
         return {
           select: mockEventSharesSelect,
           upsert: mockEventSharesUpsert,
+          delete: mockEventSharesDelete,
         };
       }
       return {};
@@ -147,16 +173,61 @@ describe('app/(app)/share', () => {
       last_shared_at: expect.any(String),
     });
     expect(mockMyPeopleIn).toHaveBeenCalledWith('id', ['p1', 'p2']);
+    expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-notification', {
+      body: { userEventId: 'ue1' },
+    });
     expect(router.back).toHaveBeenCalled();
   });
 
-  it('does not share or navigate when Done is pressed with no people selected', async () => {
+  it('does not share or navigate when Done is pressed with no people selected and no existing shares', async () => {
     const screen = render(<ShareScreen />);
 
     fireEvent.press(screen.getByText('Done'));
 
     await waitFor(() => expect(mockEventSharesUpsert).not.toHaveBeenCalled());
     expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('removes shares for deselected people when editing existing shares', async () => {
+    mockEventSharesEq.mockResolvedValue({ data: [{ person_id: 'p1' }], error: null });
+
+    const screen = render(<ShareScreen />);
+    await waitFor(() =>
+      expect(mockEventSharesEq).toHaveBeenCalledWith('user_event_id', 'ue1')
+    );
+
+    fireEvent.press(screen.getByTestId('mock-share-sheet-select-one'));
+    fireEvent.press(screen.getByText('Done'));
+
+    await waitFor(() => {
+      expect(mockEventSharesDeleteEq).toHaveBeenCalledWith('user_event_id', 'ue1');
+      expect(mockEventSharesDeleteIn).toHaveBeenCalledWith('person_id', ['p1']);
+    });
+    expect(mockEventSharesUpsert).toHaveBeenCalledWith(
+      [{ user_event_id: 'ue1', person_id: 'p2' }],
+      { onConflict: 'user_event_id,person_id', ignoreDuplicates: true }
+    );
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('allows clearing all shares when editing existing shares', async () => {
+    mockEventSharesEq.mockResolvedValue({ data: [{ person_id: 'p1' }], error: null });
+
+    const screen = render(<ShareScreen />);
+    await waitFor(() =>
+      expect(mockEventSharesEq).toHaveBeenCalledWith('user_event_id', 'ue1')
+    );
+
+    fireEvent.press(screen.getByTestId('mock-share-sheet-clear'));
+    fireEvent.press(screen.getByText('Done'));
+
+    await waitFor(() => {
+      expect(mockEventSharesDeleteIn).toHaveBeenCalledWith('person_id', ['p1']);
+    });
+    expect(mockEventSharesUpsert).not.toHaveBeenCalled();
+    // No new recipients — no notifications
+    expect(mockFunctionsInvoke).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalled();
   });
 
   describe('when userEventId is not in params', () => {
@@ -185,7 +256,7 @@ describe('app/(app)/share', () => {
           return { select: mockCirclesSelect };
         }
         if (table === 'event_shares') {
-          return { upsert: mockEventSharesUpsert };
+          return { upsert: mockEventSharesUpsert, delete: mockEventSharesDelete };
         }
         if (table === 'user_events') {
           return { select: mockUserEventsSelect, insert: mockUserEventsInsert };

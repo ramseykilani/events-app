@@ -30,6 +30,9 @@ export default function ShareScreen() {
   const [selectedPersonIds, setSelectedPersonIds] = useState<Set<string>>(
     new Set()
   );
+  const [initialSharedIds, setInitialSharedIds] = useState<Set<string>>(
+    new Set()
+  );
   const [loading, setLoading] = useState(false);
 
   const firstParamValue = (value?: string | string[]) =>
@@ -72,10 +75,12 @@ export default function ShareScreen() {
             .from('event_shares')
             .select('person_id')
             .eq('user_event_id', ueId);
-          const ids = (shares ?? []).map((s) => s.person_id);
-          setSelectedPersonIds(new Set(ids));
+          const ids = new Set((shares ?? []).map((s) => s.person_id));
+          setSelectedPersonIds(ids);
+          setInitialSharedIds(ids);
         } else {
           setSelectedPersonIds(new Set());
+          setInitialSharedIds(new Set());
         }
       }
 
@@ -84,7 +89,10 @@ export default function ShareScreen() {
   );
 
   const handleConfirm = async () => {
-    if (selectedPersonIds.size === 0) {
+    // Sharing is mandatory when the event has never been shared (e.g. right
+    // after creating it). When editing existing shares, deselecting everyone
+    // is allowed and removes all shares.
+    if (selectedPersonIds.size === 0 && initialSharedIds.size === 0) {
       Alert.alert('Select people', 'Please select at least one person to share with.');
       return;
     }
@@ -136,29 +144,53 @@ export default function ShareScreen() {
         throw new Error('Could not find event ownership for sharing');
       }
 
-      const shares = Array.from(selectedPersonIds).map((person_id) => ({
-        user_event_id: userEventId,
-        person_id,
-      }));
+      const toAdd = Array.from(selectedPersonIds).filter(
+        (pid) => !initialSharedIds.has(pid)
+      );
+      const toRemove = Array.from(initialSharedIds).filter(
+        (pid) => !selectedPersonIds.has(pid)
+      );
 
-      const { error: shareErr } = await supabase
-        .from('event_shares')
-        .upsert(shares, {
-          onConflict: 'user_event_id,person_id',
-          ignoreDuplicates: true,
-        });
+      if (toAdd.length > 0) {
+        const { error: shareErr } = await supabase
+          .from('event_shares')
+          .upsert(
+            toAdd.map((person_id) => ({
+              user_event_id: userEventId,
+              person_id,
+            })),
+            {
+              onConflict: 'user_event_id,person_id',
+              ignoreDuplicates: true,
+            }
+          );
 
-      if (shareErr) throw shareErr;
+        if (shareErr) throw shareErr;
+      }
 
-      await supabase
-        .from('my_people')
-        .update({ last_shared_at: new Date().toISOString() })
-        .in('id', Array.from(selectedPersonIds));
+      if (toRemove.length > 0) {
+        const { error: removeErr } = await supabase
+          .from('event_shares')
+          .delete()
+          .eq('user_event_id', userEventId)
+          .in('person_id', toRemove);
 
-      // Fire-and-forget: send push notifications to newly added recipients
-      supabase.functions
-        .invoke('send-notification', { body: { userEventId } })
-        .catch((err) => console.error('send-notification error:', err));
+        if (removeErr) throw removeErr;
+      }
+
+      if (selectedPersonIds.size > 0) {
+        await supabase
+          .from('my_people')
+          .update({ last_shared_at: new Date().toISOString() })
+          .in('id', Array.from(selectedPersonIds));
+      }
+
+      // Fire-and-forget: notify only newly added recipients
+      if (toAdd.length > 0) {
+        supabase.functions
+          .invoke('send-notification', { body: { userEventId } })
+          .catch((err) => console.error('send-notification error:', err));
+      }
 
       router.back();
     } catch (err: unknown) {
@@ -177,13 +209,13 @@ export default function ShareScreen() {
         <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={loading || selectedPersonIds.size === 0}
+          disabled={loading || (selectedPersonIds.size === 0 && initialSharedIds.size === 0)}
         >
           <Text
             style={[
               styles.done,
               { color: theme.textPrimary },
-              (loading || selectedPersonIds.size === 0) && { color: theme.textTertiary },
+              (loading || (selectedPersonIds.size === 0 && initialSharedIds.size === 0)) && { color: theme.textTertiary },
             ]}
           >
             Done
