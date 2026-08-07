@@ -164,9 +164,10 @@ describe('app/(app)/event/[id]', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 
-  it('navigates back after a successful hide', async () => {
+  it('navigates back after a successful hide — also when the viewer owns a copy (forwarding)', async () => {
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
-    mockUeSingle.mockResolvedValue({ data: null, error: null });
+    // userEventId stays set (default mock): recipients own their copy, and
+    // the hide action must still be available on shared events.
 
     const screen = render(<EventDetailScreen />);
     const hideButton = await screen.findByText('Hide Alice');

@@ -30,7 +30,7 @@ export default function ShareScreen() {
   const [selectedPersonIds, setSelectedPersonIds] = useState<Set<string>>(
     new Set()
   );
-  const [initialSharedIds, setInitialSharedIds] = useState<Set<string>>(
+  const [alreadySharedIds, setAlreadySharedIds] = useState<Set<string>>(
     new Set()
   );
   const [loading, setLoading] = useState(false);
@@ -69,7 +69,9 @@ export default function ShareScreen() {
     setCircles(circlesData ?? []);
     setCircleMembers(membersData);
 
-    // Load existing shares so already-shared people appear selected
+    // Load existing shares so already-shared people render as completed
+    // actions. Sharing is forwarding: once shared it cannot be unsent, so
+    // existing shares are shown as done and only new people can be picked.
     const ueId = firstParamValue(params.userEventId);
     if (ueId) {
       const { data: shares, error: sharesErr } = await supabase
@@ -77,13 +79,11 @@ export default function ShareScreen() {
         .select('person_id')
         .eq('user_event_id', ueId);
       if (sharesErr) failed = true;
-      const ids = new Set((shares ?? []).map((s) => s.person_id));
-      setSelectedPersonIds(ids);
-      setInitialSharedIds(ids);
+      setAlreadySharedIds(new Set((shares ?? []).map((s) => s.person_id)));
     } else {
-      setSelectedPersonIds(new Set());
-      setInitialSharedIds(new Set());
+      setAlreadySharedIds(new Set());
     }
+    setSelectedPersonIds(new Set());
 
     if (failed) {
       console.error('share load error:', peopleErr ?? circlesErr);
@@ -99,9 +99,9 @@ export default function ShareScreen() {
 
   const handleConfirm = async () => {
     // Sharing is mandatory when the event has never been shared (e.g. right
-    // after creating it). When editing existing shares, deselecting everyone
-    // is allowed and removes all shares.
-    if (selectedPersonIds.size === 0 && initialSharedIds.size === 0) {
+    // after creating it). Afterwards the action is additive-only: existing
+    // shares are completed and cannot be unsent.
+    if (selectedPersonIds.size === 0) {
       Alert.alert('Select people', 'Please select at least one person to share with.');
       return;
     }
@@ -153,49 +153,21 @@ export default function ShareScreen() {
         throw new Error('Could not find event ownership for sharing');
       }
 
-      const toAdd = Array.from(selectedPersonIds).filter(
-        (pid) => !initialSharedIds.has(pid)
-      );
-      const toRemove = Array.from(initialSharedIds).filter(
-        (pid) => !selectedPersonIds.has(pid)
+      const toShare = Array.from(selectedPersonIds).filter(
+        (pid) => !alreadySharedIds.has(pid)
       );
 
-      if (toAdd.length > 0) {
-        const { error: shareErr } = await supabase
-          .from('event_shares')
-          .upsert(
-            toAdd.map((person_id) => ({
-              user_event_id: userEventId,
-              person_id,
-            })),
-            {
-              onConflict: 'user_event_id,person_id',
-              ignoreDuplicates: true,
-            }
-          );
+      if (toShare.length > 0) {
+        // Delivers each recipient their own copy of the event and records the
+        // shares server-side (also bumps last_shared_at).
+        const { error: shareErr } = await supabase.rpc('share_event', {
+          p_user_event_id: userEventId,
+          p_person_ids: toShare,
+        });
 
         if (shareErr) throw shareErr;
-      }
 
-      if (toRemove.length > 0) {
-        const { error: removeErr } = await supabase
-          .from('event_shares')
-          .delete()
-          .eq('user_event_id', userEventId)
-          .in('person_id', toRemove);
-
-        if (removeErr) throw removeErr;
-      }
-
-      if (selectedPersonIds.size > 0) {
-        await supabase
-          .from('my_people')
-          .update({ last_shared_at: new Date().toISOString() })
-          .in('id', Array.from(selectedPersonIds));
-      }
-
-      // Fire-and-forget: notify only newly added recipients
-      if (toAdd.length > 0) {
+        // Fire-and-forget: notify the people just shared with
         supabase.functions
           .invoke('send-notification', { body: { userEventId } })
           .catch((err) => console.error('send-notification error:', err));
@@ -218,16 +190,16 @@ export default function ShareScreen() {
         <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={loading || (selectedPersonIds.size === 0 && initialSharedIds.size === 0)}
+          disabled={loading || selectedPersonIds.size === 0}
         >
           <Text
             style={[
               styles.done,
               { color: theme.textPrimary },
-              (loading || (selectedPersonIds.size === 0 && initialSharedIds.size === 0)) && { color: theme.textTertiary },
+              (loading || selectedPersonIds.size === 0) && { color: theme.textTertiary },
             ]}
           >
-            Done
+            Share
           </Text>
         </TouchableOpacity>
       </View>
@@ -236,6 +208,7 @@ export default function ShareScreen() {
         circles={circles}
         circleMembers={circleMembers}
         selectedPersonIds={selectedPersonIds}
+        sharedPersonIds={alreadySharedIds}
         onSelectionChange={setSelectedPersonIds}
       />
       {loadError ? (
@@ -244,6 +217,11 @@ export default function ShareScreen() {
             Could not load people. Tap to retry.
           </Text>
         </TouchableOpacity>
+      ) : null}
+      {!loadError && people.length > 0 && alreadySharedIds.size > 0 ? (
+        <Text style={[styles.forwardingNote, { color: theme.textTertiary }]}>
+          Sharing delivers people their own copy — it can't be unsent.
+        </Text>
       ) : null}
     </View>
   );
@@ -277,5 +255,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 12,
+  },
+  forwardingNote: {
+    fontSize: 13,
+    textAlign: 'center',
+    paddingBottom: 16,
+    paddingHorizontal: 24,
   },
 });

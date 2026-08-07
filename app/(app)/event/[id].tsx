@@ -128,7 +128,7 @@ export default function EventDetailScreen() {
     if (!userEventId) return;
     Alert.alert(
       'Remove Event',
-      'Remove this event from your calendar? People you shared it with will lose access, but anyone who re-shared it keeps their own copy.',
+      'Remove this event from your calendar? This only affects you — everyone you shared it with keeps their own copy.',
       [
         {
           text: 'Cancel',
@@ -298,8 +298,7 @@ export default function EventDetailScreen() {
                 </Text>
               ))}
               <Text style={[styles.sharedWithNote, { color: theme.textTertiary }]}>
-                Removing someone from My People also removes them from this
-                event.
+                Sharing delivers everyone their own copy — it can't be unsent.
               </Text>
             </View>
           ) : null}
@@ -328,7 +327,7 @@ export default function EventDetailScreen() {
                 <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
               </TouchableOpacity>
             )}
-            {sharedByPersonId && !userEventId && (
+            {sharedByPersonId && (
               <TouchableOpacity
                 style={[styles.hideButton, { backgroundColor: theme.surfaceSecondary }]}
                 onPress={handleToggleHide}

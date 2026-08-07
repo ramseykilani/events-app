@@ -8,6 +8,10 @@ type Props = {
   circles: Circle[];
   circleMembers: { circle_id: string; person_id: string }[];
   selectedPersonIds: Set<string>;
+  // People the event was already shared with. A share is a completed action
+  // (it delivered them their own copy), so these rows render as done and are
+  // not interactive.
+  sharedPersonIds?: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
 };
 
@@ -16,9 +20,11 @@ export function ShareSheet({
   circles,
   circleMembers,
   selectedPersonIds,
+  sharedPersonIds,
   onSelectionChange,
 }: Props) {
   const theme = useTheme();
+  const shared = sharedPersonIds ?? new Set<string>();
 
   const getCirclePersonIds = (circleId: string): string[] =>
     circleMembers
@@ -26,6 +32,7 @@ export function ShareSheet({
       .map((m) => m.person_id);
 
   const togglePerson = (id: string) => {
+    if (shared.has(id)) return;
     const next = new Set(selectedPersonIds);
     if (next.has(id)) {
       next.delete(id);
@@ -36,13 +43,16 @@ export function ShareSheet({
   };
 
   const toggleCircle = (circle: Circle) => {
-    const personIds = getCirclePersonIds(circle.id);
-    const allSelected = personIds.every((id) => selectedPersonIds.has(id));
+    const selectableIds = getCirclePersonIds(circle.id).filter(
+      (id) => !shared.has(id)
+    );
+    if (selectableIds.length === 0) return;
+    const allSelected = selectableIds.every((id) => selectedPersonIds.has(id));
     const next = new Set(selectedPersonIds);
     if (allSelected) {
-      personIds.forEach((id) => next.delete(id));
+      selectableIds.forEach((id) => next.delete(id));
     } else {
-      personIds.forEach((id) => next.add(id));
+      selectableIds.forEach((id) => next.add(id));
     }
     onSelectionChange(next);
   };
@@ -55,12 +65,16 @@ export function ShareSheet({
           <View style={styles.circleChips}>
             {circles.map((circle) => {
               const personIds = getCirclePersonIds(circle.id);
+              const selectableIds = personIds.filter((id) => !shared.has(id));
+              const allShared =
+                personIds.length > 0 && selectableIds.length === 0;
               const allSelected =
-                personIds.length > 0 &&
-                personIds.every((id) => selectedPersonIds.has(id));
+                selectableIds.length > 0 &&
+                selectableIds.every((id) => selectedPersonIds.has(id));
               return (
                 <TouchableOpacity
                   key={circle.id}
+                  disabled={allShared}
                   style={[
                     styles.chip,
                     {
@@ -68,11 +82,17 @@ export function ShareSheet({
                         ? theme.selectedBg
                         : theme.surfaceSecondary,
                     },
+                    allShared && { opacity: 0.5 },
                   ]}
                   onPress={() => toggleCircle(circle)}
                 >
-                  <Text style={[styles.chipText, { color: theme.textPrimary }]}>
-                    {allSelected ? `✓ ${circle.name}` : circle.name}
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: allShared ? theme.textTertiary : theme.textPrimary },
+                    ]}
+                  >
+                    {allSelected || allShared ? `✓ ${circle.name}` : circle.name}
                   </Text>
                 </TouchableOpacity>
               );
@@ -107,9 +127,11 @@ export function ShareSheet({
             data={people}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => {
+              const isShared = shared.has(item.id);
               const selected = selectedPersonIds.has(item.id);
               return (
                 <TouchableOpacity
+                  disabled={isShared}
                   style={[
                     styles.personRow,
                     { borderBottomColor: theme.surfaceSecondary },
@@ -117,10 +139,21 @@ export function ShareSheet({
                   ]}
                   onPress={() => togglePerson(item.id)}
                 >
-                  <Text style={[styles.personName, { color: theme.textPrimary }]}>
+                  <Text
+                    style={[
+                      styles.personName,
+                      { color: isShared ? theme.textTertiary : theme.textPrimary },
+                    ]}
+                  >
                     {item.contact_name ?? item.phone_number}
                   </Text>
-                  {selected && <Text style={[styles.checkmark, { color: theme.textPrimary }]}>✓</Text>}
+                  {isShared ? (
+                    <Text style={[styles.sharedLabel, { color: theme.textTertiary }]}>
+                      ✓ Shared
+                    </Text>
+                  ) : (
+                    selected && <Text style={[styles.checkmark, { color: theme.textPrimary }]}>✓</Text>
+                  )}
                 </TouchableOpacity>
               );
             }}
@@ -203,6 +236,10 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     fontSize: 18,
+    fontWeight: '600',
+  },
+  sharedLabel: {
+    fontSize: 14,
     fontWeight: '600',
   },
 });
