@@ -31,26 +31,46 @@ export default function PeopleScreen() {
   const [editingCircle, setEditingCircle] = useState<Circle | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [hiddenPeople, setHiddenPeople] = useState<(HiddenPerson & { contact_name: string | null; phone_number: string })[]>([]);
+  const [loadError, setLoadError] = useState(false);
   const hasRequestedContacts = useRef(false);
 
   const loadData = useCallback(async (): Promise<MyPerson[]> => {
     if (!userId) return [];
 
-    const { data: peopleData } = await supabase
+    const { data: peopleData, error: peopleErr } = await supabase
       .from('my_people')
       .select('*')
       .eq('owner_id', userId)
       .order('contact_name');
 
-    const { data: circlesData } = await supabase
+    const { data: circlesData, error: circlesErr } = await supabase
       .from('circles')
       .select('*')
       .eq('owner_id', userId);
 
-    const { data: hiddenData } = await supabase
+    const { data: hiddenData, error: hiddenErr } = await supabase
       .from('hidden_people')
       .select('id, owner_id, person_id, hidden_at, my_people(contact_name, phone_number)')
       .eq('owner_id', userId);
+
+    let failed = !!(peopleErr || circlesErr || hiddenErr);
+    let membersData: CircleMember[] = [];
+    const circleIds = (circlesData ?? []).map((c) => c.id);
+    if (circleIds.length > 0) {
+      const { data, error: membersErr } = await supabase
+        .from('circle_members')
+        .select('*')
+        .in('circle_id', circleIds);
+      if (membersErr) failed = true;
+      membersData = data ?? [];
+    }
+
+    if (failed) {
+      console.error('people load error:', peopleErr ?? circlesErr ?? hiddenErr);
+      setLoadError(true);
+    } else {
+      setLoadError(false);
+    }
 
     const peopleList = peopleData ?? [];
     setPeople(peopleList);
@@ -68,17 +88,7 @@ export default function PeopleScreen() {
         };
       })
     );
-
-    const circleIds = (circlesData ?? []).map((c) => c.id);
-    if (circleIds.length > 0) {
-      const { data: membersData } = await supabase
-        .from('circle_members')
-        .select('*')
-        .in('circle_id', circleIds);
-      setCircleMembers(membersData ?? []);
-    } else {
-      setCircleMembers([]);
-    }
+    setCircleMembers(membersData);
     return peopleList;
   }, [userId]);
 
@@ -167,9 +177,14 @@ export default function PeopleScreen() {
       phone_number: c.phoneNumber,
       contact_name: c.name,
     }));
-    await supabase.from('my_people').upsert(rows, {
+    const { error } = await supabase.from('my_people').upsert(rows, {
       onConflict: 'owner_id,phone_number',
     });
+    if (error) {
+      // Keep the picker open so the selection isn't lost
+      showError('Error adding people', error);
+      return;
+    }
 
     setShowPicker(false);
     loadData();
@@ -177,10 +192,14 @@ export default function PeopleScreen() {
 
   const handleAddCircle = async () => {
     if (!newCircleName.trim() || !userId) return;
-    await supabase.from('circles').insert({
+    const { error } = await supabase.from('circles').insert({
       owner_id: userId,
       name: newCircleName.trim(),
     });
+    if (error) {
+      showError('Error creating circle', error);
+      return;
+    }
     setNewCircleName('');
     loadData();
   };
@@ -195,7 +214,11 @@ export default function PeopleScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await supabase.from('circles').delete().eq('id', circle.id);
+            const { error } = await supabase.from('circles').delete().eq('id', circle.id);
+            if (error) {
+              showError('Error deleting circle', error);
+              return;
+            }
             loadData();
           },
         },
@@ -213,7 +236,11 @@ export default function PeopleScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            await supabase.from('my_people').delete().eq('id', person.id);
+            const { error } = await supabase.from('my_people').delete().eq('id', person.id);
+            if (error) {
+              showError('Error removing person', error);
+              return;
+            }
             loadData();
           },
         },
@@ -222,7 +249,11 @@ export default function PeopleScreen() {
   };
 
   const handleUnhide = async (hiddenId: string) => {
-    await supabase.from('hidden_people').delete().eq('id', hiddenId);
+    const { error } = await supabase.from('hidden_people').delete().eq('id', hiddenId);
+    if (error) {
+      showError('Error', error);
+      return;
+    }
     loadData();
   };
 
@@ -250,7 +281,16 @@ export default function PeopleScreen() {
   const handleSaveCircleMembers = async () => {
     if (!editingCircle) return;
 
-    await supabase.from('circle_members').delete().eq('circle_id', editingCircle.id);
+    const previousIds = getCircleMemberIds(editingCircle.id);
+
+    const { error: delError } = await supabase
+      .from('circle_members')
+      .delete()
+      .eq('circle_id', editingCircle.id);
+    if (delError) {
+      showError('Error', delError);
+      return;
+    }
 
     if (selectedMemberIds.size > 0) {
       const rows = Array.from(selectedMemberIds).map((personId) => ({
@@ -259,7 +299,18 @@ export default function PeopleScreen() {
       }));
       const { error } = await supabase.from('circle_members').insert(rows);
       if (error) {
+        // The delete-then-insert sequence isn't atomic: restore the previous
+        // members so the circle isn't left empty by a failed save.
+        if (previousIds.length > 0) {
+          await supabase.from('circle_members').insert(
+            previousIds.map((personId) => ({
+              circle_id: editingCircle.id,
+              person_id: personId,
+            }))
+          );
+        }
         showError('Error', error);
+        await loadData();
         return;
       }
     }
@@ -291,6 +342,13 @@ export default function PeopleScreen() {
       <Text style={[styles.count, { color: theme.textSecondary }]}>
         {people.length} / 50 people
       </Text>
+      {loadError ? (
+        <TouchableOpacity onPress={() => loadData()}>
+          <Text style={[styles.loadError, { color: theme.destructiveLink }]}>
+            Could not refresh. Tap to retry.
+          </Text>
+        </TouchableOpacity>
+      ) : null}
       {people.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>👥</Text>
@@ -452,6 +510,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingHorizontal: 20,
     paddingVertical: 8,
+  },
+  loadError: {
+    fontSize: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
   circlesSection: {
     paddingHorizontal: 20,

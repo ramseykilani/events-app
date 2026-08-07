@@ -34,58 +34,67 @@ export default function ShareScreen() {
     new Set()
   );
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const firstParamValue = (value?: string | string[]) =>
     Array.isArray(value) ? value[0] : value;
 
+  const loadData = useCallback(async () => {
+    if (!userId) return;
+
+    const { data: peopleData, error: peopleErr } = await supabase
+      .from('my_people')
+      .select('*')
+      .eq('owner_id', userId)
+      .order('contact_name');
+
+    const { data: circlesData, error: circlesErr } = await supabase
+      .from('circles')
+      .select('*')
+      .eq('owner_id', userId);
+
+    let failed = !!(peopleErr || circlesErr);
+    let membersData: CircleMember[] = [];
+    const circleIds = (circlesData ?? []).map((c) => c.id);
+    if (circleIds.length > 0) {
+      const { data, error: membersErr } = await supabase
+        .from('circle_members')
+        .select('*')
+        .in('circle_id', circleIds);
+      if (membersErr) failed = true;
+      membersData = data ?? [];
+    }
+
+    setPeople(peopleData ?? []);
+    setCircles(circlesData ?? []);
+    setCircleMembers(membersData);
+
+    // Load existing shares so already-shared people appear selected
+    const ueId = firstParamValue(params.userEventId);
+    if (ueId) {
+      const { data: shares, error: sharesErr } = await supabase
+        .from('event_shares')
+        .select('person_id')
+        .eq('user_event_id', ueId);
+      if (sharesErr) failed = true;
+      const ids = new Set((shares ?? []).map((s) => s.person_id));
+      setSelectedPersonIds(ids);
+      setInitialSharedIds(ids);
+    } else {
+      setSelectedPersonIds(new Set());
+      setInitialSharedIds(new Set());
+    }
+
+    if (failed) {
+      console.error('share load error:', peopleErr ?? circlesErr);
+    }
+    setLoadError(failed);
+  }, [userId, params.userEventId]);
+
   useFocusEffect(
     useCallback(() => {
-      if (!userId) return;
-
-      async function load() {
-        const { data: peopleData } = await supabase
-          .from('my_people')
-          .select('*')
-          .eq('owner_id', userId)
-          .order('contact_name');
-
-        const { data: circlesData } = await supabase
-          .from('circles')
-          .select('*')
-          .eq('owner_id', userId);
-
-        setPeople(peopleData ?? []);
-        setCircles(circlesData ?? []);
-
-        const circleIds = (circlesData ?? []).map((c) => c.id);
-        let membersData: CircleMember[] = [];
-        if (circleIds.length > 0) {
-          const { data } = await supabase
-            .from('circle_members')
-            .select('*')
-            .in('circle_id', circleIds);
-          membersData = data ?? [];
-        }
-        setCircleMembers(membersData);
-
-        // Load existing shares so already-shared people appear selected
-        const ueId = firstParamValue(params.userEventId);
-        if (ueId) {
-          const { data: shares } = await supabase
-            .from('event_shares')
-            .select('person_id')
-            .eq('user_event_id', ueId);
-          const ids = new Set((shares ?? []).map((s) => s.person_id));
-          setSelectedPersonIds(ids);
-          setInitialSharedIds(ids);
-        } else {
-          setSelectedPersonIds(new Set());
-          setInitialSharedIds(new Set());
-        }
-      }
-
-      load();
-    }, [userId, params.userEventId])
+      loadData();
+    }, [loadData])
   );
 
   const handleConfirm = async () => {
@@ -229,6 +238,13 @@ export default function ShareScreen() {
         selectedPersonIds={selectedPersonIds}
         onSelectionChange={setSelectedPersonIds}
       />
+      {loadError ? (
+        <TouchableOpacity onPress={loadData}>
+          <Text style={[styles.loadError, { color: theme.textSecondary }]}>
+            Could not load people. Tap to retry.
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -256,5 +272,10 @@ const styles = StyleSheet.create({
   done: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadError: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 12,
   },
 });

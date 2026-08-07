@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
+import { showError } from '../../../lib/showError';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
 import { useTheme } from '../../../hooks/useTheme';
@@ -31,101 +32,86 @@ export default function EventDetailScreen() {
   const [sharedWith, setSharedWith] = useState<SharedWithPerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessRevoked, setAccessRevoked] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [sharerName, setSharerName] = useState<string | null>(null);
   const [isHidden, setIsHidden] = useState(false);
 
-  useEffect(() => {
-    if (!id) return;
+  const load = useCallback(async () => {
+    if (!id || !session?.user?.id) return;
 
-    async function load() {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', id)
-        .single();
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          setAccessRevoked(true);
-        } else {
-          console.error('Failed to load event:', error);
-        }
-        setEvent(null);
+    if (error) {
+      if (error.code === 'PGRST116') {
+        setAccessRevoked(true);
+        setLoadError(false);
       } else {
-        setEvent(data as Event);
-        setAccessRevoked(false);
+        console.error('Failed to load event:', error);
+        setLoadError(true);
       }
-
-      if (session?.user?.id) {
-        const { data: ue } = await supabase
-          .from('user_events')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .eq('event_id', id)
-          .single();
-        setUserEventId(ue?.id ?? null);
-
-        if (ue?.id) {
-          const { data: shares } = await supabase
-            .from('event_shares')
-            .select('person_id')
-            .eq('user_event_id', ue.id);
-          const personIds = (shares ?? []).map((s) => s.person_id);
-          if (personIds.length > 0) {
-            const { data: people } = await supabase
-              .from('my_people')
-              .select('id, contact_name, phone_number')
-              .in('id', personIds);
-            setSharedWith((people ?? []) as SharedWithPerson[]);
-          } else {
-            setSharedWith([]);
-          }
-        }
-
-        if (sharedByPersonId && session?.user?.id) {
-          const { data: person } = await supabase
-            .from('my_people')
-            .select('contact_name, phone_number')
-            .eq('id', sharedByPersonId)
-            .single();
-          setSharerName(person?.contact_name ?? person?.phone_number ?? null);
-
-          const { data: hidden } = await supabase
-            .from('hidden_people')
-            .select('id')
-            .eq('owner_id', session.user.id)
-            .eq('person_id', sharedByPersonId)
-            .maybeSingle();
-          setIsHidden(!!hidden);
-        }
-      }
-      setLoading(false);
+      setEvent(null);
+    } else {
+      setEvent(data as Event);
+      setAccessRevoked(false);
+      setLoadError(false);
     }
 
-    load();
-  }, [id, session?.user?.id]);
+    const { data: ue } = await supabase
+      .from('user_events')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('event_id', id)
+      .single();
+    setUserEventId(ue?.id ?? null);
 
+    if (ue?.id) {
+      const { data: shares } = await supabase
+        .from('event_shares')
+        .select('person_id')
+        .eq('user_event_id', ue.id);
+      const personIds = (shares ?? []).map((s) => s.person_id);
+      if (personIds.length > 0) {
+        const { data: people } = await supabase
+          .from('my_people')
+          .select('id, contact_name, phone_number')
+          .in('id', personIds);
+        setSharedWith((people ?? []) as SharedWithPerson[]);
+      } else {
+        setSharedWith([]);
+      }
+    } else {
+      setSharedWith([]);
+    }
+
+    if (sharedByPersonId) {
+      const { data: person } = await supabase
+        .from('my_people')
+        .select('contact_name, phone_number')
+        .eq('id', sharedByPersonId)
+        .single();
+      setSharerName(person?.contact_name ?? person?.phone_number ?? null);
+
+      const { data: hidden } = await supabase
+        .from('hidden_people')
+        .select('id')
+        .eq('owner_id', session.user.id)
+        .eq('person_id', sharedByPersonId)
+        .maybeSingle();
+      setIsHidden(!!hidden);
+    }
+    setLoading(false);
+  }, [id, session?.user?.id, sharedByPersonId]);
+
+  // useFocusEffect (not useEffect) so returning from Edit shows the new
+  // snapshot without remounting.
   useFocusEffect(
     useCallback(() => {
-      if (!userEventId) return;
-      async function refreshSharedWith() {
-        const { data: shares } = await supabase
-          .from('event_shares')
-          .select('person_id')
-          .eq('user_event_id', userEventId);
-        const personIds = (shares ?? []).map((s) => s.person_id);
-        if (personIds.length > 0) {
-          const { data: people } = await supabase
-            .from('my_people')
-            .select('id, contact_name, phone_number')
-            .in('id', personIds);
-          setSharedWith((people ?? []) as SharedWithPerson[]);
-        } else {
-          setSharedWith([]);
-        }
-      }
-      refreshSharedWith();
-    }, [userEventId])
+      load();
+    }, [load])
   );
 
   const handleShare = () => {
@@ -179,17 +165,26 @@ export default function EventDetailScreen() {
   const handleToggleHide = async () => {
     if (!sharedByPersonId || !session?.user?.id) return;
     if (isHidden) {
-      await supabase
+      const { error } = await supabase
         .from('hidden_people')
         .delete()
         .eq('owner_id', session.user.id)
         .eq('person_id', sharedByPersonId);
+      if (error) {
+        showError('Error', error);
+        return;
+      }
       setIsHidden(false);
     } else {
-      await supabase.from('hidden_people').insert({
+      const { error } = await supabase.from('hidden_people').insert({
         owner_id: session.user.id,
         person_id: sharedByPersonId,
       });
+      if (error) {
+        // Stay put so the user can retry instead of silently navigating back
+        showError('Error', error);
+        return;
+      }
       setIsHidden(true);
       router.back();
     }
@@ -212,7 +207,12 @@ export default function EventDetailScreen() {
 
   if (accessRevoked) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.navRow}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.revokedContainer}>
           <Text style={[styles.revokedTitle, { color: theme.textPrimary }]}>Access removed</Text>
           <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
@@ -220,20 +220,50 @@ export default function EventDetailScreen() {
             have removed you from their contacts.
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.navRow}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.revokedContainer}>
+          <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
+            Could not load this event.
+          </Text>
+          <TouchableOpacity onPress={load}>
+            <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!event) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.navRow}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={[styles.loading, { color: theme.textPrimary }]}>Event not found</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={styles.navRow}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.innerContent}>
           {event.image_url ? (
@@ -334,6 +364,13 @@ const styles = StyleSheet.create({
   },
   loading: {
     padding: 24,
+    fontSize: 16,
+  },
+  navRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  navBack: {
     fontSize: 16,
   },
   image: {

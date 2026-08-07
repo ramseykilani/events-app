@@ -53,15 +53,30 @@ export function ShareSheet({
         <View style={[styles.circlesSection, { borderBottomColor: theme.borderLight }]}>
           <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Circles</Text>
           <View style={styles.circleChips}>
-            {circles.map((circle) => (
-              <TouchableOpacity
-                key={circle.id}
-                style={[styles.chip, { backgroundColor: theme.surfaceSecondary }]}
-                onPress={() => toggleCircle(circle)}
-              >
-                <Text style={[styles.chipText, { color: theme.textPrimary }]}>{circle.name}</Text>
-              </TouchableOpacity>
-            ))}
+            {circles.map((circle) => {
+              const personIds = getCirclePersonIds(circle.id);
+              const allSelected =
+                personIds.length > 0 &&
+                personIds.every((id) => selectedPersonIds.has(id));
+              return (
+                <TouchableOpacity
+                  key={circle.id}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: allSelected
+                        ? theme.selectedBg
+                        : theme.surfaceSecondary,
+                    },
+                  ]}
+                  onPress={() => toggleCircle(circle)}
+                >
+                  <Text style={[styles.chipText, { color: theme.textPrimary }]}>
+                    {allSelected ? `✓ ${circle.name}` : circle.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       )}

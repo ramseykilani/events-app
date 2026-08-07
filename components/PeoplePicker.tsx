@@ -28,8 +28,10 @@ export function PeoplePicker({
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
-  const existingSet = new Set(existingPhones);
+  const existingKey = existingPhones.join(',');
 
   const filteredContacts = contacts.filter((c) => {
     const q = searchQuery.trim();
@@ -48,11 +50,26 @@ export function PeoplePicker({
   });
 
   useEffect(() => {
-    getContactsWithPhones().then((data) => {
-      setContacts(data.filter((c) => !existingSet.has(c.normalized)));
-      setLoading(false);
-    });
-  }, []);
+    let cancelled = false;
+    setLoading(true);
+    getContactsWithPhones()
+      .then((data) => {
+        if (cancelled) return;
+        const existing = new Set(existingKey ? existingKey.split(',') : []);
+        setContacts(data.filter((c) => !existing.has(c.normalized)));
+        setLoadError(false);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load contacts:', err);
+        setLoadError(true);
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [existingKey, retryKey]);
 
   const toggle = (c: ContactWithPhone) => {
     const next = new Set(selected);
@@ -96,6 +113,15 @@ export function PeoplePicker({
         </View>
         {loading ? (
           <Text style={[styles.loading, { color: theme.textPrimary }]}>Loading contacts...</Text>
+        ) : loadError ? (
+          <View style={styles.errorContainer}>
+            <Text style={[styles.errorText, { color: theme.textSecondary }]}>
+              Couldn't load your contacts.
+            </Text>
+            <TouchableOpacity onPress={() => setRetryKey((k) => k + 1)}>
+              <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <>
             <TextInput
@@ -165,6 +191,18 @@ const styles = StyleSheet.create({
   loading: {
     padding: 24,
     fontSize: 16,
+  },
+  errorContainer: {
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+  },
+  errorText: {
+    fontSize: 16,
+  },
+  retry: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   searchInput: {
     marginHorizontal: 20,

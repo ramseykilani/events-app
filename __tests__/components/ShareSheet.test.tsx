@@ -112,8 +112,26 @@ describe('components/ShareSheet', () => {
       />
     );
 
-    fireEvent.press(screen.getByText('Friends'));
+    // All members selected → chip shows its selected state
+    fireEvent.press(screen.getByText('✓ Friends'));
     const selected = onSelectionChange.mock.calls[0][0] as Set<string>;
     expect(Array.from(selected)).toEqual([]);
+  });
+
+  it('shows the selected state on a circle chip when all members are selected', () => {
+    const screen = render(
+      <ShareSheet
+        people={people}
+        circles={circles}
+        circleMembers={[
+          { circle_id: 'c1', person_id: 'p1' },
+          { circle_id: 'c1', person_id: 'p2' },
+        ]}
+        selectedPersonIds={new Set(['p1', 'p2'])}
+        onSelectionChange={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText('✓ Friends')).toBeTruthy();
   });
 });

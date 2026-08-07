@@ -10,15 +10,15 @@ export function showError(title: string, err: unknown): void {
   if (err instanceof Error) {
     parts.push(err.message);
 
-    // Supabase errors often carry a `code` property
-    const code = (err as Record<string, unknown>).code;
+    // Supabase errors often carry extra fields not present on the Error type
+    const rec = err as unknown as Record<string, unknown>;
+    const code = rec.code;
     if (code) parts.push(`Code: ${code}`);
 
-    // Also check for `details` and `hint` (PostgrestError fields)
-    const details = (err as Record<string, unknown>).details;
+    const details = rec.details;
     if (details) parts.push(`Details: ${details}`);
 
-    const hint = (err as Record<string, unknown>).hint;
+    const hint = rec.hint;
     if (hint) parts.push(`Hint: ${hint}`);
 
     if (err.stack) parts.push(`\nStack:\n${err.stack}`);
