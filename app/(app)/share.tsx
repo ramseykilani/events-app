@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
@@ -30,62 +30,79 @@ export default function ShareScreen() {
   const [selectedPersonIds, setSelectedPersonIds] = useState<Set<string>>(
     new Set()
   );
+  const [alreadySharedIds, setAlreadySharedIds] = useState<Set<string>>(
+    new Set()
+  );
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const firstParamValue = (value?: string | string[]) =>
     Array.isArray(value) ? value[0] : value;
 
+  const loadData = useCallback(async () => {
+    if (!userId) return;
+
+    const { data: peopleData, error: peopleErr } = await supabase
+      .from('my_people')
+      .select('*')
+      .eq('owner_id', userId)
+      .order('contact_name');
+
+    const { data: circlesData, error: circlesErr } = await supabase
+      .from('circles')
+      .select('*')
+      .eq('owner_id', userId);
+
+    let failed = !!(peopleErr || circlesErr);
+    let membersData: CircleMember[] = [];
+    const circleIds = (circlesData ?? []).map((c) => c.id);
+    if (circleIds.length > 0) {
+      const { data, error: membersErr } = await supabase
+        .from('circle_members')
+        .select('*')
+        .in('circle_id', circleIds);
+      if (membersErr) failed = true;
+      membersData = data ?? [];
+    }
+
+    setPeople(peopleData ?? []);
+    setCircles(circlesData ?? []);
+    setCircleMembers(membersData);
+
+    // Load existing shares so already-shared people render as completed
+    // actions. Sharing is forwarding: once shared it cannot be unsent, so
+    // existing shares are shown as done and only new people can be picked.
+    const ueId = firstParamValue(params.userEventId);
+    if (ueId) {
+      const { data: shares, error: sharesErr } = await supabase
+        .from('event_shares')
+        .select('person_id')
+        .eq('user_event_id', ueId);
+      if (sharesErr) failed = true;
+      setAlreadySharedIds(new Set((shares ?? []).map((s) => s.person_id)));
+    } else {
+      setAlreadySharedIds(new Set());
+    }
+    setSelectedPersonIds(new Set());
+
+    if (failed) {
+      console.error('share load error:', peopleErr ?? circlesErr);
+    }
+    setLoadError(failed);
+  }, [userId, params.userEventId]);
+
   useFocusEffect(
     useCallback(() => {
-      if (!userId) return;
-
-      async function load() {
-        const { data: peopleData } = await supabase
-          .from('my_people')
-          .select('*')
-          .eq('owner_id', userId)
-          .order('contact_name');
-
-        const { data: circlesData } = await supabase
-          .from('circles')
-          .select('*')
-          .eq('owner_id', userId);
-
-        setPeople(peopleData ?? []);
-        setCircles(circlesData ?? []);
-
-        const circleIds = (circlesData ?? []).map((c) => c.id);
-        let membersData: CircleMember[] = [];
-        if (circleIds.length > 0) {
-          const { data } = await supabase
-            .from('circle_members')
-            .select('*')
-            .in('circle_id', circleIds);
-          membersData = data ?? [];
-        }
-        setCircleMembers(membersData);
-
-        // Load existing shares so already-shared people appear selected
-        const ueId = firstParamValue(params.userEventId);
-        if (ueId) {
-          const { data: shares } = await supabase
-            .from('event_shares')
-            .select('person_id')
-            .eq('user_event_id', ueId);
-          const ids = (shares ?? []).map((s) => s.person_id);
-          setSelectedPersonIds(new Set(ids));
-        } else {
-          setSelectedPersonIds(new Set());
-        }
-      }
-
-      load();
-    }, [userId, params.userEventId])
+      loadData();
+    }, [loadData])
   );
 
   const handleConfirm = async () => {
+    // Sharing is mandatory when the event has never been shared (e.g. right
+    // after creating it). Afterwards the action is additive-only: existing
+    // shares are completed and cannot be unsent.
     if (selectedPersonIds.size === 0) {
-      Alert.alert('Select people', 'Please select at least one person to share with.');
+      showAlert('Select people', 'Please select at least one person to share with.');
       return;
     }
 
@@ -136,29 +153,25 @@ export default function ShareScreen() {
         throw new Error('Could not find event ownership for sharing');
       }
 
-      const shares = Array.from(selectedPersonIds).map((person_id) => ({
-        user_event_id: userEventId,
-        person_id,
-      }));
+      const toShare = Array.from(selectedPersonIds).filter(
+        (pid) => !alreadySharedIds.has(pid)
+      );
 
-      const { error: shareErr } = await supabase
-        .from('event_shares')
-        .upsert(shares, {
-          onConflict: 'user_event_id,person_id',
-          ignoreDuplicates: true,
+      if (toShare.length > 0) {
+        // Delivers each recipient their own copy of the event and records the
+        // shares server-side (also bumps last_shared_at).
+        const { error: shareErr } = await supabase.rpc('share_event', {
+          p_user_event_id: userEventId,
+          p_person_ids: toShare,
         });
 
-      if (shareErr) throw shareErr;
+        if (shareErr) throw shareErr;
 
-      await supabase
-        .from('my_people')
-        .update({ last_shared_at: new Date().toISOString() })
-        .in('id', Array.from(selectedPersonIds));
-
-      // Fire-and-forget: send push notifications to newly added recipients
-      supabase.functions
-        .invoke('send-notification', { body: { userEventId } })
-        .catch((err) => console.error('send-notification error:', err));
+        // Fire-and-forget: notify the people just shared with
+        supabase.functions
+          .invoke('send-notification', { body: { userEventId } })
+          .catch((err) => console.error('send-notification error:', err));
+      }
 
       router.back();
     } catch (err: unknown) {
@@ -186,7 +199,7 @@ export default function ShareScreen() {
               (loading || selectedPersonIds.size === 0) && { color: theme.textTertiary },
             ]}
           >
-            Done
+            Share
           </Text>
         </TouchableOpacity>
       </View>
@@ -195,8 +208,21 @@ export default function ShareScreen() {
         circles={circles}
         circleMembers={circleMembers}
         selectedPersonIds={selectedPersonIds}
+        sharedPersonIds={alreadySharedIds}
         onSelectionChange={setSelectedPersonIds}
       />
+      {loadError ? (
+        <TouchableOpacity onPress={loadData}>
+          <Text style={[styles.loadError, { color: theme.textSecondary }]}>
+            Could not load people. Tap to retry.
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+      {!loadError && people.length > 0 && alreadySharedIds.size > 0 ? (
+        <Text style={[styles.forwardingNote, { color: theme.textTertiary }]}>
+          Sharing delivers people their own copy — it can't be unsent.
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -224,5 +250,16 @@ const styles = StyleSheet.create({
   done: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadError: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  forwardingNote: {
+    fontSize: 13,
+    textAlign: 'center',
+    paddingBottom: 16,
+    paddingHorizontal: 24,
   },
 });

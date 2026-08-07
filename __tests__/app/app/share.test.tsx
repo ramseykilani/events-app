@@ -1,5 +1,4 @@
 import React from 'react';
-import { Alert } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import ShareScreen from '../../../app/(app)/share';
@@ -7,16 +6,16 @@ import ShareScreen from '../../../app/(app)/share';
 const mockMyPeopleOrder = jest.fn();
 const mockMyPeopleEq = jest.fn();
 const mockMyPeopleSelect = jest.fn();
-const mockMyPeopleIn = jest.fn();
-const mockMyPeopleUpdate = jest.fn();
 
 const mockCirclesEq = jest.fn();
 const mockCirclesSelect = jest.fn();
 
 const mockEventSharesEq = jest.fn();
 const mockEventSharesSelect = jest.fn();
-const mockEventSharesUpsert = jest.fn();
+const mockEventSharesDelete = jest.fn();
 
+const mockRpc = jest.fn();
+const mockFunctionsInvoke = jest.fn();
 const mockFrom = jest.fn();
 
 jest.mock('../../../app/_context/SessionContext', () => ({
@@ -30,6 +29,10 @@ jest.mock('../../../app/_context/SessionContext', () => ({
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
+    rpc: (...args: unknown[]) => mockRpc(...args),
+    functions: {
+      invoke: (...args: unknown[]) => mockFunctionsInvoke(...args),
+    },
   },
 }));
 
@@ -39,20 +42,39 @@ jest.mock('../../../lib/showError', () => ({
 
 jest.mock('../../../components/ShareSheet', () => {
   const React = require('react');
-  const { TouchableOpacity, Text } = require('react-native');
+  const { TouchableOpacity, Text, View } = require('react-native');
 
   return {
     ShareSheet: ({
       onSelectionChange,
+      sharedPersonIds,
     }: {
       onSelectionChange: (ids: Set<string>) => void;
+      sharedPersonIds?: Set<string>;
     }) => (
-      <TouchableOpacity
-        testID="mock-share-sheet-select"
-        onPress={() => onSelectionChange(new Set(['p1', 'p2']))}
-      >
-        <Text>Select two people</Text>
-      </TouchableOpacity>
+      <View>
+        <TouchableOpacity
+          testID="mock-share-sheet-select"
+          onPress={() => onSelectionChange(new Set(['p1', 'p2']))}
+        >
+          <Text>Select two people</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="mock-share-sheet-select-one"
+          onPress={() => onSelectionChange(new Set(['p2']))}
+        >
+          <Text>Select only p2</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="mock-share-sheet-clear"
+          onPress={() => onSelectionChange(new Set())}
+        >
+          <Text>Clear selection</Text>
+        </TouchableOpacity>
+        <Text testID="mock-shared-ids">
+          {Array.from(sharedPersonIds ?? []).join(',')}
+        </Text>
+      </View>
     ),
   };
 });
@@ -65,6 +87,9 @@ describe('app/(app)/share', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useLocalSearchParamsMock.mockReturnValue({ eventId: 'e1', userEventId: 'ue1' });
+
+    mockFunctionsInvoke.mockResolvedValue({ data: null, error: null });
+    mockRpc.mockResolvedValue({ data: 2, error: null });
 
     mockMyPeopleOrder.mockResolvedValue({
       data: [
@@ -92,21 +117,17 @@ describe('app/(app)/share', () => {
     mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
     mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
 
-    mockMyPeopleIn.mockResolvedValue({ error: null });
-    mockMyPeopleUpdate.mockReturnValue({ in: mockMyPeopleIn });
-
     mockCirclesEq.mockResolvedValue({ data: [], error: null });
     mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
-    mockEventSharesUpsert.mockResolvedValue({ error: null });
     mockEventSharesEq.mockResolvedValue({ data: [], error: null });
     mockEventSharesSelect.mockReturnValue({ eq: mockEventSharesEq });
+    mockEventSharesDelete.mockReturnValue({ eq: jest.fn() });
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'my_people') {
         return {
           select: mockMyPeopleSelect,
-          update: mockMyPeopleUpdate,
         };
       }
       if (table === 'circles') {
@@ -117,45 +138,101 @@ describe('app/(app)/share', () => {
       if (table === 'event_shares') {
         return {
           select: mockEventSharesSelect,
-          upsert: mockEventSharesUpsert,
+          delete: mockEventSharesDelete,
         };
       }
       return {};
     });
   });
 
-  it('shares an event with selected people and navigates back', async () => {
+  it('shares via the share_event RPC, notifies, and navigates back', async () => {
     const screen = render(<ShareScreen />);
 
     fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
-    fireEvent.press(screen.getByText('Done'));
+    fireEvent.press(screen.getByText('Share'));
 
     await waitFor(() => {
-      expect(mockEventSharesUpsert).toHaveBeenCalledWith(
-        [
-          { user_event_id: 'ue1', person_id: 'p1' },
-          { user_event_id: 'ue1', person_id: 'p2' },
-        ],
-        {
-          onConflict: 'user_event_id,person_id',
-          ignoreDuplicates: true,
-        }
-      );
+      expect(mockRpc).toHaveBeenCalledWith('share_event', {
+        p_user_event_id: 'ue1',
+        p_person_ids: ['p1', 'p2'],
+      });
     });
 
-    expect(mockMyPeopleUpdate).toHaveBeenCalledWith({
-      last_shared_at: expect.any(String),
+    expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-notification', {
+      body: { userEventId: 'ue1' },
     });
-    expect(mockMyPeopleIn).toHaveBeenCalledWith('id', ['p1', 'p2']);
     expect(router.back).toHaveBeenCalled();
   });
 
-  it('does not share or navigate when Done is pressed with no people selected', async () => {
+  it('does not share or navigate when Share is pressed with no people selected', async () => {
     const screen = render(<ShareScreen />);
 
-    fireEvent.press(screen.getByText('Done'));
+    fireEvent.press(screen.getByText('Share'));
 
-    await waitFor(() => expect(mockEventSharesUpsert).not.toHaveBeenCalled());
+    await waitFor(() => expect(mockRpc).not.toHaveBeenCalled());
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('never deletes event_shares (sharing is forwarding, not revocable)', async () => {
+    mockEventSharesEq.mockResolvedValue({ data: [{ person_id: 'p1' }], error: null });
+
+    const screen = render(<ShareScreen />);
+    await waitFor(() =>
+      expect(mockEventSharesEq).toHaveBeenCalledWith('user_event_id', 'ue1')
+    );
+
+    // Even after clearing the selection, confirming is blocked and nothing
+    // is deleted — existing shares are completed actions.
+    fireEvent.press(screen.getByTestId('mock-share-sheet-clear'));
+    fireEvent.press(screen.getByText('Share'));
+
+    await waitFor(() => expect(mockRpc).not.toHaveBeenCalled());
+    expect(mockEventSharesDelete).not.toHaveBeenCalled();
+    expect(mockFunctionsInvoke).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('marks already-shared people as completed and excludes them from the RPC', async () => {
+    mockEventSharesEq.mockResolvedValue({ data: [{ person_id: 'p1' }], error: null });
+
+    const screen = render(<ShareScreen />);
+    await waitFor(() =>
+      expect(mockEventSharesEq).toHaveBeenCalledWith('user_event_id', 'ue1')
+    );
+
+    expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1');
+
+    // The sheet would not allow selecting p1; even if it did, the screen
+    // filters already-shared people out of the RPC call.
+    fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
+    fireEvent.press(screen.getByText('Share'));
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('share_event', {
+        p_user_event_id: 'ue1',
+        p_person_ids: ['p2'],
+      });
+    });
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('calls showError when the share_event RPC fails', async () => {
+    const { showError } = require('../../../lib/showError');
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'Not your event' },
+    });
+
+    const screen = render(<ShareScreen />);
+    fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
+    fireEvent.press(screen.getByText('Share'));
+
+    await waitFor(() => {
+      expect(showError).toHaveBeenCalledWith(
+        'Error',
+        expect.objectContaining({ code: '42501' })
+      );
+    });
     expect(router.back).not.toHaveBeenCalled();
   });
 
@@ -179,13 +256,13 @@ describe('app/(app)/share', () => {
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'my_people') {
-          return { select: mockMyPeopleSelect, update: mockMyPeopleUpdate };
+          return { select: mockMyPeopleSelect };
         }
         if (table === 'circles') {
           return { select: mockCirclesSelect };
         }
         if (table === 'event_shares') {
-          return { upsert: mockEventSharesUpsert };
+          return { select: mockEventSharesSelect, delete: mockEventSharesDelete };
         }
         if (table === 'user_events') {
           return { select: mockUserEventsSelect, insert: mockUserEventsInsert };
@@ -200,16 +277,13 @@ describe('app/(app)/share', () => {
 
       const screen = render(<ShareScreen />);
       fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
-      fireEvent.press(screen.getByText('Done'));
+      fireEvent.press(screen.getByText('Share'));
 
       await waitFor(() => {
-        expect(mockEventSharesUpsert).toHaveBeenCalledWith(
-          [
-            { user_event_id: 'ue-new', person_id: 'p1' },
-            { user_event_id: 'ue-new', person_id: 'p2' },
-          ],
-          { onConflict: 'user_event_id,person_id', ignoreDuplicates: true }
-        );
+        expect(mockRpc).toHaveBeenCalledWith('share_event', {
+          p_user_event_id: 'ue-new',
+          p_person_ids: ['p1', 'p2'],
+        });
       });
       expect(router.back).toHaveBeenCalled();
     });
@@ -225,16 +299,13 @@ describe('app/(app)/share', () => {
 
       const screen = render(<ShareScreen />);
       fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
-      fireEvent.press(screen.getByText('Done'));
+      fireEvent.press(screen.getByText('Share'));
 
       await waitFor(() => {
-        expect(mockEventSharesUpsert).toHaveBeenCalledWith(
-          [
-            { user_event_id: 'ue-conflict', person_id: 'p1' },
-            { user_event_id: 'ue-conflict', person_id: 'p2' },
-          ],
-          { onConflict: 'user_event_id,person_id', ignoreDuplicates: true }
-        );
+        expect(mockRpc).toHaveBeenCalledWith('share_event', {
+          p_user_event_id: 'ue-conflict',
+          p_person_ids: ['p1', 'p2'],
+        });
       });
       expect(router.back).toHaveBeenCalled();
     });
@@ -249,7 +320,7 @@ describe('app/(app)/share', () => {
 
       const screen = render(<ShareScreen />);
       fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
-      fireEvent.press(screen.getByText('Done'));
+      fireEvent.press(screen.getByText('Share'));
 
       await waitFor(() => {
         expect(showError).toHaveBeenCalledWith(

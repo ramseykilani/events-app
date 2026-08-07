@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,12 @@ import {
   TouchableOpacity,
   Linking,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
+import { showAlert, showConfirm } from '../../../lib/dialogs';
+import { showError } from '../../../lib/showError';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
 import { useTheme } from '../../../hooks/useTheme';
@@ -31,101 +32,86 @@ export default function EventDetailScreen() {
   const [sharedWith, setSharedWith] = useState<SharedWithPerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [accessRevoked, setAccessRevoked] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [sharerName, setSharerName] = useState<string | null>(null);
   const [isHidden, setIsHidden] = useState(false);
 
-  useEffect(() => {
-    if (!id) return;
+  const load = useCallback(async () => {
+    if (!id || !session?.user?.id) return;
 
-    async function load() {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', id)
-        .single();
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          setAccessRevoked(true);
-        } else {
-          console.error('Failed to load event:', error);
-        }
-        setEvent(null);
+    if (error) {
+      if (error.code === 'PGRST116') {
+        setAccessRevoked(true);
+        setLoadError(false);
       } else {
-        setEvent(data as Event);
-        setAccessRevoked(false);
+        console.error('Failed to load event:', error);
+        setLoadError(true);
       }
-
-      if (session?.user?.id) {
-        const { data: ue } = await supabase
-          .from('user_events')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .eq('event_id', id)
-          .single();
-        setUserEventId(ue?.id ?? null);
-
-        if (ue?.id) {
-          const { data: shares } = await supabase
-            .from('event_shares')
-            .select('person_id')
-            .eq('user_event_id', ue.id);
-          const personIds = (shares ?? []).map((s) => s.person_id);
-          if (personIds.length > 0) {
-            const { data: people } = await supabase
-              .from('my_people')
-              .select('id, contact_name, phone_number')
-              .in('id', personIds);
-            setSharedWith((people ?? []) as SharedWithPerson[]);
-          } else {
-            setSharedWith([]);
-          }
-        }
-
-        if (sharedByPersonId && session?.user?.id) {
-          const { data: person } = await supabase
-            .from('my_people')
-            .select('contact_name, phone_number')
-            .eq('id', sharedByPersonId)
-            .single();
-          setSharerName(person?.contact_name ?? person?.phone_number ?? null);
-
-          const { data: hidden } = await supabase
-            .from('hidden_people')
-            .select('id')
-            .eq('owner_id', session.user.id)
-            .eq('person_id', sharedByPersonId)
-            .maybeSingle();
-          setIsHidden(!!hidden);
-        }
-      }
-      setLoading(false);
+      setEvent(null);
+    } else {
+      setEvent(data as Event);
+      setAccessRevoked(false);
+      setLoadError(false);
     }
 
-    load();
-  }, [id, session?.user?.id]);
+    const { data: ue } = await supabase
+      .from('user_events')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('event_id', id)
+      .single();
+    setUserEventId(ue?.id ?? null);
 
+    if (ue?.id) {
+      const { data: shares } = await supabase
+        .from('event_shares')
+        .select('person_id')
+        .eq('user_event_id', ue.id);
+      const personIds = (shares ?? []).map((s) => s.person_id);
+      if (personIds.length > 0) {
+        const { data: people } = await supabase
+          .from('my_people')
+          .select('id, contact_name, phone_number')
+          .in('id', personIds);
+        setSharedWith((people ?? []) as SharedWithPerson[]);
+      } else {
+        setSharedWith([]);
+      }
+    } else {
+      setSharedWith([]);
+    }
+
+    if (sharedByPersonId) {
+      const { data: person } = await supabase
+        .from('my_people')
+        .select('contact_name, phone_number')
+        .eq('id', sharedByPersonId)
+        .single();
+      setSharerName(person?.contact_name ?? person?.phone_number ?? null);
+
+      const { data: hidden } = await supabase
+        .from('hidden_people')
+        .select('id')
+        .eq('owner_id', session.user.id)
+        .eq('person_id', sharedByPersonId)
+        .maybeSingle();
+      setIsHidden(!!hidden);
+    }
+    setLoading(false);
+  }, [id, session?.user?.id, sharedByPersonId]);
+
+  // useFocusEffect (not useEffect) so returning from Edit shows the new
+  // snapshot without remounting.
   useFocusEffect(
     useCallback(() => {
-      if (!userEventId) return;
-      async function refreshSharedWith() {
-        const { data: shares } = await supabase
-          .from('event_shares')
-          .select('person_id')
-          .eq('user_event_id', userEventId);
-        const personIds = (shares ?? []).map((s) => s.person_id);
-        if (personIds.length > 0) {
-          const { data: people } = await supabase
-            .from('my_people')
-            .select('id, contact_name, phone_number')
-            .in('id', personIds);
-          setSharedWith((people ?? []) as SharedWithPerson[]);
-        } else {
-          setSharedWith([]);
-        }
-      }
-      refreshSharedWith();
-    }, [userEventId])
+      load();
+    }, [load])
   );
 
   const handleShare = () => {
@@ -139,52 +125,60 @@ export default function EventDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Event',
-      'Are you sure you want to delete this event? This action cannot be undone.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            const { error } = await supabase.from('events').delete().eq('id', id);
+    if (!userEventId) return;
+    showConfirm(
+      'Remove Event',
+      'Remove this event from your calendar? This only affects you — everyone you shared it with keeps their own copy.',
+      {
+        confirmText: 'Remove',
+        destructive: true,
+        onConfirm: async () => {
+          setLoading(true);
+          const { error } = await supabase
+            .from('user_events')
+            .delete()
+            .eq('id', userEventId)
+            .eq('user_id', session?.user?.id ?? '');
 
-            if (error) {
-              console.error('Failed to delete event:', error);
-              Alert.alert('Error', 'Failed to delete event');
-              setLoading(false);
+          if (error) {
+            console.error('Failed to remove event:', error);
+            showAlert('Error', 'Failed to remove event');
+            setLoading(false);
+          } else {
+            if (router.canGoBack()) {
+              router.back();
             } else {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/(app)/');
-              }
+              router.replace('/(app)/');
             }
-          },
+          }
         },
-      ]
+      }
     );
   };
 
   const handleToggleHide = async () => {
     if (!sharedByPersonId || !session?.user?.id) return;
     if (isHidden) {
-      await supabase
+      const { error } = await supabase
         .from('hidden_people')
         .delete()
         .eq('owner_id', session.user.id)
         .eq('person_id', sharedByPersonId);
+      if (error) {
+        showError('Error', error);
+        return;
+      }
       setIsHidden(false);
     } else {
-      await supabase.from('hidden_people').insert({
+      const { error } = await supabase.from('hidden_people').insert({
         owner_id: session.user.id,
         person_id: sharedByPersonId,
       });
+      if (error) {
+        // Stay put so the user can retry instead of silently navigating back
+        showError('Error', error);
+        return;
+      }
       setIsHidden(true);
       router.back();
     }
@@ -207,7 +201,12 @@ export default function EventDetailScreen() {
 
   if (accessRevoked) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.navRow}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.revokedContainer}>
           <Text style={[styles.revokedTitle, { color: theme.textPrimary }]}>Access removed</Text>
           <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
@@ -215,20 +214,50 @@ export default function EventDetailScreen() {
             have removed you from their contacts.
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.navRow}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.revokedContainer}>
+          <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
+            Could not load this event.
+          </Text>
+          <TouchableOpacity onPress={load}>
+            <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!event) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.navRow}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={[styles.loading, { color: theme.textPrimary }]}>Event not found</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={styles.navRow}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.innerContent}>
           {event.image_url ? (
@@ -263,8 +292,7 @@ export default function EventDetailScreen() {
                 </Text>
               ))}
               <Text style={[styles.sharedWithNote, { color: theme.textTertiary }]}>
-                Removing someone from My People also removes them from this
-                event.
+                Sharing delivers everyone their own copy — it can't be unsent.
               </Text>
             </View>
           ) : null}
@@ -285,15 +313,15 @@ export default function EventDetailScreen() {
                 <Text style={[styles.editButtonText, { color: theme.textPrimary }]}>Edit</Text>
               </TouchableOpacity>
             )}
-            {event.created_by_user_id === session?.user?.id && (
+            {userEventId && (
               <TouchableOpacity
                 style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
                 onPress={handleDelete}
               >
-                <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Delete Event</Text>
+                <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
               </TouchableOpacity>
             )}
-            {sharedByPersonId && !userEventId && (
+            {sharedByPersonId && (
               <TouchableOpacity
                 style={[styles.hideButton, { backgroundColor: theme.surfaceSecondary }]}
                 onPress={handleToggleHide}
@@ -329,6 +357,13 @@ const styles = StyleSheet.create({
   },
   loading: {
     padding: 24,
+    fontSize: 16,
+  },
+  navRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  navBack: {
     fontSize: 16,
   },
   image: {

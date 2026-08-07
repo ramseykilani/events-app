@@ -8,10 +8,12 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
+import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { useTheme } from '../../hooks/useTheme';
@@ -68,6 +70,15 @@ export default function AddEventScreen() {
   const chooseExistingEvent = async (
     existing: { id: string; title: string | null; event_date: string }[]
   ): Promise<string | null> => {
+    // Web has no multi-option native dialog (Alert.alert is a no-op there), so
+    // offer the top match via window.confirm; cancel falls through to "create new".
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      const top = existing[0];
+      const useExisting = window.confirm(
+        `Existing event\n\nThis URL has already been added as "${top.title ?? 'Untitled'} (${top.event_date})".\n\nOK: use the existing event\nCancel: create a new one`
+      );
+      return useExisting ? top.id : null;
+    }
     return new Promise<string | null>((resolve) => {
       const options = existing.slice(0, 3).map((event) => ({
         text: `${event.title ?? 'Untitled'} (${event.event_date})`,
@@ -86,7 +97,7 @@ export default function AddEventScreen() {
 
   const handleCreate = async () => {
     if (!title.trim() && !url.trim()) {
-      Alert.alert('Required', 'Enter a title or URL.');
+      showAlert('Required', 'Enter a title or URL.');
       return;
     }
 

@@ -1,10 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// supabase-js always sends apikey and x-client-info alongside Authorization;
+// all four must be allowed or the browser preflight blocks the call.
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
@@ -63,8 +65,21 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !serviceRoleKey) {
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
     return jsonResponse({ error: 'Server misconfigured' }, 500);
+  }
+
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return jsonResponse({ error: 'Unauthorized' }, 401);
+  }
+  const authClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user: caller }, error: authError } = await authClient.auth.getUser();
+  if (authError || !caller) {
+    return jsonResponse({ error: 'Unauthorized' }, 401);
   }
 
   // Twilio config — all three core secrets plus at least one store URL must be
@@ -74,12 +89,15 @@ serve(async (req) => {
   const twilioFromNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
   const iosStoreUrl = Deno.env.get('IOS_APP_STORE_URL');
   const androidStoreUrl = Deno.env.get('ANDROID_PLAY_STORE_URL');
-  const smsEnabled = !!(
+  const twilioConfigured = !!(
     twilioAccountSid &&
     twilioAuthToken &&
-    twilioFromNumber &&
-    (iosStoreUrl || androidStoreUrl)
+    twilioFromNumber
   );
+  // Non-app users are told where to get the app, so at least one store URL is
+  // required. App users only need the event URL / deep link, so Twilio
+  // credentials alone are enough for them.
+  const nonAppSmsEnabled = twilioConfigured && !!(iosStoreUrl || androidStoreUrl);
 
   const db = createClient(supabaseUrl, serviceRoleKey);
 
@@ -92,7 +110,7 @@ serve(async (req) => {
     // Load the user_event to get the sharer and event
     const { data: userEvent, error: ueErr } = await db
       .from('user_events')
-      .select('user_id, event_id, events(title, event_date, event_time)')
+      .select('user_id, event_id, events(title, event_date, event_time, url)')
       .eq('id', userEventId)
       .single();
 
@@ -100,11 +118,16 @@ serve(async (req) => {
       return jsonResponse({ error: 'user_event not found' }, 404);
     }
 
+    if (userEvent.user_id !== caller.id) {
+      return jsonResponse({ error: 'Forbidden' }, 403);
+    }
+
     const sharerUserId = userEvent.user_id;
     const event = userEvent.events as {
       title: string | null;
       event_date: string;
       event_time: string | null;
+      url: string | null;
     } | null;
 
     if (!event) return jsonResponse({ error: 'event not found' }, 404);
@@ -142,6 +165,8 @@ serve(async (req) => {
     const dateStr = formatDate(event.event_date);
     const timeStr = event.event_time ? ` · ${formatTime(event.event_time)}` : '';
     const eventId = userEvent.event_id;
+    // Recipients should be able to act without opening the app.
+    const eventUrlLine = event.url ? `${event.url}\n` : '';
 
     for (const share of shares) {
       const person = share.my_people as {
@@ -154,7 +179,7 @@ serve(async (req) => {
 
       // ── Non-app user: SMS only ──────────────────────────────────────────────
       if (!person.user_id) {
-        if (!smsEnabled || !person.phone_number) continue;
+        if (!nonAppSmsEnabled || !person.phone_number) continue;
 
         const storeLines = [
           iosStoreUrl ? `iOS: ${iosStoreUrl}` : null,
@@ -165,6 +190,7 @@ serve(async (req) => {
 
         const smsBody =
           `${sharerPhone} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
+          eventUrlLine +
           `Get the Events app:\n${storeLines}\n\n` +
           `Reply STOP to unsubscribe.`;
 
@@ -182,23 +208,14 @@ serve(async (req) => {
 
       // ── App user: push notification + SMS ──────────────────────────────────
       const recipientUserId = person.user_id;
-      const recipientOwnerId = person.owner_id;
-
-      // Get recipient's push token
-      const { data: recipientUser } = await db
-        .from('users')
-        .select('expo_push_token')
-        .eq('id', recipientUserId)
-        .single();
-
-      if (!recipientUser?.expo_push_token) continue;
 
       // Check if the sharer is hidden by the recipient: find the sharer in the
-      // recipient's my_people, then check hidden_people
+      // recipient's own my_people list (owner_id = recipient), then check
+      // hidden_people for that person row.
       const { data: sharerInRecipientContacts } = await db
         .from('my_people')
         .select('id')
-        .eq('owner_id', recipientOwnerId)
+        .eq('owner_id', recipientUserId)
         .eq('user_id', sharerUserId)
         .maybeSingle();
 
@@ -206,7 +223,7 @@ serve(async (req) => {
         const { data: hidden } = await db
           .from('hidden_people')
           .select('id')
-          .eq('owner_id', recipientOwnerId)
+          .eq('owner_id', recipientUserId)
           .eq('person_id', sharerInRecipientContacts.id)
           .maybeSingle();
 
@@ -227,18 +244,29 @@ serve(async (req) => {
       const displayName =
         sharerName?.contact_name ?? sharerName?.phone_number ?? 'Someone';
 
-      // Queue push notification
-      messages.push({
-        to: recipientUser.expo_push_token,
-        title: `${displayName} added you to ${eventTitle}`,
-        body: `${dateStr}${timeStr}`,
-        data: { eventId },
-      });
+      // Queue push notification when the recipient has a token. A missing token
+      // must not suppress the SMS below.
+      const { data: recipientUser } = await db
+        .from('users')
+        .select('expo_push_token')
+        .eq('id', recipientUserId)
+        .single();
 
-      // Queue SMS with deep link (skipped gracefully if Twilio not configured)
-      if (smsEnabled && person.phone_number) {
+      if (recipientUser?.expo_push_token) {
+        messages.push({
+          to: recipientUser.expo_push_token,
+          title: `${displayName} added you to ${eventTitle}`,
+          body: `${dateStr}${timeStr}`,
+          data: { eventId },
+        });
+      }
+
+      // Queue SMS with the event URL and a deep link as fallback for opening
+      // the event in-app (skipped gracefully if Twilio is not configured).
+      if (twilioConfigured && person.phone_number) {
         const smsBody =
           `${displayName} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
+          eventUrlLine +
           `events-app://event/${eventId}`;
 
         smsSends.push(

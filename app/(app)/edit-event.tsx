@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
+import { showAlert, showConfirm } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
@@ -64,7 +64,7 @@ export default function EditEventScreen() {
 
   const handleSave = async () => {
     if (!title.trim() && !url.trim()) {
-      Alert.alert('Required', 'Enter a title or URL.');
+      showAlert('Required', 'Enter a title or URL.');
       return;
     }
 
@@ -103,9 +103,47 @@ export default function EditEventScreen() {
         .eq('user_id', session.user.id);
 
       if (ueErr) {
-        // If update fails because user already has this event (duplicate user_event),
-        // delete the current user_event and switch to the existing one.
+        // If update fails because the user already owns the target snapshot,
+        // merge into that existing user_events row instead of duplicating it:
+        // carry over shares that aren't already there, then drop the old row
+        // (its remaining duplicate shares cascade away).
         if (ueErr.code === '23505') {
+          const { data: existingUe, error: findErr } = await supabase
+            .from('user_events')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .eq('event_id', eventId)
+            .single();
+          if (findErr || !existingUe) {
+            throw findErr ?? new Error('Failed to find the existing event copy');
+          }
+
+          const [{ data: targetShares }, { data: sourceShares }] = await Promise.all([
+            supabase
+              .from('event_shares')
+              .select('person_id')
+              .eq('user_event_id', existingUe.id),
+            supabase
+              .from('event_shares')
+              .select('person_id')
+              .eq('user_event_id', params.userEventId),
+          ]);
+
+          const alreadyShared = new Set((targetShares ?? []).map((s) => s.person_id));
+          const toMove = (sourceShares ?? [])
+            .map((s) => s.person_id)
+            .filter((pid) => !alreadyShared.has(pid));
+
+          if (toMove.length > 0) {
+            const { error: moveErr } = await supabase.from('event_shares').insert(
+              toMove.map((person_id) => ({
+                user_event_id: existingUe.id,
+                person_id,
+              }))
+            );
+            if (moveErr) throw moveErr;
+          }
+
           const { error: delErr } = await supabase
             .from('user_events')
             .delete()
@@ -126,34 +164,29 @@ export default function EditEventScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Event',
-      'Are you sure you want to delete this event? This action cannot be undone.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            const { error } = await supabase
-              .from('events')
-              .delete()
-              .eq('id', params.eventId);
+    showConfirm(
+      'Remove Event',
+      'Remove this event from your calendar? This only affects you — everyone you shared it with keeps their own copy.',
+      {
+        confirmText: 'Remove',
+        destructive: true,
+        onConfirm: async () => {
+          setLoading(true);
+          const { error } = await supabase
+            .from('user_events')
+            .delete()
+            .eq('id', params.userEventId)
+            .eq('user_id', session?.user?.id ?? '');
 
-            if (error) {
-              console.error('Failed to delete event:', error);
-              Alert.alert('Error', 'Failed to delete event');
-              setLoading(false);
-            } else {
-              router.replace('/(app)/');
-            }
-          },
+          if (error) {
+            console.error('Failed to remove event:', error);
+            showAlert('Error', 'Failed to remove event');
+            setLoading(false);
+          } else {
+            router.replace('/(app)/');
+          }
         },
-      ]
+      }
     );
   };
 
@@ -259,7 +292,7 @@ export default function EditEventScreen() {
           style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
           onPress={handleDelete}
         >
-          <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Delete Event</Text>
+          <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

@@ -112,8 +112,94 @@ describe('components/ShareSheet', () => {
       />
     );
 
-    fireEvent.press(screen.getByText('Friends'));
+    // All members selected → chip shows its selected state
+    fireEvent.press(screen.getByText('✓ Friends'));
     const selected = onSelectionChange.mock.calls[0][0] as Set<string>;
     expect(Array.from(selected)).toEqual([]);
+  });
+
+  it('shows the selected state on a circle chip when all members are selected', () => {
+    const screen = render(
+      <ShareSheet
+        people={people}
+        circles={circles}
+        circleMembers={[
+          { circle_id: 'c1', person_id: 'p1' },
+          { circle_id: 'c1', person_id: 'p2' },
+        ]}
+        selectedPersonIds={new Set(['p1', 'p2'])}
+        onSelectionChange={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText('✓ Friends')).toBeTruthy();
+  });
+
+  it('renders already-shared people as completed and ignores taps on them', () => {
+    const onSelectionChange = jest.fn();
+
+    const screen = render(
+      <ShareSheet
+        people={people}
+        circles={[]}
+        circleMembers={[]}
+        selectedPersonIds={new Set()}
+        sharedPersonIds={new Set(['p1'])}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+
+    expect(screen.getByText('✓ Shared')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Alice'));
+    expect(onSelectionChange).not.toHaveBeenCalled();
+
+    // Unshared people are still selectable
+    fireEvent.press(screen.getByText('Bob'));
+    const selected = onSelectionChange.mock.calls[0][0] as Set<string>;
+    expect(Array.from(selected)).toEqual(['p2']);
+  });
+
+  it('disables a circle chip when every member was already shared', () => {
+    const onSelectionChange = jest.fn();
+
+    const screen = render(
+      <ShareSheet
+        people={people}
+        circles={circles}
+        circleMembers={[
+          { circle_id: 'c1', person_id: 'p1' },
+          { circle_id: 'c1', person_id: 'p2' },
+        ]}
+        selectedPersonIds={new Set()}
+        sharedPersonIds={new Set(['p1', 'p2'])}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+
+    fireEvent.press(screen.getByText('✓ Friends'));
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
+  it('selects only unshared members when a circle is partially shared', () => {
+    const onSelectionChange = jest.fn();
+
+    const screen = render(
+      <ShareSheet
+        people={people}
+        circles={circles}
+        circleMembers={[
+          { circle_id: 'c1', person_id: 'p1' },
+          { circle_id: 'c1', person_id: 'p2' },
+        ]}
+        selectedPersonIds={new Set()}
+        sharedPersonIds={new Set(['p1'])}
+        onSelectionChange={onSelectionChange}
+      />
+    );
+
+    fireEvent.press(screen.getByText('Friends'));
+    const selected = onSelectionChange.mock.calls[0][0] as Set<string>;
+    expect(Array.from(selected)).toEqual(['p2']);
   });
 });

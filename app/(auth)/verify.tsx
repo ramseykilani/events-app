@@ -7,10 +7,10 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -51,7 +51,7 @@ export default function VerifyScreen() {
       if (error) throw error;
 
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
-      Alert.alert('Code sent', 'A new verification code has been sent to your phone.');
+      showAlert('Code sent', 'A new verification code has been sent to your phone.');
     } catch (err: unknown) {
       showError('Failed to resend', err);
     } finally {
@@ -61,7 +61,7 @@ export default function VerifyScreen() {
 
   const handleVerify = async () => {
     if (!code.trim()) {
-      Alert.alert('Enter code', 'Please enter the verification code.');
+      showAlert('Enter code', 'Please enter the verification code.');
       return;
     }
 

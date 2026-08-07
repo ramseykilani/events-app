@@ -50,6 +50,7 @@ describe('components/Calendar', () => {
       event_date: '2026-04-15',
       event_time: null,
       sharer_contact_name: 'Alice',
+      sharer_person_id: 'mp-1',
       sharer_user_id: 'u-2',
     },
     {
@@ -62,6 +63,7 @@ describe('components/Calendar', () => {
       event_date: '2026-04-20',
       event_time: null,
       sharer_contact_name: null,
+      sharer_person_id: null,
       sharer_user_id: 'u-3',
     },
   ];
@@ -95,17 +97,15 @@ describe('components/Calendar', () => {
     expect(screen.queryByText('April 15 Event')).toBeNull();
   });
 
-  it('routes to onboarding reset, people, and add-event actions', async () => {
+  it('routes to onboarding, people, and add-event actions', async () => {
     const onMonthChange = jest.fn();
     const screen = render(<Calendar events={events} onMonthChange={onMonthChange} />);
 
     fireEvent.press(screen.getByText('?'));
     await waitFor(() =>
-      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('onboarding_complete')
-    );
-    await waitFor(() =>
       expect(router.push).toHaveBeenCalledWith('/(app)/onboarding')
     );
+    expect(AsyncStorage.removeItem).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByText('People'));
     expect(router.push).toHaveBeenCalledWith('/(app)/people');

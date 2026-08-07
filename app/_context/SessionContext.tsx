@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
+import { showError } from '../../lib/showError';
 
 type SessionContextType = {
   session: Session | null;
@@ -25,7 +26,10 @@ export function SessionContextProvider({ children }: { children: React.ReactNode
     });
 
     if (error) {
+      // Without a public.users row, RLS hides the user's own people/events —
+      // everything downstream would fail silently. Surface it.
       console.error('Failed to ensure user row:', error);
+      showError('Account setup failed', error);
     }
   };
 

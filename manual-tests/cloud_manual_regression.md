@@ -22,6 +22,7 @@ Use this when:
 Use these test credentials (if configured on Supabase):
 - Phone: `+15555550100`
 - OTP: `123456`
+- Second account (multi-user scenarios): `+15555550101`, OTP `123456`
 
 ---
 
@@ -62,12 +63,14 @@ For each executed scenario:
 
 ### M-003 Onboarding controls
 **Steps**
-1. Complete sign-in if needed.
-2. On onboarding, tap **Next** between pages.
-3. Verify final CTA changes to **Get Started**.
-4. Re-open onboarding from calendar `?` button, then tap **Skip**.
+1. Complete sign-in with a brand-new account (no events shared with it).
+2. The walkthrough should appear automatically because the calendar is empty.
+3. On onboarding, tap **Next** between pages.
+4. Verify final CTA changes to **Get Started**.
+5. Re-open onboarding from calendar `?` button, then tap **Skip**.
 
 **Expected**
+- Walkthrough auto-shows at most once, and only when the user has no events at all (an invited guest with a shared event lands directly on the calendar instead).
 - Page progression works.
 - `Get Started` and `Skip` both route back to calendar.
 
@@ -104,11 +107,11 @@ For each executed scenario:
 **Steps**
 1. In share screen, evaluate available state:
    - If no people exist, verify empty state and **Add People** CTA.
-   - If people exist, select at least one person and tap **Done**.
+   - If people exist, select at least one person and tap **Share**.
 
 **Expected**
 - Empty state copy and CTA appear when list is empty.
-- Done is enabled when selection exists and returns to previous screen.
+- Share is enabled when selection exists and returns to previous screen.
 
 ---
 
@@ -149,13 +152,91 @@ For each executed scenario:
 
 ---
 
-### E-103 Delete event
+### E-103 Remove event
 **Steps**
-1. Open event detail for event created by current user.
-2. Tap **Delete Event** and confirm.
+1. Open event detail for an event on the current user's calendar.
+2. Tap **Remove Event** and confirm.
 
 **Expected**
-- Event is deleted and user is navigated away from detail page.
+- The event disappears from the user's calendar and the user is navigated away from the detail page.
+- The underlying `events` row is untouched: anyone who re-shared the event still sees it (verify with the second test account if the event was shared onward).
+
+---
+
+### E-104 Multi-user share lands on recipient's calendar immediately
+**Steps**
+1. Signed in as `+15555550100` (account A), add `+15555550101` to My People, create an event, and share it with them.
+2. Sign out, then sign in as `+15555550101` (account B) — an account that has never opened the app.
+
+**Expected**
+- Account B lands directly on the calendar (no forced setup) and the shared event is visible on the correct date.
+- No walkthrough gate blocks the view (walkthrough only auto-shows when the calendar is completely empty).
+
+---
+
+### E-105 Hide suppresses calendar entries and notifications
+**Steps**
+1. As account B (with an event shared by A), open the shared event's detail and tap **Hide [name]**.
+2. Return to the calendar and confirm A's shared events are gone.
+3. As account A, share another event with B.
+4. As B, confirm no push notification (and no SMS, if Twilio is configured) arrives for the new share.
+5. From B's People screen, unhide A and confirm events reappear after refresh.
+
+**Expected**
+- Hidden person's events disappear from the calendar immediately.
+- New shares from a hidden person produce no push and no SMS.
+- Unhide restores visibility.
+
+---
+
+### E-106 Push token persists after sign-in
+**Steps**
+1. Sign in on a native build (or web, where supported) and accept notification permissions.
+2. In the Supabase dashboard, check the `users` row for the signed-in account.
+
+**Expected**
+- `expo_push_token` is set shortly after authenticated launch (requires the `users_update_own` RLS policy).
+- Signing out and back in keeps/refreshes the token without error.
+
+---
+
+### E-107 SMS contains the event URL
+**Steps**
+1. Requires Twilio credentials configured on the `send-notification` edge function and at least one store URL secret.
+2. As account A, create an event **with a URL** and share it with a phone number that is not an app user.
+3. Inspect the SMS delivered (or Twilio message logs).
+
+**Expected**
+- SMS body includes the event title, date/time, and the event URL itself — the recipient can act without installing the app.
+- Store links follow the event URL; message ends with `Reply STOP to unsubscribe.`
+
+---
+
+### E-108 Sharing delivers the recipient their own copy (forwarding)
+**Steps**
+1. As account A, create an event and share it with B (test OTP `+15555550101`).
+2. As account B, sign in and check the calendar — the event is there.
+3. In the Supabase dashboard, confirm B has their own `user_events` row for the same `event_id`.
+4. As account A, open the event, tap **Remove Event**, and confirm.
+5. As account B, refresh the calendar.
+
+**Expected**
+- The event stays on B's calendar after A removes it — B owns a copy, A's removal is purely personal.
+- B's calendar entry survives A re-sharing chains too: if B re-shares to a third account and B then removes the event, the third account keeps it.
+- On A's side the event disappears; in the dashboard A's `event_shares` rows are gone but B's `user_events` row remains.
+
+---
+
+### E-109 Share sheet shows completed shares, no unshare
+**Steps**
+1. As account A, open an event already shared with B, tap **Share**.
+2. Observe B's row in the people list.
+3. Try tapping B's row.
+
+**Expected**
+- B's row shows "✓ Shared", is muted, and does not toggle — sharing is a completed action and can't be unsent.
+- The header action reads **Share** (not Done) and is disabled until at least one never-shared person is selected.
+- Only newly selected people trigger notifications when sharing again.
 
 ---
 

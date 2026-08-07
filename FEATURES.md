@@ -9,6 +9,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Notifications](#notifications) | Implemented |
 | [SMS Invitations](#sms-invitations) | Implemented |
 | [Hide](#hide) | Implemented |
+| [Forwarding Shares](#forwarding-shares) | Implemented |
 
 ---
 
@@ -64,8 +65,8 @@ Push notifications only reach users who have installed the app. Non-app users (c
 
 When an event is shared, the `send-notification` Edge Function also sends an SMS via Twilio to every recipient:
 
-- **Non-app users:** SMS with event details (title, date, time), the sharer's phone number as display identity, and App Store / Play Store download links
-- **App users:** SMS with event details and a deep link (`events-app://event/[eventId]`) that opens directly to the event, in addition to their existing push notification
+- **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, the sharer's phone number as display identity, and App Store / Play Store download links
+- **App users:** SMS with event details, the event URL when one exists, and a deep link (`events-app://event/[eventId]`) that opens directly to the event, in addition to their existing push notification. A missing push token does not suppress the SMS.
 
 This means the only person who needs the app is the one sending events. Friends can receive invitations and decide to download the app from there.
 
@@ -124,7 +125,7 @@ Hiding is only possible from within an event that person shared with you. This k
 - `get_calendar_events` RPC updated: LEFT JOINs `hidden_people`, filters `WHERE hp.id IS NULL`, and now also returns `sharer_person_id` (the sharer's `my_people.id` in the recipient's contact list)
 - `CalendarEvent` type gains `sharer_person_id: string | null`
 - `components/Calendar.tsx` passes `sharedByPersonId` param when navigating to a shared event
-- `app/(app)/event/[id].tsx` accepts optional `sharedByPersonId` param; shows hide/unhide button when present and user doesn't own the event
+- `app/(app)/event/[id].tsx` accepts optional `sharedByPersonId` param; shows hide/unhide button whenever present (recipients own their copy under forwarding semantics — see [Forwarding Shares](#forwarding-shares))
 - `app/(app)/people.tsx` loads `hidden_people` joined with `my_people` and renders them as a `ListFooterComponent` of the People FlatList
 
 ### Acceptance Criteria
@@ -136,6 +137,47 @@ Hiding is only possible from within an event that person shared with you. This k
 - [x] People screen shows a "Hidden" section when there are hidden people
 - [x] "Unhide" in the People screen removes the person from the hidden list
 - [x] Hidden people's events are excluded server-side, not just client-side
+
+### Open Questions
+
+- None
+
+---
+
+## Forwarding Shares
+
+### Problem
+
+Sharing used to work by reference: recipients saw a shared event through the sharer's `user_events` row, linked by `event_shares`. That made deletion semantics incoherent — if A shared with B and B re-shared with C, A removing the event yanked it from B's calendar but not C's; whether an event survived on your calendar depended on what other people did, not on any rule a user could predict. It also motivated an "unshare" feature that tried to claw back something recipients may already have passed along.
+
+### Philosophy
+
+This app shares public event listings, not private hosted events — closer to forwarding a link by text than to Partiful-style invitations. A share is a completed action, not a revocable grant: once you send someone something, it's theirs. There is no unsend. Removal is purely personal: taking an event off your calendar never changes anyone else's.
+
+### Solution
+
+- **Share delivers a copy.** The `share_event` RPC (SECURITY DEFINER, verifies caller owns the user_event) records `event_shares` rows AND inserts each recipient's own `user_events` row for the same immutable snapshot. Contacts without an account receive their copies on sign-up via the `deliver_pending_shares` trigger (fires when `my_people.user_id` is resolved).
+- **Your calendar is yours.** `get_calendar_events` returns only the caller's own `user_events`; `event_shares` is consulted only for "Shared by X" attribution and the hide filter.
+- **No unshare.** The share sheet is additive-only: people the event was already shared with render as a completed action ("✓ Shared") and can't be deselected. The header action is "Share", not "Done".
+- **Remove is personal.** "Remove Event" deletes only the caller's `user_events` row; recipients keep their copies. The `cleanup_old_events` cron only deletes `events` snapshots with zero remaining owners — it never touches `user_events` or `event_shares`.
+- **Hide still works** as the recipient-side control for people whose events you don't want to see.
+
+### Technical Notes
+
+- New migrations: `20260807000005_share_event_rpc.sql` (RPC + backfill of existing shares into recipient copies + `events_select_owner` RLS so recipients can always read events they own), `20260807000006_signup_deliver_pending_shares.sql` (AFTER UPDATE OF user_id trigger on my_people), `20260807000007_calendar_rpc_forwarding.sql` (owned-copies calendar + attribution + hide), `20260807000008_cleanup_orphan_events_only.sql` (orphan-only cleanup)
+- `app/(app)/share.tsx` calls the RPC instead of raw `event_shares` inserts; no delete path exists
+- `components/ShareSheet.tsx` gains a `sharedPersonIds` prop rendering completed, non-interactive rows and circle chips
+- `app/(app)/event/[id].tsx` shows the hide button whenever `sharedByPersonId` is present (recipients now own a copy), and the remove confirmation states it only affects your calendar
+
+### Acceptance Criteria
+
+- [x] Sharing with an app user puts the event on their calendar immediately as their own copy
+- [x] Sharing with a non-app user delivers their copy on sign-up
+- [x] The sharer removing the event changes nobody else's calendar
+- [x] A re-sharer removing the event changes nobody else's calendar
+- [x] The share sheet shows existing shares as completed and non-interactive; only never-shared people can be selected
+- [x] No code path deletes `event_shares` to revoke access
+- [x] Event cleanup deletes only orphaned snapshots
 
 ### Open Questions
 

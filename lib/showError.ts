@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 /**
  * Show a detailed error dialog for alpha/beta debugging.
@@ -10,15 +10,15 @@ export function showError(title: string, err: unknown): void {
   if (err instanceof Error) {
     parts.push(err.message);
 
-    // Supabase errors often carry a `code` property
-    const code = (err as Record<string, unknown>).code;
+    // Supabase errors often carry extra fields not present on the Error type
+    const rec = err as unknown as Record<string, unknown>;
+    const code = rec.code;
     if (code) parts.push(`Code: ${code}`);
 
-    // Also check for `details` and `hint` (PostgrestError fields)
-    const details = (err as Record<string, unknown>).details;
+    const details = rec.details;
     if (details) parts.push(`Details: ${details}`);
 
-    const hint = (err as Record<string, unknown>).hint;
+    const hint = rec.hint;
     if (hint) parts.push(`Hint: ${hint}`);
 
     if (err.stack) parts.push(`\nStack:\n${err.stack}`);
@@ -39,5 +39,14 @@ export function showError(title: string, err: unknown): void {
     parts.push('Unknown error (no details available)');
   }
 
-  Alert.alert(title, parts.join('\n'));
+  const message = parts.join('\n');
+
+  // react-native-web's Alert.alert is a no-op, so use the browser dialog to
+  // keep failures visible on web.
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
 }
