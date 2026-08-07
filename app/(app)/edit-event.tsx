@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
+import { showAlert, showConfirm } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
@@ -64,7 +64,7 @@ export default function EditEventScreen() {
 
   const handleSave = async () => {
     if (!title.trim() && !url.trim()) {
-      Alert.alert('Required', 'Enter a title or URL.');
+      showAlert('Required', 'Enter a title or URL.');
       return;
     }
 
@@ -164,35 +164,29 @@ export default function EditEventScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    showConfirm(
       'Remove Event',
-      'Remove this event from your calendar? People you shared it with will lose access, but anyone who re-shared it keeps their own copy.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            const { error } = await supabase
-              .from('user_events')
-              .delete()
-              .eq('id', params.userEventId)
-              .eq('user_id', session?.user?.id ?? '');
+      'Remove this event from your calendar? This only affects you — everyone you shared it with keeps their own copy.',
+      {
+        confirmText: 'Remove',
+        destructive: true,
+        onConfirm: async () => {
+          setLoading(true);
+          const { error } = await supabase
+            .from('user_events')
+            .delete()
+            .eq('id', params.userEventId)
+            .eq('user_id', session?.user?.id ?? '');
 
-            if (error) {
-              console.error('Failed to remove event:', error);
-              Alert.alert('Error', 'Failed to remove event');
-              setLoading(false);
-            } else {
-              router.replace('/(app)/');
-            }
-          },
+          if (error) {
+            console.error('Failed to remove event:', error);
+            showAlert('Error', 'Failed to remove event');
+            setLoading(false);
+          } else {
+            router.replace('/(app)/');
+          }
         },
-      ]
+      }
     );
   };
 

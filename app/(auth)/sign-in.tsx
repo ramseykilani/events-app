@@ -7,11 +7,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { router } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -32,7 +32,7 @@ export default function SignInScreen() {
   const handleSignIn = async () => {
     const normalized = normalizePhone(phone);
     if (!normalized) {
-      Alert.alert('Invalid phone number', 'Please enter a valid phone number.');
+      showAlert('Invalid phone number', 'Please enter a valid phone number.');
       return;
     }
 

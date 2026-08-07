@@ -6,12 +6,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Alert,
   Modal,
   Linking,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showAlert, showConfirm } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
@@ -118,42 +118,42 @@ export default function PeopleScreen() {
     }
 
     if (status === 'denied' || status === 'restricted') {
-      Alert.alert(
+      showConfirm(
         'Contacts Access Disabled',
         'Events uses your contacts so you can quickly add people to share events with. Please enable contacts access in Settings.',
-        [
-          { text: 'Not Now', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ]
+        {
+          confirmText: 'Open Settings',
+          cancelText: 'Not Now',
+          onConfirm: () => Linking.openSettings(),
+        }
       );
       return;
     }
 
     // undetermined — explain why before triggering the OS dialog
-    Alert.alert(
+    showConfirm(
       'Access Your Contacts?',
       'Events uses your contacts so you can easily add people to share events with. Your contacts are never uploaded or stored on our servers.',
-      [
-        { text: 'Not Now', style: 'cancel' },
-        {
-          text: 'Continue',
-          onPress: async () => {
-            const granted = await requestContactsPermission();
-            if (granted) {
-              setShowPicker(true);
-            } else {
-              Alert.alert(
-                'Contacts Access Disabled',
-                'To add people from your contacts, please enable contacts access in Settings.',
-                [
-                  { text: 'Not Now', style: 'cancel' },
-                  { text: 'Open Settings', onPress: () => Linking.openSettings() },
-                ]
-              );
-            }
-          },
+      {
+        confirmText: 'Continue',
+        cancelText: 'Not Now',
+        onConfirm: async () => {
+          const granted = await requestContactsPermission();
+          if (granted) {
+            setShowPicker(true);
+          } else {
+            showConfirm(
+              'Contacts Access Disabled',
+              'To add people from your contacts, please enable contacts access in Settings.',
+              {
+                confirmText: 'Open Settings',
+                cancelText: 'Not Now',
+                onConfirm: () => Linking.openSettings(),
+              }
+            );
+          }
         },
-      ]
+      }
     );
   };
 
@@ -164,7 +164,7 @@ export default function PeopleScreen() {
 
     const count = people.length + selected.length;
     if (count > 50) {
-      Alert.alert(
+      showAlert(
         'Limit reached',
         `You can add up to 50 people. You have ${people.length} and tried to add ${selected.length}.`
       );
@@ -205,46 +205,40 @@ export default function PeopleScreen() {
   };
 
   const handleRemoveCircle = async (circle: Circle) => {
-    Alert.alert(
+    showConfirm(
       'Delete circle',
       `Delete "${circle.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.from('circles').delete().eq('id', circle.id);
-            if (error) {
-              showError('Error deleting circle', error);
-              return;
-            }
-            loadData();
-          },
+      {
+        confirmText: 'Delete',
+        destructive: true,
+        onConfirm: async () => {
+          const { error } = await supabase.from('circles').delete().eq('id', circle.id);
+          if (error) {
+            showError('Error deleting circle', error);
+            return;
+          }
+          loadData();
         },
-      ]
+      }
     );
   };
 
   const handleRemovePerson = async (person: MyPerson) => {
-    Alert.alert(
+    showConfirm(
       'Remove',
       `Remove ${person.contact_name ?? person.phone_number}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await supabase.from('my_people').delete().eq('id', person.id);
-            if (error) {
-              showError('Error removing person', error);
-              return;
-            }
-            loadData();
-          },
+      {
+        confirmText: 'Remove',
+        destructive: true,
+        onConfirm: async () => {
+          const { error } = await supabase.from('my_people').delete().eq('id', person.id);
+          if (error) {
+            showError('Error removing person', error);
+            return;
+          }
+          loadData();
         },
-      ]
+      }
     );
   };
 

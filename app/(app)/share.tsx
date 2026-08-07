@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
@@ -102,7 +102,7 @@ export default function ShareScreen() {
     // after creating it). Afterwards the action is additive-only: existing
     // shares are completed and cannot be unsent.
     if (selectedPersonIds.size === 0) {
-      Alert.alert('Select people', 'Please select at least one person to share with.');
+      showAlert('Select people', 'Please select at least one person to share with.');
       return;
     }
 

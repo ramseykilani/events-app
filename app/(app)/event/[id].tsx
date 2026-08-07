@@ -7,11 +7,11 @@ import {
   TouchableOpacity,
   Linking,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
+import { showAlert, showConfirm } from '../../../lib/dialogs';
 import { showError } from '../../../lib/showError';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
@@ -126,39 +126,33 @@ export default function EventDetailScreen() {
 
   const handleDelete = () => {
     if (!userEventId) return;
-    Alert.alert(
+    showConfirm(
       'Remove Event',
       'Remove this event from your calendar? This only affects you — everyone you shared it with keeps their own copy.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            const { error } = await supabase
-              .from('user_events')
-              .delete()
-              .eq('id', userEventId)
-              .eq('user_id', session?.user?.id ?? '');
+      {
+        confirmText: 'Remove',
+        destructive: true,
+        onConfirm: async () => {
+          setLoading(true);
+          const { error } = await supabase
+            .from('user_events')
+            .delete()
+            .eq('id', userEventId)
+            .eq('user_id', session?.user?.id ?? '');
 
-            if (error) {
-              console.error('Failed to remove event:', error);
-              Alert.alert('Error', 'Failed to remove event');
-              setLoading(false);
+          if (error) {
+            console.error('Failed to remove event:', error);
+            showAlert('Error', 'Failed to remove event');
+            setLoading(false);
+          } else {
+            if (router.canGoBack()) {
+              router.back();
             } else {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace('/(app)/');
-              }
+              router.replace('/(app)/');
             }
-          },
+          }
         },
-      ]
+      }
     );
   };
 
