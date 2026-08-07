@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 /**
  * Show a detailed error dialog for alpha/beta debugging.
@@ -39,5 +39,14 @@ export function showError(title: string, err: unknown): void {
     parts.push('Unknown error (no details available)');
   }
 
-  Alert.alert(title, parts.join('\n'));
+  const message = parts.join('\n');
+
+  // react-native-web's Alert.alert is a no-op, so use the browser dialog to
+  // keep failures visible on web.
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
 }

@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { showError } from '../../lib/showError';
 
 describe('lib/showError', () => {
@@ -74,5 +74,36 @@ describe('lib/showError', () => {
       'Unknown',
       'Unknown error (no details available)'
     );
+  });
+
+  it('uses window.alert on web, where react-native-web Alert.alert is a no-op', () => {
+    const originalOS = Platform.OS;
+    Platform.OS = 'web';
+    const alertMock = jest.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const g = globalThis as any;
+    const hadWindow = typeof g.window !== 'undefined';
+    const originalWindow = g.window;
+    const originalAlert = hadWindow ? g.window.alert : undefined;
+    g.window = { ...(originalWindow ?? {}), alert: alertMock };
+
+    try {
+      showError('Error', new Error('web failure'));
+
+      expect(alertMock).toHaveBeenCalledTimes(1);
+      expect(alertMock.mock.calls[0][0]).toContain('Error');
+      expect(alertMock.mock.calls[0][0]).toContain('web failure');
+      expect(Alert.alert).not.toHaveBeenCalled();
+    } finally {
+      Platform.OS = originalOS;
+      if (hadWindow) {
+        g.window = originalWindow;
+        if (originalWindow && typeof originalWindow === 'object') {
+          originalWindow.alert = originalAlert;
+        }
+      } else {
+        delete g.window;
+      }
+    }
   });
 });
