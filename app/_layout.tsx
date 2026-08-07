@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, LogBox, Platform, StatusBar, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, LogBox, Platform, StatusBar, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { SessionContextProvider, useSession } from './_context/SessionContext';
+import { ThemeContextProvider, useThemePreference } from './_context/ThemeContext';
 import { supabase } from '../lib/supabase';
-import { useTheme } from '../hooks/useTheme';
 
 LogBox.ignoreLogs(['unable to keep activate awake']);
 
@@ -47,8 +47,7 @@ async function registerForPushNotifications(): Promise<string | null> {
 
 function RootLayoutNav() {
   const { session, isLoading } = useSession();
-  const colorScheme = useColorScheme();
-  const theme = useTheme();
+  const { theme, isLoaded: themeLoaded } = useThemePreference();
   const segments = useSegments();
   const router = useRouter();
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
@@ -104,7 +103,9 @@ function RootLayoutNav() {
     };
   }, [router]);
 
-  if (isLoading) {
+  // Hold the loading screen until the stored theme is read so Evening users
+  // never see a flash of Paper on launch.
+  if (isLoading || !themeLoaded) {
     return (
       <View
         style={{
@@ -121,7 +122,7 @@ function RootLayoutNav() {
 
   return (
     <>
-      <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle={theme.statusBar} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
@@ -132,8 +133,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <SessionContextProvider>
-      <RootLayoutNav />
-    </SessionContextProvider>
+    <ThemeContextProvider>
+      <SessionContextProvider>
+        <RootLayoutNav />
+      </SessionContextProvider>
+    </ThemeContextProvider>
   );
 }
