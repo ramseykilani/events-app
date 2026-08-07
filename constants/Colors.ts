@@ -18,6 +18,7 @@ export const Colors = {
     calendarSelected: '#000000',
     calendarSelectedText: '#ffffff',
     calendarTodayText: '#000000',
+    shadow: '#000000',
   },
   dark: {
     background: '#000000',
@@ -38,5 +39,6 @@ export const Colors = {
     calendarSelected: '#ffffff',
     calendarSelectedText: '#000000',
     calendarTodayText: '#ffffff',
+    shadow: '#000000',
   },
 };

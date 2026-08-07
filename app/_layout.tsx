@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { LogBox, Platform, StatusBar, useColorScheme } from 'react-native';
+import { ActivityIndicator, LogBox, Platform, StatusBar, useColorScheme, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { SessionContextProvider, useSession } from './_context/SessionContext';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../hooks/useTheme';
 
 LogBox.ignoreLogs(['unable to keep activate awake']);
 
@@ -47,6 +48,7 @@ async function registerForPushNotifications(): Promise<string | null> {
 function RootLayoutNav() {
   const { session, isLoading } = useSession();
   const colorScheme = useColorScheme();
+  const theme = useTheme();
   const segments = useSegments();
   const router = useRouter();
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
@@ -103,7 +105,18 @@ function RootLayoutNav() {
   }, [router]);
 
   if (isLoading) {
-    return null;
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: theme.background,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ActivityIndicator color={theme.textPrimary} />
+      </View>
+    );
   }
 
   return (

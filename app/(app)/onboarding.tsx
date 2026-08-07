@@ -116,11 +116,16 @@ export default function OnboardingScreen() {
 
         <View style={styles.buttons}>
           {!isLastPage && (
-            <TouchableOpacity onPress={handleFinish}>
+            <TouchableOpacity onPress={handleFinish} activeOpacity={0.6} accessibilityRole="button">
               <Text style={[styles.skip, { color: theme.textSecondary }]}>Skip</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[styles.nextButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleNext}>
+          <TouchableOpacity
+            style={[styles.nextButton, { backgroundColor: theme.primaryButtonBg }]}
+            onPress={handleNext}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+          >
             <Text style={[styles.nextText, { color: theme.primaryButtonText }]}>
               {isLastPage ? 'Get Started' : 'Next'}
             </Text>

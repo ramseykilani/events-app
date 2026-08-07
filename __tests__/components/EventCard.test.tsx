@@ -47,4 +47,25 @@ describe('components/EventCard', () => {
     expect(screen.getByText('Board Game Night')).toBeTruthy();
     expect(screen.getByText('From Alice')).toBeTruthy();
   });
+
+  it('renders the event date in a friendly format', () => {
+    const event: CalendarEvent = {
+      id: 'ce-3',
+      event_id: 'e-3',
+      title: 'Picnic',
+      description: null,
+      image_url: null,
+      url: null,
+      event_date: '2026-08-07',
+      event_time: null,
+      sharer_contact_name: null,
+      sharer_person_id: null,
+      sharer_user_id: 'u-1',
+    };
+
+    const screen = render(<EventCard event={event} onPress={jest.fn()} />);
+
+    expect(screen.getByText('Fri, Aug 7')).toBeTruthy();
+    expect(screen.queryByText('2026-08-07')).toBeNull();
+  });
 });

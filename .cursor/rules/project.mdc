@@ -38,7 +38,7 @@ app/_context/        SessionContext (auth session provider)
 components/          Calendar, EventCard, ShareSheet, PeoplePicker
 docs/                Architecture, product, and philosophy docs
 hooks/               useTheme and other shared hooks
-lib/                 supabase.ts, types.ts, contacts.ts, showError.ts, dialogs.ts
+lib/                 supabase.ts, types.ts, contacts.ts, showError.ts, dialogs.ts, format.ts
 manual-tests/        Cloud manual regression suite + report template
 scripts/             Helper scripts (e.g. manual test preflight runner)
 supabase/migrations/ SQL migrations (schema, RLS, triggers, RPCs) — run in order
@@ -63,6 +63,9 @@ supabase/functions/  Edge Functions (send-notification, og-metadata, cleanup-peo
 - Edge functions are locked down: `send-notification` and `og-metadata` require a valid user JWT (send-notification also verifies caller ownership of the `user_event`); `cleanup-people`/`cleanup-events` require the `CRON_SECRET` header and fail closed when unset.
 - User-facing failures surface via `showError` or inline error + retry banners — not console-only.
 - Never call `Alert.alert` directly (react-native-web makes it a no-op). Use `showAlert`/`showConfirm` from `lib/dialogs.ts` so dialogs also render in the browser via `window.alert`/`window.confirm`.
+- Dates and phone numbers are formatted for display via `lib/format.ts` (`formatEventDate`, `formatPhoneDisplay`) — never render raw `YYYY-MM-DD` dates or E.164 numbers to users.
+- Screens get their top padding from `useSafeAreaInsets()` (not hard-coded values), and multi-field forms wrap in `KeyboardAvoidingView`.
+- Interactive elements carry `accessibilityRole` (plus `accessibilityLabel`/`accessibilityState` where the visible text isn't self-explanatory); touch targets are at least 44pt.
 - Automated regression tests use Jest + React Native Testing Library (`npm test -- --runInBand`).
 - Database semantics are tested by SQL tests: `bash supabase/tests/run_local.sh` spins up a scratch PostgreSQL with a mocked auth schema, applies every migration in order, and runs `supabase/tests/*.sql` assertions.
 - Cloud manual testing should follow `manual-tests/cloud_manual_regression.md` (preflight via `npm run test:manual`).

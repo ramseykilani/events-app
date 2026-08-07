@@ -76,6 +76,45 @@ describe('components/PeoplePicker', () => {
     expect(screen.queryByText('Alice Johnson')).toBeNull();
   });
 
+  it('keeps the confirm button disabled with no selection', async () => {
+    getContactsWithPhonesMock.mockResolvedValueOnce([
+      {
+        id: '1',
+        name: 'Alice',
+        phoneNumber: '+14165550001',
+        normalized: '+14165550001',
+      },
+    ]);
+
+    const onSelect = jest.fn();
+    const screen = render(
+      <PeoplePicker onSelect={onSelect} onCancel={jest.fn()} existingPhones={[]} />
+    );
+
+    await screen.findByText('Alice');
+    fireEvent.press(screen.getByText('Add'));
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('shows the formatted phone number alongside the contact name', async () => {
+    getContactsWithPhonesMock.mockResolvedValueOnce([
+      {
+        id: '1',
+        name: 'Alice',
+        phoneNumber: '+14165550001',
+        normalized: '+14165550001',
+      },
+    ]);
+
+    const screen = render(
+      <PeoplePicker onSelect={jest.fn()} onCancel={jest.fn()} existingPhones={[]} />
+    );
+
+    await screen.findByText('Alice');
+    expect(screen.getByText('(416) 555-0001')).toBeTruthy();
+  });
+
   it('returns normalized selections on confirm', async () => {
     getContactsWithPhonesMock.mockResolvedValueOnce([
       {

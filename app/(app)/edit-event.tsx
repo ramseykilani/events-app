@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '../../lib/supabase';
 import { showAlert, showConfirm } from '../../lib/dialogs';
@@ -20,6 +24,7 @@ export default function EditEventScreen() {
   const params = useLocalSearchParams<{ eventId: string; userEventId: string }>();
   const { session } = useSession();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [event, setEvent] = useState<Event | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -30,37 +35,40 @@ export default function EditEventScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!params.eventId) return;
 
-    async function load() {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', params.eventId)
-        .single();
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', params.eventId)
+      .single();
 
-      if (error) {
-        console.error('Failed to load event:', error);
-        return;
-      }
-
-      const e = data as Event;
-      setEvent(e);
-      setTitle(e.title ?? '');
-      setDescription(e.description ?? '');
-      setUrl(e.url ?? '');
-      setImageUrl(e.image_url ?? '');
-      const [y, m, d] = e.event_date.split('-').map(Number);
-      setEventDate(new Date(y, m - 1, d));
-      setEventTime(
-        e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null
-      );
+    if (error) {
+      console.error('Failed to load event:', error);
+      setLoadError(true);
+      return;
     }
 
-    load();
+    setLoadError(false);
+    const e = data as Event;
+    setEvent(e);
+    setTitle(e.title ?? '');
+    setDescription(e.description ?? '');
+    setUrl(e.url ?? '');
+    setImageUrl(e.image_url ?? '');
+    const [y, m, d] = e.event_date.split('-').map(Number);
+    setEventDate(new Date(y, m - 1, d));
+    setEventTime(
+      e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null
+    );
   }, [params.eventId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleSave = async () => {
     if (!title.trim() && !url.trim()) {
@@ -190,24 +198,50 @@ export default function EditEventScreen() {
     );
   };
 
+  if (loadError && !event) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <Text style={[styles.loadErrorText, { color: theme.textSecondary }]}>
+          Could not load this event.
+        </Text>
+        <TouchableOpacity onPress={load} activeOpacity={0.6}>
+          <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+          <Text style={[styles.retry, { color: theme.textSecondary }]}>Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!event) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <Text style={[styles.loading, { color: theme.textPrimary }]}>Loading...</Text>
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <ActivityIndicator color={theme.textPrimary} />
       </View>
     );
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={[
+        styles.container,
+        { backgroundColor: theme.background, paddingTop: insets.top + 12 },
+      ]}
+    >
+      <ScrollView keyboardShouldPersistTaps="handled">
+        <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Edit event</Text>
         <TouchableOpacity
           onPress={handleSave}
           disabled={loading || (!title.trim() && !url.trim())}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loading || (!title.trim() && !url.trim()) }}
         >
           <Text
             style={[
@@ -251,6 +285,7 @@ export default function EditEventScreen() {
         <TouchableOpacity
           style={[styles.input, { borderColor: theme.border }]}
           onPress={() => setShowDatePicker(true)}
+          activeOpacity={0.6}
         >
           <Text style={{ color: theme.textPrimary }}>{eventDate.toLocaleDateString()}</Text>
         </TouchableOpacity>
@@ -268,6 +303,7 @@ export default function EditEventScreen() {
         <TouchableOpacity
           style={[styles.input, { borderColor: theme.border }]}
           onPress={() => setShowTimePicker(true)}
+          activeOpacity={0.6}
         >
           <Text style={{ color: theme.textPrimary }}>
             {eventTime
@@ -291,11 +327,13 @@ export default function EditEventScreen() {
         <TouchableOpacity
           style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
           onPress={handleDelete}
+          activeOpacity={0.7}
         >
           <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -303,16 +341,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loading: {
-    padding: 24,
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadErrorText: {
     fontSize: 16,
+  },
+  retry: {
+    fontSize: 16,
+    fontWeight: '600',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 48,
     paddingBottom: 16,
     borderBottomWidth: 1,
   },

@@ -72,11 +72,14 @@ export default function SignInScreen() {
           keyboardType="phone-pad"
           autoComplete="tel"
           editable={!loading}
+          accessibilityLabel="Phone number"
         />
         <TouchableOpacity
           style={[styles.button, { backgroundColor: theme.primaryButtonBg }, loading && styles.buttonDisabled]}
           onPress={handleSignIn}
           disabled={loading}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: loading }}
         >
           <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
             {loading ? 'Sending...' : 'Send code'}
