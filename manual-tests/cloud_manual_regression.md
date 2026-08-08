@@ -51,12 +51,16 @@ For each executed scenario:
 ### M-002 OTP verification and resend cooldown
 **Steps**
 1. Sign in with valid phone.
-2. On verify screen, tap resend text.
-3. Observe countdown.
-4. Enter OTP and submit.
+2. On verify screen, confirm resend already shows `Resend code in 60s` (the initial send starts the cooldown so an accidental tap cannot fire a second SMS immediately).
+3. Wait out the cooldown (or note it decrements), then tap resend text.
+4. Observe countdown restart.
+5. Enter an invalid/old OTP and submit — expect a short friendly alert (not a debug dump with stack/code/raw JSON).
+6. Enter the valid OTP and submit.
 
 **Expected**
-- Cooldown text switches to `Resend code in 60s` and decrements.
+- After step 1, resend is already cooling down from the initial send.
+- After an intentional resend, cooldown text switches to `Resend code in 60s` and decrements.
+- Invalid OTP shows a normal alert like "That code is incorrect or no longer valid…".
 - Valid OTP signs user in and routes into app.
 
 ---

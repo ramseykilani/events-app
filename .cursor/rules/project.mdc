@@ -64,7 +64,8 @@ supabase/functions/  Edge Functions (send-notification, og-metadata, cleanup-peo
 - Supabase client is initialized in `lib/supabase.ts` with AsyncStorage for session persistence.
 - All Supabase queries from the client go through RLS. Server-side operations use `SECURITY DEFINER` functions.
 - Edge functions are locked down: `send-notification` and `og-metadata` require a valid user JWT (send-notification also verifies caller ownership of the `user_event`); `cleanup-people`/`cleanup-events` require the `CRON_SECRET` header and fail closed when unset.
-- User-facing failures surface via `showError` or inline error + retry banners — not console-only.
+- User-facing failures surface via `showError` or inline error + retry banners — not console-only. Expected auth mistakes (wrong/expired OTP, SMS rate limits, SMS send failure) use a short `showAlert` via `lib/authErrors.ts` (`getAuthUserMessage`); reserve `showError` for unexpected failures.
+- OTP resend starts a 60s cooldown after the initial send (`sent=1` param from sign-in) and after each resend, so an accidental tap on "Try again" cannot fire a second SMS immediately.
 - Never call `Alert.alert` directly (react-native-web makes it a no-op). Use `showAlert`/`showConfirm` from `lib/dialogs.ts` so dialogs also render in the browser via `window.alert`/`window.confirm`.
 - Dates and phone numbers are formatted for display via `lib/format.ts` (`formatEventDate`, `formatPhoneDisplay`) — never render raw `YYYY-MM-DD` dates or E.164 numbers to users.
 - Screens get their top padding from `useSafeAreaInsets()` (not hard-coded values), and multi-field forms wrap in `KeyboardAvoidingView`.

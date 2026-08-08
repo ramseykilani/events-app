@@ -57,11 +57,11 @@ describe('app/(auth)/sign-in', () => {
 
     expect(router.replace).toHaveBeenCalledWith({
       pathname: '/(auth)/verify',
-      params: { phone: '+14165551234' },
+      params: { phone: '+14165551234', sent: '1' },
     });
   });
 
-  it('surfaces OTP request failures via showError', async () => {
+  it('shows a friendly alert for expected OTP send failures', async () => {
     mockSignInWithOtp.mockResolvedValueOnce({
       error: { message: 'sms_send_failed' },
     });
@@ -71,9 +71,49 @@ describe('app/(auth)/sign-in', () => {
     fireEvent.press(screen.getByText('Send code'));
 
     await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Could not send code',
+        expect.stringMatching(/could not send a verification code/i)
+      );
+    });
+    expect(mockShowError).not.toHaveBeenCalled();
+  });
+
+  it('surfaces unexpected OTP request failures via showError', async () => {
+    mockSignInWithOtp.mockResolvedValueOnce({
+      error: { message: 'database connection refused' },
+    });
+
+    const screen = render(<SignInScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('+1 (555) 123-4567'), '4165551234');
+    fireEvent.press(screen.getByText('Send code'));
+
+    await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith('Error', {
-        message: 'sms_send_failed',
+        message: 'database connection refused',
       });
+    });
+  });
+
+  it('ignores a second Send code tap while the first request is in flight', async () => {
+    let resolveRequest: ((value: { error: null }) => void) | undefined;
+    mockSignInWithOtp.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        })
+    );
+
+    const screen = render(<SignInScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('+1 (555) 123-4567'), '4165551234');
+    fireEvent.press(screen.getByText('Send code'));
+    fireEvent.press(screen.getByText('Sending...'));
+
+    expect(mockSignInWithOtp).toHaveBeenCalledTimes(1);
+
+    resolveRequest?.({ error: null });
+    await waitFor(() => {
+      expect(router.replace).toHaveBeenCalled();
     });
   });
 });

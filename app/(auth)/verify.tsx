@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { getAuthUserMessage } from '../../lib/authErrors';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
@@ -17,14 +18,20 @@ import { useTheme } from '../../hooks/useTheme';
 const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function VerifyScreen() {
-  const params = useLocalSearchParams<{ phone?: string }>();
+  const params = useLocalSearchParams<{ phone?: string; sent?: string }>();
   const phone = params.phone ?? '';
+  // A code was just sent from sign-in — start the cooldown so an accidental
+  // tap on "Try again" doesn't fire a second SMS immediately.
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(
+    params.sent === '1' ? RESEND_COOLDOWN_SECONDS : 0
+  );
   const [resending, setResending] = useState(false);
   const theme = useTheme();
   const loadingSafetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const verifyInFlight = useRef(false);
+  const resendInFlight = useRef(false);
 
   useEffect(
     () => () => {
@@ -48,8 +55,9 @@ export default function VerifyScreen() {
   }, [resendCooldown]);
 
   const handleResend = async () => {
-    if (resendCooldown > 0 || resending) return;
+    if (resendCooldown > 0 || resending || resendInFlight.current) return;
 
+    resendInFlight.current = true;
     setResending(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -61,8 +69,14 @@ export default function VerifyScreen() {
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
       showAlert('Code sent', 'A new verification code has been sent to your phone.');
     } catch (err: unknown) {
-      showError('Failed to resend', err);
+      const friendly = getAuthUserMessage(err);
+      if (friendly) {
+        showAlert('Could not resend', friendly);
+      } else {
+        showError('Failed to resend', err);
+      }
     } finally {
+      resendInFlight.current = false;
       setResending(false);
     }
   };
@@ -72,7 +86,9 @@ export default function VerifyScreen() {
       showAlert('Enter code', 'Please enter the verification code.');
       return;
     }
+    if (verifyInFlight.current) return;
 
+    verifyInFlight.current = true;
     setLoading(true);
     try {
       const { error } = await supabase.auth.verifyOtp({
@@ -86,9 +102,18 @@ export default function VerifyScreen() {
       // Auth state change will trigger navigation via root layout. If that
       // redirect stalls (e.g. session persistence hiccup), re-enable the form
       // after a grace period so the user isn't stranded on "Verifying...".
-      loadingSafetyTimer.current = setTimeout(() => setLoading(false), 10000);
+      loadingSafetyTimer.current = setTimeout(() => {
+        verifyInFlight.current = false;
+        setLoading(false);
+      }, 10000);
     } catch (err: unknown) {
-      showError('Verification failed', err);
+      const friendly = getAuthUserMessage(err);
+      if (friendly) {
+        showAlert('Verification failed', friendly);
+      } else {
+        showError('Verification failed', err);
+      }
+      verifyInFlight.current = false;
       setLoading(false);
     }
   };
