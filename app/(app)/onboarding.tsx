@@ -4,9 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  PanResponder,
+  Platform,
   GestureResponderEvent,
-  PanResponderGestureState,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,7 +13,7 @@ import { router } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 
 const ONBOARDING_KEY = 'onboarding_complete';
-const SWIPE_THRESHOLD = 48;
+export const SWIPE_THRESHOLD = 48;
 
 type Page = {
   title: string;
@@ -45,9 +44,29 @@ const pages: Page[] = [
   },
 ];
 
+export function nextPageIndex(current: number, pageCount: number): number {
+  return Math.min(current + 1, pageCount - 1);
+}
+
+export function previousPageIndex(current: number): number {
+  return Math.max(current - 1, 0);
+}
+
+export function pageIndexAfterSwipe(
+  current: number,
+  dx: number,
+  pageCount: number,
+  threshold: number = SWIPE_THRESHOLD
+): number {
+  if (dx <= -threshold) return nextPageIndex(current, pageCount);
+  if (dx >= threshold) return previousPageIndex(current);
+  return current;
+}
+
 export default function OnboardingScreen() {
   const [currentPage, setCurrentPage] = useState(0);
   const currentPageRef = useRef(0);
+  const dragStartX = useRef<number | null>(null);
   const insets = useSafeAreaInsets();
   const theme = useTheme();
 
@@ -70,33 +89,60 @@ export default function OnboardingScreen() {
     }
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (
-        _: GestureResponderEvent,
-        gesture: PanResponderGestureState
-      ) =>
-        Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
-      onPanResponderRelease: (
-        _: GestureResponderEvent,
-        gesture: PanResponderGestureState
-      ) => {
-        const page = currentPageRef.current;
-        if (gesture.dx <= -SWIPE_THRESHOLD && page < pages.length - 1) {
-          goToPage(page + 1);
-        } else if (gesture.dx >= SWIPE_THRESHOLD && page > 0) {
-          goToPage(page - 1);
-        }
-      },
-    })
-  ).current;
+  const endDrag = (endX: number) => {
+    if (dragStartX.current == null) return;
+    const dx = endX - dragStartX.current;
+    dragStartX.current = null;
+    const next = pageIndexAfterSwipe(
+      currentPageRef.current,
+      dx,
+      pages.length
+    );
+    if (next !== currentPageRef.current) {
+      goToPage(next);
+    }
+  };
+
+  const startDrag = (x: number) => {
+    dragStartX.current = x;
+  };
+
+  const cancelDrag = () => {
+    dragStartX.current = null;
+  };
 
   const page = pages[currentPage];
   const isLastPage = currentPage === pages.length - 1;
 
+  // RN-web's PanResponder often fails to claim mouse drags; use responders +
+  // explicit mouse handlers so swipe works on native touch and desktop web.
+  const swipeHandlers = {
+    onStartShouldSetResponder: () => true,
+    onMoveShouldSetResponder: () => true,
+    onResponderTerminationRequest: () => false,
+    onResponderGrant: (e: GestureResponderEvent) => {
+      startDrag(e.nativeEvent.pageX);
+    },
+    onResponderRelease: (e: GestureResponderEvent) => {
+      endDrag(e.nativeEvent.pageX);
+    },
+    onResponderTerminate: cancelDrag,
+    ...(Platform.OS === 'web'
+      ? {
+          onMouseDown: (e: { clientX: number }) => startDrag(e.clientX),
+          onMouseUp: (e: { clientX: number }) => endDrag(e.clientX),
+          onMouseLeave: cancelDrag,
+        }
+      : {}),
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.page} {...panResponder.panHandlers}>
+      <View
+        style={[styles.page, Platform.OS === 'web' && styles.pageWeb]}
+        {...swipeHandlers}
+        testID="onboarding-page"
+      >
         <View style={styles.content}>
           <Text
             style={[
@@ -172,6 +218,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
+  pageWeb: {
+    // Prevent text selection from eating mouse-drag swipes on web.
+    userSelect: 'none',
+    cursor: 'default',
+  } as Record<string, string>,
   content: {
     gap: 16,
   },
