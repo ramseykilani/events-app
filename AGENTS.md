@@ -69,6 +69,22 @@ Then follow:
 - `manual-tests/cloud_manual_regression.md`
 - `manual-tests/manual_test_report_template.md`
 
+### Merging pull requests (cloud agents)
+
+Only merge when the user explicitly asks. The `gh` CLI in cloud VMs is read-only, so merge at the git level — GitHub auto-detects the PR as merged once its commits land on `master`:
+
+```bash
+git checkout master && git pull origin master
+git merge --no-ff <branch> -m "Merge pull request #<n> ..."
+git push origin master
+```
+
+Then delete the head branch, remote and local. The repo's "automatically delete head branches" setting (even once enabled) only fires for merges done through GitHub's UI/API — merges pushed from a VM leave the branch behind:
+
+```bash
+git push origin --delete <branch> && git branch -d <branch>
+```
+
 ### Deploying migrations & edge functions (runbook)
 
 Migrations `20260807000001`–`20260807000008` and the hardened edge functions were deployed to project `ijmwtjyuvdnvhblwwtpt` on 2026-08-07. For future migrations/functions the same flow applies: the client and backend must move together (e.g. the client expects the `share_event` RPC, and the calendar RPC assumes recipient copies exist).
