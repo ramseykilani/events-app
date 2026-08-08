@@ -1,0 +1,10 @@
+# Cloudflare Pages project config — direct-upload deploys via Wrangler.
+# Deploy: npm run deploy:web (builds dist/ then uploads).
+# Requires CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID in the environment.
+#
+# Project name is "shared-events" (live at https://shared-events.pages.dev),
+# not "events-app": Pages *.pages.dev subdomains are globally unique, and
+# "events-app" was already taken by another Cloudflare account. Do not rename
+# this back to events-app.
+name = "shared-events"
+pages_build_output_dir = "dist"

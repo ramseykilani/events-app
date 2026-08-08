@@ -59,10 +59,56 @@ describe('lib/dialogs', () => {
       });
 
       expect(Alert.alert).toHaveBeenCalledWith('Remove Event', 'Remove this event?', [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: undefined },
         { text: 'Remove', style: 'destructive', onPress: onConfirm },
       ]);
       expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    it('passes onCancel through to the native cancel button', () => {
+      const onCancel = jest.fn();
+      showConfirm('Access Your Contacts?', 'Allow access?', {
+        confirmText: 'Continue',
+        cancelText: 'Add Manually',
+        onConfirm: jest.fn(),
+        onCancel,
+      });
+
+      const buttons = (Alert.alert as jest.Mock).mock.calls[0][2];
+      const cancelButton = buttons.find((b: { style?: string }) => b.style === 'cancel');
+      expect(cancelButton.onPress).toBe(onCancel);
+    });
+
+    it('runs onCancel on web when window.confirm is declined', () => {
+      const originalOS = Platform.OS;
+      Platform.OS = 'web';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = globalThis as any;
+      const hadWindow = typeof g.window !== 'undefined';
+      const originalWindow = g.window;
+
+      try {
+        const confirmMock = jest.fn().mockReturnValue(false);
+        g.window = { ...(originalWindow ?? {}), confirm: confirmMock };
+        const onConfirm = jest.fn();
+        const onCancel = jest.fn();
+
+        showConfirm('Access Your Contacts?', 'Allow access?', {
+          confirmText: 'Continue',
+          onConfirm,
+          onCancel,
+        });
+
+        expect(onConfirm).not.toHaveBeenCalled();
+        expect(onCancel).toHaveBeenCalledTimes(1);
+      } finally {
+        Platform.OS = originalOS;
+        if (hadWindow) {
+          g.window = originalWindow;
+        } else {
+          delete g.window;
+        }
+      }
     });
 
     it('uses window.confirm on web and runs onConfirm only when accepted', () => {

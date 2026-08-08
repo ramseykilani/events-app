@@ -8,6 +8,7 @@ import {
   FlatList,
   Modal,
   Linking,
+  Platform,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +18,12 @@ import { showError } from '../../lib/showError';
 import { formatPhoneDisplay } from '../../lib/format';
 import { useSession } from '../_context/SessionContext';
 import { PeoplePicker } from '../../components/PeoplePicker';
-import { requestContactsPermission, getContactsPermissionDetails, getContactsPermissionStatus } from '../../lib/contacts';
+import {
+  requestContactsPermission,
+  getContactsPermissionDetails,
+  getContactsPermissionStatus,
+  normalizeToE164,
+} from '../../lib/contacts';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -30,6 +36,10 @@ export default function PeopleScreen() {
   const [circles, setCircles] = useState<Circle[]>([]);
   const [circleMembers, setCircleMembers] = useState<CircleMember[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualSaving, setManualSaving] = useState(false);
   const [newCircleName, setNewCircleName] = useState('');
   const [editingCircle, setEditingCircle] = useState<Circle | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
@@ -113,6 +123,12 @@ export default function PeopleScreen() {
   );
 
   const handleAddPeople = async () => {
+    // Web has no contacts API — go straight to the manual form.
+    if (Platform.OS === 'web') {
+      setShowManualAdd(true);
+      return;
+    }
+
     const status = await getContactsPermissionDetails();
 
     if (status === 'granted') {
@@ -123,11 +139,12 @@ export default function PeopleScreen() {
     if (status === 'denied' || status === 'restricted') {
       showConfirm(
         'Contacts Access Disabled',
-        'Events uses your contacts so you can quickly add people to share events with. Please enable contacts access in Settings.',
+        'Events uses your contacts so you can quickly add people to share events with. You can also add someone manually with just their phone number.',
         {
-          confirmText: 'Open Settings',
-          cancelText: 'Not Now',
-          onConfirm: () => Linking.openSettings(),
+          confirmText: 'Add Manually',
+          cancelText: 'Open Settings',
+          onConfirm: () => setShowManualAdd(true),
+          onCancel: () => Linking.openSettings(),
         }
       );
       return;
@@ -139,25 +156,60 @@ export default function PeopleScreen() {
       'Events uses your contacts so you can easily add people to share events with. Your contacts are never uploaded or stored on our servers.',
       {
         confirmText: 'Continue',
-        cancelText: 'Not Now',
+        cancelText: 'Add Manually',
         onConfirm: async () => {
           const granted = await requestContactsPermission();
           if (granted) {
             setShowPicker(true);
           } else {
-            showConfirm(
-              'Contacts Access Disabled',
-              'To add people from your contacts, please enable contacts access in Settings.',
-              {
-                confirmText: 'Open Settings',
-                cancelText: 'Not Now',
-                onConfirm: () => Linking.openSettings(),
-              }
-            );
+            setShowManualAdd(true);
           }
         },
+        onCancel: () => setShowManualAdd(true),
       }
     );
+  };
+
+  const handleAddManually = async () => {
+    if (!userId) return;
+
+    const phone = normalizeToE164(manualPhone.trim());
+    if (!phone) {
+      showAlert(
+        'Invalid phone number',
+        'Enter a valid phone number, ideally with the country code (e.g. +1 416 555 1234).'
+      );
+      return;
+    }
+
+    if (people.length >= 50) {
+      showAlert('Limit reached', 'You can add up to 50 people.');
+      return;
+    }
+
+    setManualSaving(true);
+    try {
+      const { error } = await supabase.from('my_people').upsert(
+        [
+          {
+            owner_id: userId,
+            phone_number: phone,
+            contact_name: manualName.trim() || null,
+          },
+        ],
+        { onConflict: 'owner_id,phone_number' }
+      );
+      if (error) {
+        showError('Error adding person', error);
+        return;
+      }
+      setShowManualAdd(false);
+      setManualName('');
+      setManualPhone('');
+      loadData();
+    } finally {
+      setManualSaving(false);
+    }
   };
 
   const handleSelectContacts = async (
@@ -362,11 +414,14 @@ export default function PeopleScreen() {
           <Text style={styles.emptyIcon}>👥</Text>
           <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No people yet</Text>
           <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-            Add people from your contacts to organize them into circles and
-            invite them to events.
+            {Platform.OS === 'web'
+              ? 'Add people by name and phone number to organize them into circles and invite them to events.'
+              : 'Add people from your contacts to organize them into circles and invite them to events.'}
           </Text>
           <TouchableOpacity style={[styles.emptyButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleAddPeople} activeOpacity={0.7} accessibilityRole="button">
-            <Text style={[styles.emptyButtonText, { color: theme.primaryButtonText }]}>Add from Contacts</Text>
+            <Text style={[styles.emptyButtonText, { color: theme.primaryButtonText }]}>
+              {Platform.OS === 'web' ? 'Add Manually' : 'Add from Contacts'}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -452,6 +507,70 @@ export default function PeopleScreen() {
           existingPhones={people.map((p) => p.phone_number)}
         />
       )}
+      <Modal visible={showManualAdd} animationType="slide" presentationStyle="pageSheet">
+        <View
+          style={[
+            styles.modalContainer,
+            { backgroundColor: theme.background, paddingTop: insets.top + 12 },
+          ]}
+        >
+          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowManualAdd(false);
+                setManualName('');
+                setManualPhone('');
+              }}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Add person</Text>
+            <TouchableOpacity
+              onPress={handleAddManually}
+              disabled={manualSaving || !manualPhone.trim()}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: manualSaving || !manualPhone.trim() }}
+            >
+              <Text
+                style={[
+                  styles.add,
+                  { color: theme.textPrimary },
+                  (manualSaving || !manualPhone.trim()) && { color: theme.textTertiary },
+                ]}
+              >
+                Save
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.manualForm}>
+            <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>Name (optional)</Text>
+            <TextInput
+              style={[styles.manualInput, { borderColor: theme.border, color: theme.textPrimary }]}
+              placeholder="Name"
+              placeholderTextColor={theme.textTertiary}
+              value={manualName}
+              onChangeText={setManualName}
+              autoFocus
+            />
+            <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>Phone number</Text>
+            <TextInput
+              style={[styles.manualInput, { borderColor: theme.border, color: theme.textPrimary }]}
+              placeholder="+1 416 555 1234"
+              placeholderTextColor={theme.textTertiary}
+              value={manualPhone}
+              onChangeText={setManualPhone}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+            />
+            <Text style={[styles.manualHint, { color: theme.textTertiary }]}>
+              Include the country code for numbers outside the US.
+            </Text>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={!!editingCircle} animationType="slide" presentationStyle="pageSheet">
         <View
           style={[
@@ -654,5 +773,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
+  },
+  manualForm: {
+    padding: 20,
+  },
+  manualLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  manualInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
+  manualHint: {
+    fontSize: 13,
+    marginTop: 8,
   },
 });

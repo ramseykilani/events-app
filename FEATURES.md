@@ -11,7 +11,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Hide](#hide) | Implemented |
 | [Forwarding Shares](#forwarding-shares) | Implemented |
 | [Sign Out](#sign-out) | Planned |
-| [Web Support](#web-support) | Planned |
+| [Web Support](#web-support) | Implemented |
 
 ---
 
@@ -220,11 +220,21 @@ A deliberately low-prominence sign-out action — this should not be easy to tap
 
 ## Web Support
 
-**Status:** Planned
+**Status:** Implemented
 
 ### Problem
 
-The app already runs in the browser (`npx expo start --web`) — the entire manual regression suite runs against the web build — but it is only a local dev server, and two gaps block real web usage: there is no contacts API on the web (so My People can't be populated), and the date/time pickers don't open (`@react-native-community/datetimepicker` is native-only).
+The app already runs in the browser (`npx expo start --web`) — the entire manual regression suite runs against the web build — but it used to be only a local dev server, and two gaps blocked real web usage: there is no contacts API on the web (so My People can't be populated), and the date/time pickers don't open (`@react-native-community/datetimepicker` is native-only).
+
+### Solution (shipped 2026-08-08)
+
+Live at **https://shared-events.pages.dev**. Web and native share the same Expo codebase; web users get SMS (never browser push). Items 1–6 from the rollout below are all done.
+
+- **Manual add person** (`app/(app)/people.tsx`): an "Add manually" form (name + phone) — on web it's the primary add path (no contacts API in the browser); on native it's offered alongside contacts. Numbers are normalized to E.164 with `libphonenumber-js` and upserted into `my_people` via the same path contacts import uses, so `user_id` resolution and pending-share delivery work unchanged.
+- **Web date/time** (`components/WebDateTimeInputs.tsx`, used by `add-event.tsx` / `edit-event.tsx`): HTML `date`/`time` inputs render when `Platform.OS === 'web'`. Dates are built as local dates (no UTC day-shift); clearing the time input unsets the time.
+- **`WEB_APP_URL`** (`supabase/functions/send-notification/index.ts`): function secret. Non-app-user SMS links the website ("See it on the web", preferred over store links); app-user SMS uses a single universal `https` event link (`WEB_APP_URL/event/[id]`) instead of the `events-app://` custom scheme. Falls back to store links / the deep link when unset. Currently set to `https://shared-events.pages.dev`.
+- **Hosting: Cloudflare Pages** via Wrangler direct-upload — `wrangler.toml` (project name `shared-events`), `npm run deploy:web`, `public/_redirects` SPA fallback. See AGENTS.md → Deploying the web app.
+- **Why `shared-events`, not `events-app`:** Cloudflare Pages `*.pages.dev` subdomains are **globally unique**. The bare name `events-app` was already taken by another Cloudflare account, so the first deploy landed on a suffixed hostname (`events-app-lzv.pages.dev`). The project was then renamed to `shared-events`, which claimed the clean `https://shared-events.pages.dev` URL. Do **not** try to recreate or rename back to `events-app` — that name is unavailable. Keep `wrangler.toml` `name = "shared-events"` and `WEB_APP_URL` in sync with whatever hostname is live.
 
 ### Philosophy
 
@@ -256,13 +266,16 @@ A web-first beta is attractive: nobody has to install anything, and notification
 
 ### Acceptance Criteria
 
-- [ ] A person can be added on web with name + phone number (E.164), and sharing to them works end-to-end
-- [ ] Event date/time can be chosen on web
-- [ ] A production web build is deployed at a stable URL and sign-in via SMS OTP works there
-- [ ] `TWILIO_AUTH_TOKEN` function secret is set and a real SMS is received end-to-end (event title, date/time, event URL, STOP footer)
-- [ ] Sharing to a non-user sends an SMS containing the website URL
+- [x] A person can be added on web with name + phone number (E.164), and sharing to them works end-to-end
+- [x] Event date/time can be chosen on web
+- [x] A production web build is deployed at a stable URL and sign-in via SMS OTP works there (`https://shared-events.pages.dev`)
+- [x] `TWILIO_AUTH_TOKEN` function secret is set and a real SMS is received end-to-end (event title, date/time, event URL, STOP footer) — verified 2026-08-07 (E-107)
+- [x] Sharing to a non-user sends an SMS containing the website URL (`WEB_APP_URL=https://shared-events.pages.dev`)
 
-### Open Questions
+### Open Questions / follow-ups
 
-- Hosting provider and domain
+- ~~Hosting provider~~ → Cloudflare Pages at **https://shared-events.pages.dev** (see "Why `shared-events`" above — `events-app.pages.dev` was globally taken)
+- Custom domain when purchased: add in Pages dashboard, then update `WEB_APP_URL`
 - Whether the browser build should show any "install the app" prompt once native builds exist
+- Optional: remove the placeholder `IOS_APP_STORE_URL` secret now that `WEB_APP_URL` is set
+- [Sign Out](#sign-out) remains a separate Planned feature

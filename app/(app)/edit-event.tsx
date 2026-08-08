@@ -13,6 +13,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { WebDateInput, WebTimeInput } from '../../components/WebDateTimeInputs';
 import { supabase } from '../../lib/supabase';
 import { showAlert, showConfirm } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
@@ -282,47 +283,61 @@ export default function EditEventScreen() {
           multiline
         />
         <Text style={[styles.label, { color: theme.textSecondary }]}>Date</Text>
-        <TouchableOpacity
-          style={[styles.input, { borderColor: theme.border }]}
-          onPress={() => setShowDatePicker(true)}
-          activeOpacity={0.6}
-        >
-          <Text style={{ color: theme.textPrimary }}>{eventDate.toLocaleDateString()}</Text>
-        </TouchableOpacity>
-        {showDatePicker && (
-          <DateTimePicker
-            value={eventDate}
-            mode="date"
-            onChange={(_, d) => {
-              setShowDatePicker(false);
-              if (d) setEventDate(d);
-            }}
-          />
+        {Platform.OS === 'web' ? (
+          <WebDateInput value={eventDate} onChange={setEventDate} />
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.input, { borderColor: theme.border }]}
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+            >
+              <Text style={{ color: theme.textPrimary }}>{eventDate.toLocaleDateString()}</Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={eventDate}
+                mode="date"
+                onChange={(_, d) => {
+                  setShowDatePicker(false);
+                  if (d) setEventDate(d);
+                }}
+              />
+            )}
+          </>
         )}
         <Text style={[styles.label, { color: theme.textSecondary }]}>Time (optional)</Text>
-        <TouchableOpacity
-          style={[styles.input, { borderColor: theme.border }]}
-          onPress={() => setShowTimePicker(true)}
-          activeOpacity={0.6}
-        >
-          <Text style={{ color: theme.textPrimary }}>
-            {eventTime
-              ? eventTime.toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })
-              : 'Not set'}
-          </Text>
-        </TouchableOpacity>
-        {showTimePicker && (
-          <DateTimePicker
-            value={eventTime ?? new Date()}
-            mode="time"
-            onChange={(_, d) => {
-              setShowTimePicker(false);
-              if (d) setEventTime(d);
-            }}
-          />
+        {Platform.OS === 'web' ? (
+          <WebTimeInput value={eventTime} onChange={setEventTime} />
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.input, { borderColor: theme.border }]}
+              onPress={() => setShowTimePicker(true)}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+            >
+              <Text style={{ color: theme.textPrimary }}>
+                {eventTime
+                  ? eventTime.toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })
+                  : 'Not set'}
+              </Text>
+            </TouchableOpacity>
+            {showTimePicker && (
+              <DateTimePicker
+                value={eventTime ?? new Date()}
+                mode="time"
+                onChange={(_, d) => {
+                  setShowTimePicker(false);
+                  if (d) setEventTime(d);
+                }}
+              />
+            )}
+          </>
         )}
         <TouchableOpacity
           style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}

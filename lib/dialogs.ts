@@ -13,6 +13,7 @@ type ConfirmOptions = {
   cancelText?: string;
   destructive?: boolean;
   onConfirm: () => void;
+  onCancel?: () => void;
 };
 
 export function showAlert(title: string, message: string): void {
@@ -26,16 +27,18 @@ export function showAlert(title: string, message: string): void {
 export function showConfirm(
   title: string,
   message: string,
-  { confirmText = 'OK', cancelText = 'Cancel', destructive = false, onConfirm }: ConfirmOptions
+  { confirmText = 'OK', cancelText = 'Cancel', destructive = false, onConfirm, onCancel }: ConfirmOptions
 ): void {
   if (canUseWebDialogs() && typeof window.confirm === 'function') {
     if (window.confirm(`${title}\n\n${message}`)) {
       onConfirm();
+    } else {
+      onCancel?.();
     }
     return;
   }
   Alert.alert(title, message, [
-    { text: cancelText, style: 'cancel' },
+    { text: cancelText, style: 'cancel', onPress: onCancel },
     {
       text: confirmText,
       style: destructive ? 'destructive' : 'default',

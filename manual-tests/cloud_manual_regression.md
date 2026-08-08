@@ -132,12 +132,26 @@ For each executed scenario:
 ### E-101 People management
 **Steps**
 1. Open My People.
-2. Add contacts (if contacts are available).
+2. Add a person. On web, tap **Add** to open the manual "Add person" form (there is no contacts API in the browser) and enter a name + phone number. On native, add from contacts (or use "Add Manually" from the contacts dialog).
 3. Create a circle and edit circle members.
 4. Remove one person.
 
 **Expected**
+- Manual add normalizes the phone to E.164 and the person appears in the list.
 - Count updates and circle membership edits persist.
+
+---
+
+### E-110 Web date/time inputs
+**Steps**
+1. On web, open Add Event (`+`).
+2. Confirm the **Date** and **Time (optional)** fields are HTML date/time inputs (not buttons that open nothing).
+3. Pick a date via the calendar picker and set a time; enter a title and **Save**.
+4. Navigate the calendar to that month.
+
+**Expected**
+- Date/time are selectable on web (the native `@react-native-community/datetimepicker` doesn't open in the browser).
+- The event lands on the correct day (no off-by-one / year shift).
 
 ---
 
