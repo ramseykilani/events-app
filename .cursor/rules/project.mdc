@@ -28,7 +28,7 @@ Read `docs/events-technical-architecture.md` for the full architecture, data mod
 - **Pull, not push.** The app fetches fresh data on screen focus. No real-time subscriptions. Notifications are person-triggered only (a share action calls `send-notification`) — never broadcasts or marketing pushes.
 - **Delete means remove.** Deleting an event deletes only the caller's own `user_events` row (their `event_shares` records cascade). The app never deletes `events` rows; `cleanup-events` (cron, `CRON_SECRET` header) reclaims only snapshots with zero remaining owners — it must never delete `user_events`/`event_shares`.
 - **Don't withhold to drive opens.** SMS messages include the event URL (plus store links for non-app users) so recipients can act without installing the app.
-- **Themes are named moods, not OS light/dark.** Paper (default) and Evening are user-selected via the segmented control in the calendar header and persisted to AsyncStorage (`theme_preference`). Every color/type decision comes from a role token in `constants/Colors.ts` via `useTheme` — never hard-code hex values, and never read the OS color scheme. The accent is spent only on the selected day, event dots, the primary action, and the "From X" attribution; destructive is always red. `docs/events-design-language.md` is the source of truth.
+- **Themes are named moods, not OS light/dark.** Paper (default) and Evening are user-selected via the theme swatch button in the calendar header (previews the next theme's colors; cycles the registry) and persisted to AsyncStorage (`theme_preference`). Every color/type decision comes from a role token in `constants/Colors.ts` via `useTheme` — never hard-code hex values, and never read the OS color scheme. The accent is spent only on the selected day, event dots, the primary action, and the "From X" attribution; destructive is always red. `docs/events-design-language.md` is the source of truth.
 
 ## Project layout
 
@@ -36,7 +36,7 @@ Read `docs/events-technical-architecture.md` for the full architecture, data mod
 app/(auth)/          Sign-in and OTP verification
 app/(app)/           Authenticated screens (calendar, events, sharing, people, onboarding walkthrough)
 app/_context/        SessionContext (auth session) and ThemeContext (theme selection + persistence)
-components/          Calendar (with header theme picker), EventCard, ShareSheet, PeoplePicker
+components/          Calendar (with header theme swatch), EventCard, ShareSheet, PeoplePicker
 constants/           Colors.ts — role-token palettes for paper/evening + the theme registry
 docs/                Architecture, product, philosophy, and design-language docs
 hooks/               useTheme (active theme palette from ThemeContext) and other shared hooks

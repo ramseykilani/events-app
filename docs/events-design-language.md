@@ -122,9 +122,11 @@ Events is soft, not flat-brutalist and not floating-card-heavy.
 
 ---
 
-## 7. The themes toggle
+## 7. The theme control
 
-Theme selection lives in the calendar header as a compact **segmented control labeled with the theme names** ("Paper | Evening"), not an icon and not a settings page. Tapping selects a mood; the choice persists across sessions. The control is designed to accept additional themes later without changing its shape — the registry of themes is the contract.
+Theme selection lives in the calendar header as a small circular **swatch button** — a two-tone disc in the *other* mood's colors (its ground and accent), inviting a tap. With two themes the whole screen is already the preview of the current mood, so the control does not need the theme names printed on it; the names remain in the accessibility label ("Switch to Evening theme") and anywhere a chooser is summoned. It is not a sun/moon icon — the moods are not a light/dark toggle, and the swatch previews a destination rather than symbolizing a state. Not a settings page, and never a permanent banner of chrome.
+
+Tapping switches moods; the choice persists across sessions. The control stays data-driven from the theme registry: it always previews the *next* theme in the registry and cycles through them. A future third theme changes nothing about its size or placement — the same button cycles, or summons a small named chooser, without a redesign.
 
 ---
 

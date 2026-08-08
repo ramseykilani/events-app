@@ -14,7 +14,7 @@ import { EventCard } from './EventCard';
 import type { CalendarEvent } from '../lib/types';
 import { useTheme } from '../hooks/useTheme';
 import { useThemePreference } from '../app/_context/ThemeContext';
-import { THEME_REGISTRY } from '../constants/Colors';
+import { Colors, THEME_REGISTRY } from '../constants/Colors';
 
 type Props = {
   events: CalendarEvent[];
@@ -91,6 +91,42 @@ export function Calendar({
           Events
         </Text>
         <View style={styles.headerRight}>
+          {(() => {
+            // The swatch previews the NEXT theme in the registry (its ground +
+            // accent) and cycles on tap — a third theme needs no new control.
+            const next =
+              THEME_REGISTRY[
+                (THEME_REGISTRY.findIndex((t) => t.name === themeName) + 1) %
+                  THEME_REGISTRY.length
+              ];
+            const nextPalette = Colors[next.name];
+            return (
+              <TouchableOpacity
+                style={styles.themeButton}
+                onPress={() => setTheme(next.name)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Switch to ${next.label} theme`}
+              >
+                <View
+                  style={[
+                    styles.themeSwatch,
+                    {
+                      backgroundColor: nextPalette.background,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.themeSwatchCore,
+                      { backgroundColor: nextPalette.accent },
+                    ]}
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })()}
           <TouchableOpacity
             style={[styles.helpButton, { borderColor: theme.border }]}
             onPress={() => router.push('/(app)/onboarding')}
@@ -118,44 +154,6 @@ export function Calendar({
             <Text style={[styles.fabText, { color: theme.primaryButtonText }]}>+</Text>
           </TouchableOpacity>
         </View>
-      </View>
-      <View
-        style={[
-          styles.themePicker,
-          { backgroundColor: theme.surfaceSecondary, borderColor: theme.border },
-        ]}
-        accessibilityRole="radiogroup"
-        accessibilityLabel="Theme"
-      >
-        {THEME_REGISTRY.map((option) => {
-          const selected = option.name === themeName;
-          return (
-            <TouchableOpacity
-              key={option.name}
-              style={[
-                styles.themeOption,
-                selected && {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.border,
-                },
-              ]}
-              onPress={() => setTheme(option.name)}
-              activeOpacity={0.7}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              accessibilityLabel={`${option.label} theme`}
-            >
-              <Text
-                style={[
-                  styles.themeOptionText,
-                  { color: selected ? theme.textPrimary : theme.textSecondary },
-                ]}
-              >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
       </View>
       <RNCalendar
         // Remount on theme switch: react-native-calendars caches computed
@@ -253,27 +251,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  themePicker: {
-    flexDirection: 'row',
-    alignSelf: 'center',
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 3,
-    marginBottom: 12,
-  },
-  themeOption: {
-    minHeight: 44,
-    minWidth: 96,
-    paddingHorizontal: 16,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: 'transparent',
+  themeButton: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  themeOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
+  themeSwatch: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeSwatchCore: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   helpButton: {
     width: 44,

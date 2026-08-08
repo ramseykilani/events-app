@@ -115,7 +115,7 @@ describe('components/Calendar', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/add-event');
   });
 
-  it('renders the theme picker from the registry and persists a switch', async () => {
+  it('renders the theme swatch and persists a switch to the next theme', async () => {
     const onMonthChange = jest.fn();
     const screen = render(
       <ThemeContextProvider>
@@ -124,22 +124,14 @@ describe('components/Calendar', () => {
     );
     await act(async () => {});
 
-    const paper = screen.getByLabelText('Paper theme');
-    const evening = screen.getByLabelText('Evening theme');
-    expect(paper.props.accessibilityState.selected).toBe(true);
-    expect(evening.props.accessibilityState.selected).toBe(false);
-
-    fireEvent.press(evening);
+    // From Paper (the default), the swatch offers Evening.
+    fireEvent.press(screen.getByLabelText('Switch to Evening theme'));
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       'theme_preference',
       'evening'
     );
-    expect(screen.getByLabelText('Evening theme').props.accessibilityState.selected).toBe(
-      true
-    );
-    expect(screen.getByLabelText('Paper theme').props.accessibilityState.selected).toBe(
-      false
-    );
+    // Once in Evening, the swatch offers Paper again.
+    expect(screen.getByLabelText('Switch to Paper theme')).toBeTruthy();
   });
 });
