@@ -13,6 +13,8 @@ import { router } from 'expo-router';
 import { EventCard } from './EventCard';
 import type { CalendarEvent } from '../lib/types';
 import { useTheme } from '../hooks/useTheme';
+import { useThemePreference } from '../app/_context/ThemeContext';
+import { Colors, THEME_REGISTRY } from '../constants/Colors';
 
 type Props = {
   events: CalendarEvent[];
@@ -46,6 +48,7 @@ export function Calendar({
   onRefresh,
 }: Props) {
   const theme = useTheme();
+  const { themeName, setTheme } = useThemePreference();
   const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<string>(
     toLocalDateString(new Date())
@@ -75,8 +78,55 @@ export function Calendar({
   return (
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Events</Text>
+        <Text
+          style={[
+            styles.title,
+            {
+              color: theme.textPrimary,
+              fontFamily: theme.titleFontFamily,
+              fontWeight: theme.titleFontWeight,
+            },
+          ]}
+        >
+          Events
+        </Text>
         <View style={styles.headerRight}>
+          {(() => {
+            // The swatch previews the NEXT theme in the registry (its ground +
+            // accent) and cycles on tap — a third theme needs no new control.
+            const next =
+              THEME_REGISTRY[
+                (THEME_REGISTRY.findIndex((t) => t.name === themeName) + 1) %
+                  THEME_REGISTRY.length
+              ];
+            const nextPalette = Colors[next.name];
+            return (
+              <TouchableOpacity
+                style={styles.themeButton}
+                onPress={() => setTheme(next.name)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Switch to ${next.label} theme`}
+              >
+                <View
+                  style={[
+                    styles.themeSwatch,
+                    {
+                      backgroundColor: nextPalette.background,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.themeSwatchCore,
+                      { backgroundColor: nextPalette.accent },
+                    ]}
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })()}
           <TouchableOpacity
             style={[styles.helpButton, { borderColor: theme.border }]}
             onPress={() => router.push('/(app)/onboarding')}
@@ -106,6 +156,9 @@ export function Calendar({
         </View>
       </View>
       <RNCalendar
+        // Remount on theme switch: react-native-calendars caches computed
+        // styles internally, so a new theme object alone may not repaint.
+        key={themeName}
         current={selectedDate}
         onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
         onMonthChange={(date: DateData) => {
@@ -129,7 +182,7 @@ export function Calendar({
           arrowColor: theme.textPrimary,
           monthTextColor: theme.textPrimary,
           textDisabledColor: theme.textTertiary,
-          dotColor: theme.textPrimary,
+          dotColor: theme.accent,
         }}
       />
       <ScrollView
@@ -192,12 +245,30 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  themeButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeSwatch: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeSwatchCore: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   helpButton: {
     width: 44,

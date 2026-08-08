@@ -89,7 +89,18 @@ export default function OnboardingScreen() {
         renderItem={({ item }) => (
           <View style={styles.page}>
             <View style={styles.content}>
-              <Text style={[styles.title, { color: theme.textPrimary }]}>{item.title}</Text>
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    color: theme.textPrimary,
+                    fontFamily: theme.titleFontFamily,
+                    fontWeight: theme.titleFontWeight,
+                  },
+                ]}
+              >
+                {item.title}
+              </Text>
               {item.lines.map((line: string, i: number) => (
                 <Text key={i} style={[styles.body, { color: theme.textSecondary }]}>
                   {line}
@@ -151,7 +162,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
     marginBottom: 8,
   },
   body: {

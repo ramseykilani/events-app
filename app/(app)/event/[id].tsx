@@ -270,7 +270,18 @@ export default function EventDetailScreen() {
               accessibilityLabel={event.title ? `${event.title} image` : 'Event image'}
             />
           ) : null}
-          <Text style={[styles.title, { color: theme.textPrimary }]}>{event.title ?? 'Untitled event'}</Text>
+          <Text
+            style={[
+              styles.title,
+              {
+                color: theme.textPrimary,
+                fontFamily: theme.titleFontFamily,
+                fontWeight: theme.titleFontWeight,
+              },
+            ]}
+          >
+            {event.title ?? 'Untitled event'}
+          </Text>
           <Text style={[styles.meta, { color: theme.textSecondary }]}>
             {formatEventDate(event.event_date)}
             {timeStr ? ` · ${timeStr}` : ''}
@@ -385,7 +396,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },

@@ -1,8 +1,9 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { Calendar } from '../../components/Calendar';
+import { ThemeContextProvider } from '../../app/_context/ThemeContext';
 import type { CalendarEvent } from '../../lib/types';
 
 jest.mock('react-native-calendars', () => {
@@ -112,5 +113,25 @@ describe('components/Calendar', () => {
 
     fireEvent.press(screen.getByText('+'));
     expect(router.push).toHaveBeenCalledWith('/(app)/add-event');
+  });
+
+  it('renders the theme swatch and persists a switch to the next theme', async () => {
+    const onMonthChange = jest.fn();
+    const screen = render(
+      <ThemeContextProvider>
+        <Calendar events={events} onMonthChange={onMonthChange} />
+      </ThemeContextProvider>
+    );
+    await act(async () => {});
+
+    // From Paper (the default), the swatch offers Evening.
+    fireEvent.press(screen.getByLabelText('Switch to Evening theme'));
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      'theme_preference',
+      'evening'
+    );
+    // Once in Evening, the swatch offers Paper again.
+    expect(screen.getByLabelText('Switch to Paper theme')).toBeTruthy();
   });
 });

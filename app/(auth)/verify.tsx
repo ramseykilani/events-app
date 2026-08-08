@@ -101,7 +101,18 @@ export default function VerifyScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <View style={styles.content}>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Verify</Text>
+        <Text
+          style={[
+            styles.title,
+            {
+              color: theme.textPrimary,
+              fontFamily: theme.titleFontFamily,
+              fontWeight: theme.titleFontWeight,
+            },
+          ]}
+        >
+          Verify
+        </Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           Enter the 6-digit code sent to {phone}
         </Text>
@@ -161,7 +172,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '700',
     marginBottom: 8,
   },
   subtitle: {
