@@ -1,0 +1,5 @@
+# SPA fallback: any unmatched path serves index.html so deep links like
+# /event/<id> (from SMS) load the app and let expo-router resolve the route.
+# Cloudflare Pages already defaults to this when no 404.html exists, but
+# making it explicit also makes the bundle portable to Netlify (same syntax).
+/*    /index.html    200

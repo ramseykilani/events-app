@@ -86,6 +86,18 @@ Function-only deploys (no DB access) work without linking — pass the ref direc
 
 For the web beta, `send-notification` accepts a `WEB_APP_URL` secret (see FEATURES.md → Web Support). Set it once the static build is hosted: `npx supabase secrets set WEB_APP_URL=https://<host>` — then non-app SMS links the website and app-user SMS uses `WEB_APP_URL/event/[id]` instead of the `events-app://` scheme. Build the static bundle with `npm run build:web` (→ `dist/`).
 
+### Deploying the web app (Cloudflare Pages)
+
+The web build is hosted on **Cloudflare Pages** as a **direct-upload** project managed via Wrangler (not Pages' built-in Git integration — Wrangler keeps the whole deploy path in the repo and runnable by any agent).
+
+- Config: `wrangler.toml` (project name `events-app`, output dir `dist/`). `public/_redirects` carries the SPA fallback (`/* /index.html 200`) so deep links like `/event/<id>` load the app; it's copied into `dist/` at export time.
+- Prerequisites: `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets).
+- One-time project creation: `npx wrangler pages project create events-app --production-branch=master`
+- Deploy: `npm run deploy:web` (builds `dist/` then `wrangler pages deploy`). Every deploy of the production branch updates `https://events-app.pages.dev`; other `--branch` values create preview URLs.
+- After the first deploy, set `WEB_APP_URL` (see above) so SMS links point at the site, and remove the placeholder `IOS_APP_STORE_URL` secret.
+- CI alternative: `.github/workflows/deploy-web.yml` deploys on every push to `master` once the repo Variable `DEPLOY_WEB=true` and Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` are set. It runs the same `wrangler pages deploy` command, so CI and agents behave identically.
+- When a custom domain is purchased: Pages dashboard → Custom domains → add it (free auto SSL; instant if DNS is on Cloudflare), then update `WEB_APP_URL`.
+
 Verify afterwards:
 
 ```bash

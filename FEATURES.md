@@ -234,6 +234,7 @@ Items **1, 2, 4, and 5 are implemented** (client + edge function). Item 6 (Twili
 - **Web date/time** (`components/WebDateTimeInputs.tsx`, used by `add-event.tsx` / `edit-event.tsx`): HTML `date`/`time` inputs render when `Platform.OS === 'web'`. Dates are built as local dates (no UTC day-shift); clearing the time input unsets the time.
 - **`WEB_APP_URL`** (`supabase/functions/send-notification/index.ts`): new function secret. When set, non-app-user SMS links the website ("See it on the web", preferred over store links) and app-user SMS uses a single universal `https` event link (`WEB_APP_URL/event/[id]`) instead of the `events-app://` custom scheme. Falls back to store links / the deep link when unset.
 - **`build:web`** npm script: `expo export --platform web` → `dist/` (verified — single ~2.1 MB JS bundle, ready for any static host).
+- **Hosting decided (2026-08-08): Cloudflare Pages**, direct-upload via Wrangler — `wrangler.toml` + `npm run deploy:web` + `public/_redirects` SPA fallback (deep links like `/event/<id>` must load the app). Optional push-to-deploy CI in `.github/workflows/deploy-web.yml` (gated behind repo var `DEPLOY_WEB`). See AGENTS.md → Deploying the web app.
 - Deploy the updated function with `npx supabase functions deploy send-notification`; set `WEB_APP_URL` once the web build is hosted, then remove the placeholder `IOS_APP_STORE_URL` secret.
 
 ### Philosophy
@@ -274,5 +275,5 @@ A web-first beta is attractive: nobody has to install anything, and notification
 
 ### Open Questions
 
-- Hosting provider and domain
+- ~~Hosting provider~~ → decided: Cloudflare Pages (Wrangler direct-upload). Still open: custom domain (deploy to `events-app.pages.dev` until one is purchased)
 - Whether the browser build should show any "install the app" prompt once native builds exist
