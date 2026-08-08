@@ -11,7 +11,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Hide](#hide) | Implemented |
 | [Forwarding Shares](#forwarding-shares) | Implemented |
 | [Sign Out](#sign-out) | Planned |
-| [Web Support](#web-support) | Planned |
+| [Web Support](#web-support) | In Progress |
 
 ---
 
@@ -220,11 +220,21 @@ A deliberately low-prominence sign-out action — this should not be easy to tap
 
 ## Web Support
 
-**Status:** Planned
+**Status:** In Progress
 
 ### Problem
 
 The app already runs in the browser (`npx expo start --web`) — the entire manual regression suite runs against the web build — but it is only a local dev server, and two gaps block real web usage: there is no contacts API on the web (so My People can't be populated), and the date/time pickers don't open (`@react-native-community/datetimepicker` is native-only).
+
+### Implementation status (2026-08-08)
+
+Items **1, 2, 4, and 5 are implemented** (client + edge function). Item 6 (Twilio function secrets) was already set. Remaining: item 3 (deploy the static build at a stable URL) and one real-SMS end-to-end verification.
+
+- **Manual add person** (`app/(app)/people.tsx`): an "Add manually" form (name + phone) — on web it's the primary add path (no contacts API in the browser); on native it's offered alongside contacts. Numbers are normalized to E.164 with `libphonenumber-js` and upserted into `my_people` via the same path contacts import uses, so `user_id` resolution and pending-share delivery work unchanged.
+- **Web date/time** (`components/WebDateTimeInputs.tsx`, used by `add-event.tsx` / `edit-event.tsx`): HTML `date`/`time` inputs render when `Platform.OS === 'web'`. Dates are built as local dates (no UTC day-shift); clearing the time input unsets the time.
+- **`WEB_APP_URL`** (`supabase/functions/send-notification/index.ts`): new function secret. When set, non-app-user SMS links the website ("See it on the web", preferred over store links) and app-user SMS uses a single universal `https` event link (`WEB_APP_URL/event/[id]`) instead of the `events-app://` custom scheme. Falls back to store links / the deep link when unset.
+- **`build:web`** npm script: `expo export --platform web` → `dist/` (verified — single ~2.1 MB JS bundle, ready for any static host).
+- Deploy the updated function with `npx supabase functions deploy send-notification`; set `WEB_APP_URL` once the web build is hosted, then remove the placeholder `IOS_APP_STORE_URL` secret.
 
 ### Philosophy
 
@@ -256,11 +266,11 @@ A web-first beta is attractive: nobody has to install anything, and notification
 
 ### Acceptance Criteria
 
-- [ ] A person can be added on web with name + phone number (E.164), and sharing to them works end-to-end
-- [ ] Event date/time can be chosen on web
+- [x] A person can be added on web with name + phone number (E.164), and sharing to them works end-to-end
+- [x] Event date/time can be chosen on web
 - [ ] A production web build is deployed at a stable URL and sign-in via SMS OTP works there
 - [ ] `TWILIO_AUTH_TOKEN` function secret is set and a real SMS is received end-to-end (event title, date/time, event URL, STOP footer)
-- [ ] Sharing to a non-user sends an SMS containing the website URL
+- [ ] Sharing to a non-user sends an SMS containing the website URL (code path implemented; needs `WEB_APP_URL` set + verification)
 
 ### Open Questions
 

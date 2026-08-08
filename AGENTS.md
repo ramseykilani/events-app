@@ -82,6 +82,10 @@ npx supabase functions deploy send-notification cleanup-people cleanup-events og
 npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # already set; pg_cron jobs send it as x-cron-secret
 ```
 
+Function-only deploys (no DB access) work without linking — pass the ref directly: `npx supabase functions deploy send-notification --project-ref ijmwtjyuvdnvhblwwtpt`. Note `supabase link` can fail on newer CLI versions with a `LegacyLinkApiKeysNetworkError ... inserted_at SchemaError` (Management API response drift); function deploys/secrets don't need link.
+
+For the web beta, `send-notification` accepts a `WEB_APP_URL` secret (see FEATURES.md → Web Support). Set it once the static build is hosted: `npx supabase secrets set WEB_APP_URL=https://<host>` — then non-app SMS links the website and app-user SMS uses `WEB_APP_URL/event/[id]` instead of the `events-app://` scheme. Build the static bundle with `npm run build:web` (→ `dist/`).
+
 Verify afterwards:
 
 ```bash
