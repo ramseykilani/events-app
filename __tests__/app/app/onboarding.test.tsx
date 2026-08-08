@@ -1,5 +1,4 @@
 import React from 'react';
-import { Dimensions, FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
@@ -19,14 +18,21 @@ describe('app/(app)/onboarding', () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/(app)'));
   });
 
-  it('shows Get Started on last page and completes onboarding', async () => {
+  it('advances pages with Next and completes on Get Started', async () => {
     const screen = render(<OnboardingScreen />);
-    const list = screen.UNSAFE_getByType(FlatList);
-    const width = Dimensions.get('window').width;
 
-    fireEvent(list, 'onMomentumScrollEnd', {
-      nativeEvent: { contentOffset: { x: width * 2 } },
-    });
+    expect(screen.getByText('One place for events')).toBeTruthy();
+    expect(screen.getByText('Next')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText('Add from a link or from scratch')).toBeTruthy();
+    expect(screen.getByText('Next')).toBeTruthy();
+    expect(screen.getByText('Skip')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Next'));
+    expect(screen.getByText("You choose who's in")).toBeTruthy();
+    expect(screen.getByText('Get Started')).toBeTruthy();
+    expect(screen.queryByText('Skip')).toBeNull();
 
     fireEvent.press(screen.getByText('Get Started'));
     expect(AsyncStorage.setItem).toHaveBeenCalledWith('onboarding_complete', 'true');
