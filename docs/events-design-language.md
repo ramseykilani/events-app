@@ -128,6 +128,8 @@ Theme selection lives in the calendar header as a small circular **swatch button
 
 Tapping switches moods; the choice persists across sessions. The control stays data-driven from the theme registry: it always previews the *next* theme in the registry and cycles through them. A future third theme changes nothing about its size or placement — the same button cycles, or summons a small named chooser, without a redesign.
 
+*A note on how this section drifted.* The first implementation followed this section's original text literally: a labeled segmented control ("Paper | Evening") on its own row of the calendar header. It worked, and it was wrong — a permanent labeled row spends chrome that a set-once preference has not earned (§1), and in an app whose main screen is only a calendar, it read as a second headline. The swatch replaced it within a day; the names moved to the accessibility label and to any future chooser. This is recorded so that whoever adds the third theme does not "fix" the swatch back into a segmented row — that shape was tried and rejected. If three themes make blind cycling awkward, have the swatch summon a small named chooser rather than restoring permanent labels.
+
 ---
 
 ## 8. Adding a future theme
@@ -138,7 +140,7 @@ The role-token structure is the whole contract. To add a theme:
 2. Give it a name and a display label; add it to the theme registry.
 3. Choose its typeface voice (serif / sans) for titles.
 
-No component changes should be required. A natural third candidate is a warm **ledger** theme — salmon-cream paper, teal as a working accent — which occupies the space between Paper's daylight and Evening's dark.
+No component changes should be required — the header swatch picks the new theme up automatically, since it cycles the registry. With three or more themes, consider having the swatch summon a small named chooser instead of cycling blindly (see §7's drift note for why a permanent labeled row is not the answer). A natural third candidate is a warm **ledger** theme — salmon-cream paper, teal as a working accent — which occupies the space between Paper's daylight and Evening's dark.
 
 ---
 
