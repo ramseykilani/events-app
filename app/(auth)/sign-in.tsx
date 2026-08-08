@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { router } from 'expo-router';
+import { getAuthUserMessage } from '../../lib/authErrors';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
@@ -18,6 +19,7 @@ import { useTheme } from '../../hooks/useTheme';
 export default function SignInScreen() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const theme = useTheme();
 
   const normalizePhone = (input: string): string | null => {
@@ -35,7 +37,11 @@ export default function SignInScreen() {
       showAlert('Invalid phone number', 'Please enter a valid phone number.');
       return;
     }
+    // Guard against double-taps that race past the disabled button state and
+    // would otherwise send two OTP SMS messages.
+    if (submittingRef.current) return;
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -46,11 +52,17 @@ export default function SignInScreen() {
 
       router.replace({
         pathname: '/(auth)/verify',
-        params: { phone: normalized },
+        params: { phone: normalized, sent: '1' },
       });
     } catch (err: unknown) {
-      showError('Error', err);
+      const friendly = getAuthUserMessage(err);
+      if (friendly) {
+        showAlert('Could not send code', friendly);
+      } else {
+        showError('Error', err);
+      }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
