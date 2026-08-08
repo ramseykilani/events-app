@@ -90,10 +90,10 @@ For the web beta, `send-notification` accepts a `WEB_APP_URL` secret (see FEATUR
 
 The web build is hosted on **Cloudflare Pages** as a **direct-upload** project managed via Wrangler (not Pages' built-in Git integration — Wrangler keeps the whole deploy path in the repo and runnable by any agent).
 
-- Config: `wrangler.toml` (project name `events-app`, output dir `dist/`). `public/_redirects` carries the SPA fallback (`/* /index.html 200`) so deep links like `/event/<id>` load the app; it's copied into `dist/` at export time.
-- Prerequisites: `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets).
-- One-time project creation: `npx wrangler pages project create events-app --production-branch=master`
-- Deploy: `npm run deploy:web` (builds `dist/` then `wrangler pages deploy`). Every deploy of the production branch updates `https://events-app.pages.dev`; other `--branch` values create preview URLs.
+- Config: `wrangler.toml` (project name `shared-events`, output dir `dist/`). `public/_redirects` carries the SPA fallback (`/* /index.html 200`) so deep links like `/event/<id>` load the app; it's copied into `dist/` at export time.
+- Prerequisites: `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` (32-char hex account id — not a second copy of the token) in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets).
+- One-time project creation: `npx wrangler pages project create shared-events --production-branch=master`. The `*.pages.dev` subdomain is global: if `<name>.pages.dev` is taken by another account, Cloudflare silently assigns a suffixed host like `<name>-xyz.pages.dev` — pick another name if you want a clean one.
+- Deploy: `npm run deploy:web` (builds `dist/` then `wrangler pages deploy`). Every deploy of the production branch updates `https://shared-events.pages.dev`; other `--branch` values create preview URLs. Wrangler infers the branch from the git checkout, so on a feature branch use `npx wrangler pages deploy --branch=master` to publish to production.
 - After the first deploy, set `WEB_APP_URL` (see above) so SMS links point at the site, and remove the placeholder `IOS_APP_STORE_URL` secret.
 - CI alternative: `.github/workflows/deploy-web.yml` deploys on every push to `master` once the repo Variable `DEPLOY_WEB=true` and Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` are set. It runs the same `wrangler pages deploy` command, so CI and agents behave identically.
 - When a custom domain is purchased: Pages dashboard → Custom domains → add it (free auto SSL; instant if DNS is on Cloudflare), then update `WEB_APP_URL`.

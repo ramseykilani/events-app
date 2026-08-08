@@ -275,5 +275,5 @@ A web-first beta is attractive: nobody has to install anything, and notification
 
 ### Open Questions
 
-- ~~Hosting provider~~ → decided: Cloudflare Pages (Wrangler direct-upload). Still open: custom domain (deploy to `events-app.pages.dev` until one is purchased)
+- ~~Hosting provider~~ → decided: Cloudflare Pages (Wrangler direct-upload). Still open: custom domain (deployed at `shared-events.pages.dev` until one is purchased)
 - Whether the browser build should show any "install the app" prompt once native builds exist
