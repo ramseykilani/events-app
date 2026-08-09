@@ -265,7 +265,9 @@ export default function AddEventScreen() {
         <Text style={[styles.label, { color: theme.textSecondary }]}>URL (optional)</Text>
         <View style={styles.urlRow}>
           <TextInput
-            style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
+            // flex: 1 — without it the row layout collapses the field to
+            // intrinsic width on web (~quarter width on desktop).
+            style={[styles.input, { flex: 1, borderColor: theme.border, color: theme.textPrimary }]}
             placeholder="https://..."
             placeholderTextColor={theme.textTertiary}
             value={url}

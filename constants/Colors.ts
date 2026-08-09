@@ -57,7 +57,9 @@ export const Colors: Record<'paper' | 'evening', ThemePalette> = {
     selectedBg: '#f3ecda',
     textPrimary: '#1a1815',
     textSecondary: '#6b6357',
-    textTertiary: '#a39a8b',
+    // 4.83:1 on background — the design doc (§3) promises ≥4.5:1 for all
+    // text-role pairs; the previous #a39a8b measured 2.6:1 (release review).
+    textTertiary: '#756c5d',
     border: '#e3dcc9',
     borderLight: '#efe9da',
     primaryButtonBg: '#1a1815',
@@ -65,7 +67,8 @@ export const Colors: Record<'paper' | 'evening', ThemePalette> = {
     destructiveBg: '#f7e3dd',
     destructiveText: '#c2482f',
     destructiveLink: '#c2482f',
-    linkText: '#a3691a',
+    // 5.40:1 on background (was #a3691a at 4.27:1, under the doc's ≥4.5:1 floor).
+    linkText: '#8f5a10',
     calendarSelected: '#c8871e',
     calendarSelectedText: '#ffffff',
     calendarTodayText: '#c8871e',
@@ -83,7 +86,8 @@ export const Colors: Record<'paper' | 'evening', ThemePalette> = {
     selectedBg: '#2e2a3a',
     textPrimary: '#ece7df',
     textSecondary: '#a49fb0',
-    textTertiary: '#6e6879',
+    // 5.14:1 on background (was #6e6879 at 3.38:1, under the doc's floor).
+    textTertiary: '#8b85a0',
     border: '#37334a',
     borderLight: '#282435',
     primaryButtonBg: '#d9a05b',

@@ -55,6 +55,9 @@ test('calendar shell matches baseline (frozen clock)', async ({ page }) => {
 });
 
 test('add-event form matches baseline', async ({ page }) => {
+  // Frozen clock too: the date input would otherwise embed the live date and
+  // the baseline would diff every day.
+  await page.clock.install({ time: new Date('2026-06-15T12:00:00') });
   await page.goto('/');
   await expectCalendar(page);
   await page.getByRole('button', { name: 'Add event' }).click();
