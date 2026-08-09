@@ -16,6 +16,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned |
 | [Contacts Permission Explainer](#contacts-permission-explainer) | Planned |
+| [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Planned |
 
 ---
 
@@ -350,6 +351,30 @@ A real explainer screen, framed around the product truth:
 - [ ] Denying lands on the recovery screen with Settings + manual-add paths
 - [ ] Granting later via Settings makes Add from Contacts work on return
 - [ ] Web behavior unchanged
+
+### Open Questions
+
+- None
+
+---
+
+## Themeable Icons (Emoji Audit)
+
+**Status:** Planned
+
+### Problem
+
+The People screen's empty state shows a raw `👥` emoji ([app/(app)/people.tsx](app/(app)/people.tsx), `emptyIcon`). Emoji render in the OS emoji font — blue on iOS and most web browsers — and cannot be tinted, so the glyph sits entirely outside the role-token palettes (`constants/Colors.ts`). The design language spends color deliberately; an unthemeable blue blob in the middle of Paper/Evening breaks it.
+
+### Proposed Solution
+
+Replace emoji glyphs with vector icons tinted by theme role tokens (e.g. `textTertiary` for empty-state art). `@expo/vector-icons` already ships with the `expo` package — no new dependency. Grep for remaining emoji in `app/` and `components/` at implementation time; the People empty state is the only known instance.
+
+### Acceptance Criteria
+
+- [ ] No UI element renders color outside the role-token system in either theme
+- [ ] Empty-state icon reads correctly in both Paper and Evening
+- [ ] Pixel-diff baselines regenerated (the People screen isn't currently snapshotted — consider adding it)
 
 ### Open Questions
 
