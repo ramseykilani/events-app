@@ -1,11 +1,14 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Platform,
-  GestureResponderEvent,
+  ScrollView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,7 +16,6 @@ import { router } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 
 const ONBOARDING_KEY = 'onboarding_complete';
-export const SWIPE_THRESHOLD = 48;
 
 type Page = {
   title: string;
@@ -36,7 +38,7 @@ const pages: Page[] = [
     ],
   },
   {
-    title: 'You choose who\'s in',
+    title: "You choose who's in",
     lines: [
       'Add up to 50 people from your contacts. These are the people you can share your events with.',
       'Group them into circles so sharing with the right crowd is one tap.',
@@ -44,36 +46,40 @@ const pages: Page[] = [
   },
 ];
 
-export function nextPageIndex(current: number, pageCount: number): number {
-  return Math.min(current + 1, pageCount - 1);
-}
-
-export function previousPageIndex(current: number): number {
-  return Math.max(current - 1, 0);
-}
-
-export function pageIndexAfterSwipe(
-  current: number,
-  dx: number,
-  pageCount: number,
-  threshold: number = SWIPE_THRESHOLD
-): number {
-  if (dx <= -threshold) return nextPageIndex(current, pageCount);
-  if (dx >= threshold) return previousPageIndex(current);
-  return current;
+export function pageIndexFromOffset(offsetX: number, pageWidth: number, pageCount: number): number {
+  if (pageWidth <= 0) return 0;
+  return Math.max(0, Math.min(pageCount - 1, Math.round(offsetX / pageWidth)));
 }
 
 export default function OnboardingScreen() {
+  const scrollRef = useRef<ScrollView>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const currentPageRef = useRef(0);
-  const dragStartX = useRef<number | null>(null);
+  const [pageWidth, setPageWidth] = useState(0);
+  const pageWidthRef = useRef(0);
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const theme = useTheme();
 
-  const goToPage = (index: number) => {
+  // Fall back to window width until onLayout fires so first paint has real page widths.
+  const resolvedWidth = pageWidth > 0 ? pageWidth : windowWidth;
+
+  useEffect(() => {
+    pageWidthRef.current = resolvedWidth;
+    scrollRef.current?.scrollTo({
+      x: currentPageRef.current * resolvedWidth,
+      animated: false,
+    });
+  }, [resolvedWidth]);
+
+  const goToPage = (index: number, animated = true) => {
     const next = Math.max(0, Math.min(index, pages.length - 1));
     currentPageRef.current = next;
     setCurrentPage(next);
+    scrollRef.current?.scrollTo({
+      x: next * pageWidthRef.current,
+      animated,
+    });
   };
 
   const handleFinish = async () => {
@@ -89,83 +95,105 @@ export default function OnboardingScreen() {
     }
   };
 
-  const endDrag = (endX: number) => {
-    if (dragStartX.current == null) return;
-    const dx = endX - dragStartX.current;
-    dragStartX.current = null;
-    const next = pageIndexAfterSwipe(
-      currentPageRef.current,
-      dx,
-      pages.length
-    );
-    if (next !== currentPageRef.current) {
-      goToPage(next);
+  const syncPageFromOffset = (offsetX: number) => {
+    const width = pageWidthRef.current;
+    if (width <= 0) return;
+    const index = pageIndexFromOffset(offsetX, width, pages.length);
+    if (index !== currentPageRef.current) {
+      currentPageRef.current = index;
+      setCurrentPage(index);
     }
   };
 
-  const startDrag = (x: number) => {
-    dragStartX.current = x;
+  const handlePagerLayout = (e: LayoutChangeEvent) => {
+    const width = Math.round(e.nativeEvent.layout.width);
+    if (width > 0 && width !== pageWidthRef.current) {
+      pageWidthRef.current = width;
+      setPageWidth(width);
+      // Re-snap after measure so pages align to the real pager width (not window).
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          x: currentPageRef.current * width,
+          animated: false,
+        });
+      });
+    }
   };
 
-  const cancelDrag = () => {
-    dragStartX.current = null;
-  };
-
-  const page = pages[currentPage];
   const isLastPage = currentPage === pages.length - 1;
-
-  // RN-web's PanResponder often fails to claim mouse drags; use responders +
-  // explicit mouse handlers so swipe works on native touch and desktop web.
-  const swipeHandlers = {
-    onStartShouldSetResponder: () => true,
-    onMoveShouldSetResponder: () => true,
-    onResponderTerminationRequest: () => false,
-    onResponderGrant: (e: GestureResponderEvent) => {
-      startDrag(e.nativeEvent.pageX);
-    },
-    onResponderRelease: (e: GestureResponderEvent) => {
-      endDrag(e.nativeEvent.pageX);
-    },
-    onResponderTerminate: cancelDrag,
-    ...(Platform.OS === 'web'
-      ? {
-          onMouseDown: (e: { clientX: number }) => startDrag(e.clientX),
-          onMouseUp: (e: { clientX: number }) => endDrag(e.clientX),
-          onMouseLeave: cancelDrag,
-        }
-      : {}),
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View
-        style={[styles.page, Platform.OS === 'web' && styles.pageWeb]}
-        {...swipeHandlers}
-        testID="onboarding-page"
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        nestedScrollEnabled
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        disableIntervalMomentum
+        snapToInterval={resolvedWidth > 0 ? resolvedWidth : undefined}
+        snapToAlignment="start"
+        onLayout={handlePagerLayout}
+        onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          syncPageFromOffset(e.nativeEvent.contentOffset.x);
+        }}
+        onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          syncPageFromOffset(e.nativeEvent.contentOffset.x);
+        }}
+        onScrollEndDrag={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          syncPageFromOffset(e.nativeEvent.contentOffset.x);
+        }}
+        scrollEventThrottle={16}
+        style={styles.pager}
+        testID="onboarding-pager"
       >
-        <View style={styles.content}>
-          <Text
+        {pages.map((page) => (
+          <View
+            key={page.title}
             style={[
-              styles.title,
+              styles.page,
               {
-                color: theme.textPrimary,
-                fontFamily: theme.titleFontFamily,
-                fontWeight: theme.titleFontWeight,
+                width: resolvedWidth,
+                paddingTop: insets.top + 56,
+                paddingBottom: 24,
               },
             ]}
-            accessibilityRole="header"
           >
-            {page.title}
-          </Text>
-          {page.lines.map((line: string, i: number) => (
-            <Text key={i} style={[styles.body, { color: theme.textSecondary }]}>
-              {line}
-            </Text>
-          ))}
-        </View>
-      </View>
+            <View style={styles.content}>
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    color: theme.textPrimary,
+                    fontFamily: theme.titleFontFamily,
+                    fontWeight: theme.titleFontWeight,
+                  },
+                ]}
+                accessibilityRole="header"
+              >
+                {page.title}
+              </Text>
+              {page.lines.map((line, i) => (
+                <Text key={i} style={[styles.body, { color: theme.textSecondary }]}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          </View>
+        ))}
+      </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: 48 + insets.bottom }]}>
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: Math.max(insets.bottom, 16) + 20,
+            borderTopColor: theme.borderLight,
+          },
+        ]}
+      >
         <View style={styles.dots} accessibilityRole="adjustable">
           {pages.map((_, i) => (
             <View
@@ -182,15 +210,19 @@ export default function OnboardingScreen() {
         </View>
 
         <View style={styles.buttons}>
-          {!isLastPage && (
+          {!isLastPage ? (
             <TouchableOpacity
               onPress={handleFinish}
               activeOpacity={0.6}
               accessibilityRole="button"
               accessibilityLabel="Skip onboarding"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={styles.skipHit}
             >
               <Text style={[styles.skip, { color: theme.textSecondary }]}>Skip</Text>
             </TouchableOpacity>
+          ) : (
+            <View style={styles.skipHit} />
           )}
           <TouchableOpacity
             style={[styles.nextButton, { backgroundColor: theme.primaryButtonBg }]}
@@ -213,22 +245,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  page: {
+  pager: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
   },
-  pageWeb: {
-    // Prevent text selection from eating mouse-drag swipes on web.
-    userSelect: 'none',
-    cursor: 'default',
-  } as Record<string, string>,
+  page: {
+    paddingHorizontal: 28,
+    justifyContent: 'flex-start',
+  },
   content: {
     gap: 16,
+    maxWidth: 420,
   },
   title: {
     fontSize: 28,
-    marginBottom: 8,
+    lineHeight: 34,
+    marginBottom: 4,
   },
   body: {
     fontSize: 16,
@@ -236,12 +267,15 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 24,
-    gap: 24,
+    paddingTop: 16,
+    gap: 20,
   },
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
+    minHeight: 8,
   },
   dot: {
     width: 8,
@@ -252,6 +286,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    minHeight: 48,
+  },
+  skipHit: {
+    minWidth: 64,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   skip: {
     fontSize: 16,
@@ -259,10 +299,10 @@ const styles = StyleSheet.create({
   nextButton: {
     borderRadius: 12,
     paddingVertical: 14,
-    paddingHorizontal: 32,
-    marginLeft: 'auto',
-    minHeight: 44,
+    paddingHorizontal: 28,
+    minHeight: 48,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   nextText: {
     fontSize: 16,
