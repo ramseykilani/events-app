@@ -17,6 +17,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned |
 | [Contacts Permission Explainer](#contacts-permission-explainer) | Planned |
 | [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Planned |
+| [Delete Account](#delete-account) | Planned — **launch-blocking** |
 
 ---
 
@@ -379,6 +380,40 @@ Replace emoji glyphs with vector icons tinted by theme role tokens (e.g. `textTe
 ### Open Questions
 
 - None
+
+---
+
+## Delete Account
+
+**Status:** Planned — **launch-blocking.** Apple App Review Guideline 5.1.1(v) requires in-app account deletion for any app with account creation, and Play requires a deletion path plus a matching data-deletion declaration. TestFlight internal won't check it; everything past internal testing will.
+
+### Problem
+
+There is no way to delete an account. Phone-number identity makes the data unambiguously personal, and both stores require a self-serve deletion path anyway. Deletion should be easy and trivial: one button, one honest confirm, done.
+
+### Proposed Solution
+
+"Delete account" at the bottom of the People screen, below Sign out, in destructive red (per the design language). A single `showConfirm` with honest copy ("This deletes your calendar, your people, and your sign-in. Events you already shared stay on the calendars of the people you sent them to."). On confirm, call a new `delete_my_account()` RPC; `SessionContext` routes to the sign-in screen on the auth state change, as with sign-out.
+
+### Technical Notes
+
+- **One schema fix is required first.** `events.created_by_user_id` is currently `NOT NULL REFERENCES users(id) ON DELETE CASCADE` ([supabase/migrations/20240216000001_schema.sql](supabase/migrations/20240216000001_schema.sql)). A naive account deletion would cascade into `events` and delete snapshots the user created — which cascades further into *other people's* `user_events` copies, stripping events off their calendars and breaking the forwarding model ("removing your copy never affects anyone else's calendar"). Fix: make the column nullable and re-add the FK `ON DELETE SET NULL`. The architecture doc already calls this column informational-only, and `cleanup-events` reclaims snapshots with zero owners, so nothing leaks. Update `lib/types.ts` (`created_by_user_id: string | null`).
+- New `delete_my_account()` `SECURITY DEFINER` function: `DELETE FROM auth.users WHERE id = auth.uid()`; revoke from `anon`, grant to `authenticated`. Client-side deletion of auth users isn't possible with the anon key — the RPC is the whole reason this function exists.
+- After the auth row goes, existing cascades do the right thing: `public.users`, `my_people` (owned), `circles`, `hidden_people`, `user_events` copies, `event_shares` records, and the push token all die. Other users' `my_people` rows pointing at the deleted account get `user_id` SET NULL — the person reverts to a pending phone-number contact, which is coherent: the number is a non-user again, future shares to it get the non-app SMS, and re-signup triggers pending-share delivery.
+- Add SQL tests in `supabase/tests/`: A shares to B, A deletes account → B keeps their copy and calendar attribution disappears cleanly; A's own data is gone; a snapshot with remaining owners survives with `created_by_user_id` NULL.
+- The privacy policy currently routes deletion requests to the store-listing contact — update `public/privacy.html` to describe in-app deletion when this ships, and make the Play data-deletion declaration match.
+
+### Acceptance Criteria
+
+- [ ] "Delete account" exists at the People screen footer, destructive-styled, behind one confirm dialog
+- [ ] Deleting removes the account's own data (calendar, people, circles, sign-in) and lands on the sign-in screen
+- [ ] Events the deleted user shared remain on recipients' calendars
+- [ ] Re-signing up with the same phone number starts a clean account and receives any pending shares
+- [ ] SQL tests cover the forwarding-preservation case
+
+### Open Questions
+
+- None (immediate deletion, no grace period — the confirm dialog is the grace period)
 
 ---
 
