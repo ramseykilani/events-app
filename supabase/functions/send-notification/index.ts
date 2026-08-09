@@ -99,12 +99,6 @@ serve(async (req) => {
   const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
   const twilioMessagingServiceSid = Deno.env.get('TWILIO_MESSAGING_SERVICE_SID');
   const twilioFromNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
-  const iosStoreUrl = Deno.env.get('IOS_APP_STORE_URL');
-  const androidStoreUrl = Deno.env.get('ANDROID_PLAY_STORE_URL');
-  // Stable URL of the deployed web build. When set, SMS messages link the
-  // website (which anyone can open) instead of app-store links / the
-  // custom-scheme deep link that SMS clients never linkify.
-  const webAppUrl = Deno.env.get('WEB_APP_URL')?.replace(/\/+$/, '') || null;
   const twilioConfigured = !!(
     twilioAccountSid &&
     twilioAuthToken &&
@@ -114,10 +108,6 @@ serve(async (req) => {
     messagingServiceSid: twilioMessagingServiceSid ?? undefined,
     fromNumber: twilioFromNumber ?? undefined,
   };
-  // Non-app users are told where to get the app, so at least one destination
-  // (the website or a store) is required. App users only need the event URL /
-  // event link, so Twilio credentials alone are enough for them.
-  const nonAppSmsEnabled = twilioConfigured && !!(webAppUrl || iosStoreUrl || androidStoreUrl);
 
   const db = createClient(supabaseUrl, serviceRoleKey);
 
@@ -199,23 +189,16 @@ serve(async (req) => {
 
       // ── Non-app user: SMS only ──────────────────────────────────────────────
       if (!person.user_id) {
-        if (!nonAppSmsEnabled || !person.phone_number) continue;
+        if (!twilioConfigured || !person.phone_number) continue;
 
-        // Prefer the website (anyone can open it) over store links.
-        const appLines = webAppUrl
-          ? `See it on the web:\n${webAppUrl}`
-          : `Get the Events app:\n${[
-              iosStoreUrl ? `iOS: ${iosStoreUrl}` : null,
-              androidStoreUrl ? `Android: ${androidStoreUrl}` : null,
-            ]
-              .filter(Boolean)
-              .join('\n')}`;
-
+        // The SMS is the whole message: event details plus the original event
+        // URL when one exists. No app/web CTA — the web app is a dev surface,
+        // not somewhere we want first impressions, and link-free SMS reads
+        // less like spam to carrier filters.
         const smsBody =
           `${sharerPhone} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
           eventUrlLine +
-          `${appLines}\n\n` +
-          `Reply STOP to unsubscribe.`;
+          `\nReply STOP to unsubscribe.`;
 
         smsSends.push(
           sendSms(
@@ -284,19 +267,14 @@ serve(async (req) => {
         });
       }
 
-      // Queue SMS with the event URL and a tappable link to open the event.
-      // When the web build is deployed, a single https link opens the event for
-      // anyone (and can upgrade to a universal link / App Link later); the
-      // custom scheme only works on native installs and isn't linkified by
-      // SMS clients. Skipped gracefully if Twilio is not configured.
+      // Queue SMS with the event details (original event URL when present).
+      // No app link: push is the tappable path for app users — SMS is a pure
+      // notification. Skipped gracefully if Twilio is not configured.
       if (twilioConfigured && person.phone_number) {
-        const eventLink = webAppUrl
-          ? `${webAppUrl}/event/${eventId}`
-          : `events-app://event/${eventId}`;
-        const smsBody =
+        const smsBody = (
           `${displayName} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
-          eventUrlLine +
-          eventLink;
+          eventUrlLine
+        ).trimEnd();
 
         smsSends.push(
           sendSms(

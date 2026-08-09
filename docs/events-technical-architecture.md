@@ -293,21 +293,23 @@ The `send-notification` Edge Function sends a push notification and/or SMS to ea
 3. Function queries all event_shares for that userEventId, including `my_people.phone_number`, and fetches the event's `url`
 4. Fetches the sharer's `users.phone_number` once (used as display identifier in SMS to non-app users)
 5. For each recipient:
-   - **Non-app user** (`my_people.user_id IS NULL`): sends an SMS with event info, the event URL (when present), and App Store / Play Store download links
-   - **App user** (`my_people.user_id IS NOT NULL`): checks whether the sharer is in the recipient's hidden_people (lookup is by the recipient's my_people; skips both push and SMS if hidden), then queues a push notification when a token exists and an SMS containing the event URL (when present) plus a deep link (`events-app://event/[eventId]`). A missing push token never suppresses the SMS.
+   - **Non-app user** (`my_people.user_id IS NULL`): sends an SMS with event info and the event URL (when present) — no app/web links; the SMS is the whole message
+   - **App user** (`my_people.user_id IS NOT NULL`): checks whether the sharer is in the recipient's hidden_people (lookup is by the recipient's my_people; skips both push and SMS if hidden), then queues a push notification when a token exists and an SMS containing the event URL (when present). Push is the tappable path into the event; the SMS is a plain notification with no links. A missing push token never suppresses the SMS.
 6. Push messages are batch-sent to the Expo Push API; SMS messages are fired concurrently via the Twilio REST API
 7. `DeviceNotRegistered` errors from Expo Push API clear the stale token
 8. SMS failures are logged via `console.error` and never propagate — missing Twilio credentials silently disable SMS
 
 **Push notification body:** `{ title: "[Name] added you to [Event Title]", body: "[date] · [time]", data: { eventId } }`
 
-**SMS body (app user):** `"[DisplayName] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]\nevents-app://event/[eventId]"` — the event URL line is omitted for linkless events.
+**SMS body (app user):** `"[DisplayName] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]"` — the event URL line is omitted for linkless events.
 
-**SMS body (non-app user):** `"[SharerPhone] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]\nGet the Events app:\niOS: [IOS_APP_STORE_URL]\nAndroid: [ANDROID_PLAY_STORE_URL]\n\nReply STOP to unsubscribe."` — the event URL line is omitted for linkless events.
+**SMS body (non-app user):** `"[SharerPhone] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]\n\nReply STOP to unsubscribe."` — the event URL line is omitted for linkless events.
+
+SMS deliberately carries no app or web links (decision 2026-08-09, see `docs/distribution-strategy.md`): the only URL in a message is the event's own original URL. This keeps first impressions off the web build and link-free SMS reads less like spam to carrier filters. Store links may return as the non-app CTA once the app is listed.
 
 **Tap handler (push):** Configured in `app/_layout.tsx` — tapping a notification navigates to `/(app)/event/[eventId]`.
 
-**Required Supabase secrets:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `IOS_APP_STORE_URL` (optional), `ANDROID_PLAY_STORE_URL` (optional). Store URLs gate only SMS to non-app users (who are told where to get the app); app-user SMS needs just the Twilio credentials.
+**Required Supabase secrets:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender (`TWILIO_MESSAGING_SERVICE_SID` preferred, `TWILIO_PHONE_NUMBER` as fallback). No other secrets gate SMS.
 
 ---
 

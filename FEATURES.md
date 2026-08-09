@@ -67,16 +67,16 @@ Push notifications only reach users who have installed the app. Non-app users (c
 
 When an event is shared, the `send-notification` Edge Function also sends an SMS via Twilio to every recipient:
 
-- **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, the sharer's phone number as display identity, and App Store / Play Store download links
-- **App users:** SMS with event details, the event URL when one exists, and a deep link (`events-app://event/[eventId]`) that opens directly to the event, in addition to their existing push notification. A missing push token does not suppress the SMS.
+- **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, and the sharer's phone number as display identity. No app or web links — the SMS is the whole message.
+- **App users:** the same link-free SMS in addition to their push notification (push is the tappable path into the event). A missing push token does not suppress the SMS.
 
-This means the only person who needs the app is the one sending events. Friends can receive invitations and decide to download the app from there.
+This means the only person who needs the app is the one sending events. Friends are informed by text; nothing in the message pulls them into the app or website. (Revised 2026-08-09: SMS previously carried web/store/deep links; removed deliberately — see `docs/distribution-strategy.md`.)
 
 ### Technical Notes
 
 - No SDK dependency: Twilio REST API called directly via `fetch` with Basic auth in `supabase/functions/send-notification/index.ts`
-- New Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender — `TWILIO_MESSAGING_SERVICE_SID` (preferred; built-in STOP opt-out handling) or `TWILIO_PHONE_NUMBER` — and `IOS_APP_STORE_URL`, `ANDROID_PLAY_STORE_URL` for the non-app-user path
-- Graceful degradation: if any Twilio secret is missing (or both store URLs are absent for non-app-user path), SMS is silently skipped — push notifications are unaffected
+- New Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender — `TWILIO_MESSAGING_SERVICE_SID` (preferred; built-in STOP opt-out handling) or `TWILIO_PHONE_NUMBER`. No other secrets gate SMS (`IOS_APP_STORE_URL` placeholder was removed 2026-08-09; `WEB_APP_URL` is no longer read by this function)
+- Graceful degradation: if any Twilio secret is missing, SMS is silently skipped — push notifications are unaffected
 - SMS failures use `.catch(console.error)` and never propagate to the caller
 - SMS sends are collected as `Promise<void>[]` and flushed with `Promise.all` after the Expo push batch — concurrent, non-blocking
 - Hidden-person check applies to SMS as well: if the sharer is hidden by the recipient, neither push nor SMS is sent
@@ -86,8 +86,8 @@ This means the only person who needs the app is the one sending events. Friends 
 
 ### Acceptance Criteria
 
-- [x] Non-app users receive an SMS with event title, date/time, sharer phone, and app download links when shared an event
-- [x] App users receive both a push notification and an SMS deep link when shared an event
+- [x] Non-app users receive an SMS with event title, date/time, sharer phone, and the event URL when one exists — no app/web links
+- [x] App users receive both a push notification and a plain-text SMS when shared an event
 - [x] SMS is skipped silently when Twilio secrets are not configured
 - [x] SMS is skipped when the recipient has no phone number in `my_people`
 - [x] SMS is not sent to app users when the sharer is hidden by the recipient
