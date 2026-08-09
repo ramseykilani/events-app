@@ -222,9 +222,144 @@ A deliberately low-prominence sign-out action — this should not be easy to tap
 
 ---
 
+## Display Names
+
+**Status:** Planned
+
+### Problem
+
+Notification SMS identifies the sharer by raw phone number ("+1 416 555 1234 added you to…"). To a recipient who doesn't have the sharer's number saved, that reads like spam. The app never captures a name for the account itself — `contact_name` is always someone *else's* label for you, so a recipient with no prior relationship has nothing human to show.
+
+### Proposed Solution
+
+Capture a display name at sign-up: one field after OTP verification ("What name should friends see?"). `send-notification` then attributes shares by name instead of number.
+
+**Decision (2026-08-09): explicitly no name lookup or auto-fill.** Typing a phone number must never reveal whether that number is a user or what they call themselves — that would make the app a phone-number-to-name oracle. Names on `my_people` rows remain whatever the owner typed or imported from contacts; the display name is only ever shown to people the user voluntarily shares with.
+
+### Technical Notes
+
+- Migration: `ALTER TABLE public.users ADD COLUMN display_name text` (+ SQL test in `supabase/tests/`)
+- Capture UX: after successful OTP verify, if `users.display_name` is null, show a one-time name prompt. Recommend lightweight and skippable — but note that skipping means your friends get SMS from a bare phone number
+- `send-notification`: select `display_name` alongside `phone_number`. Attribution order for app users: recipient's own `contact_name` for the sharer → `display_name` → phone. Non-app users: `display_name` → phone
+- `get_calendar_events` attribution currently uses only the recipient-side `contact_name`; consider coalescing `display_name` so "From X" works when the recipient hasn't added the sharer (pairs with [Add Sharer to Your People](#add-sharer-to-your-people))
+- `users` table RLS: verify what other users can read before assuming `send-notification` (service role) is the only reader of `display_name`
+
+### Acceptance Criteria
+
+- [ ] New users are asked for a display name once after first sign-in
+- [ ] SMS to non-app recipients shows the sharer's display name when set (phone number as fallback)
+- [ ] Push notification titles use the display name when the recipient has no contact name for the sharer
+- [ ] No code path reveals a user's name in response to a phone-number lookup
+
+### Open Questions
+
+- Skippable vs. required name prompt
+- Whether "From X" attribution should switch to display name when the recipient has no `my_people` row for the sharer
+
+---
+
+## Inline Add-by-Phone in Share Sheet
+
+**Status:** Planned
+
+### Problem
+
+The share screen is mandatory after creating an event, but a first-time user with an empty people list hits a dead end: "No people added yet" → navigate to People → fill the manual form → come back → select the person. On web this is the *only* add path; on native it's the fallback when contacts permission is denied. The moment of highest intent (just created an event, want to send it) is where we strand new users.
+
+### Proposed Solution
+
+A "name or phone number" input at the top of the share sheet ([components/ShareSheet.tsx](components/ShareSheet.tsx)). Typing filters existing people; digits that match nobody offer an inline "Add +1 416 555 1234" row. Tapping it normalizes to E.164, inserts the `my_people` row (same path as the manual form), and selects the new person for sharing — one step, no navigation.
+
+### Technical Notes
+
+- Reuse `normalizeToE164` ([lib/contacts.ts](lib/contacts.ts)) and the upsert from [app/(app)/people.tsx](app/(app)/people.tsx) (`onConflict: 'owner_id,phone_number'`) — extract a shared helper rather than duplicating
+- Must work identically on web and native; no contacts permission involved
+- Respect the 50-person cap (disable the add row with a message when full)
+- The share screen ([app/(app)/share.tsx](app/(app)/share.tsx)) currently routes the empty state to `/people`; keep that link as secondary ("Manage people") but it stops being the primary path
+- e2e gotcha applies: row-selection taps can be eaten by re-renders — see `e2e/helpers.ts` selection retry helpers
+
+### Acceptance Criteria
+
+- [ ] A user with zero people can create an event and share it to a typed phone number without leaving the share screen
+- [ ] Invalid numbers surface the same alert as manual add; nothing is inserted
+- [ ] Adding a number that already exists in `my_people` selects the existing person (no duplicate row)
+- [ ] Works on web and native, with Jest + e2e coverage
+
+### Open Questions
+
+- Whether the input also searches existing people by name (recommended: yes, it's the same field)
+
+---
+
+## Add Sharer to Your People
+
+**Status:** Planned
+
+### Problem
+
+A user whose first experience is *receiving* an event has an empty people list. Sharing anything back — even to the person who invited them — means manually entering that person's number. Every invite-acquired user starts with zero network, so the invite channel doesn't compound.
+
+### Proposed Solution
+
+On the event detail screen ([app/(app)/event/[id].tsx](app/(app)/event/[id].tsx)) for an event with "From X" attribution, offer a one-tap "Add X to your people". This creates a `my_people` row for the sharer and makes sharing back to them zero-friction. Once added (or if already present), the action doesn't appear.
+
+### Technical Notes
+
+- The event detail screen already loads attribution (`sharedByPersonId`, `sharerName`) and hidden state
+- The sharer's phone number is not currently exposed to recipients: `my_people` rows are owner-scoped by RLS. Expose it via a narrow `SECURITY DEFINER` function (or extend `get_calendar_events`) that returns the sharer's phone only for events actually shared with the caller — they were texted from that number, so this reveals nothing new
+- Don't show the action for hidden sharers (unhide stays a separate deliberate act)
+- Pairs naturally with [Display Names](#display-names): pre-fill the person name from attribution when available
+
+### Acceptance Criteria
+
+- [ ] Received events show an add-sharer action when the sharer isn't already in your people
+- [ ] After adding, sharing back to them works without re-entering their number
+- [ ] The action never appears for self-created events, already-added sharers, or hidden sharers
+
+### Open Questions
+
+- None
+
+---
+
+## Contacts Permission Explainer
+
+**Status:** Planned
+
+### Problem
+
+On native, the contacts ask is a bare system prompt, and denying it produces a small `showConfirm` dialog ([app/(app)/people.tsx](app/(app)/people.tsx)). Neither explains the product reason: Events texts your people for you, and your contacts are how it knows who to text. Users who deny out of reflex never reconsider, and then adding people is manual-forever.
+
+### Proposed Solution
+
+A real explainer screen, framed around the product truth:
+
+1. **Pre-prompt** (first tap of Add from Contacts): what we access (only the contacts you pick — never the whole address book), why (so Events can text the right people when you share), then the system prompt
+2. **Denial recovery**: a full screen with the same framing, an "Open Settings" path, and the manual-add escape hatch — replacing the current dialog
+
+### Technical Notes
+
+- iOS only asks once; denial recovery must deep-link to Settings (`Linking.openSettings()`)
+- Web path is unchanged (no contacts API → straight to the manual form)
+- Copy and layout follow `docs/events-design-language.md`; keep the touch targets and accessibility roles per convention
+- The auto-open-picker-on-focus logic in `people.tsx` (only when permission already granted) stays as-is
+
+### Acceptance Criteria
+
+- [ ] First Add tap shows the explainer before the OS prompt, never the OS prompt cold
+- [ ] Denying lands on the recovery screen with Settings + manual-add paths
+- [ ] Granting later via Settings makes Add from Contacts work on return
+- [ ] Web behavior unchanged
+
+### Open Questions
+
+- None
+
+---
+
 ## Web Support
 
-**Status:** Implemented
+**Status:** Implemented — **demoted 2026-08-09.** The web build is now a dev/staging/testing surface only, not somewhere we direct users (see `docs/distribution-strategy.md`). Notification SMS no longer links it; the native app is the product. Everything below is the historical record of the web rollout.
 
 ### Problem
 
@@ -281,6 +416,11 @@ A web-first beta is attractive: nobody has to install anything, and notification
 
 - ~~Hosting provider~~ → Cloudflare Pages at **https://shared-events.pages.dev** (see "Why `shared-events`" above — `events-app.pages.dev` was globally taken)
 - Custom domain when purchased: add in Pages dashboard, then update `WEB_APP_URL`
-- Whether the browser build should show any "install the app" prompt once native builds exist
-- Optional: remove the placeholder `IOS_APP_STORE_URL` secret now that `WEB_APP_URL` is set
-- [Sign Out](#sign-out) remains a separate Planned feature
+- ~~Remove the placeholder `IOS_APP_STORE_URL` secret~~ — done 2026-08-09 (the whole store-URL concept left with the SMS links)
+- **Considered and rejected (2026-08-09), recorded so they aren't resurrected blindly:**
+  - *Contact Picker API* (browser contact picking on Chrome/Android): web-only, and the web build is no longer a user surface
+  - *Universal links / App Links + AASA/assetlinks hosting*: there are no links in SMS left to make universal; push already deep-links app users
+  - *PWA install prompts*: installing the PWA unlocks no contacts capability on any platform, so it can't honestly be pitched as fixing the add-people problem
+  - *Shareable event invite links*: duplicates the group-chat behavior the app replaces with extra steps; not a contacts bootstrap worth building
+  - *Bulk paste of contact lists*: target users don't maintain such lists
+- [Sign Out](#sign-out) — implemented separately
