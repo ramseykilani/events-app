@@ -61,9 +61,13 @@ can't:
    + navigation, theme switching with persistence, add/edit/remove event (web
    date inputs, fork semantics), share-sheet disabled/selected states, the
    A→B share flow with forwarding semantics, hide/unhide, people/circle
-   management.
-4. **Agentic UX review** — a cloud agent clicking through the deployed preview
-   with judgment (visual polish, copy, mobile feel), reported as a PR.
+   management — plus **pixel-diff baselines** (`e2e/visual.spec.ts`,
+   snapshots committed in `e2e/visual.spec.ts-snapshots/`) that catch
+   unintended pixel movement on key screens for free on every push, before any
+   agent-review money is spent. Regenerate after INTENTIONAL design changes
+   with `npx playwright test e2e/visual.spec.ts --update-snapshots` and review
+   the diffs like any other change.
+4. **Agentic UX review** — the phased ship-time click-through; see below.
 
 ## The e2e suite
 
@@ -107,28 +111,38 @@ Test-environment quirks worth knowing (all handled in `e2e/fixtures.ts` and
 
 ## Agentic UX review (the release click-through)
 
-The review happens **at ship time, batched per release** — not on every push.
-One complete pass over every feature costs one agent run and keeps token spend
-proportional to releases, not commits.
+The review happens **at ship time, batched per release** — not on every push
+— and it is **phased so money stops being spent the moment a blocker is
+known**:
 
-Two ways to run it:
+- **Phase 0 (free):** staging pipeline green, including pixel-diff baselines.
+- **Phase 1 (pennies):** one Grok-fast agent smoke-sweeps the happy paths.
+  Any failure → `DON'T SHIP`, stop.
+- **Phase 2 (the budget):** five parallel `computerUse` tracks per
+  `manual-tests/release_review_checklist.md` (auth+first-run, event lifecycle,
+  sharing/people, the visual matrix over screen × form factor × theme, edge
+  states). A confirmed blocker in any track halts the rest.
+- **Phase 3:** a stronger model re-judges the flagged evidence only.
 
-1. **In-session (default, no setup):** when the owner says ship it, the agent
-   launches a `computerUse` subagent with model `cursor-grok-4.5-high-fast`
-   and `scripts/agent-ux-review-prompt.md` as the instructions. Runs in the
-   current cloud VM; needs no GitHub secrets. This is the normal path.
+The orchestrator instructions an agent follows at ship time live in
+`scripts/release-review-orchestrator.md`. Two ways to execute the review
+itself:
+
+1. **In-session (default, no setup):** the agent you say "ship it" to runs
+   the phases with `computerUse` subagents (model `cursor-grok-4.5-high-fast`
+   for the click-through tracks). Runs in the current cloud VM; needs no
+   GitHub secrets.
 2. **CI-launched (optional):** `agent-ux-review.yml` fires on release PRs
    (staging → production) and manual dispatch, launching a Cursor Cloud Agent
-   via the Cloud Agents API (`POST /v1/agents`). Requires the repo secret
+   via the Cloud Agents API with `scripts/agent-ux-review-prompt.md` (the
+   single-agent variant of the same checklist). Requires the repo secret
    `CURSOR_API_KEY`; the model comes from the repo variable `UX_REVIEW_MODEL`
    (default `cursor-grok-4.5-high-fast`), with automatic fallback to the
    account default if the ID is rejected.
 
-Either way, the reviewer follows the same prompt: every scenario in
-`manual-tests/cloud_manual_regression.md` against the staging preview,
-desktop + mobile viewports, screenshot discipline (evidence only), and a
-first-line `VERDICT: SHIP` / `VERDICT: DON'T SHIP` in a report PR against
-`staging`. A DON'T SHIP blocks promotion until fixed and re-reviewed.
+Either way the output is a report PR against `staging` whose first line is
+`VERDICT: SHIP` / `VERDICT: DON'T SHIP`. A DON'T SHIP blocks promotion until
+fixed and re-reviewed.
 
 ## GitHub settings (one time)
 

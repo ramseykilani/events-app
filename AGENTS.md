@@ -59,11 +59,7 @@ Two long-lived branches, named after their environments (see `docs/development-w
 
 **Push policy (set by the repo owner):** agents push finished work **straight to `staging`** — no PR, no human review. Hard rule: before pushing, the fast checks must pass locally (`npx tsc --noEmit && npm run test:conventions && npm test -- --runInBand && npm run test:sql`). Every push then runs the full suite in CI; if it goes red, the next agent fixes forward before anything ships. PRs into staging are optional paper trail, never required.
 
-**Only promote `staging → production` when the owner explicitly says to ship/release/push to prod.** The ship-it protocol, in order:
-
-1. Confirm the full suite is green on the staging tip (CI, or run `npm run build:web && npm run test:e2e` locally if the `EXPO_PUBLIC_SUPABASE_*` repo secrets aren't set yet — without them the CI e2e job skips with a warning).
-2. Run the **release click-through review**: launch a `computerUse` subagent (model `cursor-grok-4.5-high-fast`) with `scripts/agent-ux-review-prompt.md` as the instructions. It covers every scenario in `manual-tests/cloud_manual_regression.md` against the staging preview, desktop + mobile viewports, and ends with `VERDICT: SHIP` / `VERDICT: DON'T SHIP` and a report PR.
-3. `VERDICT: SHIP` → promote with `git push origin staging:production` (branch protection requires the full-suite checks on the commit, so untested code physically cannot ship). `VERDICT: DON'T SHIP` → fix forward on staging and re-review.
+**Only promote `staging → production` when the owner explicitly says to ship/release/push to prod.** The ship-it protocol lives in **`scripts/release-review-orchestrator.md`** — follow it exactly. Summary: Phase 0 free gates (staging pipeline green incl. pixel diffs) → Phase 1 cheap Grok smoke sweep (halt on failure) → Phase 2 five parallel deep tracks per `manual-tests/release_review_checklist.md` (halt all on any blocker — never finish an expensive review when a bug is already known) → Phase 3 skeptic pass on flagged evidence → report PR with `VERDICT: SHIP` / `DON'T SHIP` → only on SHIP, `git push origin origin/staging:production`. Branch protection requires the full-suite checks on the promoted commit, so untested code physically cannot ship. DON'T SHIP → fix forward on staging, re-run the protocol from the top (early phases are cheap by design).
 
 The review is batched per release on purpose: one complete click-through at ship time beats a shallow review on every push, and it keeps token spend proportional to releases, not commits.
 
