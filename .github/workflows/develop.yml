@@ -1,0 +1,52 @@
+# Develop integration pipeline.
+#
+# Every merge into `develop` runs the full suite (static checks + SQL + Jest
+# + desktop/mobile-web e2e). Only when it is green does the develop preview
+# redeploy to https://develop.shared-events.pages.dev (Cloudflare Pages
+# branch alias for --branch=develop), so the preview always reflects the
+# latest known-good develop.
+#
+# Requires the same repo Variable/Secrets as deploy-web.yml.
+name: Develop
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: develop-pipeline
+  cancel-in-progress: false
+
+jobs:
+  full-suite:
+    uses: ./.github/workflows/full-suite.yml
+    secrets: inherit
+
+  deploy-preview:
+    name: Deploy develop preview
+    needs: full-suite
+    # Vars gate keeps the workflow inert until Cloudflare secrets are configured.
+    if: vars.DEPLOY_WEB == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Deploy the exact bundle the e2e job just tested.
+      - name: Download tested bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Deploy preview to Cloudflare Pages (branch alias "develop")
+        run: npx wrangler pages deploy --branch=develop
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

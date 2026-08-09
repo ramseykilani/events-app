@@ -1,0 +1,46 @@
+# Fast checks for feature PRs into develop.
+#
+# Feature work merges into `develop`; these checks are the only gate on those
+# PRs so individual features stay cheap. The full suite (including mobile-web
+# e2e) runs on every push to develop and again as the gate on develop→master
+# release PRs — see full-suite.yml, develop.yml, release.yml, and
+# docs/development-workflow.md.
+name: PR checks (fast)
+on:
+  pull_request:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Jest suite
+        run: npm test -- --runInBand --ci
+
+      - name: Set up PostgreSQL
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql
+          fi
+          sudo systemctl start postgresql || sudo service postgresql start
+          sudo -u postgres psql -c 'SELECT 1'
+
+      - name: SQL semantics suite
+        run: bash supabase/tests/run_local.sh

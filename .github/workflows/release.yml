@@ -1,0 +1,29 @@
+# Release gate: the only way into master.
+#
+# Runs on PRs targeting master and (a) refuses any source branch other than
+# develop, (b) re-runs the full suite — including desktop and mobile-web e2e —
+# on the merge result. Set the "Full suite" jobs as required status checks on
+# master (see docs/development-workflow.md → GitHub settings) so this gate
+# cannot be bypassed. A green master push then deploys production via
+# deploy-web.yml.
+name: Release gate
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  guard-source-branch:
+    name: Only develop may merge to master
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check source branch
+        if: github.head_ref != 'develop'
+        run: |
+          echo "::error::PRs into master must come from the develop branch (this one is '${{ github.head_ref }}')."
+          exit 1
+      - run: echo "Source branch is develop — OK."
+
+  full-suite:
+    needs: guard-source-branch
+    uses: ./.github/workflows/full-suite.yml
+    secrets: inherit

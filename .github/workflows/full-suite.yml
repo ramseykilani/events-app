@@ -1,0 +1,91 @@
+# Full test suite — reusable workflow (workflow_call) invoked by:
+#   - develop.yml  on every push to develop (before the preview deploy)
+#   - release.yml  on every develop→master PR (the release gate)
+#
+# Layers: static checks (tsc, Jest, SQL semantics) → web build → Playwright
+# e2e against the built bundle on desktop Chrome, Mobile Safari (WebKit), and
+# Mobile Chrome. The e2e suite signs in with the Supabase test-OTP accounts
+# documented in AGENTS.md, so it needs EXPO_PUBLIC_SUPABASE_URL /
+# EXPO_PUBLIC_SUPABASE_ANON_KEY secrets to build the bundle.
+name: Full suite
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Jest suite
+        run: npm test -- --runInBand --ci
+
+      - name: Set up PostgreSQL
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql
+          fi
+          sudo systemctl start postgresql || sudo service postgresql start
+          sudo -u postgres psql -c 'SELECT 1'
+
+      - name: SQL semantics suite
+        run: bash supabase/tests/run_local.sh
+
+  e2e:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # EXPO_PUBLIC_* values are inlined into the bundle at export time.
+      - name: Build web bundle
+        run: npm run build:web
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Playwright e2e (desktop + mobile web)
+        run: npm run test:e2e
+
+      - name: Upload built bundle (reused by the develop preview deploy)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

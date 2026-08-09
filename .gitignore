@@ -40,6 +40,11 @@ supabase/.temp/
 # test coverage
 coverage/
 
+# Playwright e2e
+e2e/.auth/
+playwright-report/
+test-results/
+
 # Firebase config (these are public identifiers, not secrets — security comes from Firebase Security Rules)
 # google-services.json
 # GoogleService-Info.plist
