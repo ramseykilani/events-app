@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { disableNavigatorLocks, expect, test } from './fixtures';
 import {
   ACCOUNT_B,
   PERSON_B_NAME,
@@ -54,7 +54,11 @@ test('sharing delivers B their own copy that survives A removing theirs', async 
   await expect(page.getByText(title, { exact: true })).toBeVisible();
 
   // --- Account B (separate browser context): sign in, event is on today.
-  const contextB = await browser.newContext();
+  // Same baseURL + Web-Locks shim as the fixture-provided context.
+  const contextB = await browser.newContext({
+    baseURL: testInfo.project.use.baseURL,
+  });
+  await contextB.addInitScript(disableNavigatorLocks);
   const pageB = await contextB.newPage();
   try {
     await signIn(pageB, ACCOUNT_B);

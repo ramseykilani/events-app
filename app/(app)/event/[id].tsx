@@ -325,6 +325,7 @@ export default function EventDetailScreen() {
                   })
                 }
                 activeOpacity={0.7}
+                accessibilityRole="button"
               >
                 <Text style={[styles.editButtonText, { color: theme.textPrimary }]}>Edit</Text>
               </TouchableOpacity>
@@ -334,6 +335,7 @@ export default function EventDetailScreen() {
                 style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
                 onPress={handleDelete}
                 activeOpacity={0.7}
+                accessibilityRole="button"
               >
                 <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
               </TouchableOpacity>
@@ -343,6 +345,7 @@ export default function EventDetailScreen() {
                 style={[styles.hideButton, { backgroundColor: theme.surfaceSecondary }]}
                 onPress={handleToggleHide}
                 activeOpacity={0.7}
+                accessibilityRole="button"
               >
                 <Text style={[styles.hideButtonText, { color: theme.textSecondary }]}>
                   {isHidden

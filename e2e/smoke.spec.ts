@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 // Smoke: the signed-in calendar shell renders on every supported web form
 // factor. Catches auth-redirect, RPC wiring, and theme-load regressions.

@@ -34,13 +34,22 @@ export function SessionContextProvider({ children }: { children: React.ReactNode
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        await ensureUserRow(session);
-      }
-      setIsLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session } }) => {
+        setSession(session);
+        if (session?.user) {
+          await ensureUserRow(session);
+        }
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        // Without this, a failed getSession (e.g. the Web Locks acquire
+        // timeout in a busy multi-tab browser) strands the app on the boot
+        // spinner forever. Fall through to the sign-in screen instead.
+        console.error('Failed to restore session:', err);
+        setIsLoading(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);

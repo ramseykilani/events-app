@@ -20,7 +20,13 @@ export async function signIn(
   page: Page,
   account: { phone: string; otp: string }
 ): Promise<void> {
+  // Clear any persisted session first: a shared account whose session was
+  // revoked by a later sign-in would otherwise boot into a permanently
+  // loading screen instead of the sign-in form.
+  await page.context().clearCookies();
   await page.goto('/');
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload();
   await expect(
     page.getByRole('button', { name: 'Send code' })
   ).toBeVisible();
