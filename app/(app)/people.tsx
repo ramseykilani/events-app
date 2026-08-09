@@ -387,6 +387,28 @@ export default function PeopleScreen() {
     );
   };
 
+  const handleDeleteAccount = () => {
+    showConfirm(
+      'Delete account',
+      'This deletes your calendar, your people, and your sign-in. Events you already shared stay on the calendars of the people you sent them to.',
+      {
+        confirmText: 'Delete Account',
+        destructive: true,
+        onConfirm: async () => {
+          const { error } = await supabase.rpc('delete_my_account');
+          if (error) {
+            showError('Error deleting account', error);
+            return;
+          }
+          // The server-side deletion doesn't reach the client — clear the
+          // local session so SessionContext routes to sign-in.
+          const { error: signOutError } = await supabase.auth.signOut();
+          if (signOutError) showError('Error', signOutError);
+        },
+      }
+    );
+  };
+
   return (
     <View
       style={[
@@ -531,9 +553,17 @@ export default function PeopleScreen() {
           onPress={handleSignOut}
           activeOpacity={0.6}
           accessibilityRole="button"
-          style={styles.signOutButton}
+          style={styles.footerButton}
         >
-          <Text style={[styles.signOut, { color: theme.textTertiary }]}>Sign out</Text>
+          <Text style={[styles.footerAction, { color: theme.textTertiary }]}>Sign out</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleDeleteAccount}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          style={styles.footerButton}
+        >
+          <Text style={[styles.footerAction, { color: theme.destructiveLink }]}>Delete account</Text>
         </TouchableOpacity>
       </View>
       {showPicker && (
@@ -749,12 +779,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 4,
   },
-  signOutButton: {
+  footerButton: {
     minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
-  signOut: {
+  footerAction: {
     fontSize: 14,
   },
   personRow: {

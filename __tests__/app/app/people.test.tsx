@@ -14,6 +14,7 @@ const mockHiddenEq = jest.fn();
 const mockHiddenSelect = jest.fn();
 const mockFrom = jest.fn();
 const mockSignOut = jest.fn();
+const mockRpc = jest.fn();
 
 jest.mock('../../../app/_context/SessionContext', () => ({
   useSession: () => ({
@@ -26,6 +27,7 @@ jest.mock('../../../app/_context/SessionContext', () => ({
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
+    rpc: (...args: unknown[]) => mockRpc(...args),
     auth: { signOut: (...args: unknown[]) => mockSignOut(...args) },
   },
 }));
@@ -241,5 +243,92 @@ describe('app/(app)/people sign out', () => {
     await options.onConfirm();
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('app/(app)/people delete account', () => {
+  const originalOS = Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
+    mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
+
+    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
+
+    mockHiddenEq.mockResolvedValue({ data: [], error: null });
+    mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
+
+    mockRpc.mockResolvedValue({ data: null, error: null });
+    mockSignOut.mockResolvedValue({ error: null });
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'my_people') {
+        return { select: mockMyPeopleSelect, upsert: mockMyPeopleUpsert };
+      }
+      if (table === 'circles') {
+        return { select: mockCirclesSelect };
+      }
+      if (table === 'hidden_people') {
+        return { select: mockHiddenSelect };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+  });
+
+  afterEach(() => {
+    Platform.OS = originalOS;
+  });
+
+  it('asks for confirmation with honest copy before deleting', async () => {
+    Platform.OS = 'web';
+    const { getByText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Delete account')).toBeTruthy());
+    fireEvent.press(getByText('Delete account'));
+
+    expect(showConfirm).toHaveBeenCalledTimes(1);
+    const [title, message, options] = (showConfirm as jest.Mock).mock.calls[0];
+    expect(title).toBe('Delete account');
+    expect(message).toContain('deletes your calendar, your people, and your sign-in');
+    expect(message).toContain('stay on the calendars of the people you sent them to');
+    expect(options.destructive).toBe(true);
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('calls delete_my_account then signs out when the confirmation is accepted', async () => {
+    Platform.OS = 'web';
+    const { getByText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Delete account')).toBeTruthy());
+    fireEvent.press(getByText('Delete account'));
+
+    const [, , options] = (showConfirm as jest.Mock).mock.calls[0];
+    await options.onConfirm();
+
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith('delete_my_account');
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces an RPC failure and keeps the session', async () => {
+    Platform.OS = 'web';
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
+    const { showError } = jest.requireMock('../../../lib/showError');
+    const { getByText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Delete account')).toBeTruthy());
+    fireEvent.press(getByText('Delete account'));
+
+    const [, , options] = (showConfirm as jest.Mock).mock.calls[0];
+    await options.onConfirm();
+
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(showError).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).not.toHaveBeenCalled();
   });
 });

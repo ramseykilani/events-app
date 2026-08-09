@@ -30,7 +30,9 @@ export interface CircleMember {
 
 export interface Event {
   id: string;
-  created_by_user_id: string;
+  // NULL once the creator deletes their account — the snapshot belongs to
+  // whoever still owns a copy (see delete_my_account).
+  created_by_user_id: string | null;
   url: string | null;
   title: string | null;
   description: string | null;
