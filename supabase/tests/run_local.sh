@@ -33,10 +33,13 @@ CREATE ROLE authenticated NOLOGIN;
 CREATE ROLE service_role NOLOGIN;
 SQL
 
+# Files are piped via stdin (not psql -f): the shell opens them as the calling
+# user, so the postgres user never needs read/traverse rights on the checkout
+# (GitHub runners' workspace dirs are not traversable by other users).
 for f in $(ls *.sql | sort); do
-  sudo -u postgres psql -d events_test -v ON_ERROR_STOP=1 -q -f "$f" > /dev/null 2>&1 || {
+  sudo -u postgres psql -d events_test -v ON_ERROR_STOP=1 -q < "$f" > /dev/null 2>&1 || {
     echo "MIGRATION FAILED: $f"
-    sudo -u postgres psql -d events_test -v ON_ERROR_STOP=1 -f "$f"
+    sudo -u postgres psql -d events_test -v ON_ERROR_STOP=1 < "$f"
     exit 1
   }
 done
@@ -47,7 +50,7 @@ for t in "$REPO_ROOT"/supabase/tests/*_semantics.sql "$REPO_ROOT"/supabase/tests
   echo "=== $(basename "$t")"
   # Tests use fixed UUIDs and are not idempotent — run once, ON_ERROR_STOP
   # makes any SQL error or RAISE EXCEPTION abort with a nonzero exit code.
-  out="$(sudo -u postgres psql -d events_test -f "$t" 2>&1)" || {
+  out="$(sudo -u postgres psql -d events_test -v ON_ERROR_STOP=1 < "$t" 2>&1)" || {
     echo "$out"
     echo "TEST FAILED: $t"
     exit 1
