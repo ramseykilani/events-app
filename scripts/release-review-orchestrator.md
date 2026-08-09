@@ -23,14 +23,17 @@ Phase 1 section of the checklist against
 https://staging.shared-events.pages.dev. If anything fails → write the report
 (see below) with `VERDICT: DON'T SHIP` and STOP. Do not start Phase 2.
 
-## Phase 2 — Deep tracks (parallel). Halt remaining tracks on a blocker.
+## Phase 2 — Deep tracks. Halt remaining tracks on a blocker.
 
-Launch the five checklist tracks as separate `computerUse` subagents (model
+Run the five checklist tracks as separate `computerUse` subagents (model
 `cursor-grok-4.5-high-fast`), each with ONLY its track's checklist section plus
-the shared rules below. Run them in parallel; tracks 1–3 mutate data and use
-separate accounts (track 1: fresh throwaway test OTP — add via the Supabase
-Management API per AGENTS.md and REMOVE it after; track 2: account A; track 3:
-accounts A+B; tracks 4–5 are read-only-ish and can share A).
+the shared rules below. IMPORTANT: in-session computerUse subagents share this
+VM's single display, so run tracks SEQUENTIALLY here — parallel execution is
+only safe when each track is its own Cursor cloud agent (separate VMs), e.g.
+via the CI-launched path or multiple API-launched agents. Tracks 1–3 mutate
+data and use separate accounts (track 1: fresh throwaway test OTP — add via
+the Supabase Management API per AGENTS.md and REMOVE it after; track 2:
+account A; track 3: accounts A+B; tracks 4–5 are read-only-ish and share A).
 
 Shared rules for every track: test accounts are shared fixtures — clean up
 everything you create; unhide anyone you hid; screenshot ONLY flagged issues
