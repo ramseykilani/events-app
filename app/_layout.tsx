@@ -21,6 +21,10 @@ Notifications.setNotificationHandler({
 });
 
 async function registerForPushNotifications(): Promise<string | null> {
+  // Web users get SMS, not browser push — never trigger the browser's
+  // notification permission prompt (observed firing on web sign-in).
+  if (Platform.OS === 'web') return null;
+
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
