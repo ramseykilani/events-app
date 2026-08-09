@@ -155,6 +155,15 @@ first-line `VERDICT: SHIP` / `VERDICT: DON'T SHIP` in a report PR against
 - Settings → General → **Default branch** → `production`, then delete the old
   `master` branch. (`workflow_run` triggers and PR defaulting read from the
   default branch.)
+- Cloudflare Pages project `shared-events`: set the **production branch** to
+  `production` (Pages dashboard → project → Settings → Builds & deployments →
+  Production branch, or
+  `curl -X PATCH "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/shared-events" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d '{"production_branch":"production"}'`).
+  Pages decides production vs preview by comparing the deploy's branch to
+  this setting — while it still says `master`, every `--branch=production`
+  deploy lands as a **preview** and https://shared-events.pages.dev silently
+  stops updating. (2026-08-09 incident: production served a stale build for
+  ~25h because merges to `master` never deployed.)
 
 ## Deploying the staging preview by hand
 

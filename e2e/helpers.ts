@@ -75,9 +75,11 @@ export async function addPersonManually(
     .getByRole('button', { name: 'Add', exact: true })
     .first()
     .click();
-  // The modal can briefly double-mount during its open animation on slower
-  // runners (observed on CI webkit) — wait for exactly one input before
-  // filling, or strict mode sees double.
+  // Two modal-timing hazards, both observed on CI: (1) exact-match the
+  // placeholder — the circle form's "New circle name" input stays mounted
+  // under the modal and contains "Name" as a substring; (2) the modal can
+  // briefly double-mount during its open animation on slower runners
+  // (webkit), so wait for exactly one input before filling.
   const nameInput = page.getByPlaceholder('Name', { exact: true });
   await expect(nameInput).toHaveCount(1);
   await nameInput.fill(name);
