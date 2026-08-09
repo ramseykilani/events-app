@@ -128,6 +128,8 @@ Theme selection lives in the calendar header as a small circular **swatch button
 
 Tapping switches moods; the choice persists across sessions. The control stays data-driven from the theme registry: it always previews the *next* theme in the registry and cycles through them. A future third theme changes nothing about its size or placement — the same button cycles, or summons a small named chooser, without a redesign.
 
+On web, browser chrome (the iOS Safari status bar / Dynamic Island tint, Android address bar) must follow the same mood. That is not OS light/dark and not a separate skin — it is the active theme's `background` (plus `color-scheme` derived from the theme's status-bar content style) applied to the document so Safari and friends stop sampling a default white page shell.
+
 *A note on how this section drifted.* The first implementation followed this section's original text literally: a labeled segmented control ("Paper | Evening") on its own row of the calendar header. It worked, and it was wrong — a permanent labeled row spends chrome that a set-once preference has not earned (§1), and in an app whose main screen is only a calendar, it read as a second headline. The swatch replaced it within a day; the names moved to the accessibility label and to any future chooser. This is recorded so that whoever adds the third theme does not "fix" the swatch back into a segmented row — that shape was tried and rejected. If three themes make blind cycling awkward, have the swatch summon a small named chooser rather than restoring permanent labels.
 
 ---

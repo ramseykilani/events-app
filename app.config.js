@@ -35,6 +35,9 @@ export default {
     },
     web: {
       favicon: "./assets/favicon.png",
+      // Must match Colors.paper.background — runtime applyWebBrowserChrome updates
+      // the live theme-color meta when the user switches to Evening.
+      themeColor: "#faf7f0",
     },
     plugins: [
       "@react-native-community/datetimepicker",

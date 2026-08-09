@@ -7,6 +7,7 @@ import {
   type ThemeName,
   type ThemePalette,
 } from '../../constants/Colors';
+import { applyWebBrowserChrome } from '../../lib/applyWebBrowserChrome';
 
 // Stable storage key — a rename would silently reset every user's chosen mood.
 const THEME_STORAGE_KEY = 'theme_preference';
@@ -45,6 +46,12 @@ export function ThemeContextProvider({ children }: { children: React.ReactNode }
       })
       .finally(() => setIsLoaded(true));
   }, []);
+
+  // Keep iOS Safari / browser chrome (status bar, Dynamic Island tint) in
+  // sync with Paper/Evening — native StatusBar does nothing on web.
+  useEffect(() => {
+    applyWebBrowserChrome(Colors[themeName]);
+  }, [themeName]);
 
   const setTheme = (name: ThemeName) => {
     setThemeName(name);
