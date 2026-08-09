@@ -179,6 +179,12 @@ export function Calendar({
           todayTextColor: theme.calendarTodayText,
           selectedDayBackgroundColor: theme.calendarSelected,
           selectedDayTextColor: theme.calendarSelectedText,
+          // Without this, the dot on the selected day falls back to the
+          // library default (white) — invisible-ish on Paper's ochre and
+          // off-token on Evening (design doc §9: a visual decision without a
+          // token is a defect).
+          selectedDotColor: theme.calendarSelectedText,
+          textMonthFontFamily: theme.titleFontFamily,
           arrowColor: theme.textPrimary,
           monthTextColor: theme.textPrimary,
           textDisabledColor: theme.textTertiary,
