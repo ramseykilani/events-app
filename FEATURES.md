@@ -17,7 +17,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned |
 | [Contacts Permission Explainer](#contacts-permission-explainer) | Planned |
 | [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Implemented |
-| [Delete Account](#delete-account) | Planned — **launch-blocking** |
+| [Delete Account](#delete-account) | Implemented |
 
 ---
 
@@ -387,7 +387,7 @@ Replace emoji glyphs with vector icons tinted by theme role tokens (e.g. `textTe
 
 ## Delete Account
 
-**Status:** Planned — **launch-blocking.** Apple App Review Guideline 5.1.1(v) requires in-app account deletion for any app with account creation, and Play requires a deletion path plus a matching data-deletion declaration. TestFlight internal won't check it; everything past internal testing will.
+**Status:** Implemented (2026-08-09). Was **launch-blocking**: Apple App Review Guideline 5.1.1(v) requires in-app account deletion for any app with account creation, and Play requires a deletion path plus a matching data-deletion declaration. TestFlight internal won't check it; everything past internal testing will. The Play data-deletion declaration still needs to be made to match at listing time.
 
 ### Problem
 
@@ -407,11 +407,11 @@ There is no way to delete an account. Phone-number identity makes the data unamb
 
 ### Acceptance Criteria
 
-- [ ] "Delete account" exists at the People screen footer, destructive-styled, behind one confirm dialog
-- [ ] Deleting removes the account's own data (calendar, people, circles, sign-in) and lands on the sign-in screen
-- [ ] Events the deleted user shared remain on recipients' calendars
-- [ ] Re-signing up with the same phone number starts a clean account and receives any pending shares
-- [ ] SQL tests cover the forwarding-preservation case
+- [x] "Delete account" exists at the People screen footer, destructive-styled, behind one confirm dialog
+- [x] Deleting removes the account's own data (calendar, people, circles, sign-in) and lands on the sign-in screen
+- [x] Events the deleted user shared remain on recipients' calendars
+- [x] Re-signing up with the same phone number starts a clean account and receives any pending shares
+- [x] SQL tests cover the forwarding-preservation case
 
 ### Open Questions
 

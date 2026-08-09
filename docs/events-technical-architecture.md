@@ -82,7 +82,7 @@ Circles are saved selections — shortcuts for quickly selecting a group of peop
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid (PK) | |
-| created_by_user_id | uuid (FK → users, NOT NULL) | Who originally created this snapshot. Informational only — does not grant mutation rights over other users' copies. |
+| created_by_user_id | uuid (FK → users, nullable) | Who originally created this snapshot. Informational only — does not grant mutation rights over other users' copies. NULL once the creator deletes their account (FK is ON DELETE SET NULL so snapshots survive their creator). |
 | url | text (nullable) | Link to the public event listing. Optional — linkless events like "park hang 4pm" are valid. |
 | title | text (nullable) | Auto-filled from OG metadata if URL provided, editable by the user |
 | description | text (nullable) | From OG metadata |
@@ -253,6 +253,12 @@ This means each user's view of an event is their own. Nobody can change your dat
 
 Removing an event from your calendar deletes only your own user_events row (your event_shares share records cascade with it). Because sharing delivered everyone their own copy up front, this is purely personal — nobody else's calendar changes when you remove an event, whether you created it or re-shared it. The events row itself is never deleted by the app; snapshots with no remaining user_events are reclaimed by the `cleanup-events` cron job.
 
+### 5b. Delete Account
+
+"Delete account" sits at the bottom of the People screen (below Sign out, destructive-styled) behind a single confirm dialog. Confirming calls the `delete_my_account()` RPC (SECURITY DEFINER, granted to `authenticated` only), which deletes the caller's own `auth.users` row — client-side auth-user deletion isn't possible with the anon key, so the RPC is the deletion path. The app then signs out locally; SessionContext routes to sign-in.
+
+The cascades do the rest: `public.users` (and with it the push token), `my_people`, `circles`, `hidden_people`, `user_events`, and `event_shares` all die with the account. Other users' `my_people` rows pointing at the deleted account get `user_id` SET NULL — the contact reverts to a pending phone-number entry, so future shares get the non-app SMS and a re-signup triggers pending-share delivery. Events the deleted user created stay on recipients' calendars with `created_by_user_id` SET NULL; snapshots left with zero owners are reclaimed by `cleanup-events`. Re-signing up with the same phone number starts a clean account.
+
 ### 6. Hide / Unhide a Person
 
 1. User opens an event detail for an event someone else shared with them
@@ -338,6 +344,7 @@ Supabase RLS policies ensure users can only access data they should see. Key pol
 - **user_events:** Users can create/delete their own. Copies for other users' recipients are created only by the `share_event` RPC (SECURITY DEFINER), which verifies the caller owns the user_event being shared.
 - **event_shares:** Creatable by the user_event owner (via `share_event`). Readable by the share owner and by the person the event was shared with.
 - **hidden_people:** Owner-only CRUD.
+- **auth.users:** No client access. Account deletion goes through `delete_my_account()` (SECURITY DEFINER, `authenticated` only), which deletes exactly the caller's row.
 
 ---
 
