@@ -75,17 +75,25 @@ export default function ShareScreen() {
     // actions. Sharing is forwarding: once shared it cannot be unsent, so
     // existing shares are shown as done and only new people can be picked.
     const ueId = firstParamValue(params.userEventId);
+    const sharedNow = new Set<string>();
     if (ueId) {
       const { data: shares, error: sharesErr } = await supabase
         .from('event_shares')
         .select('person_id')
         .eq('user_event_id', ueId);
       if (sharesErr) failed = true;
-      setAlreadySharedIds(new Set((shares ?? []).map((s) => s.person_id)));
-    } else {
-      setAlreadySharedIds(new Set());
+      for (const s of shares ?? []) sharedNow.add(s.person_id);
     }
-    setSelectedPersonIds(new Set());
+    setAlreadySharedIds(sharedNow);
+    // Preserve in-flight selections: a user who taps while the sheet is still
+    // loading must not lose their picks when the fetch lands (CI caught this —
+    // the reset raced the tap and left Share disabled). Only drop picks that
+    // turn out to be already shared.
+    setSelectedPersonIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set([...prev].filter((id) => !sharedNow.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
 
     if (failed) {
       console.error('share load error:', peopleErr ?? circlesErr);
