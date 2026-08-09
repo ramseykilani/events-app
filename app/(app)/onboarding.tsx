@@ -95,12 +95,10 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = pageIndexFromOffset(
-      e.nativeEvent.contentOffset.x,
-      pageWidthRef.current,
-      pages.length
-    );
+  const syncPageFromOffset = (offsetX: number) => {
+    const width = pageWidthRef.current;
+    if (width <= 0) return;
+    const index = pageIndexFromOffset(offsetX, width, pages.length);
     if (index !== currentPageRef.current) {
       currentPageRef.current = index;
       setCurrentPage(index);
@@ -108,10 +106,17 @@ export default function OnboardingScreen() {
   };
 
   const handlePagerLayout = (e: LayoutChangeEvent) => {
-    const width = e.nativeEvent.layout.width;
+    const width = Math.round(e.nativeEvent.layout.width);
     if (width > 0 && width !== pageWidthRef.current) {
       pageWidthRef.current = width;
       setPageWidth(width);
+      // Re-snap after measure so pages align to the real pager width (not window).
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          x: currentPageRef.current * width,
+          animated: false,
+        });
+      });
     }
   };
 
@@ -127,9 +132,19 @@ export default function OnboardingScreen() {
         bounces={false}
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
+        disableIntervalMomentum
+        snapToInterval={resolvedWidth > 0 ? resolvedWidth : undefined}
+        snapToAlignment="start"
         onLayout={handlePagerLayout}
-        onMomentumScrollEnd={handleScrollEnd}
-        onScrollEndDrag={handleScrollEnd}
+        onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          syncPageFromOffset(e.nativeEvent.contentOffset.x);
+        }}
+        onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          syncPageFromOffset(e.nativeEvent.contentOffset.x);
+        }}
+        onScrollEndDrag={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+          syncPageFromOffset(e.nativeEvent.contentOffset.x);
+        }}
         scrollEventThrottle={16}
         style={styles.pager}
         testID="onboarding-pager"
