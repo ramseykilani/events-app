@@ -27,6 +27,30 @@ real phone numbers.
 | PR `develop → master` (release PR) | `release.yml` | Refuses any source branch that isn't `develop`, then re-runs the **full suite** on the merge result. This is the release gate. |
 | Push to `master` | `deploy-web.yml` | Production deploy (unchanged). |
 
+## Who merges what
+
+- **Feature PRs → develop:** the agent that wrote the change merges it once
+  the fast checks are green — no human review round-trip. (Owner's call, and
+  the reason the fast checks + full-suite-on-develop layering matters: the
+  safety net replaces review, not complements it.)
+- **develop → master (production):** only when the owner explicitly says to
+  ship. The agent opens the release PR, confirms the full suite (and, when
+  configured, the agentic UX review report) is green, and merges.
+- The owner never has to test individual changes; the develop preview at
+  https://develop.shared-events.pages.dev always runs the latest green
+  develop, so "go look at the test app" is always available.
+
+One-time GitHub secrets/variables for the full system (Settings → Secrets and
+variables → Actions):
+
+| Name | Kind | Needed for |
+|------|------|-----------|
+| `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Secrets | e2e in CI (bundle build signs in to Supabase). Without them the e2e job skips with a warning instead of failing. |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Secrets | Preview + production deploys. |
+| `DEPLOY_WEB` = `true` | Variable | Enables both deploy jobs. Requires the four secrets above. |
+| `CURSOR_API_KEY` | Secret | Agentic UX review (Cursor Dashboard → API Keys). |
+| `UX_REVIEW_MODEL` | Variable | Optional override of the UX-review agent's model; defaults to `cursor-grok-4.5-high-fast`. |
+
 Because the full suite already ran on the tip of `develop`, a release PR is
 normally a formality: open it, watch it go green, merge. The agentic UX review
 (or a manual pass with `manual-tests/cloud_manual_regression.md` when it's not
@@ -65,7 +89,12 @@ report PR against `develop` with its findings and screenshots.
 One-time setup: add the repo secret `CURSOR_API_KEY` (Cursor Dashboard → API
 Keys). Until then the workflow exits quietly. The agent's own VM secrets
 (`EXPO_PUBLIC_SUPABASE_*`, test accounts) come from the Cursor dashboard like
-any cloud agent run.
+any cloud agent run. The review agent's model defaults to
+`cursor-grok-4.5-high-fast` (screenshot-driven review doesn't need the top
+coding model); set the repo variable `UX_REVIEW_MODEL` to override, and if the
+configured ID is rejected the workflow retries with the account default. If
+the launch fails and no review PR appears within ~15 minutes of a develop
+push, check the workflow run's annotations.
 
 **Alternative without CI plumbing:** create a Cursor Automation
 (cursor.com/automations) with a "Push to branch: develop" trigger and the same

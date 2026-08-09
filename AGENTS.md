@@ -50,14 +50,18 @@ npx tsc --noEmit
 
 The tree is currently `tsc`-clean — keep it that way.
 
-### Branching & CI gates
+### Branching, merging & releases
 
 Two long-lived branches (see `docs/development-workflow.md` for the full model):
 
-- `develop` — integration branch. **All feature PRs target `develop`**, gated only by fast checks (`.github/workflows/ci-fast.yml`: tsc + Jest + SQL). Every push to `develop` runs the full suite and redeploys the **develop preview** at `https://develop.shared-events.pages.dev` (Cloudflare Pages branch alias) when green.
+- `develop` — integration branch. **All feature PRs target `develop`**, gated only by fast checks (`.github/workflows/ci-fast.yml`: tsc + conventions + Jest + SQL). Every push to `develop` runs the full suite and redeploys the **develop preview** at `https://develop.shared-events.pages.dev` (Cloudflare Pages branch alias) when green.
 - `master` — production. Only accepts PRs from `develop` (`.github/workflows/release.yml`), gated by the full suite re-run. Merges deploy production via `deploy-web.yml`.
 
-The full suite (`.github/workflows/full-suite.yml`) = tsc + Jest + SQL semantics + web build + Playwright e2e on desktop Chrome, Mobile Safari (WebKit), and Mobile Chrome. Branch-protection settings to make the gates binding are listed in `docs/development-workflow.md`.
+**Merge policy (set by the repo owner):** agents merge their own feature PRs into `develop` once the fast checks pass — do not wait for human review. The owner does not review individual feature PRs; they try the develop preview when they feel like it. **Only merge `develop → master` when the owner explicitly says to ship/release/push to prod.** Then: open the release PR, confirm the full suite is green, merge. The full suite on develop needs the `EXPO_PUBLIC_SUPABASE_*` repo secrets — until they exist the e2e job skips with a warning, so run `npm run build:web && npm run test:e2e` locally before merging anything risky.
+
+**Model policy:** use the session's default model for development. For agentic click-through/manual testing (computerUse subagents, the UX-review automation), use `cursor-grok-4.5-high-fast` — screenshot review doesn't need the top coding model. The CI-launched UX review defaults to it too (repo variable `UX_REVIEW_MODEL` overrides; discover IDs via `GET https://api.cursor.com/v1/models`).
+
+The full suite (`.github/workflows/full-suite.yml`) = tsc + conventions + Jest + SQL semantics + web build + Playwright e2e on desktop Chrome, Mobile Safari (WebKit), and Mobile Chrome. Branch-protection settings to make the gates binding are listed in `docs/development-workflow.md`.
 
 ### Tests
 
