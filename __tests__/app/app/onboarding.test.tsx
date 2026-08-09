@@ -1,11 +1,9 @@
 import React from 'react';
+import { ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import OnboardingScreen, {
-  pageIndexAfterSwipe,
-  SWIPE_THRESHOLD,
-} from '../../../app/(app)/onboarding';
+import OnboardingScreen, { pageIndexFromOffset } from '../../../app/(app)/onboarding';
 
 describe('app/(app)/onboarding', () => {
   beforeEach(() => {
@@ -23,17 +21,26 @@ describe('app/(app)/onboarding', () => {
 
   it('advances pages with Next and completes on Get Started', async () => {
     const screen = render(<OnboardingScreen />);
+    const pager = screen.UNSAFE_getByType(ScrollView);
+
+    fireEvent(pager, 'layout', {
+      nativeEvent: { layout: { width: 390, height: 700, x: 0, y: 0 } },
+    });
 
     expect(screen.getByText('One place for events')).toBeTruthy();
     expect(screen.getByText('Next')).toBeTruthy();
 
     fireEvent.press(screen.getByText('Next'));
-    expect(screen.getByText('Add from a link or from scratch')).toBeTruthy();
+    expect(screen.getByLabelText('Page 2 of 3').props.accessibilityState).toEqual({
+      selected: true,
+    });
     expect(screen.getByText('Next')).toBeTruthy();
     expect(screen.getByText('Skip')).toBeTruthy();
 
     fireEvent.press(screen.getByText('Next'));
-    expect(screen.getByText("You choose who's in")).toBeTruthy();
+    expect(screen.getByLabelText('Page 3 of 3').props.accessibilityState).toEqual({
+      selected: true,
+    });
     expect(screen.getByText('Get Started')).toBeTruthy();
     expect(screen.queryByText('Skip')).toBeNull();
 
@@ -42,34 +49,30 @@ describe('app/(app)/onboarding', () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/(app)'));
   });
 
-  it('advances and retreats pages on horizontal swipe gestures', () => {
+  it('syncs page state when the pager finishes a swipe', () => {
     const screen = render(<OnboardingScreen />);
-    const page = screen.getByTestId('onboarding-page');
+    const pager = screen.UNSAFE_getByType(ScrollView);
 
-    fireEvent(page, 'responderGrant', {
-      nativeEvent: { pageX: 200 },
+    fireEvent(pager, 'layout', {
+      nativeEvent: { layout: { width: 390, height: 700, x: 0, y: 0 } },
     });
-    fireEvent(page, 'responderRelease', {
-      nativeEvent: { pageX: 200 - SWIPE_THRESHOLD - 1 },
+    fireEvent(pager, 'momentumScrollEnd', {
+      nativeEvent: { contentOffset: { x: 780, y: 0 } },
     });
-    expect(screen.getByText('Add from a link or from scratch')).toBeTruthy();
 
-    fireEvent(page, 'responderGrant', {
-      nativeEvent: { pageX: 100 },
+    expect(screen.getByLabelText('Page 3 of 3').props.accessibilityState).toEqual({
+      selected: true,
     });
-    fireEvent(page, 'responderRelease', {
-      nativeEvent: { pageX: 100 + SWIPE_THRESHOLD + 1 },
-    });
-    expect(screen.getByText('One place for events')).toBeTruthy();
+    expect(screen.getByText('Get Started')).toBeTruthy();
   });
 });
 
-describe('pageIndexAfterSwipe', () => {
-  it('moves forward and backward past the threshold only', () => {
-    expect(pageIndexAfterSwipe(0, -SWIPE_THRESHOLD, 3)).toBe(1);
-    expect(pageIndexAfterSwipe(1, SWIPE_THRESHOLD, 3)).toBe(0);
-    expect(pageIndexAfterSwipe(0, -(SWIPE_THRESHOLD - 1), 3)).toBe(0);
-    expect(pageIndexAfterSwipe(2, -SWIPE_THRESHOLD, 3)).toBe(2);
-    expect(pageIndexAfterSwipe(0, SWIPE_THRESHOLD, 3)).toBe(0);
+describe('pageIndexFromOffset', () => {
+  it('rounds to the nearest in-range page', () => {
+    expect(pageIndexFromOffset(0, 390, 3)).toBe(0);
+    expect(pageIndexFromOffset(200, 390, 3)).toBe(1);
+    expect(pageIndexFromOffset(780, 390, 3)).toBe(2);
+    expect(pageIndexFromOffset(-40, 390, 3)).toBe(0);
+    expect(pageIndexFromOffset(0, 0, 3)).toBe(0);
   });
 });
