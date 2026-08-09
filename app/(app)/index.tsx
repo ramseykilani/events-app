@@ -115,6 +115,7 @@ export default function CalendarScreen() {
         <TouchableOpacity
           style={[styles.errorBanner, { backgroundColor: theme.surface }]}
           onPress={handleRefresh}
+          accessibilityRole="button"
         >
           <Text style={[styles.errorText, { color: theme.textPrimary }]}>{fetchError}</Text>
         </TouchableOpacity>

@@ -1,0 +1,123 @@
+#!/usr/bin/env node
+// Mechanical enforcement of the project conventions that users experience as
+// "inconsistencies" when they slip. Runs in the fast CI checks
+// (`npm run test:conventions`). Keep it fast, deterministic, and zero-false-
+// positive — an intentional exception carries an inline `conventions-ok`
+// comment explaining why.
+//
+// Rules:
+//   1. Every <TouchableOpacity> / <Pressable> carries accessibilityRole
+//      (project rule: interactive elements are accessible — and e2e-locatable).
+//   2. No Alert.alert outside lib/dialogs.ts / lib/showError.ts
+//      (react-native-web makes Alert a no-op; dialogs must render on web).
+//   3. No hard-coded hex colors in app/, components/, hooks/, lib/
+//      (every color is a role token from constants/Colors.ts via useTheme).
+import ts from 'typescript';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+const ROOT = new URL('..', import.meta.url).pathname;
+const SCAN_DIRS = ['app', 'components', 'hooks', 'lib'];
+const SOURCE_RE = /\.(ts|tsx)$/;
+const HEX_RE = /#[0-9a-fA-F]{3}\b|#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{8}\b/g;
+// lib/dialogs.ts and lib/showError.ts are the dialog implementations.
+const ALERT_ALLOWED_FILES = new Set(['lib/dialogs.ts', 'lib/showError.ts']);
+
+function* walk(dir) {
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) yield* walk(path);
+    else if (SOURCE_RE.test(entry)) yield path;
+  }
+}
+
+function lineOf(source, pos) {
+  return source.getLineAndCharacterOfPosition(pos).line + 1;
+}
+
+function hasAllowComment(lines, line) {
+  // lines[] is 0-indexed; allow the marker on the line itself or up to two
+  // lines above it.
+  return [line, line - 1, line - 2].some(
+    (ln) => ln >= 1 && ln <= lines.length && lines[ln - 1].includes('conventions-ok')
+  );
+}
+
+const violations = [];
+
+function checkAccessibilityRoles(path, source) {
+  const visit = (node) => {
+    if (
+      (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) &&
+      ts.isIdentifier(node.tagName) &&
+      (node.tagName.text === 'TouchableOpacity' || node.tagName.text === 'Pressable')
+    ) {
+      const attrs = node.attributes.properties;
+      const hasRole = attrs.some(
+        (a) => ts.isJsxAttribute(a) && a.name.text === 'accessibilityRole'
+      );
+      const hasSpread = attrs.some((a) => ts.isJsxSpreadAttribute(a));
+      if (!hasRole && !hasSpread) {
+        violations.push(
+          `${rel(path)}:${lineOf(source, node.getStart())} — <${node.tagName.text}> without accessibilityRole`
+        );
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+function checkRegexRules(path, text, source) {
+  const lines = text.split('\n');
+  const relPath = rel(path);
+
+  if (!ALERT_ALLOWED_FILES.has(relPath)) {
+    for (const m of text.matchAll(/Alert\.alert\(/g)) {
+      const line = lineOf(source, m.index);
+      if (!hasAllowComment(lines, line)) {
+        violations.push(
+          `${relPath}:${line} — Alert.alert is a no-op on web; use showAlert/showConfirm from lib/dialogs.ts`
+        );
+      }
+    }
+  }
+
+  for (const m of text.matchAll(HEX_RE)) {
+    const line = lineOf(source, m.index);
+    const textLine = lines[line - 1].trim();
+    if (textLine.startsWith('//') || textLine.startsWith('*')) continue;
+    if (!hasAllowComment(lines, line)) {
+      violations.push(
+        `${relPath}:${line} — hard-coded color ${m[0]}; use a role token from constants/Colors.ts via useTheme`
+      );
+    }
+  }
+}
+
+const rel = (path) => relative(ROOT, path);
+
+for (const dir of SCAN_DIRS) {
+  for (const path of walk(join(ROOT, dir))) {
+    const text = readFileSync(path, 'utf8');
+    const source = ts.createSourceFile(
+      path,
+      text,
+      ts.ScriptTarget.Latest,
+      true,
+      path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+    );
+    checkAccessibilityRoles(path, source);
+    checkRegexRules(path, text, source);
+  }
+}
+
+if (violations.length > 0) {
+  console.error(`Convention violations (${violations.length}):\n`);
+  for (const v of violations) console.error(`  ${v}`);
+  console.error(
+    '\nIntentional exceptions need an inline `conventions-ok` comment with the reason.'
+  );
+  process.exit(1);
+}
+console.log('Convention checks passed.');

@@ -222,7 +222,7 @@ export default function ShareScreen() {
         onSelectionChange={setSelectedPersonIds}
       />
       {loadError ? (
-        <TouchableOpacity onPress={loadData} activeOpacity={0.6}>
+        <TouchableOpacity onPress={loadData} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.loadError, { color: theme.textSecondary }]}>
             Could not load people. Tap to retry.
           </Text>

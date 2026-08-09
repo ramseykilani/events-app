@@ -138,7 +138,7 @@ export function PeoplePicker({
             <Text style={[styles.errorText, { color: theme.textSecondary }]}>
               Couldn't load your contacts.
             </Text>
-            <TouchableOpacity onPress={() => setRetryKey((k) => k + 1)} activeOpacity={0.6}>
+            <TouchableOpacity onPress={() => setRetryKey((k) => k + 1)} activeOpacity={0.6} accessibilityRole="button">
               <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
             </TouchableOpacity>
           </View>

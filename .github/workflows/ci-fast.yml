@@ -31,6 +31,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Convention checks
+        run: npm run test:conventions
+
       - name: Jest suite
         run: npm test -- --runInBand --ci
 

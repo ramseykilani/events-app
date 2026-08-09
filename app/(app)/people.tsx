@@ -403,7 +403,7 @@ export default function PeopleScreen() {
         {people.length} / 50 people
       </Text>
       {loadError ? (
-        <TouchableOpacity onPress={() => loadData()} activeOpacity={0.6}>
+        <TouchableOpacity onPress={() => loadData()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.loadError, { color: theme.destructiveLink }]}>
             Could not refresh. Tap to retry.
           </Text>
@@ -456,6 +456,7 @@ export default function PeopleScreen() {
               />
               <TouchableOpacity
                 style={[styles.addCircleBtn, { backgroundColor: theme.primaryButtonBg }]}
+                accessibilityRole="button"
                 onPress={handleAddCircle}
                 disabled={!newCircleName.trim()}
                 activeOpacity={0.7}

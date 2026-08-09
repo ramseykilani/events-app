@@ -1,0 +1,66 @@
+# Agentic UX review of the develop preview.
+#
+# After every green Develop pipeline (full suite + preview deploy), launches a
+# Cursor Cloud Agent that drives https://develop.shared-events.pages.dev like
+# a user — desktop and mobile-emulated viewports, following
+# manual-tests/cloud_manual_regression.md — and opens a PR with the report.
+# This is the "agent actually clicks the buttons" layer; the deterministic
+# Playwright suite stays the merge gate.
+#
+# Setup (one time): add the repo secret CURSOR_API_KEY (Cursor Dashboard →
+# API Keys). Until then the workflow exits quietly. Cursor-side, the repo's
+# Cloud Agent secrets (EXPO_PUBLIC_SUPABASE_*) come from the Cursor dashboard,
+# same as for any cloud agent.
+#
+# Alternative: a Cursor Automation with a "Push to branch: develop" trigger
+# can run the same prompt with zero CI config — see docs/development-
+# workflow.md. Enable only one of the two or every push gets two reviews.
+#
+# Note: workflow_run triggers read this file from the DEFAULT branch, so this
+# starts firing only after it reaches master.
+name: Agent UX review
+on:
+  workflow_run:
+    workflows: ["Develop"]
+    branches: [develop]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: agent-ux-review
+  cancel-in-progress: false
+
+jobs:
+  launch:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Launch Cursor cloud agent
+        run: |
+          if [ -z "${CURSOR_API_KEY}" ]; then
+            echo "CURSOR_API_KEY secret not set — skipping agent UX review."
+            echo "Set it (Cursor Dashboard → API Keys) to enable; see docs/development-workflow.md."
+            exit 0
+          fi
+          PAYLOAD=$(jq -n \
+            --arg prompt "$(cat scripts/agent-ux-review-prompt.md)" \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}" \
+            '{
+              prompt: { text: $prompt },
+              repos: [{ url: $url, startingRef: "develop" }],
+              autoCreatePR: true
+            }')
+          RESPONSE=$(curl -sf --request POST \
+            --url https://api.cursor.com/v1/agents \
+            -u "${CURSOR_API_KEY}:" \
+            --header 'Content-Type: application/json' \
+            --data "${PAYLOAD}")
+          AGENT_URL=$(echo "${RESPONSE}" | jq -r '.agent.url')
+          echo "UX review agent launched: ${AGENT_URL}"
+          echo "### UX review agent launched: ${AGENT_URL}" >> "${GITHUB_STEP_SUMMARY}"

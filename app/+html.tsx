@@ -3,6 +3,8 @@ import type { PropsWithChildren } from 'react';
 
 // Must match Colors.paper.background / DEFAULT_THEME. Do not import constants/Colors
 // here — that module pulls react-native Platform, which breaks the Node HTML shell.
+// conventions-ok: the HTML shell renders before React/hooks exist, so a role
+// token via useTheme is impossible here by construction.
 const DEFAULT_WEB_BACKGROUND = '#faf7f0';
 
 // Static HTML shell for web. Runtime theme changes update these via

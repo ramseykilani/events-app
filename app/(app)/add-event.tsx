@@ -88,6 +88,9 @@ export default function AddEventScreen() {
         text: `${event.title ?? 'Untitled'} (${event.event_date})`,
         onPress: () => resolve(event.id),
       }));
+      // Native needs a multi-option dialog (one button per existing event),
+      // which showConfirm can't express; web never reaches this branch (it
+      // takes the window.confirm path above). conventions-ok
       Alert.alert(
         'Existing event',
         'This URL has already been added. Choose an existing event or create a new one.',

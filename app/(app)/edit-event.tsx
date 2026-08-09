@@ -205,10 +205,10 @@ export default function EditEventScreen() {
         <Text style={[styles.loadErrorText, { color: theme.textSecondary }]}>
           Could not load this event.
         </Text>
-        <TouchableOpacity onPress={load} activeOpacity={0.6}>
+        <TouchableOpacity onPress={load} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.retry, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
       </View>
@@ -343,6 +343,7 @@ export default function EditEventScreen() {
           style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
           onPress={handleDelete}
           activeOpacity={0.7}
+          accessibilityRole="button"
         >
           <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
         </TouchableOpacity>

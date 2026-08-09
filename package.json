@@ -14,6 +14,7 @@
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
     "test:e2e:mobile": "playwright test --project=mobile-safari --project=mobile-chrome",
+    "test:conventions": "node scripts/check-conventions.mjs",
     "test:sql": "bash supabase/tests/run_local.sh",
     "serve:web": "serve -s dist -l 8081",
     "deploy:develop": "npm run build:web && wrangler pages deploy --branch=develop",

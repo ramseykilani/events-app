@@ -201,6 +201,7 @@ export function Calendar({
             <TouchableOpacity
               onPress={() => router.push('/(app)/add-event')}
               activeOpacity={0.6}
+              accessibilityRole="button"
             >
               <Text style={[styles.emptyAction, { color: theme.linkText }]}>Add an event</Text>
             </TouchableOpacity>

@@ -1,7 +1,9 @@
-import { disableNavigatorLocks, expect, test } from './fixtures';
+import { expect, newExtraContext, test } from './fixtures';
 import {
   ACCOUNT_B,
   PERSON_B_NAME,
+  addPersonManually,
+  createEventAndShareToB,
   expectCalendar,
   openEventFromCalendar,
   removeOpenEvent,
@@ -29,41 +31,23 @@ test('sharing delivers B their own copy that survives A removing theirs', async 
   await page.goto('/');
   await expectCalendar(page);
   await page.getByRole('button', { name: 'People' }).click();
-  await page
-    .getByRole('button', { name: 'Add', exact: true })
-    .first()
-    .click();
-  await page.getByPlaceholder('Name').fill(PERSON_B_NAME);
-  await page.getByPlaceholder('+1 416 555 1234').fill(ACCOUNT_B.phone);
-  await page
-    .getByRole('button', { name: 'Save', exact: true })
-    .click();
-  await expect(page.getByText(PERSON_B_NAME)).toBeVisible();
+  await addPersonManually(page, PERSON_B_NAME, ACCOUNT_B.phone);
   await page.getByRole('button', { name: 'Back' }).click();
 
   // --- Account A: create an event for today and share it with B.
-  await expectCalendar(page);
-  await page.getByRole('button', { name: 'Add event' }).click();
-  await page.getByPlaceholder('Event title').fill(title);
-  await page.getByRole('button', { name: 'Save' }).click();
+  await createEventAndShareToB(page, title);
 
-  await expect(page.getByText('Share with')).toBeVisible();
-  await page.getByText(PERSON_B_NAME).click();
-  await page.getByRole('button', { name: 'Share', exact: true }).click();
-  await expectCalendar(page);
-  await expect(page.getByText(title, { exact: true })).toBeVisible();
-
-  // --- Account B (separate browser context): sign in, event is on today.
-  // Same baseURL + Web-Locks shim as the fixture-provided context.
-  const contextB = await browser.newContext({
-    baseURL: testInfo.project.use.baseURL,
-  });
-  await contextB.addInitScript(disableNavigatorLocks);
+  // --- Account B (separate signed-out browser context): sign in, event is
+  // on today.
+  const contextB = await newExtraContext(browser, testInfo);
   const pageB = await contextB.newPage();
   try {
     await signIn(pageB, ACCOUNT_B);
+    // Generous timeout: B's first fetch includes session bootstrap plus the
+    // calendar query on a freshly created context, and this step is where a
+    // slow runner shows up first.
     await expect(pageB.getByText(title, { exact: true })).toBeVisible({
-      timeout: 15000,
+      timeout: 30000,
     });
 
     // --- A removes their own copy; B's copy must survive (E-108).

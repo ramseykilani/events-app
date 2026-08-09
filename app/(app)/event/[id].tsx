@@ -232,7 +232,7 @@ export default function EventDetailScreen() {
           <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
             Could not load this event.
           </Text>
-          <TouchableOpacity onPress={load} activeOpacity={0.6}>
+          <TouchableOpacity onPress={load} activeOpacity={0.6} accessibilityRole="button">
             <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -294,6 +294,7 @@ export default function EventDetailScreen() {
               style={styles.link}
               onPress={() => Linking.openURL(event.url!)}
               activeOpacity={0.6}
+              accessibilityRole="button"
             >
               <Text style={[styles.linkText, { color: theme.linkText }]}>Open link</Text>
             </TouchableOpacity>

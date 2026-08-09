@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Dialog, type Page } from '@playwright/test';
 
 // Test OTP accounts configured on the Supabase project (see AGENTS.md →
 // "Signing in (test OTP)"). Both expire March 31, 2027. They are documented
@@ -65,21 +65,96 @@ export function uniqueTitle(prefix: string, projectName: string): string {
   return `${prefix} ${projectName} ${Date.now()}`;
 }
 
+// On the People screen, upsert a person via the web manual-add form.
+export async function addPersonManually(
+  page: Page,
+  name: string,
+  phone: string
+): Promise<void> {
+  await page
+    .getByRole('button', { name: 'Add', exact: true })
+    .first()
+    .click();
+  await page.getByPlaceholder('Name').fill(name);
+  await page.getByPlaceholder('+1 416 555 1234').fill(phone);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  // Exact: the calendar stacked underneath shows "From <name>" attribution
+  // cards, which a substring match would also hit.
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+  // The modal's slide-out keeps the main screen's inputs unfocusable until it
+  // fully unmounts (~1s on web) — wait for its content to leave the DOM.
+  // (Exact match: the circle form's "New circle name" placeholder contains
+  // "Name" as a substring.)
+  await expect(page.getByPlaceholder('Name', { exact: true })).toBeHidden();
+}
+
+// From the calendar: create an event for today and share it with PERSON_B_NAME.
+// Ends back on the calendar with the event visible.
+export async function createEventAndShareToB(
+  page: Page,
+  title: string
+): Promise<void> {
+  // A failed create/share surfaces via showError → window.alert on web, which
+  // Playwright would otherwise auto-dismiss and hide the real error behind a
+  // downstream "event not found" timeout. Fail loudly with the message.
+  let errorDialog: string | null = null;
+  const onDialog = (dialog: Dialog) => {
+    errorDialog = dialog.message();
+    void dialog.accept();
+  };
+  page.on('dialog', onDialog);
+  try {
+    await expectCalendar(page);
+    await page.getByRole('button', { name: 'Add event' }).click();
+    await page.getByPlaceholder('Event title').fill(title);
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    await expect(page.getByText('Share with')).toBeVisible();
+    // Self-verifying selection: a tap that races a list re-render can be eaten
+    // (the row node gets replaced mid-click), leaving Share disabled forever.
+    // Retry until the row's ✓ shows — guarded so an already-selected row isn't
+    // toggled back off by the retry.
+    const rowB = page.getByText(PERSON_B_NAME, { exact: true }).locator('..');
+    await expect(async () => {
+      if (!(await rowB.getByText('✓').isVisible().catch(() => false))) {
+        await rowB.click();
+      }
+      await expect(rowB.getByText('✓')).toBeVisible({ timeout: 2000 });
+    }).toPass();
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    await expectCalendar(page);
+    await expect(page.getByText(title, { exact: true })).toBeVisible();
+    expect(errorDialog).toBeNull();
+  } finally {
+    page.off('dialog', onDialog);
+  }
+}
+
+// React Navigation keeps covered screens mounted in the DOM (display:none on
+// web), so a text/role locator can resolve to elements on both the visible
+// screen and the one underneath. Assert against the visible copy.
+export function visibleText(page: Page, text: string) {
+  return page.getByText(text, { exact: true }).filter({ visible: true });
+}
+
 // The calendar opens on today and both add/remove flows operate on the
 // selected day, so every e2e event is created for today.
 export async function openEventFromCalendar(
   page: Page,
   title: string
 ): Promise<void> {
-  await page.getByText(title, { exact: true }).click();
+  await visibleText(page, title).click();
   await expect(
-    page.getByRole('button', { name: 'Remove Event' })
+    page.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
   ).toBeVisible({ timeout: 15000 });
 }
 
 // "Remove Event" confirms via window.confirm on web (lib/dialogs.ts).
 export async function removeOpenEvent(page: Page): Promise<void> {
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Remove Event' }).click();
+  await page
+    .getByRole('button', { name: 'Remove Event' })
+    .filter({ visible: true })
+    .click();
   await expectCalendar(page);
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTheme } from '../hooks/useTheme';
 
 // Web-only date/time inputs. @react-native-community/datetimepicker is
 // native-only (its pickers never open in the browser), so the add/edit event
@@ -18,19 +19,21 @@ function toTimeInputValue(date: Date): string {
   return `${h}:${m}`;
 }
 
-const inputStyle: React.CSSProperties = {
-  borderWidth: 1,
-  borderStyle: 'solid',
-  borderColor: '#ccc',
-  borderRadius: 12,
-  padding: 14,
-  fontSize: 16,
-  fontFamily: 'inherit',
-  backgroundColor: 'transparent',
-  color: 'inherit',
-  width: '100%',
-  boxSizing: 'border-box',
-};
+function inputStyle(borderColor: string): React.CSSProperties {
+  return {
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    fontFamily: 'inherit',
+    backgroundColor: 'transparent',
+    color: 'inherit',
+    width: '100%',
+    boxSizing: 'border-box',
+  };
+}
 
 export function WebDateInput({
   value,
@@ -39,11 +42,12 @@ export function WebDateInput({
   value: Date;
   onChange: (date: Date) => void;
 }) {
+  const theme = useTheme();
   return (
     <input
       type="date"
       aria-label="Date"
-      style={inputStyle}
+      style={inputStyle(theme.border)}
       value={toDateInputValue(value)}
       onChange={(e) => {
         const v = e.target.value; // YYYY-MM-DD
@@ -63,11 +67,12 @@ export function WebTimeInput({
   value: Date | null;
   onChange: (date: Date | null) => void;
 }) {
+  const theme = useTheme();
   return (
     <input
       type="time"
       aria-label="Time (optional)"
-      style={inputStyle}
+      style={inputStyle(theme.border)}
       value={value ? toTimeInputValue(value) : ''}
       onChange={(e) => {
         const v = e.target.value; // "HH:MM", or "" when cleared

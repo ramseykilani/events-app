@@ -73,7 +73,11 @@ E2E tests (Playwright, `e2e/`): build the web bundle first, then run all form fa
 npm run build:web && npm run test:e2e
 ```
 
-Two e2e gotchas, both handled in `e2e/fixtures.ts` / `e2e/helpers.ts`: (1) test contexts must drop `navigator.locks` — supabase-js Web Locks are browser-process-wide per origin and a document destroyed mid-lock orphans it, hanging every later `getSession()` on the boot spinner; any context created outside the fixture (like account B in `share.spec.ts`) needs the same `disableNavigatorLocks` init script. (2) `signIn()` clears cookies/localStorage first because a shared test account's stored session may have been revoked by a later sign-in.
+Convention checks (no ESLint in this repo — this is the mechanical layer): `npm run test:conventions` enforces accessibilityRole on touchables, no `Alert.alert` outside the dialog helpers, and no hard-coded hex colors. Intentional exceptions carry an inline `conventions-ok` comment.
+
+E2e gotchas, all handled in `e2e/fixtures.ts` / `e2e/helpers.ts`: (1) test contexts must drop `navigator.locks` — supabase-js Web Locks are browser-process-wide per origin and a document destroyed mid-lock orphans it, hanging every later `getSession()` on the boot spinner; any context created outside the fixture must use `newExtraContext()`. (2) `signIn()` clears cookies/localStorage first because a shared test account's stored session may have been revoked by a later sign-in. (3) Covered nav screens stay mounted (`display:none`) so locators can double-match — use `visibleText()`; modals overlay WITHOUT hiding the base screen — scope modal interactions to `getByRole('dialog')` and wait for the dialog to unmount before touching what's underneath. (4) List-row selection taps can be eaten by re-renders — selection helpers retry until the row's ✓ shows.
+
+After every green develop pipeline, `agent-ux-review.yml` launches a Cursor Cloud Agent to click through the develop preview (desktop + mobile viewports) and open a report PR — inert until the `CURSOR_API_KEY` repo secret is set. See `docs/development-workflow.md` → Agentic UX review.
 
 Manual regression suite for cloud agents:
 
