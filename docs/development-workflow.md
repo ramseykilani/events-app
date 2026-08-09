@@ -22,21 +22,23 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
    staging preview redeploys automatically. When red, the branch shows it and
    the next agent fixes forward — staging is allowed to be briefly red,
    production never is.
-3. **When it feels right, the owner looks at the staging preview** — and/or
-   asks for the agentic UX review (a cloud agent that clicks through the
-   preview on desktop and phone viewports and opens a report PR).
-4. **The owner says "ship it."** An agent fast-forwards the exact
-   green-tested staging commit to `production`
-   (`git push origin staging:production`). Branch protection on `production`
-   requires the full-suite checks on that commit, so an untested or red commit
-   is physically rejected. The push deploys production.
+3. **The owner says "ship it."** The agent runs the release click-through
+   review first (see "Agentic UX review"): a complete pass over every scenario
+   in the manual regression suite against the staging preview, desktop +
+   mobile viewports, ending in `VERDICT: SHIP` / `VERDICT: DON'T SHIP`. On
+   DON'T SHIP, fix forward on staging and re-review.
+4. **On SHIP, the agent fast-forwards the exact green-tested staging commit
+   to `production`** (`git push origin staging:production`). Branch protection
+   on `production` requires the full-suite checks on that commit, so an
+   untested or red commit is physically rejected. The push deploys production.
 
 ## What runs where
 
 | Trigger | Workflow | What runs |
 |---------|----------|-----------|
 | Push to `staging` | `staging.yml` | **Full suite** (`full-suite.yml`): tsc, convention checks, Jest, SQL semantics, web build, Playwright e2e on desktop Chrome / Mobile Safari / Mobile Chrome. If green, redeploys the staging preview with the tested bundle. |
-| Green `staging.yml` run | `agent-ux-review.yml` | Launches the Cursor UX-review agent against the staging preview; opens a report PR. Inert until `CURSOR_API_KEY` is set. |
+| Ship time (owner says "ship it") | in-session `computerUse` subagent | Complete click-through of every manual-suite scenario against the staging preview → `VERDICT: SHIP` / `DON'T SHIP` + report PR. Gate for promotion. |
+| PR → `production` (optional path) | `agent-ux-review.yml` | CI-launched copy of the same review. Inert until `CURSOR_API_KEY` is set. |
 | PR → `staging` (optional) | `ci-fast.yml` | Fast checks only. PRs into staging are optional paper trail. |
 | PR → `production` (optional path) | `release.yml` | Rejects any source branch that isn't `staging`, re-runs the full suite. Defense in depth; normal promotion is the fast-forward push above. |
 | Push to `production` | `deploy-web.yml` | Production deploy. |
@@ -103,32 +105,30 @@ Test-environment quirks worth knowing (all handled in `e2e/fixtures.ts` and
 - **Selection taps**: list-row taps can be eaten by a re-render; selection
   helpers retry until the row's ✓ appears (guarded against double-toggle).
 
-## Agentic UX review
+## Agentic UX review (the release click-through)
 
-`agent-ux-review.yml` fires after every green Staging pipeline (or manually
-via workflow_dispatch) and launches a Cursor Cloud Agent through the Cloud
-Agents API (`POST /v1/agents`) with `scripts/agent-ux-review-prompt.md`. The
-agent gets a full desktop VM, tests the staging preview on desktop and
-mobile-emulated viewports following the manual regression suite, and opens a
-report PR against `staging` with its findings and screenshots. If reviews are
-too frequent, delete the `workflow_run` trigger and keep workflow_dispatch —
-then reviews run only when someone asks.
+The review happens **at ship time, batched per release** — not on every push.
+One complete pass over every feature costs one agent run and keeps token spend
+proportional to releases, not commits.
 
-One-time setup: add the repo secret `CURSOR_API_KEY` (Cursor Dashboard → API
-Keys). Until then the workflow exits quietly. The agent's own VM secrets
-(`EXPO_PUBLIC_SUPABASE_*`, test accounts) come from the Cursor dashboard like
-any cloud agent run. The review agent's model defaults to
-`cursor-grok-4.5-high-fast` (screenshot-driven review doesn't need the top
-coding model); set the repo variable `UX_REVIEW_MODEL` to override, and if the
-configured ID is rejected the workflow retries with the account default.
+Two ways to run it:
 
-**Alternative without CI plumbing:** create a Cursor Automation
-(cursor.com/automations) with a "Push to branch: staging" trigger and the same
-prompt file as the instructions. Enable only one of the two, or every push
-gets two reviews.
+1. **In-session (default, no setup):** when the owner says ship it, the agent
+   launches a `computerUse` subagent with model `cursor-grok-4.5-high-fast`
+   and `scripts/agent-ux-review-prompt.md` as the instructions. Runs in the
+   current cloud VM; needs no GitHub secrets. This is the normal path.
+2. **CI-launched (optional):** `agent-ux-review.yml` fires on release PRs
+   (staging → production) and manual dispatch, launching a Cursor Cloud Agent
+   via the Cloud Agents API (`POST /v1/agents`). Requires the repo secret
+   `CURSOR_API_KEY`; the model comes from the repo variable `UX_REVIEW_MODEL`
+   (default `cursor-grok-4.5-high-fast`), with automatic fallback to the
+   account default if the ID is rejected.
 
-Note: `workflow_run` triggers read the workflow file from the default branch,
-so the automatic trigger starts once that branch (production) contains it.
+Either way, the reviewer follows the same prompt: every scenario in
+`manual-tests/cloud_manual_regression.md` against the staging preview,
+desktop + mobile viewports, screenshot discipline (evidence only), and a
+first-line `VERDICT: SHIP` / `VERDICT: DON'T SHIP` in a report PR against
+`staging`. A DON'T SHIP blocks promotion until fixed and re-reviewed.
 
 ## GitHub settings (one time)
 

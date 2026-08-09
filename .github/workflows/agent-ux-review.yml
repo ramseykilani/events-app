@@ -1,30 +1,20 @@
-# Agentic UX review of the staging preview.
+# Agentic UX review of the staging preview — the release-candidate review.
 #
-# After every green Staging pipeline (full suite + preview deploy), launches a
-# Cursor Cloud Agent that drives https://staging.shared-events.pages.dev like
-# a user — desktop and mobile-emulated viewports, following
-# manual-tests/cloud_manual_regression.md — and opens a PR with the report.
-# This is the "agent actually clicks the buttons" layer; the deterministic
-# Playwright suite stays the merge gate.
+# Deliberately NOT run on every staging push: reviews are batched and happen
+# at ship time, covering every feature, before anything promotes to
+# production. The normal path is the ship-it protocol in AGENTS.md (the agent
+# runs the review in-session via a computerUse subagent, no GitHub secrets
+# needed). This workflow is the optional hands-off path: it fires on release
+# PRs (staging → production) and on manual dispatch.
 #
 # Setup (one time): add the repo secret CURSOR_API_KEY (Cursor Dashboard →
 # API Keys). Until then the workflow exits quietly. Cursor-side, the repo's
 # Cloud Agent secrets (EXPO_PUBLIC_SUPABASE_*) come from the Cursor dashboard,
-# same as for any cloud agent. To run reviews only on demand instead, delete
-# the workflow_run trigger below and use workflow_dispatch.
-#
-# Alternative: a Cursor Automation with a "Push to branch: staging" trigger
-# can run the same prompt with zero CI config — see docs/development-
-# workflow.md. Enable only one of the two or every push gets two reviews.
-#
-# Note: workflow_run triggers read this file from the DEFAULT branch, so this
-# starts firing only after the default branch contains it (production).
+# same as for any cloud agent.
 name: Agent UX review
 on:
-  workflow_run:
-    workflows: ["Staging"]
-    branches: [staging]
-    types: [completed]
+  pull_request:
+    branches: [production]
   workflow_dispatch:
 
 concurrency:

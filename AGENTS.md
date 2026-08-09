@@ -59,7 +59,13 @@ Two long-lived branches, named after their environments (see `docs/development-w
 
 **Push policy (set by the repo owner):** agents push finished work **straight to `staging`** — no PR, no human review. Hard rule: before pushing, the fast checks must pass locally (`npx tsc --noEmit && npm run test:conventions && npm test -- --runInBand && npm run test:sql`). Every push then runs the full suite in CI; if it goes red, the next agent fixes forward before anything ships. PRs into staging are optional paper trail, never required.
 
-**Only promote `staging → production` when the owner explicitly says to ship/release/push to prod.** Promotion is a fast-forward push of the green-tested staging tip (`git push origin staging:production`): branch protection on production requires the full-suite checks to be green on the commit, so untested code physically cannot ship. The full suite needs the `EXPO_PUBLIC_SUPABASE_*` repo secrets — until they exist the e2e job skips with a warning, so also run `npm run build:web && npm run test:e2e` locally before promoting.
+**Only promote `staging → production` when the owner explicitly says to ship/release/push to prod.** The ship-it protocol, in order:
+
+1. Confirm the full suite is green on the staging tip (CI, or run `npm run build:web && npm run test:e2e` locally if the `EXPO_PUBLIC_SUPABASE_*` repo secrets aren't set yet — without them the CI e2e job skips with a warning).
+2. Run the **release click-through review**: launch a `computerUse` subagent (model `cursor-grok-4.5-high-fast`) with `scripts/agent-ux-review-prompt.md` as the instructions. It covers every scenario in `manual-tests/cloud_manual_regression.md` against the staging preview, desktop + mobile viewports, and ends with `VERDICT: SHIP` / `VERDICT: DON'T SHIP` and a report PR.
+3. `VERDICT: SHIP` → promote with `git push origin staging:production` (branch protection requires the full-suite checks on the commit, so untested code physically cannot ship). `VERDICT: DON'T SHIP` → fix forward on staging and re-review.
+
+The review is batched per release on purpose: one complete click-through at ship time beats a shallow review on every push, and it keeps token spend proportional to releases, not commits.
 
 **Model policy:** use the session's default model for development. For agentic click-through/manual testing (computerUse subagents, the UX-review automation), use `cursor-grok-4.5-high-fast` — screenshot review doesn't need the top coding model. The CI-launched UX review defaults to it too (repo variable `UX_REVIEW_MODEL` overrides; discover IDs via `GET https://api.cursor.com/v1/models`).
 
@@ -83,7 +89,7 @@ Convention checks (no ESLint in this repo — this is the mechanical layer): `np
 
 E2e gotchas, all handled in `e2e/fixtures.ts` / `e2e/helpers.ts`: (1) test contexts must drop `navigator.locks` — supabase-js Web Locks are browser-process-wide per origin and a document destroyed mid-lock orphans it, hanging every later `getSession()` on the boot spinner; any context created outside the fixture must use `newExtraContext()`. (2) `signIn()` clears cookies/localStorage first because a shared test account's stored session may have been revoked by a later sign-in. (3) Covered nav screens stay mounted (`display:none`) so locators can double-match — use `visibleText()`; modals overlay WITHOUT hiding the base screen — scope modal interactions to `getByRole('dialog')` and wait for the dialog to unmount before touching what's underneath. (4) List-row selection taps can be eaten by re-renders — selection helpers retry until the row's ✓ shows.
 
-After every green staging pipeline, `agent-ux-review.yml` launches a Cursor Cloud Agent to click through the staging preview (desktop + mobile viewports) and open a report PR — inert until the `CURSOR_API_KEY` repo secret is set. See `docs/development-workflow.md` → Agentic UX review.
+The agent click-through review runs at ship time, not per push (see Branching → ship-it protocol). `agent-ux-review.yml` is the optional CI path (fires on release PRs and manual dispatch; inert until the `CURSOR_API_KEY` repo secret is set). See `docs/development-workflow.md` → Agentic UX review.
 
 Manual regression suite for cloud agents:
 
