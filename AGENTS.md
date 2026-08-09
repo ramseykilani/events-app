@@ -50,6 +50,15 @@ npx tsc --noEmit
 
 The tree is currently `tsc`-clean — keep it that way.
 
+### Branching & CI gates
+
+Two long-lived branches (see `docs/development-workflow.md` for the full model):
+
+- `develop` — integration branch. **All feature PRs target `develop`**, gated only by fast checks (`.github/workflows/ci-fast.yml`: tsc + Jest + SQL). Every push to `develop` runs the full suite and redeploys the **develop preview** at `https://develop.shared-events.pages.dev` (Cloudflare Pages branch alias) when green.
+- `master` — production. Only accepts PRs from `develop` (`.github/workflows/release.yml`), gated by the full suite re-run. Merges deploy production via `deploy-web.yml`.
+
+The full suite (`.github/workflows/full-suite.yml`) = tsc + Jest + SQL semantics + web build + Playwright e2e on desktop Chrome, Mobile Safari (WebKit), and Mobile Chrome. Branch-protection settings to make the gates binding are listed in `docs/development-workflow.md`.
+
 ### Tests
 
 Automated regression tests are configured with Jest + React Native Testing Library:
@@ -57,6 +66,14 @@ Automated regression tests are configured with Jest + React Native Testing Libra
 ```bash
 npm test -- --runInBand
 ```
+
+E2E tests (Playwright, `e2e/`): build the web bundle first, then run all form factors (or `test:e2e:mobile` for mobile only). Set `E2E_BASE_URL` to run against a deployed build:
+
+```bash
+npm run build:web && npm run test:e2e
+```
+
+Two e2e gotchas, both handled in `e2e/fixtures.ts` / `e2e/helpers.ts`: (1) test contexts must drop `navigator.locks` — supabase-js Web Locks are browser-process-wide per origin and a document destroyed mid-lock orphans it, hanging every later `getSession()` on the boot spinner; any context created outside the fixture (like account B in `share.spec.ts`) needs the same `disableNavigatorLocks` init script. (2) `signIn()` clears cookies/localStorage first because a shared test account's stored session may have been revoked by a later sign-in.
 
 Manual regression suite for cloud agents:
 
@@ -88,7 +105,7 @@ For the web beta, `send-notification` accepts a `WEB_APP_URL` secret (see FEATUR
 
 ### Deploying the web app (Cloudflare Pages)
 
-The web build is hosted on **Cloudflare Pages** as a **direct-upload** project managed via Wrangler (not Pages' built-in Git integration — Wrangler keeps the whole deploy path in the repo and runnable by any agent).
+The web build is hosted on **Cloudflare Pages** as a **direct-upload** project managed via Wrangler (not Pages' built-in Git integration — Wrangler keeps the whole deploy path in the repo and runnable by any agent). Two standing sites: production `https://shared-events.pages.dev` (deploys from `master`) and the develop preview `https://develop.shared-events.pages.dev` (`npm run deploy:develop`, or CI `develop.yml`).
 
 - Config: `wrangler.toml` (project name `shared-events`, output dir `dist/`). `public/_redirects` carries the SPA fallback (`/* /index.html 200`) so deep links like `/event/<id>` load the app; it's copied into `dist/` at export time.
 - Prerequisites: `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). `CLOUDFLARE_ACCOUNT_ID` must be the 32-char hex account id — not the API token.

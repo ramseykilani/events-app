@@ -19,10 +19,16 @@ Use this when:
 3. Start app:
    - `npx expo start --web --port 8081`
 
-Use these test credentials (if configured on Supabase):
-- Phone: `+15555550100`
-- OTP: `123456`
-- Second account (multi-user scenarios): `+15555550101`, OTP `123456`
+Use these test credentials (configured on the Supabase project, expire 2027-03-31):
+- Phone: `+15555550100` (account A), OTP: `123456`
+- Second account (multi-user scenarios): `+15555550103` (account B), OTP `123456`
+- `+15555550101` is NOT a configured test number — Twilio rejects it with `sms_send_failed`.
+
+When this suite runs as the pre-release gate (see `docs/development-workflow.md`),
+run it against the develop preview `https://develop.shared-events.pages.dev` and
+repeat the Core scenarios once in a mobile-emulated viewport (Chrome DevTools
+device toolbar, e.g. iPhone 14) — the automated e2e suite covers mobile web, but
+touch-feel and layout need eyes.
 
 ---
 
