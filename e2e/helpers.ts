@@ -75,7 +75,9 @@ export async function addPersonManually(
     .getByRole('button', { name: 'Add', exact: true })
     .first()
     .click();
-  await page.getByPlaceholder('Name').fill(name);
+  // Exact: the circle form's "New circle name" placeholder also contains
+  // "Name", and it stays mounted under the modal on narrow viewports.
+  await page.getByPlaceholder('Name', { exact: true }).fill(name);
   await page.getByPlaceholder('+1 416 555 1234').fill(phone);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   // Exact: the calendar stacked underneath shows "From <name>" attribution

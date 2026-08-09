@@ -8,6 +8,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   LayoutChangeEvent,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -78,7 +79,11 @@ export default function OnboardingScreen() {
     setCurrentPage(next);
     scrollRef.current?.scrollTo({
       x: next * pageWidthRef.current,
-      animated,
+      // On web, button-driven jumps must be instant: scroll-snap fights an
+      // interrupted smooth scroll and can snap back a page, which then
+      // re-syncs page state backward and swallows rapid Next taps. Gesture
+      // scrolling still animates via snap on every platform.
+      animated: Platform.OS === 'web' ? false : animated,
     });
   };
 
