@@ -69,13 +69,15 @@ For each executed scenario:
 **Steps**
 1. Complete sign-in with a brand-new account (no events shared with it).
 2. The walkthrough should appear automatically because the calendar is empty.
-3. On onboarding, tap **Next** between pages.
-4. Verify final CTA changes to **Get Started**.
-5. Re-open onboarding from calendar `?` button, then tap **Skip**.
+3. **Also re-check at a mobile viewport** (Chrome device toolbar → iPhone 12/14 Pro, ~390×844). Desktop-only passes are not enough for this scenario.
+4. On onboarding, tap **Next** between pages. Confirm copy sits near the top (not vertically centered in a huge empty void) and footer controls stay clear of the home-indicator/safe area.
+5. Swipe horizontally between pages (touch / mobile emulation). Confirm dots track the page and the final CTA becomes **Get Started**.
+6. Re-open onboarding from calendar `?` button, then tap **Skip**.
 
 **Expected**
 - Walkthrough auto-shows at most once, and only when the user has no events at all (an invited guest with a shared event lands directly on the calendar instead).
-- Page progression works.
+- Page progression works via **Next** and via horizontal swipe on mobile web.
+- Layout is top-anchored on a phone-sized viewport — no giant empty beige band above the copy.
 - `Get Started` and `Skip` both route back to calendar.
 
 ---
