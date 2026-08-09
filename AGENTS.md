@@ -52,16 +52,18 @@ The tree is currently `tsc`-clean — keep it that way.
 
 ### Branching, merging & releases
 
-Two long-lived branches (see `docs/development-workflow.md` for the full model):
+Two long-lived branches, named after their environments (see `docs/development-workflow.md` for the full model):
 
-- `develop` — integration branch. **All feature PRs target `develop`**, gated only by fast checks (`.github/workflows/ci-fast.yml`: tsc + conventions + Jest + SQL). Every push to `develop` runs the full suite and redeploys the **develop preview** at `https://develop.shared-events.pages.dev` (Cloudflare Pages branch alias) when green.
-- `master` — production. Only accepts PRs from `develop` (`.github/workflows/release.yml`), gated by the full suite re-run. Merges deploy production via `deploy-web.yml`.
+- `staging` — where all finished work lands. The staging preview at `https://staging.shared-events.pages.dev` redeploys automatically when the full suite is green on a push.
+- `production` — the live app at `https://shared-events.pages.dev`.
 
-**Merge policy (set by the repo owner):** agents merge their own feature PRs into `develop` once the fast checks pass — do not wait for human review. The owner does not review individual feature PRs; they try the develop preview when they feel like it. **Only merge `develop → master` when the owner explicitly says to ship/release/push to prod.** Then: open the release PR, confirm the full suite is green, merge. The full suite on develop needs the `EXPO_PUBLIC_SUPABASE_*` repo secrets — until they exist the e2e job skips with a warning, so run `npm run build:web && npm run test:e2e` locally before merging anything risky.
+**Push policy (set by the repo owner):** agents push finished work **straight to `staging`** — no PR, no human review. Hard rule: before pushing, the fast checks must pass locally (`npx tsc --noEmit && npm run test:conventions && npm test -- --runInBand && npm run test:sql`). Every push then runs the full suite in CI; if it goes red, the next agent fixes forward before anything ships. PRs into staging are optional paper trail, never required.
+
+**Only promote `staging → production` when the owner explicitly says to ship/release/push to prod.** Promotion is a fast-forward push of the green-tested staging tip (`git push origin staging:production`): branch protection on production requires the full-suite checks to be green on the commit, so untested code physically cannot ship. The full suite needs the `EXPO_PUBLIC_SUPABASE_*` repo secrets — until they exist the e2e job skips with a warning, so also run `npm run build:web && npm run test:e2e` locally before promoting.
 
 **Model policy:** use the session's default model for development. For agentic click-through/manual testing (computerUse subagents, the UX-review automation), use `cursor-grok-4.5-high-fast` — screenshot review doesn't need the top coding model. The CI-launched UX review defaults to it too (repo variable `UX_REVIEW_MODEL` overrides; discover IDs via `GET https://api.cursor.com/v1/models`).
 
-The full suite (`.github/workflows/full-suite.yml`) = tsc + conventions + Jest + SQL semantics + web build + Playwright e2e on desktop Chrome, Mobile Safari (WebKit), and Mobile Chrome. Branch-protection settings to make the gates binding are listed in `docs/development-workflow.md`.
+The full suite (`.github/workflows/full-suite.yml`) = tsc + conventions + Jest + SQL semantics + web build + Playwright e2e on desktop Chrome, Mobile Safari (WebKit), and Mobile Chrome. Branch-protection settings are listed in `docs/development-workflow.md`.
 
 ### Tests
 
@@ -81,7 +83,7 @@ Convention checks (no ESLint in this repo — this is the mechanical layer): `np
 
 E2e gotchas, all handled in `e2e/fixtures.ts` / `e2e/helpers.ts`: (1) test contexts must drop `navigator.locks` — supabase-js Web Locks are browser-process-wide per origin and a document destroyed mid-lock orphans it, hanging every later `getSession()` on the boot spinner; any context created outside the fixture must use `newExtraContext()`. (2) `signIn()` clears cookies/localStorage first because a shared test account's stored session may have been revoked by a later sign-in. (3) Covered nav screens stay mounted (`display:none`) so locators can double-match — use `visibleText()`; modals overlay WITHOUT hiding the base screen — scope modal interactions to `getByRole('dialog')` and wait for the dialog to unmount before touching what's underneath. (4) List-row selection taps can be eaten by re-renders — selection helpers retry until the row's ✓ shows.
 
-After every green develop pipeline, `agent-ux-review.yml` launches a Cursor Cloud Agent to click through the develop preview (desktop + mobile viewports) and open a report PR — inert until the `CURSOR_API_KEY` repo secret is set. See `docs/development-workflow.md` → Agentic UX review.
+After every green staging pipeline, `agent-ux-review.yml` launches a Cursor Cloud Agent to click through the staging preview (desktop + mobile viewports) and open a report PR — inert until the `CURSOR_API_KEY` repo secret is set. See `docs/development-workflow.md` → Agentic UX review.
 
 Manual regression suite for cloud agents:
 
@@ -113,15 +115,15 @@ For the web beta, `send-notification` accepts a `WEB_APP_URL` secret (see FEATUR
 
 ### Deploying the web app (Cloudflare Pages)
 
-The web build is hosted on **Cloudflare Pages** as a **direct-upload** project managed via Wrangler (not Pages' built-in Git integration — Wrangler keeps the whole deploy path in the repo and runnable by any agent). Two standing sites: production `https://shared-events.pages.dev` (deploys from `master`) and the develop preview `https://develop.shared-events.pages.dev` (`npm run deploy:develop`, or CI `develop.yml`).
+The web build is hosted on **Cloudflare Pages** as a **direct-upload** project managed via Wrangler (not Pages' built-in Git integration — Wrangler keeps the whole deploy path in the repo and runnable by any agent). Two standing sites: production `https://shared-events.pages.dev` (deploys from the `production` branch) and the staging preview `https://staging.shared-events.pages.dev` (`npm run deploy:staging`, or CI `staging.yml`).
 
 - Config: `wrangler.toml` (project name `shared-events`, output dir `dist/`). `public/_redirects` carries the SPA fallback (`/* /index.html 200`) so deep links like `/event/<id>` load the app; it's copied into `dist/` at export time.
 - Prerequisites: `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). `CLOUDFLARE_ACCOUNT_ID` must be the 32-char hex account id — not the API token.
 - Live site: **https://shared-events.pages.dev** (`WEB_APP_URL` already points here). Project already exists — do not recreate.
 - **Why not `events-app.pages.dev`:** Pages `*.pages.dev` names are globally unique. `events-app` was already claimed by another Cloudflare account, so the first deploy got a random suffix (`events-app-lzv`). The project was renamed to `shared-events` to get a clean URL. Leave the Wrangler `name` as `shared-events`; do not try to reclaim `events-app`.
-- Deploy: `npm run deploy:web` (builds `dist/` then `wrangler pages deploy`). Production updates go to `https://shared-events.pages.dev` when deploying with `--branch=master` (or from master); other `--branch` values create preview URLs.
+- Deploy: `npm run deploy:web` (builds `dist/` then `wrangler pages deploy`). Production updates go to `https://shared-events.pages.dev` when deploying with `--branch=production` (or from the production branch); other `--branch` values create preview URLs.
 - After a domain change, update `WEB_APP_URL` and remove the placeholder `IOS_APP_STORE_URL` secret if still present.
-- CI alternative: `.github/workflows/deploy-web.yml` deploys on every push to `master` once the repo Variable `DEPLOY_WEB=true` and Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` are set. It runs the same `wrangler pages deploy` command, so CI and agents behave identically.
+- CI alternative: `.github/workflows/deploy-web.yml` deploys on every push to `production` once the repo Variable `DEPLOY_WEB=true` and Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` are set. It runs the same `wrangler pages deploy` command, so CI and agents behave identically.
 - When a custom domain is purchased: Pages dashboard → Custom domains → add it (free auto SSL; instant if DNS is on Cloudflare), then update `WEB_APP_URL`.
 
 Verify afterwards:

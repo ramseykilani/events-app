@@ -1,27 +1,32 @@
-# Release gate: the only way into master.
+# Release gate: the PR path into production.
 #
-# Runs on PRs targeting master and (a) refuses any source branch other than
-# develop, (b) re-runs the full suite — including desktop and mobile-web e2e —
-# on the merge result. Set the "Full suite" jobs as required status checks on
-# master (see docs/development-workflow.md → GitHub settings) so this gate
-# cannot be bypassed. A green master push then deploys production via
-# deploy-web.yml.
+# Runs on PRs targeting production and (a) refuses any source branch other
+# than staging, (b) re-runs the full suite — including desktop and mobile-web
+# e2e — on the merge result. Set the "full-suite / checks" and
+# "full-suite / e2e" status checks as required on the production branch (see
+# docs/development-workflow.md → GitHub settings) so untested code cannot be
+# promoted. A green production push then deploys via deploy-web.yml.
+#
+# Note: production does not require PRs in this repo's setup — promotions are
+# fast-forward pushes of the green-tested staging tip, which satisfy the
+# required checks because the full suite already ran on that commit. This
+# workflow is the defense-in-depth path for anyone who opens a PR.
 name: Release gate
 on:
   pull_request:
-    branches: [master]
+    branches: [production]
 
 jobs:
   guard-source-branch:
-    name: Only develop may merge to master
+    name: Only staging may merge to production
     runs-on: ubuntu-latest
     steps:
       - name: Check source branch
-        if: github.head_ref != 'develop'
+        if: github.head_ref != 'staging'
         run: |
-          echo "::error::PRs into master must come from the develop branch (this one is '${{ github.head_ref }}')."
+          echo "::error::PRs into production must come from the staging branch (this one is '${{ github.head_ref }}')."
           exit 1
-      - run: echo "Source branch is develop — OK."
+      - run: echo "Source branch is staging — OK."
 
   full-suite:
     needs: guard-source-branch

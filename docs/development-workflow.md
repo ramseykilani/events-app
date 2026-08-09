@@ -1,60 +1,45 @@
 # Development Workflow
 
-How changes move from a branch to production, what gets tested where, and why.
+How changes move from an agent to production, what gets tested where, and why.
 
 ## Branches
 
-| Branch | Purpose | Deploys to |
-|--------|---------|------------|
-| `master` | Production. Nothing lands here except via a `develop → master` PR. | https://shared-events.pages.dev |
-| `develop` | Standing integration branch. All feature work merges here first. | https://develop.shared-events.pages.dev |
-| feature branches (`cursor/*`, `feature/*`, …) | One change each, branched off `develop`, merged back via PR. | — |
+| Branch | Environment | What it's for |
+|--------|-------------|---------------|
+| `staging` | https://staging.shared-events.pages.dev | Every finished change lands here. The owner's "try it when I feel like it" app. |
+| `production` | https://shared-events.pages.dev | The live app. Only green-tested staging commits get promoted. |
 
-The develop preview is a Cloudflare Pages **branch alias**: any
-`wrangler pages deploy --branch=develop` updates
-`https://develop.shared-events.pages.dev`. No extra infrastructure — the same
-project, same Wrangler config, different branch name. It shares the production
-Supabase backend, so use the test-OTP accounts (AGENTS.md) there rather than
-real phone numbers.
+Both sites are the same Cloudflare Pages project — branch aliases mean no
+extra infrastructure. They share the production Supabase backend, so use the
+test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
+
+## The process
+
+1. **Owner describes a feature. An agent implements it and pushes straight to
+   `staging`.** No PR, no review round-trip. Hard rule for agents: the fast
+   checks (`tsc`, conventions, Jest, SQL) must pass locally first.
+2. **Every push to `staging` runs the full suite in CI.** When green, the
+   staging preview redeploys automatically. When red, the branch shows it and
+   the next agent fixes forward — staging is allowed to be briefly red,
+   production never is.
+3. **When it feels right, the owner looks at the staging preview** — and/or
+   asks for the agentic UX review (a cloud agent that clicks through the
+   preview on desktop and phone viewports and opens a report PR).
+4. **The owner says "ship it."** An agent fast-forwards the exact
+   green-tested staging commit to `production`
+   (`git push origin staging:production`). Branch protection on `production`
+   requires the full-suite checks on that commit, so an untested or red commit
+   is physically rejected. The push deploys production.
 
 ## What runs where
 
 | Trigger | Workflow | What runs |
 |---------|----------|-----------|
-| PR → `develop` | `ci-fast.yml` | `tsc --noEmit`, convention checks, Jest, SQL semantics suite. Fast — this is the only gate on individual features. |
-| Push to `develop` (i.e. every merged feature) | `develop.yml` | **Full suite** (`full-suite.yml`): all fast checks + web build + Playwright e2e on desktop Chrome, Mobile Safari (WebKit) and Mobile Chrome. If green, redeploys the develop preview with the exact bundle the e2e job tested. |
-| Green `develop.yml` run | `agent-ux-review.yml` | Launches a Cursor Cloud Agent that drives the develop preview like a user (desktop + mobile viewports, manual regression suite) and opens a report PR. Inert until `CURSOR_API_KEY` is set — see "Agentic UX review" below. |
-| PR `develop → master` (release PR) | `release.yml` | Refuses any source branch that isn't `develop`, then re-runs the **full suite** on the merge result. This is the release gate. |
-| Push to `master` | `deploy-web.yml` | Production deploy (unchanged). |
-
-## Who merges what
-
-- **Feature PRs → develop:** the agent that wrote the change merges it once
-  the fast checks are green — no human review round-trip. (Owner's call, and
-  the reason the fast checks + full-suite-on-develop layering matters: the
-  safety net replaces review, not complements it.)
-- **develop → master (production):** only when the owner explicitly says to
-  ship. The agent opens the release PR, confirms the full suite (and, when
-  configured, the agentic UX review report) is green, and merges.
-- The owner never has to test individual changes; the develop preview at
-  https://develop.shared-events.pages.dev always runs the latest green
-  develop, so "go look at the test app" is always available.
-
-One-time GitHub secrets/variables for the full system (Settings → Secrets and
-variables → Actions):
-
-| Name | Kind | Needed for |
-|------|------|-----------|
-| `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Secrets | e2e in CI (bundle build signs in to Supabase). Without them the e2e job skips with a warning instead of failing. |
-| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Secrets | Preview + production deploys. |
-| `DEPLOY_WEB` = `true` | Variable | Enables both deploy jobs. Requires the four secrets above. |
-| `CURSOR_API_KEY` | Secret | Agentic UX review (Cursor Dashboard → API Keys). |
-| `UX_REVIEW_MODEL` | Variable | Optional override of the UX-review agent's model; defaults to `cursor-grok-4.5-high-fast`. |
-
-Because the full suite already ran on the tip of `develop`, a release PR is
-normally a formality: open it, watch it go green, merge. The agentic UX review
-(or a manual pass with `manual-tests/cloud_manual_regression.md` when it's not
-configured yet) is the pre-release sanity check on the preview.
+| Push to `staging` | `staging.yml` | **Full suite** (`full-suite.yml`): tsc, convention checks, Jest, SQL semantics, web build, Playwright e2e on desktop Chrome / Mobile Safari / Mobile Chrome. If green, redeploys the staging preview with the tested bundle. |
+| Green `staging.yml` run | `agent-ux-review.yml` | Launches the Cursor UX-review agent against the staging preview; opens a report PR. Inert until `CURSOR_API_KEY` is set. |
+| PR → `staging` (optional) | `ci-fast.yml` | Fast checks only. PRs into staging are optional paper trail. |
+| PR → `production` (optional path) | `release.yml` | Rejects any source branch that isn't `staging`, re-runs the full suite. Defense in depth; normal promotion is the fast-forward push above. |
+| Push to `production` | `deploy-web.yml` | Production deploy. |
 
 ## Layers of the safety net
 
@@ -69,41 +54,14 @@ can't:
    carry an inline `conventions-ok` comment with the reason.
 2. **Jest + SQL semantics** — units, components, DB invariants.
 3. **Playwright e2e** (`e2e/`) — real browser, real Supabase, three form
-   factors. Covers: sign-in validation and OTP cooldown/errors, onboarding
-   controls, calendar shell + navigation, theme switching with persistence,
-   add/edit/remove event (web date inputs, fork semantics), share-sheet
-   disabled/selected states, the A→B share flow with forwarding semantics,
-   hide/unhide, people/circle management.
+   factors. Covers: sign-in validation and OTP cooldown/errors, no browser
+   notification-permission prompt on web, onboarding controls, calendar shell
+   + navigation, theme switching with persistence, add/edit/remove event (web
+   date inputs, fork semantics), share-sheet disabled/selected states, the
+   A→B share flow with forwarding semantics, hide/unhide, people/circle
+   management.
 4. **Agentic UX review** — a cloud agent clicking through the deployed preview
    with judgment (visual polish, copy, mobile feel), reported as a PR.
-
-## Agentic UX review
-
-`agent-ux-review.yml` fires after every green Develop pipeline (or manually
-via workflow_dispatch) and launches a Cursor Cloud Agent through the Cloud
-Agents API (`POST /v1/agents`) with `scripts/agent-ux-review-prompt.md`. The
-agent gets a full desktop VM, tests the develop preview on desktop and
-mobile-emulated viewports following the manual regression suite, and opens a
-report PR against `develop` with its findings and screenshots.
-
-One-time setup: add the repo secret `CURSOR_API_KEY` (Cursor Dashboard → API
-Keys). Until then the workflow exits quietly. The agent's own VM secrets
-(`EXPO_PUBLIC_SUPABASE_*`, test accounts) come from the Cursor dashboard like
-any cloud agent run. The review agent's model defaults to
-`cursor-grok-4.5-high-fast` (screenshot-driven review doesn't need the top
-coding model); set the repo variable `UX_REVIEW_MODEL` to override, and if the
-configured ID is rejected the workflow retries with the account default. If
-the launch fails and no review PR appears within ~15 minutes of a develop
-push, check the workflow run's annotations.
-
-**Alternative without CI plumbing:** create a Cursor Automation
-(cursor.com/automations) with a "Push to branch: develop" trigger and the same
-prompt file as the instructions. Enable only one of the two, or every push
-gets two reviews.
-
-Note: `workflow_run` triggers read the workflow file from the default branch,
-so the automatic trigger starts after this reaches `master`; before that, use
-workflow_dispatch or the Automation.
 
 ## The e2e suite
 
@@ -115,16 +73,8 @@ npm run test:e2e           # all projects: desktop-chrome, mobile-safari, mobile
 npm run test:e2e:mobile    # mobile projects only
 
 # Run against a deployed build instead of a local one:
-E2E_BASE_URL=https://develop.shared-events.pages.dev npm run test:e2e
+E2E_BASE_URL=https://staging.shared-events.pages.dev npm run test:e2e
 ```
-
-What it covers, per form factor: sign-in validation + OTP cooldown + wrong
-code (M-001/M-002), onboarding controls (M-003), calendar shell and navigation
-(M-004), theme switching with reload persistence, add-event through the web
-HTML date/time inputs (M-005/E-110), share-sheet disabled-until-selected
-(M-006), event detail share/edit-fork/remove with formatted-date rendering
-(M-007), people + circles management (E-101), the two-account share flow with
-forwarding semantics (E-104/E-108), and hide/unhide suppression (E-105).
 
 Auth uses the Supabase test-OTP accounts documented in AGENTS.md
 (`E2E_PHONE_A/B`, `E2E_OTP_A/B` env vars override them). One sign-in per run
@@ -153,32 +103,65 @@ Test-environment quirks worth knowing (all handled in `e2e/fixtures.ts` and
 - **Selection taps**: list-row taps can be eaten by a re-render; selection
   helpers retry until the row's ✓ appears (guarded against double-toggle).
 
-## GitHub settings to make the gates real
+## Agentic UX review
 
-Workflows can't enforce themselves — set branch protection once in
-**Settings → Branches**:
+`agent-ux-review.yml` fires after every green Staging pipeline (or manually
+via workflow_dispatch) and launches a Cursor Cloud Agent through the Cloud
+Agents API (`POST /v1/agents`) with `scripts/agent-ux-review-prompt.md`. The
+agent gets a full desktop VM, tests the staging preview on desktop and
+mobile-emulated viewports following the manual regression suite, and opens a
+report PR against `staging` with its findings and screenshots. If reviews are
+too frequent, delete the `workflow_run` trigger and keep workflow_dispatch —
+then reviews run only when someone asks.
 
-- `master`: require a pull request; require status checks
-  `Only develop may merge to master`, `checks`, `e2e` (from *Release gate*);
-  block direct pushes.
-- `develop`: require a pull request; require status check `fast-checks`
-  (from *PR checks*). Direct pushes to `develop` are what the develop pipeline
-  assumes won't happen; keep them blocked.
+One-time setup: add the repo secret `CURSOR_API_KEY` (Cursor Dashboard → API
+Keys). Until then the workflow exits quietly. The agent's own VM secrets
+(`EXPO_PUBLIC_SUPABASE_*`, test accounts) come from the Cursor dashboard like
+any cloud agent run. The review agent's model defaults to
+`cursor-grok-4.5-high-fast` (screenshot-driven review doesn't need the top
+coding model); set the repo variable `UX_REVIEW_MODEL` to override, and if the
+configured ID is rejected the workflow retries with the account default.
 
-## CI secrets/variables
+**Alternative without CI plumbing:** create a Cursor Automation
+(cursor.com/automations) with a "Push to branch: staging" trigger and the same
+prompt file as the instructions. Enable only one of the two, or every push
+gets two reviews.
 
-Same set the existing deploy workflow uses
-(Settings → Secrets and variables → Actions):
+Note: `workflow_run` triggers read the workflow file from the default branch,
+so the automatic trigger starts once that branch (production) contains it.
 
-- Secrets: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`,
-  `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- Variable: `DEPLOY_WEB=true` (also gates the develop preview deploy)
+## GitHub settings (one time)
 
-## Deploying the develop preview by hand
+### Secrets and variables (Settings → Secrets and variables → Actions)
+
+| Name | Kind | Needed for |
+|------|------|-----------|
+| `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Secrets | e2e in CI (bundle build signs in to Supabase). Both are always visible in the Supabase dashboard → Project Settings → API keys. Without them the e2e job skips with a warning instead of failing. |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Secrets | Preview + production deploys. The account ID is on the Cloudflare dashboard's right rail; the token is shown once at creation — make a new one (Profile → API Tokens → Create, Account → Cloudflare Pages: Edit) and paste it into both GitHub and Cursor secrets. |
+| `DEPLOY_WEB` = `true` | Variable | Enables both deploy jobs. Requires the four secrets above. |
+| `CURSOR_API_KEY` | Secret | Agentic UX review (Cursor Dashboard → API Keys → new key). |
+| `UX_REVIEW_MODEL` | Variable | Optional override of the UX-review agent's model; defaults to `cursor-grok-4.5-high-fast`. |
+
+### Branch protection (Settings → Branches)
+
+- `staging`: add a rule with the defaults (blocks force pushes and deletion).
+  No PR or check requirements — agents push directly.
+- `production`: add a rule with **Require status checks to pass before
+  merging** and select `full-suite / checks` and `full-suite / e2e` (they
+  appear in the picker after the suite has run once). Defaults block force
+  pushes and deletion. Do **not** require pull requests — promotion is a
+  fast-forward push, and the required checks still guarantee only green-tested
+  commits land.
+- Settings → General → **Default branch** → `production`, then delete the old
+  `master` branch. (`workflow_run` triggers and PR defaulting read from the
+  default branch.)
+
+## Deploying the staging preview by hand
 
 ```bash
-npm run deploy:develop     # builds dist/ then wrangler pages deploy --branch=develop
+npm run deploy:staging     # builds dist/ then wrangler pages deploy --branch=staging
 ```
 
 Requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in the environment,
-same as production deploys.
+same as production deploys. (The old `develop.shared-events.pages.dev` alias
+is superseded by the staging one and will simply stop updating.)

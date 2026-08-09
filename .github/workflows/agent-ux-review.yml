@@ -1,7 +1,7 @@
-# Agentic UX review of the develop preview.
+# Agentic UX review of the staging preview.
 #
-# After every green Develop pipeline (full suite + preview deploy), launches a
-# Cursor Cloud Agent that drives https://develop.shared-events.pages.dev like
+# After every green Staging pipeline (full suite + preview deploy), launches a
+# Cursor Cloud Agent that drives https://staging.shared-events.pages.dev like
 # a user — desktop and mobile-emulated viewports, following
 # manual-tests/cloud_manual_regression.md — and opens a PR with the report.
 # This is the "agent actually clicks the buttons" layer; the deterministic
@@ -10,19 +10,20 @@
 # Setup (one time): add the repo secret CURSOR_API_KEY (Cursor Dashboard →
 # API Keys). Until then the workflow exits quietly. Cursor-side, the repo's
 # Cloud Agent secrets (EXPO_PUBLIC_SUPABASE_*) come from the Cursor dashboard,
-# same as for any cloud agent.
+# same as for any cloud agent. To run reviews only on demand instead, delete
+# the workflow_run trigger below and use workflow_dispatch.
 #
-# Alternative: a Cursor Automation with a "Push to branch: develop" trigger
+# Alternative: a Cursor Automation with a "Push to branch: staging" trigger
 # can run the same prompt with zero CI config — see docs/development-
 # workflow.md. Enable only one of the two or every push gets two reviews.
 #
 # Note: workflow_run triggers read this file from the DEFAULT branch, so this
-# starts firing only after it reaches master.
+# starts firing only after the default branch contains it (production).
 name: Agent UX review
 on:
   workflow_run:
-    workflows: ["Develop"]
-    branches: [develop]
+    workflows: ["Staging"]
+    branches: [staging]
     types: [completed]
   workflow_dispatch:
 
@@ -61,7 +62,7 @@ jobs:
               --arg model "$1" \
               '{
                 prompt: { text: $prompt },
-                repos: [{ url: $url, startingRef: "develop" }],
+                repos: [{ url: $url, startingRef: "staging" }],
                 autoCreatePR: true
               } + (if $model == "" then {} else { model: { id: $model } } end)'
           }

@@ -7,8 +7,8 @@ import { AUTH_FILE_A } from './e2e/constants';
 //
 // By default tests run against a local static serve of dist/ (run
 // `npm run build:web` first). Set E2E_BASE_URL to run against a deployed
-// build instead, e.g. the develop preview:
-//   E2E_BASE_URL=https://develop.shared-events.pages.dev npm run test:e2e
+// build instead, e.g. the staging preview:
+//   E2E_BASE_URL=https://staging.shared-events.pages.dev npm run test:e2e
 const PORT = Number(process.env.E2E_PORT ?? 8081);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 

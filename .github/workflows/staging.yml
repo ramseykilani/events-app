@@ -1,20 +1,20 @@
-# Develop integration pipeline.
+# Staging integration pipeline.
 #
-# Every merge into `develop` runs the full suite (static checks + SQL + Jest
-# + desktop/mobile-web e2e). Only when it is green does the develop preview
-# redeploy to https://develop.shared-events.pages.dev (Cloudflare Pages
-# branch alias for --branch=develop), so the preview always reflects the
-# latest known-good develop.
+# Every push to `staging` runs the full suite (static checks + SQL + Jest +
+# desktop/mobile-web e2e). Only when it is green does the staging preview
+# redeploy to https://staging.shared-events.pages.dev (Cloudflare Pages
+# branch alias for --branch=staging), so the preview always reflects the
+# latest known-good staging.
 #
 # Requires the same repo Variable/Secrets as deploy-web.yml.
-name: Develop
+name: Staging
 on:
   push:
-    branches: [develop]
+    branches: [staging]
   workflow_dispatch:
 
 concurrency:
-  group: develop-pipeline
+  group: staging-pipeline
   cancel-in-progress: false
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
     secrets: inherit
 
   deploy-preview:
-    name: Deploy develop preview
+    name: Deploy staging preview
     needs: full-suite
     # Vars gate keeps the workflow inert until Cloudflare secrets are configured.
     if: vars.DEPLOY_WEB == 'true'
@@ -45,8 +45,8 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Deploy preview to Cloudflare Pages (branch alias "develop")
-        run: npx wrangler pages deploy --branch=develop
+      - name: Deploy preview to Cloudflare Pages (branch alias "staging")
+        run: npx wrangler pages deploy --branch=staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

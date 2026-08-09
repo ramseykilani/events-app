@@ -17,7 +17,7 @@
     "test:conventions": "node scripts/check-conventions.mjs",
     "test:sql": "bash supabase/tests/run_local.sh",
     "serve:web": "serve -s dist -l 8081",
-    "deploy:develop": "npm run build:web && wrangler pages deploy --branch=develop",
+    "deploy:staging": "npm run build:web && wrangler pages deploy --branch=staging",
     "test:manual": "bash ./scripts/manual-test-suite.sh",
     "test:manual:strict": "bash ./scripts/manual-test-suite.sh --strict",
     "test:manual:start": "bash ./scripts/manual-test-suite.sh --strict --start"

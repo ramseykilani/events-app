@@ -1,6 +1,6 @@
 # Full test suite — reusable workflow (workflow_call) invoked by:
-#   - develop.yml  on every push to develop (before the preview deploy)
-#   - release.yml  on every develop→master PR (the release gate)
+#   - staging.yml  on every push to staging (before the preview deploy)
+#   - release.yml  on every staging→production PR (the release gate)
 #
 # Layers: static checks (tsc, Jest, SQL semantics) → web build → Playwright
 # e2e against the built bundle on desktop Chrome, Mobile Safari (WebKit), and
@@ -98,7 +98,7 @@ jobs:
         if: steps.secrets.outputs.present == 'true'
         run: npm run test:e2e
 
-      - name: Upload built bundle (reused by the develop preview deploy)
+      - name: Upload built bundle (reused by the staging preview deploy)
         if: steps.secrets.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:

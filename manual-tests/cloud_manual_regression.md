@@ -25,7 +25,7 @@ Use these test credentials (configured on the Supabase project, expire 2027-03-3
 - `+15555550101` is NOT a configured test number — Twilio rejects it with `sms_send_failed`.
 
 When this suite runs as the pre-release gate (see `docs/development-workflow.md`),
-run it against the develop preview `https://develop.shared-events.pages.dev` and
+run it against the staging preview `https://staging.shared-events.pages.dev` and
 repeat the Core scenarios once in a mobile-emulated viewport (Chrome DevTools
 device toolbar, e.g. iPhone 14) — the automated e2e suite covers mobile web, but
 touch-feel and layout need eyes.
