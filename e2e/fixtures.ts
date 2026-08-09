@@ -26,12 +26,35 @@ export function disableNavigatorLocks(): void {
   });
 }
 
+// Counts browser notification-permission requests on
+// window.__e2eNotificationRequests. Project rule: web users get SMS and are
+// never prompted — a regression here means a confusing browser popup on
+// sign-in (observed in the wild).
+export function instrumentNotificationRequests(): void {
+  const w = window as unknown as {
+    __e2eNotificationRequests: number;
+    Notification?: { requestPermission?: unknown };
+  };
+  w.__e2eNotificationRequests = 0;
+  const requestPermission = w.Notification?.requestPermission;
+  if (typeof requestPermission === 'function' && w.Notification) {
+    w.Notification.requestPermission = (...args: unknown[]) => {
+      w.__e2eNotificationRequests += 1;
+      return (requestPermission as (...a: unknown[]) => unknown).apply(
+        w.Notification,
+        args
+      );
+    };
+  }
+}
+
 // Shared fixtures for all e2e specs. Any context created outside the fixture
 // (e.g. the second account in share.spec.ts) must register the same script —
 // use newExtraContext() below.
 export const test = base.extend({
   context: async ({ context }, use) => {
     await context.addInitScript(disableNavigatorLocks);
+    await context.addInitScript(instrumentNotificationRequests);
     await use(context);
   },
 });
@@ -50,6 +73,7 @@ export async function newExtraContext(
     storageState: { cookies: [], origins: [] },
   });
   await context.addInitScript(disableNavigatorLocks);
+  await context.addInitScript(instrumentNotificationRequests);
   return context;
 }
 
