@@ -10,8 +10,12 @@ A running list of planned and in-progress features. Each section contains a full
 | [SMS Invitations](#sms-invitations) | Implemented |
 | [Hide](#hide) | Implemented |
 | [Forwarding Shares](#forwarding-shares) | Implemented |
-| [Sign Out](#sign-out) | Planned |
+| [Sign Out](#sign-out) | Implemented |
 | [Web Support](#web-support) | Implemented |
+| [Display Names](#display-names) | Planned |
+| [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned |
+| [Add Sharer to Your People](#add-sharer-to-your-people) | Planned |
+| [Contacts Permission Explainer](#contacts-permission-explainer) | Planned |
 
 ---
 
@@ -189,7 +193,7 @@ This app shares public event listings, not private hosted events — closer to f
 
 ## Sign Out
 
-**Status:** Planned
+**Status:** Implemented
 
 ### Problem
 
@@ -207,10 +211,10 @@ A deliberately low-prominence sign-out action — this should not be easy to tap
 
 ### Acceptance Criteria
 
-- [ ] Sign-out control exists but is not prominent (bottom of People screen or behind a menu)
-- [ ] Tapping it requires confirming a dialog
-- [ ] After sign-out the app lands on the sign-in screen and protected screens are unreachable
-- [ ] Signing back in restores the calendar exactly as before
+- [x] Sign-out control exists but is not prominent (bottom of People screen or behind a menu)
+- [x] Tapping it requires confirming a dialog
+- [x] After sign-out the app lands on the sign-in screen and protected screens are unreachable
+- [ ] Signing back in restores the calendar exactly as before (covered by the native device smoke pass, `manual-tests/native_device_smoke.md`)
 
 ### Open Questions
 

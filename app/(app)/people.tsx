@@ -369,6 +369,23 @@ export default function PeopleScreen() {
     await loadData();
   };
 
+  const handleSignOut = () => {
+    const phone = session?.user?.phone;
+    showConfirm(
+      'Sign out',
+      `Sign out of ${phone ? formatPhoneDisplay(phone) : 'this account'}?`,
+      {
+        confirmText: 'Sign Out',
+        onConfirm: async () => {
+          // SessionContext reacts to the auth state change and routes back to
+          // /(auth)/sign-in — no navigation code needed here.
+          const { error } = await supabase.auth.signOut();
+          if (error) showError('Error', error);
+        },
+      }
+    );
+  };
+
   return (
     <View
       style={[
@@ -501,6 +518,16 @@ export default function PeopleScreen() {
           </View>
         </>
       )}
+      <View style={[styles.footer, { borderTopColor: theme.borderLight }]}>
+        <TouchableOpacity
+          onPress={handleSignOut}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          style={styles.signOutButton}
+        >
+          <Text style={[styles.signOut, { color: theme.textTertiary }]}>Sign out</Text>
+        </TouchableOpacity>
+      </View>
       {showPicker && (
         <PeoplePicker
           onSelect={handleSelectContacts}
@@ -708,6 +735,19 @@ const styles = StyleSheet.create({
   },
   addCircleBtnText: {
     fontWeight: '600',
+  },
+  footer: {
+    borderTopWidth: 1,
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  signOutButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  signOut: {
+    fontSize: 14,
   },
   personRow: {
     flexDirection: 'row',
