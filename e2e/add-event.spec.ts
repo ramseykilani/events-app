@@ -50,3 +50,27 @@ test('add event via web inputs, then remove it', async ({
   await removeOpenEvent(page);
   await expect(page.getByText(title, { exact: true })).not.toBeVisible();
 });
+
+// Regression: the browser's segmented date widget makes year typos easy
+// (typing 2026 can land as 1906) and the event would silently save a century
+// off. The save path now blocks implausible years with a clear message.
+test('implausible year is blocked with a clear message', async ({ page }) => {
+  await page.goto('/');
+  await expectCalendar(page);
+  await page.getByRole('button', { name: 'Add event' }).click();
+  await page.getByPlaceholder('Event title').fill('Should never save');
+  await page.getByLabel('Date', { exact: true }).fill('1906-09-15');
+
+  let dialogMessage: string | null = null;
+  page.on('dialog', (dialog) => {
+    dialogMessage = dialog.message();
+    void dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  await expect
+    .poll(() => dialogMessage, { message: 'year guard alert to fire' })
+    .toContain('1906');
+  // Still on the form — nothing was saved.
+  await expect(page.getByPlaceholder('Event title')).toBeVisible();
+});

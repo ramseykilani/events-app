@@ -35,6 +35,18 @@ function inputStyle(borderColor: string): React.CSSProperties {
   };
 }
 
+// The browser's segmented date widget makes it easy to mistype the YEAR
+// (typing "2026" can land as 1906) and silently save an event a century off.
+// min/max constrain the picker; the save path re-validates (see
+// isPlausibleEventDate) since typed input can still blow past them.
+export const EVENT_DATE_MIN = '2020-01-01';
+export const EVENT_DATE_MAX = '2100-12-31';
+
+export function isPlausibleEventDate(date: Date): boolean {
+  const year = date.getFullYear();
+  return year >= 2020 && year <= 2100;
+}
+
 export function WebDateInput({
   value,
   onChange,
@@ -49,6 +61,8 @@ export function WebDateInput({
       aria-label="Date"
       style={inputStyle(theme.border)}
       value={toDateInputValue(value)}
+      min={EVENT_DATE_MIN}
+      max={EVENT_DATE_MAX}
       onChange={(e) => {
         const v = e.target.value; // YYYY-MM-DD
         const [y, m, d] = v.split('-').map(Number);

@@ -14,7 +14,7 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { WebDateInput, WebTimeInput } from '../../components/WebDateTimeInputs';
+import { WebDateInput, WebTimeInput, isPlausibleEventDate } from '../../components/WebDateTimeInputs';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
@@ -154,6 +154,16 @@ export default function AddEventScreen() {
           return;
         }
       }
+    }
+
+    if (!isPlausibleEventDate(eventDate)) {
+      // The web date widget makes year typos easy (2026 -> 1906) and the event
+      // would silently land a century off; block with a clear message.
+      showAlert(
+        'Check the date',
+        `That date is in ${eventDate.getFullYear()}. The date field can mistype years — please pick the date again.`
+      );
+      return;
     }
 
     setLoading(true);

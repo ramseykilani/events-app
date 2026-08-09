@@ -13,7 +13,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { WebDateInput, WebTimeInput } from '../../components/WebDateTimeInputs';
+import { WebDateInput, WebTimeInput, isPlausibleEventDate } from '../../components/WebDateTimeInputs';
 import { supabase } from '../../lib/supabase';
 import { showAlert, showConfirm } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
@@ -78,6 +78,15 @@ export default function EditEventScreen() {
     }
 
     if (!session?.user?.id || !params.userEventId || !event) return;
+
+    if (!isPlausibleEventDate(eventDate)) {
+      // Same web year-typo guard as add-event (2026 -> 1906 is one slip away).
+      showAlert(
+        'Check the date',
+        `That date is in ${eventDate.getFullYear()}. The date field can mistype years — please pick the date again.`
+      );
+      return;
+    }
 
     setLoading(true);
     try {
