@@ -12,7 +12,10 @@ The checklist that defines "complete" is
 
 - [ ] The Staging pipeline for the staging tip is green in CI
       (`gh run list --branch staging --limit 1`), including `full-suite / e2e`
-      (which contains the pixel-diff baselines).
+      (which contains the pixel-diff baselines) — and NOT merely in progress.
+      The e2e suite and the review agents share the same Supabase test
+      accounts; running them concurrently causes OTP/session contention and
+      false failures. Never start Phase 1 while a pipeline run is in flight.
 - [ ] If the pipeline never ran e2e (secrets warning), run the full suite
       locally instead: `npm run build:web && CI=1 npm run test:e2e`.
 
