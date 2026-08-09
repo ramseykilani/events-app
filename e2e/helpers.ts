@@ -75,8 +75,15 @@ export async function addPersonManually(
     .getByRole('button', { name: 'Add', exact: true })
     .first()
     .click();
-  await page.getByPlaceholder('Name').fill(name);
-  await page.getByPlaceholder('+1 416 555 1234').fill(phone);
+  // The modal can briefly double-mount during its open animation on slower
+  // runners (observed on CI webkit) — wait for exactly one input before
+  // filling, or strict mode sees double.
+  const nameInput = page.getByPlaceholder('Name', { exact: true });
+  await expect(nameInput).toHaveCount(1);
+  await nameInput.fill(name);
+  const phoneInput = page.getByPlaceholder('+1 416 555 1234');
+  await expect(phoneInput).toHaveCount(1);
+  await phoneInput.fill(phone);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   // Exact: the calendar stacked underneath shows "From <name>" attribution
   // cards, which a substring match would also hit.
