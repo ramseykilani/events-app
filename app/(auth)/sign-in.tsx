@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
+  Linking,
   Platform,
 } from 'react-native';
 import { parsePhoneNumber } from 'libphonenumber-js';
@@ -15,6 +16,8 @@ import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useTheme } from '../../hooks/useTheme';
+
+const PRIVACY_POLICY_URL = 'https://shared-events.pages.dev/privacy.html';
 
 export default function SignInScreen() {
   const [phone, setPhone] = useState('');
@@ -108,6 +111,17 @@ export default function SignInScreen() {
             {loading ? 'Sending...' : 'Send code'}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+          activeOpacity={0.6}
+          accessibilityRole="link"
+          accessibilityLabel="Privacy policy"
+          style={styles.privacyLink}
+        >
+          <Text style={[styles.privacyText, { color: theme.textTertiary }]}>
+            Privacy policy
+          </Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -147,5 +161,15 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  privacyLink: {
+    alignSelf: 'center',
+    marginTop: 20,
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  privacyText: {
+    fontSize: 14,
   },
 });
