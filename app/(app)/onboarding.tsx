@@ -3,20 +3,17 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
-  Dimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
+  Platform,
+  GestureResponderEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 
-const { width } = Dimensions.get('window');
-
 const ONBOARDING_KEY = 'onboarding_complete';
+export const SWIPE_THRESHOLD = 48;
 
 type Page = {
   title: string;
@@ -47,26 +44,36 @@ const pages: Page[] = [
   },
 ];
 
+export function nextPageIndex(current: number, pageCount: number): number {
+  return Math.min(current + 1, pageCount - 1);
+}
+
+export function previousPageIndex(current: number): number {
+  return Math.max(current - 1, 0);
+}
+
+export function pageIndexAfterSwipe(
+  current: number,
+  dx: number,
+  pageCount: number,
+  threshold: number = SWIPE_THRESHOLD
+): number {
+  if (dx <= -threshold) return nextPageIndex(current, pageCount);
+  if (dx >= threshold) return previousPageIndex(current);
+  return current;
+}
+
 export default function OnboardingScreen() {
-  const flatListRef = useRef<FlatList>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const currentPageRef = useRef(0);
+  const dragStartX = useRef<number | null>(null);
   const insets = useSafeAreaInsets();
   const theme = useTheme();
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / width);
-    setCurrentPage(index);
-  };
-
-  const handleNext = () => {
-    if (currentPage < pages.length - 1) {
-      flatListRef.current?.scrollToIndex({
-        index: currentPage + 1,
-        animated: true,
-      });
-    } else {
-      handleFinish();
-    }
+  const goToPage = (index: number) => {
+    const next = Math.max(0, Math.min(index, pages.length - 1));
+    currentPageRef.current = next;
+    setCurrentPage(next);
   };
 
   const handleFinish = async () => {
@@ -74,45 +81,92 @@ export default function OnboardingScreen() {
     router.replace('/(app)');
   };
 
+  const handleNext = () => {
+    if (currentPageRef.current < pages.length - 1) {
+      goToPage(currentPageRef.current + 1);
+    } else {
+      handleFinish();
+    }
+  };
+
+  const endDrag = (endX: number) => {
+    if (dragStartX.current == null) return;
+    const dx = endX - dragStartX.current;
+    dragStartX.current = null;
+    const next = pageIndexAfterSwipe(
+      currentPageRef.current,
+      dx,
+      pages.length
+    );
+    if (next !== currentPageRef.current) {
+      goToPage(next);
+    }
+  };
+
+  const startDrag = (x: number) => {
+    dragStartX.current = x;
+  };
+
+  const cancelDrag = () => {
+    dragStartX.current = null;
+  };
+
+  const page = pages[currentPage];
   const isLastPage = currentPage === pages.length - 1;
+
+  // RN-web's PanResponder often fails to claim mouse drags; use responders +
+  // explicit mouse handlers so swipe works on native touch and desktop web.
+  const swipeHandlers = {
+    onStartShouldSetResponder: () => true,
+    onMoveShouldSetResponder: () => true,
+    onResponderTerminationRequest: () => false,
+    onResponderGrant: (e: GestureResponderEvent) => {
+      startDrag(e.nativeEvent.pageX);
+    },
+    onResponderRelease: (e: GestureResponderEvent) => {
+      endDrag(e.nativeEvent.pageX);
+    },
+    onResponderTerminate: cancelDrag,
+    ...(Platform.OS === 'web'
+      ? {
+          onMouseDown: (e: { clientX: number }) => startDrag(e.clientX),
+          onMouseUp: (e: { clientX: number }) => endDrag(e.clientX),
+          onMouseLeave: cancelDrag,
+        }
+      : {}),
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <FlatList
-        ref={flatListRef}
-        data={pages}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll}
-        keyExtractor={(_, i) => String(i)}
-        renderItem={({ item }) => (
-          <View style={styles.page}>
-            <View style={styles.content}>
-              <Text
-                style={[
-                  styles.title,
-                  {
-                    color: theme.textPrimary,
-                    fontFamily: theme.titleFontFamily,
-                    fontWeight: theme.titleFontWeight,
-                  },
-                ]}
-              >
-                {item.title}
-              </Text>
-              {item.lines.map((line: string, i: number) => (
-                <Text key={i} style={[styles.body, { color: theme.textSecondary }]}>
-                  {line}
-                </Text>
-              ))}
-            </View>
-          </View>
-        )}
-      />
+      <View
+        style={[styles.page, Platform.OS === 'web' && styles.pageWeb]}
+        {...swipeHandlers}
+        testID="onboarding-page"
+      >
+        <View style={styles.content}>
+          <Text
+            style={[
+              styles.title,
+              {
+                color: theme.textPrimary,
+                fontFamily: theme.titleFontFamily,
+                fontWeight: theme.titleFontWeight,
+              },
+            ]}
+            accessibilityRole="header"
+          >
+            {page.title}
+          </Text>
+          {page.lines.map((line: string, i: number) => (
+            <Text key={i} style={[styles.body, { color: theme.textSecondary }]}>
+              {line}
+            </Text>
+          ))}
+        </View>
+      </View>
 
       <View style={[styles.footer, { paddingBottom: 48 + insets.bottom }]}>
-        <View style={styles.dots}>
+        <View style={styles.dots} accessibilityRole="adjustable">
           {pages.map((_, i) => (
             <View
               key={i}
@@ -121,13 +175,20 @@ export default function OnboardingScreen() {
                 { backgroundColor: theme.border },
                 i === currentPage && { backgroundColor: theme.textPrimary, width: 24 },
               ]}
+              accessibilityLabel={`Page ${i + 1} of ${pages.length}`}
+              accessibilityState={{ selected: i === currentPage }}
             />
           ))}
         </View>
 
         <View style={styles.buttons}>
           {!isLastPage && (
-            <TouchableOpacity onPress={handleFinish} activeOpacity={0.6} accessibilityRole="button">
+            <TouchableOpacity
+              onPress={handleFinish}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel="Skip onboarding"
+            >
               <Text style={[styles.skip, { color: theme.textSecondary }]}>Skip</Text>
             </TouchableOpacity>
           )}
@@ -136,6 +197,7 @@ export default function OnboardingScreen() {
             onPress={handleNext}
             activeOpacity={0.7}
             accessibilityRole="button"
+            accessibilityLabel={isLastPage ? 'Get Started' : 'Next'}
           >
             <Text style={[styles.nextText, { color: theme.primaryButtonText }]}>
               {isLastPage ? 'Get Started' : 'Next'}
@@ -152,11 +214,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   page: {
-    width,
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
+  pageWeb: {
+    // Prevent text selection from eating mouse-drag swipes on web.
+    userSelect: 'none',
+    cursor: 'default',
+  } as Record<string, string>,
   content: {
     gap: 16,
   },
@@ -195,6 +261,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 32,
     marginLeft: 'auto',
+    minHeight: 44,
+    justifyContent: 'center',
   },
   nextText: {
     fontSize: 16,
