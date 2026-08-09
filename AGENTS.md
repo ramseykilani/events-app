@@ -4,7 +4,9 @@
 
 ### Overview
 
-This is a React Native (Expo SDK 54) events-sharing app. The frontend runs via the Expo dev server; the backend is a remote Supabase project (Postgres + Auth + Edge Functions). There is no local backend to start.
+This is a React Native (Expo SDK 54) events-sharing app. The backend is a remote Supabase project (Postgres + Auth + Edge Functions). There is no local backend to start.
+
+**Strategy (2026-08-09):** the native app is the product; the web build is the dev/staging/CI surface and is never promoted to users. See `docs/distribution-strategy.md`. Beta distribution is TestFlight internal + Play internal testing; native builds are EAS-run (`docs/development-workflow.md` → Native builds). Agents test via the web build (`npx expo start --web --port 8081`) — the only option in a headless cloud VM — but user-facing design decisions should assume native.
 
 ### Running the app (web mode)
 
@@ -38,7 +40,7 @@ Two test OTPs are configured on the Supabase project (both expire March 31, 2027
 
 Use either to sign in without a real SMS provider. The second number is useful for testing multi-user scenarios (e.g. sharing events between two accounts). After sign-in the app goes straight to the calendar; the onboarding walkthrough auto-shows only when the user has no events at all, and can be reopened via the `?` button.
 
-Note: account B was re-pointed from `+16462655565` (a real-format Manhattan number that would receive real texts) to the reserved fictional 555 range — never point test accounts at real-format numbers. `+15555550101` is **not** a configured test number — Twilio rejects it with `sms_send_failed`. For a truly fresh account (e.g. M-003 onboarding auto-show), temporarily add a third test OTP via the Management API (`PATCH /v1/projects/{ref}/config/auth` with both `sms_test_otp` and `sms_test_otp_valid_until`), then remove it when done. There is no sign-out button in the app UI; on web, sign out with `localStorage.clear(); location.reload();` in the browser console.
+Note: account B was re-pointed from `+16462655565` (a real-format Manhattan number that would receive real texts) to the reserved fictional 555 range — never point test accounts at real-format numbers. `+15555550101` is **not** a configured test number — Twilio rejects it with `sms_send_failed`. For a truly fresh account (e.g. M-003 onboarding auto-show), temporarily add a third test OTP via the Management API (`PATCH /v1/projects/{ref}/config/auth` with both `sms_test_otp` and `sms_test_otp_valid_until`), then remove it when done. Sign out lives at the bottom of the People screen (behind a confirm dialog); on web you can also sign out with `localStorage.clear(); location.reload();` in the browser console.
 
 ### Linting / type checking
 
@@ -113,7 +115,7 @@ npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # already set; pg
 
 Function-only deploys (no DB access) work without linking — pass the ref directly: `npx supabase functions deploy send-notification --project-ref ijmwtjyuvdnvhblwwtpt`. Note `supabase link` can fail on newer CLI versions with a `LegacyLinkApiKeysNetworkError ... inserted_at SchemaError` (Management API response drift); function deploys/secrets don't need link.
 
-For the web beta, `send-notification` accepts a `WEB_APP_URL` secret (see FEATURES.md → Web Support). Set it once the static build is hosted: `npx supabase secrets set WEB_APP_URL=https://<host>` — then non-app SMS links the website and app-user SMS uses `WEB_APP_URL/event/[id]` instead of the `events-app://` scheme. Build the static bundle with `npm run build:web` (→ `dist/`).
+Notification SMS carries no app/web links (decision 2026-08-09 — see `docs/distribution-strategy.md`): `send-notification` reads only the Twilio secrets, and `WEB_APP_URL` is currently set but unused by it (it returns as the store-link base at launch). The placeholder `IOS_APP_STORE_URL` secret was removed 2026-08-09. Build the static bundle with `npm run build:web` (→ `dist/`).
 
 ### Deploying the web app (Cloudflare Pages)
 
@@ -124,7 +126,7 @@ The web build is hosted on **Cloudflare Pages** as a **direct-upload** project m
 - Live site: **https://shared-events.pages.dev** (`WEB_APP_URL` already points here). Project already exists — do not recreate.
 - **Why not `events-app.pages.dev`:** Pages `*.pages.dev` names are globally unique. `events-app` was already claimed by another Cloudflare account, so the first deploy got a random suffix (`events-app-lzv`). The project was renamed to `shared-events` to get a clean URL. Leave the Wrangler `name` as `shared-events`; do not try to reclaim `events-app`.
 - Deploy: `npm run deploy:web` (builds `dist/` then `wrangler pages deploy`). Production updates go to `https://shared-events.pages.dev` when deploying with `--branch=production` (or from the production branch); other `--branch` values create preview URLs. This requires the Pages project's production-branch setting to be `production` (one-time cutover step — see `docs/development-workflow.md` → Branch protection); while it still says `master`, `--branch=production` deploys land as previews.
-- After a domain change, update `WEB_APP_URL` and remove the placeholder `IOS_APP_STORE_URL` secret if still present.
+- After a domain change, update `WEB_APP_URL` and the `PRIVACY_POLICY_URL` constant in `app/(auth)/sign-in.tsx`.
 - CI alternative: `.github/workflows/deploy-web.yml` deploys on every push to `production` once the repo Variable `DEPLOY_WEB=true` and Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` are set. It runs the same `wrangler pages deploy` command, so CI and agents behave identically.
 - When a custom domain is purchased: Pages dashboard → Custom domains → add it (free auto SSL; instant if DNS is on Cloudflare), then update `WEB_APP_URL`.
 

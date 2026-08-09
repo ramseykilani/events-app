@@ -188,3 +188,59 @@ npm run deploy:staging     # builds dist/ then wrangler pages deploy --branch=st
 Requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` in the environment,
 same as production deploys. (The old `develop.shared-events.pages.dev` alias
 is superseded by the staging one and will simply stop updating.)
+
+## Native builds & beta distribution (EAS)
+
+The native app is the product (see `docs/distribution-strategy.md`); the web
+build is the dev/staging surface. Native builds are produced by EAS Build from
+this same codebase — profiles in `eas.json`, project ID in `app.config.js`
+(`extra.eas.projectId`). Nothing here runs in CI yet; builds are triggered by
+hand.
+
+### One-time prerequisites (owner)
+
+- Apple Developer Program membership ($99/yr) — for TestFlight.
+- Play Console account ($25 one-time) — for the internal testing track.
+- An Expo access token: Expo dashboard → Access Tokens → create, then add it
+  as `EXPO_TOKEN` (Cursor secret for cloud agents, or `export` locally). The
+  first iOS build also needs Apple credentials — easiest run interactively on
+  the owner's machine (`eas build` prompts for App Store Connect login and
+  manages certificates/provisioning automatically).
+
+### Building
+
+```bash
+# iOS → TestFlight (App Store Connect upload via eas submit)
+eas build --platform ios --profile production
+eas submit --platform ios --profile production
+
+# Android → Play internal testing (AAB)
+eas build --platform android --profile production
+eas submit --platform android --profile production   # needs a Play service account
+
+# Android → instant sideload for your own device (APK, no Play needed)
+eas build --platform android --profile preview       # distribution: internal
+```
+
+`production` auto-increments build numbers (`appVersionSource: remote` in
+`eas.json` — EAS owns the build counter, don't set versions manually).
+
+### Distributing to testers
+
+- **iOS — TestFlight internal:** App Store Connect → Users and Access → add
+  each tester (any role with app access) → TestFlight tab → add them to the
+  internal group. Up to 100, no review, builds installable minutes after
+  processing. Builds expire 90 days after upload — rebuild periodically during
+  a long beta.
+- **Android — Play internal testing:** Play Console → Internal testing → add
+  testers' Gmail addresses → share the opt-in link. Up to ~100, no review.
+- The Play "12 testers for 14 days" closed-test rule gates *production* only
+  (personal accounts created after Nov 2023); internal testing is unaffected.
+- Before Play app setup completes you'll need the privacy policy URL
+  (`https://shared-events.pages.dev/privacy.html`), the data-safety form
+  (answers follow from that policy), and the content-rating questionnaire.
+
+### After the first build lands
+
+Run `manual-tests/native_device_smoke.md` on real hardware before inviting
+anyone — the native-only paths have never been exercised by any test harness.

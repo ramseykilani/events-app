@@ -1,0 +1,81 @@
+# Native Device Smoke Suite
+
+Run this on a real phone (iOS via TestFlight, Android via internal track or
+sideloaded APK) after every new EAS build, before inviting testers. Every
+automated harness in this repo exercises the **web** build — the native-only
+paths below have no other coverage. Two devices (or a friend with the app) are
+needed for the push/share steps.
+
+Record results in a report file like the cloud suite
+(`manual-tests/manual_test_report_<date>-device.md`), one line per check:
+pass / fail + note.
+
+## N-001: Sign-in with a real phone number
+
+1. Fresh install → enter your real phone number → OTP SMS arrives → enter code.
+2. Lands on the calendar (onboarding walkthrough may auto-show if the account
+   has no events — dismiss it for now).
+3. Kill and relaunch the app: session persists (no sign-in loop).
+
+## N-002: Contacts permission and import
+
+1. People → Add. The contacts explainer appears before the OS prompt.
+2. Grant permission → the picker lists device contacts → select 2–3 → they
+   appear in My People with names from your contacts.
+3. Fresh install (or second device/account) → People → Add → **deny** the OS
+   prompt → the denial recovery screen appears with an Open Settings path and
+   manual-add option (not a bare dialog).
+
+## N-003: Manual add fallback
+
+1. People → Add → add manually: name + phone → Save → person appears.
+2. Invalid number → alert, nothing saved.
+
+## N-004: Event creation with native pickers
+
+1. Calendar → + → the native date/time pickers open and set values (this is
+   the native path — web uses HTML inputs and does not exercise it).
+2. Save → event appears on the calendar.
+
+## N-005: Share → push between two devices (the core loop)
+
+1. Device A: share the event to Device B's owner (they must be in A's people).
+2. Device B: push notification arrives, showing the sharer's name/number, the
+   event title, and date/time.
+3. Device B: **tap the notification** → the app opens directly to the event
+   detail screen, with "From X" attribution.
+4. Device B: the event is on the calendar and survives a relaunch.
+
+## N-006: SMS content (share to a non-user)
+
+1. Device A: share an event (with a URL set) to your own real second number,
+   or a friend's non-app number.
+2. The SMS reads: who added you, event title, date/time, the event URL — and
+   **no app/web links**, with a Reply STOP footer.
+3. Eyeball check: it does not read like spam.
+
+## N-007: Edit and remove
+
+1. Edit the event's time on Device A → your calendar shows the new time
+   (edit = fork; B's copy is unchanged).
+2. Remove the event from A's calendar → B keeps their copy.
+
+## N-008: Sign out
+
+1. People → scroll to the bottom → Sign out → confirm dialog shows your
+   formatted phone number → confirm.
+2. Lands on the sign-in screen; protected screens are unreachable via back.
+3. Sign back in → the calendar is exactly as before (no duplicates).
+
+## N-009: Theme + safe areas
+
+1. Calendar header → theme swatch → colors change and persist across relaunch.
+2. Header/footer content clears the notch/Dynamic Island and home indicator in
+   both themes.
+
+## Known acceptable rough edges (don't report)
+
+- Notification SMS leads with a raw phone number when the sharer has no name
+  on file (display names are a planned feature — FEATURES.md).
+- The web app is not a supported user surface; anything web-specific goes
+  through `manual-tests/cloud_manual_regression.md` instead.
