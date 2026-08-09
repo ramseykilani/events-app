@@ -18,6 +18,12 @@ The checklist that defines "complete" is
       false failures. Never start Phase 1 while a pipeline run is in flight.
 - [ ] If the pipeline never ran e2e (secrets warning), run the full suite
       locally instead: `npm run build:web && CI=1 npm run test:e2e`.
+- [ ] **Short-circuit:** if a release review with `VERDICT: SHIP` already
+      exists (a merged "Release review" report PR) whose reviewed commit is an
+      ancestor of the staging tip AND the delta since is docs/tests/tooling
+      only (no `app/`, `components/`, `lib/`, `constants/`, or `supabase/`
+      changes), cite that report and skip to Promotion. Any code delta means
+      running the full protocol.
 
 ## Phase 1 — Smoke sweep (~5–10 min). Stop on any failure.
 
