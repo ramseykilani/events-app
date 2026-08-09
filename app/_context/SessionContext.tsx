@@ -38,10 +38,14 @@ export function SessionContextProvider({ children }: { children: React.ReactNode
       .getSession()
       .then(async ({ data: { session } }) => {
         setSession(session);
-        if (session?.user) {
-          await ensureUserRow(session);
-        }
+        // Cleared before ensureUserRow on purpose: a slow or hung
+        // profile-row RPC must never gate the UI behind the boot spinner.
+        // (The row is created by the auth trigger at signup; this is only a
+        // safety net, and failures surface via showError inside it.)
         setIsLoading(false);
+        if (session?.user) {
+          void ensureUserRow(session);
+        }
       })
       .catch((err) => {
         // Without this, a failed getSession (e.g. the Web Locks acquire
