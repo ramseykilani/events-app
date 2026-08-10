@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { showAlert, showConfirm } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
@@ -428,7 +429,14 @@ export default function PeopleScreen() {
       ) : null}
       {people.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>👥</Text>
+          <View
+            style={styles.emptyIcon}
+            testID="people-empty-icon"
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          >
+            <Ionicons name="people-outline" size={52} color={theme.textTertiary} />
+          </View>
           <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No people yet</Text>
           <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
             {Platform.OS === 'web'
@@ -781,7 +789,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIcon: {
-    fontSize: 48,
     marginBottom: 16,
   },
   emptyTitle: {

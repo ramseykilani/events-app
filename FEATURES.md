@@ -16,7 +16,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned |
 | [Contacts Permission Explainer](#contacts-permission-explainer) | Planned |
-| [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Planned |
+| [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Implemented |
 | [Delete Account](#delete-account) | Planned — **launch-blocking** |
 
 ---
@@ -361,7 +361,7 @@ A real explainer screen, framed around the product truth:
 
 ## Themeable Icons (Emoji Audit)
 
-**Status:** Planned
+**Status:** Implemented
 
 ### Problem
 
@@ -371,11 +371,13 @@ The People screen's empty state shows a raw `👥` emoji ([app/(app)/people.tsx]
 
 Replace emoji glyphs with vector icons tinted by theme role tokens (e.g. `textTertiary` for empty-state art). `@expo/vector-icons` already ships with the `expo` package — no new dependency. Grep for remaining emoji in `app/` and `components/` at implementation time; the People empty state is the only known instance.
 
+**As shipped (2026-08-10):** the empty state renders Ionicons `people-outline` at 52px in `textTertiary`, wrapped in a decorative View hidden from accessibility. The audit confirmed 👥 was the only emoji in the UI source (the `✓` checkmarks are U+2713 text dingbats, already tinted via role tokens — not emoji). `@expo/vector-icons` is now a declared dependency (`^15.0.3`), and `scripts/check-conventions.mjs` rule 4 bans Unicode Extended_Pictographic characters in `app/`/`components/`/`hooks/`/`lib/` so the audit can't regress.
+
 ### Acceptance Criteria
 
-- [ ] No UI element renders color outside the role-token system in either theme
-- [ ] Empty-state icon reads correctly in both Paper and Evening
-- [ ] Pixel-diff baselines regenerated (the People screen isn't currently snapshotted — consider adding it)
+- [x] No UI element renders color outside the role-token system in either theme
+- [x] Empty-state icon reads correctly in both Paper and Evening
+- [x] Pixel-diff baselines regenerated — vacuous: no baseline contained the emoji, so nothing drifted (verified by running `e2e/visual.spec.ts`). A People empty-state baseline was considered and skipped: the shared e2e accounts always have people (share/hide specs upsert "E2E Account B" and never remove it), so the empty state isn't deterministically reachable. The conventions rule above is the permanent guard instead.
 
 ### Open Questions
 

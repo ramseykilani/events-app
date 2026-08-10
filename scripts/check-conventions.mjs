@@ -12,6 +12,10 @@
 //      (react-native-web makes Alert a no-op; dialogs must render on web).
 //   3. No hard-coded hex colors in app/, components/, hooks/, lib/
 //      (every color is a role token from constants/Colors.ts via useTheme).
+//   4. No emoji (Unicode Extended_Pictographic) in UI source — emoji render in
+//      the OS emoji font and ignore role-token tints; use a vector icon
+//      (@expo/vector-icons) colored by a theme token instead. Text-font
+//      dingbats like ✓ (U+2713) are not pictographic and remain fine.
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -20,6 +24,7 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const SCAN_DIRS = ['app', 'components', 'hooks', 'lib'];
 const SOURCE_RE = /\.(ts|tsx)$/;
 const HEX_RE = /#[0-9a-fA-F]{3}\b|#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{8}\b/g;
+const EMOJI_RE = /\p{Extended_Pictographic}/gu;
 // lib/dialogs.ts and lib/showError.ts are the dialog implementations.
 const ALERT_ALLOWED_FILES = new Set(['lib/dialogs.ts', 'lib/showError.ts']);
 
@@ -90,6 +95,17 @@ function checkRegexRules(path, text, source) {
     if (!hasAllowComment(lines, line)) {
       violations.push(
         `${relPath}:${line} — hard-coded color ${m[0]}; use a role token from constants/Colors.ts via useTheme`
+      );
+    }
+  }
+
+  for (const m of text.matchAll(EMOJI_RE)) {
+    const line = lineOf(source, m.index);
+    const textLine = lines[line - 1].trim();
+    if (textLine.startsWith('//') || textLine.startsWith('*')) continue;
+    if (!hasAllowComment(lines, line)) {
+      violations.push(
+        `${relPath}:${line} — emoji ${m[0]} renders in the OS emoji font and can't be tinted; use a vector icon with a role-token color`
       );
     }
   }

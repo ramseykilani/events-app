@@ -141,6 +141,45 @@ describe('app/(app)/people manual add', () => {
   });
 });
 
+describe('app/(app)/people empty state', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
+    mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
+
+    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
+
+    mockHiddenEq.mockResolvedValue({ data: [], error: null });
+    mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'my_people') {
+        return { select: mockMyPeopleSelect, upsert: mockMyPeopleUpsert };
+      }
+      if (table === 'circles') {
+        return { select: mockCirclesSelect };
+      }
+      if (table === 'hidden_people') {
+        return { select: mockHiddenSelect };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+  });
+
+  it('renders a themeable vector icon instead of an emoji', async () => {
+    const { getByTestId, getByText, queryByText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('No people yet')).toBeTruthy());
+    // The icon is decorative, so the wrapper is hidden from accessibility —
+    // includeHiddenElements is required to find it (and proves the hiding).
+    expect(getByTestId('people-empty-icon', { includeHiddenElements: true })).toBeTruthy();
+    expect(queryByText('👥')).toBeNull();
+  });
+});
+
 describe('app/(app)/people sign out', () => {
   const originalOS = Platform.OS;
 
