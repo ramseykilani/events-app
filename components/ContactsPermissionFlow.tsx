@@ -75,7 +75,9 @@ export function ContactsPermissionFlow({
         if (perm.status === 'granted') setPhase('picker');
       });
     });
-    return () => sub.remove();
+    return () => {
+      sub?.remove?.();
+    };
   }, [phase]);
 
   const handleContinue = async () => {
