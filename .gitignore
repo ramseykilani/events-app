@@ -37,6 +37,9 @@ yarn-error.*
 # Supabase CLI local state
 supabase/.temp/
 
+# Store submit credentials (agents materialize these from secrets; never commit)
+google-play-service-account.json
+
 # test coverage
 coverage/
 
