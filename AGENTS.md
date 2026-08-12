@@ -141,6 +141,41 @@ npm test -- --runInBand              # Jest suite
 
 Then run the manual regression suite (`manual-tests/cloud_manual_regression.md`), especially E-108/E-109 (forwarding) and M-003.
 
+### Native builds (agent-run)
+
+Native binaries are built on EAS **by agents** — not by CI, not on the owner's machine. `STATUS.md` (repo root) tracks enrollment/secrets/build/tester state: read it before any release work and update it whenever you change any of that state. The ship-time sequence that uses these commands lives in `scripts/release-review-orchestrator.md` → Native rollout.
+
+Prerequisites (Cursor secrets — injected into new cloud-agent VMs only; a running VM never picks up newly added secrets):
+
+- `EXPO_TOKEN` — Expo access token (Expo dashboard → Account settings → Access Tokens). Authenticates every `eas` command.
+- iOS (App Store Connect API key): `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, and `EXPO_ASC_API_KEY_P8_BASE64` (base64 of the `.p8`). Decode the key and export the set the CLI reads:
+  ```bash
+  echo "$EXPO_ASC_API_KEY_P8_BASE64" | base64 -d > /tmp/AuthKey.p8
+  export EXPO_ASC_API_KEY_PATH=/tmp/AuthKey.p8
+  export EXPO_APPLE_TEAM_TYPE=INDIVIDUAL
+  ```
+- Android submit (Play service account): decode `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (base64) to the path `eas.json` expects — `echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" | base64 -d > google-play-service-account.json`. The file is gitignored; never commit it.
+
+Commands:
+
+```bash
+# Owner smoke build (sideloadable APK; preview profile = internal distribution)
+eas build --platform android --profile preview --non-interactive --wait
+
+# Tester build → Play internal track (submit profile carries track + key path)
+eas build --platform android --profile production --non-interactive --wait
+eas submit --platform android --profile production --non-interactive --latest
+
+# iOS → TestFlight (ASC key env vars above authenticate both build and submit)
+eas build --platform ios --profile production --non-interactive --wait
+eas submit --platform ios --profile production --non-interactive --latest
+```
+
+- `--wait` blocks until the build finishes and prints the artifact page URL — hand that link to the owner. Builds are metered (free plan: 15 Android + 15 iOS per month); never build speculatively.
+- Preview produces an APK (sideload); production produces an AAB (Play) / IPA (TestFlight). Same commit, same code — preview is the owner's smoke surface, production is what testers get.
+- First iOS build fallback: if non-interactive credential bootstrap fails (bundle ID registration, APNs key), the owner runs `eas build --platform ios --profile production` once interactively on their machine; after that the env-var path works. Once the ASC key exists, its IDs may also be added to the `submit.production.ios` profile in `eas.json` (`ascApiKeyPath`/`ascApiKeyId`/`ascApiKeyIssuerId`) — optional; env vars suffice.
+- If a required secret is missing, stop and tell the owner exactly which one to add (Cursor Dashboard → Cloud Agents → Secrets, and GitHub repo secrets if CI ever builds). Do not half-run a release.
+
 ### Key gotchas
 
 - `react-native-web` must be installed for web mode to work (`npx expo install react-native-web`). It is already in `package.json` dependencies.
