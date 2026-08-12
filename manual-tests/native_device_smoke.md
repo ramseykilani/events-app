@@ -3,8 +3,8 @@
 Run this on a real phone (iOS via TestFlight, Android via internal track or
 sideloaded APK) after every new EAS build, before inviting testers. Every
 automated harness in this repo exercises the **web** build — the native-only
-paths below have no other coverage. Two devices (or a friend with the app) are
-needed for the push/share steps.
+paths below have no other coverage. The push/share steps need a second
+device, a friend with the app, or an agent playing the sharer (see N-005).
 
 Record results in a report file like the cloud suite
 (`manual-tests/manual_test_report_<date>-device.md`), one line per check:
@@ -51,6 +51,14 @@ pass / fail + note.
    detail screen, with "From X" attribution.
 4. Device B: the event is on the calendar and survives a relaunch.
 
+**One-device variant (agent-assisted):** an agent plays Device A. Ask it to
+sign in on the staging web preview with a test-OTP account, add your real
+phone number to its people (manual name + phone form), and share an event to
+you. Your phone — this build installed, signed in, push token registered —
+should get the push; tap it and check the event detail and calendar as above.
+The push title should show the test account's display name (the share gate
+requires one).
+
 ## N-006: SMS content (share to a non-user)
 
 1. Device A: share an event (with a URL set) to your own real second number,
@@ -80,7 +88,8 @@ pass / fail + note.
 
 ## Known acceptable rough edges (don't report)
 
-- Notification SMS leads with a raw phone number when the sharer has no name
-  on file (display names are a planned feature — FEATURES.md).
+- Notification SMS leads with the sharer's display name. A raw phone number
+  appears only for accounts that last shared before display names shipped
+  (2026-08-12) — the share gate prevents any new nameless share.
 - The web app is not a supported user surface; anything web-specific goes
   through `manual-tests/cloud_manual_regression.md` instead.

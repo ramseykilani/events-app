@@ -84,6 +84,34 @@ never bypass. The production push deploys automatically. Confirm the deploy
 (`gh run list --branch production --limit 1`) and tell the owner the release
 is live.
 
+## Native rollout (after promotion)
+
+The production push deploys the **web** app only — no native binary moves on
+its own. Testers get updates through this explicit sequence (auth setup and
+command details: AGENTS.md → Native builds (agent-run); current state:
+`STATUS.md`):
+
+1. Build the owner's smoke APK from the exact promoted commit:
+   `eas build --platform android --profile preview --non-interactive --wait`.
+   Hand the owner the artifact link plus the smoke checklist from
+   `manual-tests/native_device_smoke.md` — print it inline; never make them
+   go find it.
+2. Wait for the owner's explicit pass/fail. On fail: fix forward on staging
+   and re-run this protocol from Phase 0. Testers never see the build.
+3. On pass: build and submit production to the Play internal track:
+   `eas build --platform android --profile production --non-interactive --wait`
+   then `eas submit --platform android --profile production --non-interactive --latest`.
+   iOS (TestFlight) joins once iPhone testers exist — same profiles, with the
+   ASC key env vars exported.
+4. Update `STATUS.md` (build numbers, links, date) and tell the owner the
+   build is rolling out to testers.
+
+If the EAS secrets are not in the environment (`EXPO_TOKEN`, and for submits
+the Play/ASC credentials), stop after the git promotion and tell the owner
+exactly which secret to add — the web release is already live either way.
+Builds are metered (free plan: 15 Android + 15 iOS per month); this loop
+spends 1–2 per release, so never build speculatively.
+
 ## If the verdict is DON'T SHIP
 
 Summarize the blockers for the owner plainly. When they (or another agent
