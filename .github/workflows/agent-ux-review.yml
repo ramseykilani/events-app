@@ -53,7 +53,9 @@ jobs:
               '{
                 prompt: { text: $prompt },
                 repos: [{ url: $url, startingRef: "staging" }],
-                autoCreatePR: true
+                # The reviewer pushes its report commit straight to staging
+                # (docs-only) — there is no review branch to turn into a PR.
+                autoCreatePR: false
               } + (if $model == "" then {} else { model: { id: $model } } end)'
           }
           RESPONSE=$(build_payload "${MODEL_ID}" | curl -sf --request POST \

@@ -6,7 +6,9 @@ paths) for flags and a one-line note per item. An item may only be marked N/A
 with a reason. Anything less than a fully ticked list is an incomplete review.
 
 Report result: `VERDICT: SHIP` or `VERDICT: DON'T SHIP` (first line), then
-this checklist filled in, then flagged issues with evidence.
+this checklist filled in, then per-blocker briefs, then a Known minor issues
+section (same brief format). Written from
+`manual-tests/release_review_report_template.md`.
 
 ## Phase 1 — Smoke sweep (cheap, halts the review on any failure)
 
@@ -17,7 +19,15 @@ this checklist filled in, then flagged issues with evidence.
 - [ ] Remove the event on A → gone on A, still on B; remove on B (cleanup)
 - [ ] No browser permission prompts, no visible errors, no console errors
 
-## Phase 2 — Deep tracks (parallel; halt everything on a blocker)
+## Phase 2 — Deep tracks (halt everything on a blocker; minors never halt)
+
+Severity rules for every track: a **blocker** makes the release wrong (broken
+core flow, data loss, crash, debug output shown to users) — note it and stop
+your track. A **minor** is cosmetic or an edge-case papercut — screenshot it,
+note it, keep testing. Unsure whether it's a blocker? It's a blocker. The
+open entries in `manual-tests/known_issues.md` are known and accepted: never
+flag, halt on, or screenshot them (flag only if one looks materially worse
+than its entry).
 
 ### Track 1: Auth & first-run (fresh throwaway account via Management API test OTP — remove it after)
 
@@ -72,10 +82,11 @@ Judged against `docs/events-design-language.md`:
 - [ ] Rapid interaction: double-tap Save/Share doesn't double-create (guards work)
 - [ ] Browser back/forward buttons behave sanely on web
 - [ ] Deep link: open an /event/<id> URL signed-out → sign-in → lands correctly
+- [ ] Known-issues ledger: re-check each open entry in `manual-tests/known_issues.md` — fixed / still present (note which per entry)
 
 ## Phase 3 — Skeptic pass (stronger model)
 
-- [ ] Re-examine every flagged screenshot: real issue or false alarm?
+- [ ] Re-examine every flagged screenshot: false alarm (dismiss with a reason — including "matches KI-xxx"), confirmed minor (→ report's Known minor issues), or confirmed blocker (→ upgrades the verdict to DON'T SHIP)
 - [ ] Skim the visual matrix screenshots: any flag the tracks missed?
 - [ ] Confirm every checklist item is genuinely evidenced, not hand-waved
 

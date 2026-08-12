@@ -28,8 +28,11 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
 3. **The owner says "ship it."** The agent runs the release click-through
    review first (see "Agentic UX review"): a complete pass over every scenario
    in the manual regression suite against the staging preview, desktop +
-   mobile viewports, ending in `VERDICT: SHIP` / `VERDICT: DON'T SHIP`. On
-   DON'T SHIP, fix forward on staging and re-review.
+   mobile viewports, ending in `VERDICT: SHIP` / `VERDICT: DON'T SHIP`. The
+   review is read-only on the product — on DON'T SHIP the review session ends
+   with the report on `staging`; fixes are independent tasks (a fresh agent
+   works from the report's blocker briefs), and the next "ship it" starts a
+   fresh review from Phase 0 against the new tip.
 4. **On SHIP, the agent fast-forwards the exact green-tested staging commit
    to `production`** (`git push origin staging:production`). Branch protection
    on `production` requires the full-suite checks on that commit, so an
@@ -40,7 +43,7 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
 | Trigger | Workflow | What runs |
 |---------|----------|-----------|
 | Push to `staging` | `staging.yml` | **Full suite** (`full-suite.yml`): tsc, convention checks, Jest, SQL semantics, web build, Playwright e2e on desktop Chrome / Mobile Safari / Mobile Chrome. If green, redeploys the staging preview with the tested bundle. |
-| Ship time (owner says "ship it") | in-session `computerUse` subagent | Complete click-through of every manual-suite scenario against the staging preview → `VERDICT: SHIP` / `DON'T SHIP` + report PR. Gate for promotion. |
+| Ship time (owner says "ship it") | in-session `computerUse` subagent | Complete click-through of every manual-suite scenario against the staging preview → `VERDICT: SHIP` / `DON'T SHIP` + report committed to `staging`. Gate for promotion. |
 | PR → `production` (optional path) | `agent-ux-review.yml` | CI-launched copy of the same review. Inert until `CURSOR_API_KEY` is set. |
 | PR → `staging` (optional) | `ci-fast.yml` | Fast checks only. PRs into staging are optional paper trail. |
 | PR → `production` (optional path) | `release.yml` | Rejects any source branch that isn't `staging`, re-runs the full suite. Defense in depth; normal promotion is the fast-forward push above. |
@@ -121,11 +124,19 @@ known**:
 - **Phase 0 (free):** staging pipeline green, including pixel-diff baselines.
 - **Phase 1 (pennies):** one Grok-fast agent smoke-sweeps the happy paths.
   Any failure → `DON'T SHIP`, stop.
-- **Phase 2 (the budget):** five parallel `computerUse` tracks per
+- **Phase 2 (the budget):** five `computerUse` tracks per
   `manual-tests/release_review_checklist.md` (auth+first-run, event lifecycle,
   sharing/people, the visual matrix over screen × form factor × theme, edge
-  states). A confirmed blocker in any track halts the rest.
-- **Phase 3:** a stronger model re-judges the flagged evidence only.
+  states) — sequential in-session, one fresh subagent per track. Severity is
+  two-tier: a **blocker** (broken core flow, data loss, crash, debug output
+  shown to users) halts everything immediately — evidence gathered after a
+  known blocker is contaminated by it; a **minor** (cosmetic, edge-case
+  papercut) is flagged and the track continues. Tracks are briefed with the
+  open entries in `manual-tests/known_issues.md` so accepted issues aren't
+  re-flagged.
+- **Phase 3:** a stronger model re-judges the flagged evidence only —
+  dismissing false alarms, confirming minors, and upgrading any misjudged
+  flag to a blocker.
 
 The orchestrator instructions an agent follows at ship time live in
 `scripts/release-review-orchestrator.md`. Two ways to execute the review
@@ -143,9 +154,18 @@ itself:
    (default `cursor-grok-4.6-high-fast`), with automatic fallback to the
    account default if the ID is rejected.
 
-Either way the output is a report PR against `staging` whose first line is
-`VERDICT: SHIP` / `VERDICT: DON'T SHIP`. A DON'T SHIP blocks promotion until
-fixed and re-reviewed.
+Either way the output is a report committed straight to `staging`
+(`manual-tests/manual_test_report_<date>-release.md`, docs-only) whose first
+line is `VERDICT: SHIP` / `VERDICT: DON'T SHIP`, with self-contained briefs
+per blocker and per confirmed minor — the report IS the bug record; there is
+no separate tracker. Confirmed minors also land in
+`manual-tests/known_issues.md` (the open-issues ledger future reviews are
+briefed from) in the same commit. A DON'T SHIP blocks promotion until fixed
+(independent fix tasks, fresh sessions) and re-reviewed from Phase 0. On
+SHIP, the report ships with the code: the orchestrator waits for the suite to
+go green on the report commit, verifies the staging tip is still the reviewed
+commit plus docs-only deltas, and only then fast-forwards to `production` —
+so production always contains the review that blessed it.
 
 ## GitHub settings (one time)
 
