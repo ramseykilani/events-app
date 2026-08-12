@@ -41,12 +41,14 @@ export async function getContactsPermission(): Promise<ContactsPermission> {
 
 /**
  * Normalize phone number to E.164 format.
- * Returns null if the number cannot be parsed.
+ * Returns null if the number cannot be parsed or is not a possible number
+ * (incomplete stubs like "123"). Uses isPossible() rather than isValid() so
+ * reserved 555 test numbers still normalize.
  */
 export function normalizeToE164(phone: string, defaultCountry: CountryCode = 'US'): string | null {
   try {
     const parsed = parsePhoneNumber(phone, defaultCountry);
-    return parsed ? parsed.format('E.164') : null;
+    return parsed?.isPossible() ? parsed.format('E.164') : null;
   } catch {
     return null;
   }

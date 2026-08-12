@@ -32,6 +32,16 @@ test('invalid phone number shows a friendly alert (M-001)', async ({
       .poll(() => dialogMessage, { message: 'alert to fire' })
       .toContain('Invalid phone number');
 
+    // Incomplete numeric stubs used to parse as +1123 and hit Twilio, which
+    // dumped sms_send_failed via showError. They must stay client-side.
+    dialogMessage = null;
+    await page.getByLabel('Phone number').fill('123');
+    await page.getByRole('button', { name: 'Send code' }).click();
+    await expect
+      .poll(() => dialogMessage, { message: 'alert to fire for numeric stub' })
+      .toContain('Invalid phone number');
+    expect(dialogMessage).not.toMatch(/sms_send_failed|twilio/i);
+
     // Still on the sign-in form — no navigation happened.
     await expect(page.getByLabel('Phone number')).toBeVisible();
   } finally {

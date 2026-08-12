@@ -28,7 +28,10 @@ export default function SignInScreen() {
   const normalizePhone = (input: string): string | null => {
     try {
       const parsed = parsePhoneNumber(input, 'US');
-      return parsed ? parsed.format('E.164') : null;
+      // isPossible() (not isValid()): incomplete stubs like "123" must not
+      // reach Twilio, but reserved 555 test numbers are possible-and-invalid
+      // and still have to sign in.
+      return parsed?.isPossible() ? parsed.format('E.164') : null;
     } catch {
       return null;
     }

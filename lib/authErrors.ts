@@ -24,7 +24,11 @@ export function getAuthUserMessage(err: unknown): string | null {
     return 'Too many codes requested. Please wait a minute before trying again.';
   }
 
-  if (normalized.includes('sms_send_failed') || normalized.includes('unable to send')) {
+  if (
+    code === 'sms_send_failed' ||
+    normalized.includes('sms_send_failed') ||
+    normalized.includes('unable to send')
+  ) {
     return 'We could not send a verification code to that number. Check the number and try again.';
   }
 

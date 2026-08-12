@@ -42,6 +42,19 @@ describe('app/(auth)/sign-in', () => {
     expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 
+  it('rejects incomplete numeric stubs before they reach the SMS provider', () => {
+    const screen = render(<SignInScreen />);
+
+    fireEvent.changeText(screen.getByPlaceholderText('+1 (555) 123-4567'), '123');
+    fireEvent.press(screen.getByText('Send code'));
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Invalid phone number',
+      'Please enter a valid phone number.'
+    );
+    expect(mockSignInWithOtp).not.toHaveBeenCalled();
+  });
+
   it('normalizes phone number and navigates to verify on success', async () => {
     mockSignInWithOtp.mockResolvedValueOnce({ error: null });
     const screen = render(<SignInScreen />);

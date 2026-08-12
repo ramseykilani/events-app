@@ -38,6 +38,11 @@ describe('lib/contacts', () => {
 
   it('returns null for invalid numbers', () => {
     expect(normalizeToE164('not-a-number')).toBeNull();
+    expect(normalizeToE164('123')).toBeNull();
+  });
+
+  it('still normalizes reserved 555 numbers that are possible but not valid', () => {
+    expect(normalizeToE164('5555550100')).toBe('+15555550100');
   });
 
   it('reports permission granted status', async () => {

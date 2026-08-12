@@ -27,6 +27,19 @@ describe('lib/authErrors', () => {
     expect(getAuthUserMessage({ message: 'sms_send_failed' })).toMatch(
       /could not send a verification code/i
     );
+
+    // Live Twilio failures put the code on `code` and a provider sentence in
+    // `message` — the message often does not contain the string sms_send_failed.
+    expect(
+      getAuthUserMessage(
+        Object.assign(
+          new Error(
+            "Error sending confirmation OTP to provider: The 'To' number +**** is not a valid phone number."
+          ),
+          { code: 'sms_send_failed' }
+        )
+      )
+    ).toMatch(/could not send a verification code/i);
   });
 
   it('returns null for unexpected errors', () => {
