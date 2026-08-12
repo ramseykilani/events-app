@@ -12,6 +12,11 @@ const mockCirclesEq = jest.fn();
 const mockCirclesSelect = jest.fn();
 const mockHiddenEq = jest.fn();
 const mockHiddenSelect = jest.fn();
+const mockUsersSingle = jest.fn();
+const mockUsersEq = jest.fn();
+const mockUsersSelect = jest.fn();
+const mockUsersUpdateEq = jest.fn();
+const mockUsersUpdate = jest.fn();
 const mockFrom = jest.fn();
 const mockSignOut = jest.fn();
 const mockRpc = jest.fn();
@@ -71,6 +76,12 @@ describe('app/(app)/people manual add', () => {
     mockHiddenEq.mockResolvedValue({ data: [], error: null });
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockResolvedValue({ error: null });
+
     mockMyPeopleUpsert.mockResolvedValue({ data: null, error: null });
     mockSignOut.mockResolvedValue({ error: null });
 
@@ -83,6 +94,9 @@ describe('app/(app)/people manual add', () => {
       }
       if (table === 'hidden_people') {
         return { select: mockHiddenSelect };
+      }
+      if (table === 'users') {
+        return { select: mockUsersSelect, update: mockUsersUpdate };
       }
       throw new Error(`Unexpected table ${table}`);
     });
@@ -157,6 +171,12 @@ describe('app/(app)/people empty state', () => {
     mockHiddenEq.mockResolvedValue({ data: [], error: null });
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockResolvedValue({ error: null });
+
     mockFrom.mockImplementation((table: string) => {
       if (table === 'my_people') {
         return { select: mockMyPeopleSelect, upsert: mockMyPeopleUpsert };
@@ -166,6 +186,9 @@ describe('app/(app)/people empty state', () => {
       }
       if (table === 'hidden_people') {
         return { select: mockHiddenSelect };
+      }
+      if (table === 'users') {
+        return { select: mockUsersSelect, update: mockUsersUpdate };
       }
       throw new Error(`Unexpected table ${table}`);
     });
@@ -198,6 +221,12 @@ describe('app/(app)/people sign out', () => {
     mockHiddenEq.mockResolvedValue({ data: [], error: null });
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockResolvedValue({ error: null });
+
     mockSignOut.mockResolvedValue({ error: null });
 
     mockFrom.mockImplementation((table: string) => {
@@ -209,6 +238,9 @@ describe('app/(app)/people sign out', () => {
       }
       if (table === 'hidden_people') {
         return { select: mockHiddenSelect };
+      }
+      if (table === 'users') {
+        return { select: mockUsersSelect, update: mockUsersUpdate };
       }
       throw new Error(`Unexpected table ${table}`);
     });
@@ -262,6 +294,12 @@ describe('app/(app)/people delete account', () => {
     mockHiddenEq.mockResolvedValue({ data: [], error: null });
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockResolvedValue({ error: null });
+
     mockRpc.mockResolvedValue({ data: null, error: null });
     mockSignOut.mockResolvedValue({ error: null });
 
@@ -274,6 +312,9 @@ describe('app/(app)/people delete account', () => {
       }
       if (table === 'hidden_people') {
         return { select: mockHiddenSelect };
+      }
+      if (table === 'users') {
+        return { select: mockUsersSelect, update: mockUsersUpdate };
       }
       throw new Error(`Unexpected table ${table}`);
     });
@@ -330,5 +371,107 @@ describe('app/(app)/people delete account', () => {
     expect(mockRpc).toHaveBeenCalledTimes(1);
     expect(showError).toHaveBeenCalledTimes(1);
     expect(mockSignOut).not.toHaveBeenCalled();
+  });
+});
+
+describe('app/(app)/people display name', () => {
+  const originalOS = Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
+    mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
+
+    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
+
+    mockHiddenEq.mockResolvedValue({ data: [], error: null });
+    mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
+
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockResolvedValue({ error: null });
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'my_people') {
+        return { select: mockMyPeopleSelect, upsert: mockMyPeopleUpsert };
+      }
+      if (table === 'circles') {
+        return { select: mockCirclesSelect };
+      }
+      if (table === 'hidden_people') {
+        return { select: mockHiddenSelect };
+      }
+      if (table === 'users') {
+        return { select: mockUsersSelect, update: mockUsersUpdate };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+  });
+
+  afterEach(() => {
+    Platform.OS = originalOS;
+  });
+
+  it('shows the current name in the footer and edits it via the modal', async () => {
+    const { getByText, getByLabelText, queryByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Your name: Test User')).toBeTruthy());
+    fireEvent.press(getByText('Your name: Test User'));
+
+    const input = getByLabelText('Your name');
+    expect(input.props.value).toBe('Test User');
+
+    fireEvent.changeText(input, 'Ramsey');
+    fireEvent.press(getByText('Save'));
+
+    await waitFor(() => {
+      expect(mockUsersUpdate).toHaveBeenCalledWith({ display_name: 'Ramsey' });
+    });
+    expect(mockUsersUpdateEq).toHaveBeenCalledWith('id', 'u1');
+
+    // Modal closed and the footer reflects the new name.
+    await waitFor(() => expect(queryByLabelText('Your name')).toBeNull());
+    expect(getByText('Your name: Ramsey')).toBeTruthy();
+  });
+
+  it('shows Not set and keeps Save disabled while the field is empty', async () => {
+    mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Your name: Not set')).toBeTruthy());
+    fireEvent.press(getByText('Your name: Not set'));
+
+    const input = getByLabelText('Your name');
+    expect(input.props.value).toBe('');
+
+    // Names are never removable: an empty (or whitespace-only) field cannot save.
+    fireEvent.press(getByText('Save'));
+    fireEvent.changeText(input, '   ');
+    fireEvent.press(getByText('Save'));
+    expect(mockUsersUpdate).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a save failure and keeps the modal open', async () => {
+    const { showError } = jest.requireMock('../../../lib/showError');
+    mockUsersUpdateEq.mockResolvedValue({ error: { code: '23514', message: 'check violation' } });
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Your name: Test User')).toBeTruthy());
+    fireEvent.press(getByText('Your name: Test User'));
+    fireEvent.changeText(getByLabelText('Your name'), 'Ramsey');
+    fireEvent.press(getByText('Save'));
+
+    await waitFor(() => {
+      expect(showError).toHaveBeenCalledWith(
+        'Could not save name',
+        expect.objectContaining({ code: '23514' })
+      );
+    });
+    expect(getByLabelText('Your name')).toBeTruthy();
   });
 });

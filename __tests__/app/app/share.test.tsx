@@ -14,6 +14,12 @@ const mockEventSharesEq = jest.fn();
 const mockEventSharesSelect = jest.fn();
 const mockEventSharesDelete = jest.fn();
 
+const mockUsersSingle = jest.fn();
+const mockUsersEq = jest.fn();
+const mockUsersSelect = jest.fn();
+const mockUsersUpdateEq = jest.fn();
+const mockUsersUpdate = jest.fn();
+
 const mockRpc = jest.fn();
 const mockFunctionsInvoke = jest.fn();
 const mockFrom = jest.fn();
@@ -124,6 +130,12 @@ describe('app/(app)/share', () => {
     mockEventSharesSelect.mockReturnValue({ eq: mockEventSharesEq });
     mockEventSharesDelete.mockReturnValue({ eq: jest.fn() });
 
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockResolvedValue({ error: null });
+
     mockFrom.mockImplementation((table: string) => {
       if (table === 'my_people') {
         return {
@@ -139,6 +151,12 @@ describe('app/(app)/share', () => {
         return {
           select: mockEventSharesSelect,
           delete: mockEventSharesDelete,
+        };
+      }
+      if (table === 'users') {
+        return {
+          select: mockUsersSelect,
+          update: mockUsersUpdate,
         };
       }
       return {};
@@ -236,6 +254,107 @@ describe('app/(app)/share', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 
+  describe('display name gate', () => {
+    it('blocks Share until a name is saved, then shares', async () => {
+      mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
+
+      const screen = render(<ShareScreen />);
+
+      await waitFor(() =>
+        expect(
+          screen.getByText(/Your friends get a text when you share/)
+        ).toBeTruthy()
+      );
+
+      fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
+      fireEvent.press(screen.getByText('Share'));
+      expect(mockRpc).not.toHaveBeenCalled();
+
+      fireEvent.changeText(screen.getByLabelText('Your name'), '  Ramsey  ');
+      fireEvent.press(screen.getByText('Save'));
+
+      await waitFor(() => {
+        expect(mockUsersUpdate).toHaveBeenCalledWith({ display_name: 'Ramsey' });
+      });
+      expect(mockUsersUpdateEq).toHaveBeenCalledWith('id', 'u1');
+
+      // The gate disappears once the name is saved.
+      await waitFor(() =>
+        expect(screen.queryByText(/Your friends get a text when you share/)).toBeNull()
+      );
+
+      fireEvent.press(screen.getByText('Share'));
+      await waitFor(() => {
+        expect(mockRpc).toHaveBeenCalledWith('share_event', {
+          p_user_event_id: 'ue1',
+          p_person_ids: ['p1', 'p2'],
+        });
+      });
+      expect(router.back).toHaveBeenCalled();
+    });
+
+    it('keeps Save disabled while the name input is empty', async () => {
+      mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
+
+      const screen = render(<ShareScreen />);
+      await waitFor(() => expect(screen.getByLabelText('Your name')).toBeTruthy());
+
+      fireEvent.press(screen.getByText('Save'));
+      expect(mockUsersUpdate).not.toHaveBeenCalled();
+    });
+
+    it('strips newlines from the name input', async () => {
+      mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
+
+      const screen = render(<ShareScreen />);
+      const input = await screen.findByLabelText('Your name');
+
+      fireEvent.changeText(input, 'Bad\nName');
+      expect(input.props.value).toBe('BadName');
+    });
+
+    it('calls showError and keeps the gate when saving the name fails', async () => {
+      const { showError } = require('../../../lib/showError');
+      mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
+      mockUsersUpdateEq.mockResolvedValue({
+        error: { code: '23514', message: 'check violation' },
+      });
+
+      const screen = render(<ShareScreen />);
+      await waitFor(() => expect(screen.getByLabelText('Your name')).toBeTruthy());
+
+      fireEvent.changeText(screen.getByLabelText('Your name'), 'Ramsey');
+      fireEvent.press(screen.getByText('Save'));
+
+      await waitFor(() => {
+        expect(showError).toHaveBeenCalledWith(
+          'Could not save name',
+          expect.objectContaining({ code: '23514' })
+        );
+      });
+      // Gate still up, Share still blocked.
+      expect(screen.getByText(/Your friends get a text when you share/)).toBeTruthy();
+      fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
+      fireEvent.press(screen.getByText('Share'));
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('does not gate sharing when the display name fetch fails', async () => {
+      mockUsersSingle.mockResolvedValue({ data: null, error: { message: 'boom' } });
+
+      const screen = render(<ShareScreen />);
+      await waitFor(() =>
+        expect(mockMyPeopleOrder).toHaveBeenCalled()
+      );
+
+      expect(screen.queryByText(/Your friends get a text when you share/)).toBeNull();
+
+      fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
+      fireEvent.press(screen.getByText('Share'));
+      await waitFor(() => expect(mockRpc).toHaveBeenCalled());
+    });
+  });
+
   describe('when userEventId is not in params', () => {
     const mockUserEventsSingle = jest.fn();
     const mockUserEventsEqEventId = jest.fn();
@@ -266,6 +385,9 @@ describe('app/(app)/share', () => {
         }
         if (table === 'user_events') {
           return { select: mockUserEventsSelect, insert: mockUserEventsInsert };
+        }
+        if (table === 'users') {
+          return { select: mockUsersSelect, update: mockUsersUpdate };
         }
         return {};
       });

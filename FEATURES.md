@@ -12,7 +12,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Forwarding Shares](#forwarding-shares) | Implemented |
 | [Sign Out](#sign-out) | Implemented |
 | [Web Support](#web-support) | Implemented |
-| [Display Names](#display-names) | Planned |
+| [Display Names](#display-names) | Implemented |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned |
 | [Contacts Permission Explainer](#contacts-permission-explainer) | Planned |
@@ -226,37 +226,46 @@ A deliberately low-prominence sign-out action — this should not be easy to tap
 
 ## Display Names
 
-**Status:** Planned
+**Status:** Implemented (2026-08-12)
 
 ### Problem
 
-Notification SMS identifies the sharer by raw phone number ("+1 416 555 1234 added you to…"). To a recipient who doesn't have the sharer's number saved, that reads like spam. The app never captures a name for the account itself — `contact_name` is always someone *else's* label for you, so a recipient with no prior relationship has nothing human to show.
+Notification SMS identifies the sharer by raw phone number ("+1 416 555 1234 added you to…"). This is worse than it sounds: the SMS arrives from a Twilio Messaging Service pool number, so the recipient's phone can never match it to a saved contact — the body text is the *only* identity signal. A nameless share is effectively an anonymous text, and the SMS is the entire product surface for non-app recipients.
 
-### Proposed Solution
+### Solution (as shipped)
 
-Capture a display name at sign-up: one field after OTP verification ("What name should friends see?"). `send-notification` then attributes shares by name instead of number.
+Capture a display name with a **hard gate at first share — never at sign-up**. The name is only ever consumed at share time (`send-notification` and calendar attribution are its only readers), so the ask lives in the share screen where it is self-justifying: an inline field with one line of context ("Your friends get a text when you share — this is the name they'll see") appears while `display_name` is null, and Share stays disabled until it's saved. Users who never share are never asked; the no-forced-onboarding rule stays absolute. The gate binds the Share *action*, not the share screen, which is also the mandatory step after event creation.
 
-**Decision (2026-08-09): explicitly no name lookup or auto-fill.** Typing a phone number must never reveal whether that number is a user or what they call themselves — that would make the app a phone-number-to-name oracle. Names on `my_people` rows remain whatever the owner typed or imported from contacts; the display name is only ever shown to people the user voluntarily shares with.
+This supersedes the originally spec'd capture UX ("one skippable field after OTP verification"). A skippable sign-up prompt had the worst of both worlds: friction for recipients who may never share, and a permanent nameless state for skippers (a skip was forever — there was no edit path). The share-time gate guarantees no nameless share can ever go out, asks at the moment the user is most motivated to be recognizable, and composes with [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) (a first-time sharer's screen becomes: your name, their names, send).
+
+### Decisions (2026-08-12)
+
+- **No backfill.** Accounts that predate the feature stay NULL until their next share, when the gate asks. Recorded so nobody "fixes" it later.
+- **Editable, never removable.** A "Your name" row at the People screen footer opens an edit modal; empty saves are rejected (client and CHECK constraint). There is no delete-name path.
+- **No verification / impersonation accepted.** A user can call themselves anything. Acceptable because shares only reach the sharer's own chosen contacts — the same trust model as contact names.
+- **Still no name lookup.** Typing a phone number never reveals whether that number is a user or what they call themselves. `users` rows are select/update own-only via RLS; the only cross-user reads are `send-notification` (service role) and the calendar RPC's share attribution — both limited to people the user actually shared with.
+- **"From X" coalesces.** Calendar attribution is the recipient's own `contact_name` for the sharer when present, else the sharer's `display_name`, else no attribution line.
 
 ### Technical Notes
 
-- Migration: `ALTER TABLE public.users ADD COLUMN display_name text` (+ SQL test in `supabase/tests/`)
-- Capture UX: after successful OTP verify, if `users.display_name` is null, show a one-time name prompt. Recommend lightweight and skippable — but note that skipping means your friends get SMS from a bare phone number
-- `send-notification`: select `display_name` alongside `phone_number`. Attribution order for app users: recipient's own `contact_name` for the sharer → `display_name` → phone. Non-app users: `display_name` → phone
-- `get_calendar_events` attribution currently uses only the recipient-side `contact_name`; consider coalescing `display_name` so "From X" works when the recipient hasn't added the sharer (pairs with [Add Sharer to Your People](#add-sharer-to-your-people))
-- `users` table RLS: verify what other users can read before assuming `send-notification` (service role) is the only reader of `display_name`
+- Migration `20260812000001`: `users.display_name text` nullable, plus CHECK constraint `users_display_name_valid` (non-empty after trim, ≤50 chars, no newlines). The CHECK is the real validation boundary: `users_update_own` RLS lets any authenticated user write their own row via raw REST, and the value is interpolated unescaped at the start of an SMS body. The cap also bounds push titles and the "From X" line.
+- Migration `20260812000002`: `get_calendar_events` attribution becomes `COALESCE(mp_owner.contact_name, u_sharer.display_name)` (joins `users` for the sharer). Return shape unchanged — no calendar client changes.
+- `send-notification`: selects `display_name` alongside `phone_number`. App users (push title + SMS): `contact_name` → `display_name` → phone. Non-app users: `display_name` → phone. The phone fallback is pre-feature legacy state given the share gate.
+- Share screen ([app/(app)/share.tsx](app/(app)/share.tsx)): fetches the caller's `display_name` on focus; the gate renders only when the value is positively known null — a failed fetch never blocks sharing. Name save is its own step (so a failed write can't swallow a share); inputs strip newlines client-side too.
+- Edit path ([app/(app)/people.tsx](app/(app)/people.tsx)): footer row + pageSheet modal cloned from the manual-add pattern; `users_update_own` RLS already permits the update. Name changes propagate for free — attribution is read fresh at share/query time (pull, not push).
+- SQL coverage: [supabase/tests/display_name_test.sql](supabase/tests/display_name_test.sql) (CHECK constraint cases + attribution coalesce). E2e: [e2e/display-name.spec.ts](e2e/display-name.spec.ts); `createEventAndShareToB` fills the gate when it appears.
 
 ### Acceptance Criteria
 
-- [ ] New users are asked for a display name once after first sign-in
-- [ ] SMS to non-app recipients shows the sharer's display name when set (phone number as fallback)
-- [ ] Push notification titles use the display name when the recipient has no contact name for the sharer
-- [ ] No code path reveals a user's name in response to a phone-number lookup
+- [x] A user cannot send a share without a display name; users who never share are never asked
+- [x] SMS to non-app recipients shows the sharer's display name when set (phone number as fallback)
+- [x] Push notification titles use the display name when the recipient has no contact name for the sharer
+- [x] No code path reveals a user's name in response to a phone-number lookup
+- [x] The name is editable from the People screen footer and cannot be removed
 
 ### Open Questions
 
-- Skippable vs. required name prompt
-- Whether "From X" attribution should switch to display name when the recipient has no `my_people` row for the sharer
+- None
 
 ---
 

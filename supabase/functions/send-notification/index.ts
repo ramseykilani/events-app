@@ -142,14 +142,17 @@ serve(async (req) => {
 
     if (!event) return jsonResponse({ error: 'event not found' }, 404);
 
-    // Fetch the sharer's phone number once — used as display identifier in SMS
-    // to non-app users who don't have a contact name for the sharer
+    // Fetch the sharer's phone number and display name once. The name is the
+    // preferred attribution everywhere; the phone is the fallback for
+    // nameless accounts (the client gates sharing on a saved name, so this is
+    // only pre-feature legacy state).
     const { data: sharerUser } = await db
       .from('users')
-      .select('phone_number')
+      .select('phone_number, display_name')
       .eq('id', sharerUserId)
       .single();
     const sharerPhone = sharerUser?.phone_number ?? 'Someone';
+    const sharerDisplayName = (sharerUser?.display_name as string | null) ?? null;
 
     // Load all shares for this user_event, including each recipient's phone number
     const { data: shares, error: sharesErr } = await db
@@ -196,7 +199,7 @@ serve(async (req) => {
         // not somewhere we want first impressions, and link-free SMS reads
         // less like spam to carrier filters.
         const smsBody =
-          `${sharerPhone} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
+          `${sharerDisplayName ?? sharerPhone} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
           eventUrlLine +
           `\nReply STOP to unsubscribe.`;
 
@@ -236,7 +239,7 @@ serve(async (req) => {
         if (hidden) continue; // sharer is hidden — skip both push and SMS
       }
 
-      // Get the sharer's display name in the recipient's contacts
+      // Get the sharer's contact name in the recipient's contacts
       const sharerName = sharerInRecipientContacts
         ? (
             await db
@@ -247,8 +250,10 @@ serve(async (req) => {
           ).data
         : null;
 
+      // Attribution order: the recipient's own label for the sharer, then the
+      // sharer's chosen display name, then the raw phone number.
       const displayName =
-        sharerName?.contact_name ?? sharerName?.phone_number ?? 'Someone';
+        sharerName?.contact_name ?? sharerDisplayName ?? sharerPhone;
 
       // Queue push notification when the recipient has a token. A missing token
       // must not suppress the SMS below.

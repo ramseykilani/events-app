@@ -35,10 +35,11 @@ Every piece of data in Events is subjective. There is no centralized source of t
 |--------|------|-------|
 | id | uuid (PK) | Supabase auth user ID |
 | phone_number | text (unique) | E.164 format, e.g. +14165551234 |
+| display_name | text (nullable) | Self-chosen attribution name ("X added you to ..."). Captured by a hard gate on the first share — never at sign-up, and users who never share are never asked. Editable from the People screen footer; never removable. CHECK constraint: non-empty after trim, ≤50 chars, no newlines (the value is interpolated unescaped into SMS bodies, and RLS lets users write their own row via raw REST) |
 | expo_push_token | text (nullable) | Expo push token, upserted on authenticated app launch |
 | created_at | timestamptz | |
 
-The user's name comes from however they appear in your phone's contact list. The app never asks for or stores a display name.
+A user's name is never revealed in response to a phone-number lookup: `users` rows are select/update own-only via RLS, and the only cross-user reads are `send-notification` (service role) and the calendar RPC's share attribution — both limited to people the user actually shared with. Names are not verified; a user can call themselves anything, which is acceptable because shares only reach their own chosen contacts (the same trust model as contact names).
 
 **my_people**
 | Column | Type | Notes |
@@ -172,7 +173,9 @@ Given: current user's user_id, start_date, end_date
   shares (added by the caller) always show
 → Return: event details + sharer_contact_name + sharer_person_id +
   sharer_user_id (null sharer name/person for self-added events;
-  sharer_user_id falls back to the caller)
+  sharer_user_id falls back to the caller). sharer_contact_name is the
+  caller's own contact_name for the sharer when present, else the sharer's
+  display_name, else NULL (no "From X" line rendered)
 ```
 
 `sharer_person_id` is the sharer's `my_people.id` in the recipient's contact list. It is returned so the event detail screen can offer a hide/unhide action without a separate lookup.
@@ -297,7 +300,7 @@ The `send-notification` Edge Function sends a push notification and/or SMS to ea
 1. `share.tsx` calls the Edge Function fire-and-forget after event_shares are created, passing `userEventId`
 2. The function requires a valid user JWT and verifies the caller owns that user_events row — otherwise 401/403
 3. Function queries all event_shares for that userEventId, including `my_people.phone_number`, and fetches the event's `url`
-4. Fetches the sharer's `users.phone_number` once (used as display identifier in SMS to non-app users)
+4. Fetches the sharer's `users.phone_number` and `users.display_name` once. Attribution order for app users: the recipient's own `contact_name` for the sharer → `display_name` → phone. For non-app users: `display_name` → phone. (The share screen gates sharing on a saved display name, so the phone fallback is pre-feature legacy state.)
 5. For each recipient:
    - **Non-app user** (`my_people.user_id IS NULL`): sends an SMS with event info and the event URL (when present) — no app/web links; the SMS is the whole message
    - **App user** (`my_people.user_id IS NOT NULL`): checks whether the sharer is in the recipient's hidden_people (lookup is by the recipient's my_people; skips both push and SMS if hidden), then queues a push notification when a token exists and an SMS containing the event URL (when present). Push is the tappable path into the event; the SMS is a plain notification with no links. A missing push token never suppresses the SMS.
@@ -309,7 +312,7 @@ The `send-notification` Edge Function sends a push notification and/or SMS to ea
 
 **SMS body (app user):** `"[DisplayName] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]"` — the event URL line is omitted for linkless events.
 
-**SMS body (non-app user):** `"[SharerPhone] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]\n\nReply STOP to unsubscribe."` — the event URL line is omitted for linkless events.
+**SMS body (non-app user):** `"[SharerName] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]\n\nReply STOP to unsubscribe."` — SharerName is the sharer's display name (phone number as fallback); the event URL line is omitted for linkless events.
 
 SMS deliberately carries no app or web links (decision 2026-08-09, see `docs/distribution-strategy.md`): the only URL in a message is the event's own original URL. This keeps first impressions off the web build and link-free SMS reads less like spam to carrier filters. Store links may return as the non-app CTA once the app is listed.
 

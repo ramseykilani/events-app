@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
@@ -37,12 +38,30 @@ export default function ShareScreen() {
   );
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  // Shares are attributed by display name ("X added you to ..."), so sending
+  // one requires a saved name. null = gate the Share action; undefined = the
+  // fetch hasn't resolved or failed (a fetch failure must never block sharing).
+  const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
+  const [nameDraft, setNameDraft] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   const firstParamValue = (value?: string | string[]) =>
     Array.isArray(value) ? value[0] : value;
 
   const loadData = useCallback(async () => {
     if (!userId) return;
+
+    const { data: userData, error: userErr } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', userId)
+      .single();
+    if (userErr) {
+      // Fail open: a flaky read must not gate the Share action.
+      console.error('display name load error:', userErr);
+    } else {
+      setDisplayName(userData?.display_name ?? null);
+    }
 
     const { data: peopleData, error: peopleErr } = await supabase
       .from('my_people')
@@ -107,12 +126,35 @@ export default function ShareScreen() {
     }, [loadData])
   );
 
+  const handleSaveName = async () => {
+    const name = nameDraft.trim();
+    if (!name || !userId || savingName) return;
+
+    setSavingName(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ display_name: name })
+        .eq('id', userId);
+      if (error) throw error;
+      setDisplayName(name);
+    } catch (err: unknown) {
+      showError('Could not save name', err);
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   const handleConfirm = async () => {
     // Sharing is mandatory when the event has never been shared (e.g. right
     // after creating it). Afterwards the action is additive-only: existing
     // shares are completed and cannot be unsent.
     if (selectedPersonIds.size === 0) {
       showAlert('Select people', 'Please select at least one person to share with.');
+      return;
+    }
+    if (displayName === null) {
+      showAlert('Add your name', 'Save your name below so friends know who shared this.');
       return;
     }
 
@@ -205,22 +247,54 @@ export default function ShareScreen() {
         <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
         <TouchableOpacity
           onPress={handleConfirm}
-          disabled={loading || selectedPersonIds.size === 0}
+          disabled={loading || selectedPersonIds.size === 0 || displayName === null}
           activeOpacity={0.6}
           accessibilityRole="button"
-          accessibilityState={{ disabled: loading || selectedPersonIds.size === 0 }}
+          accessibilityState={{ disabled: loading || selectedPersonIds.size === 0 || displayName === null }}
         >
           <Text
             style={[
               styles.done,
               { color: theme.textPrimary },
-              (loading || selectedPersonIds.size === 0) && { color: theme.textTertiary },
+              (loading || selectedPersonIds.size === 0 || displayName === null) && { color: theme.textTertiary },
             ]}
           >
             Share
           </Text>
         </TouchableOpacity>
       </View>
+      {displayName === null && (
+        <View style={[styles.nameGate, { borderBottomColor: theme.borderLight }]}>
+          <Text style={[styles.nameGateText, { color: theme.textSecondary }]}>
+            Your friends get a text when you share — this is the name they'll see.
+          </Text>
+          <View style={styles.nameGateRow}>
+            <TextInput
+              style={[styles.nameInput, { borderColor: theme.border, color: theme.textPrimary }]}
+              placeholder="Your name"
+              placeholderTextColor={theme.textTertiary}
+              value={nameDraft}
+              onChangeText={(text) => setNameDraft(text.replace(/[\r\n]/g, ''))}
+              maxLength={50}
+              autoCapitalize="words"
+              editable={!savingName}
+              accessibilityLabel="Your name"
+            />
+            <TouchableOpacity
+              style={[styles.nameSaveButton, { backgroundColor: theme.primaryButtonBg }]}
+              onPress={handleSaveName}
+              disabled={!nameDraft.trim() || savingName}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !nameDraft.trim() || savingName }}
+            >
+              <Text style={[styles.nameSaveText, { color: theme.primaryButtonText }]}>
+                {savingName ? 'Saving...' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
       <ShareSheet
         people={people}
         circles={circles}
@@ -272,6 +346,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 12,
+  },
+  nameGate: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    gap: 10,
+  },
+  nameGateText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  nameGateRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  nameInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 16,
+    minHeight: 44,
+  },
+  nameSaveButton: {
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  nameSaveText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   forwardingNote: {
     fontSize: 13,

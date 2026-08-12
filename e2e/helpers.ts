@@ -97,6 +97,21 @@ export async function addPersonManually(
   await expect(page.getByPlaceholder('Name', { exact: true })).toBeHidden();
 }
 
+// Sharing requires a saved display name ("X added you to ..." attribution).
+// The gate appears on the share screen only while the account has no name —
+// once any run saves one it sticks server-side, so this is a no-op afterwards.
+export async function fillNameGateIfShown(page: Page): Promise<void> {
+  const nameInput = page.getByLabel('Your name');
+  try {
+    await nameInput.waitFor({ state: 'visible', timeout: 8000 });
+    await nameInput.fill('E2E User');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(nameInput).toBeHidden();
+  } catch {
+    // Account already has a display name — no gate.
+  }
+}
+
 // From the calendar: create an event for today and share it with PERSON_B_NAME.
 // Ends back on the calendar with the event visible.
 export async function createEventAndShareToB(
@@ -119,6 +134,7 @@ export async function createEventAndShareToB(
     await page.getByRole('button', { name: 'Save' }).click();
 
     await expect(page.getByText('Share with')).toBeVisible();
+    await fillNameGateIfShown(page);
     // Self-verifying selection: a tap that races a list re-render can be eaten
     // (the row node gets replaced mid-click), leaving Share disabled forever.
     // Retry until the row's ✓ shows — guarded so an already-selected row isn't

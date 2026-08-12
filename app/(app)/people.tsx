@@ -46,6 +46,10 @@ export default function PeopleScreen() {
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [hiddenPeople, setHiddenPeople] = useState<(HiddenPerson & { contact_name: string | null; phone_number: string })[]>([]);
   const [loadError, setLoadError] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [showNameEdit, setShowNameEdit] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameSaving, setNameSaving] = useState(false);
   const hasRequestedContacts = useRef(false);
 
   const loadData = useCallback(async (): Promise<MyPerson[]> => {
@@ -66,6 +70,13 @@ export default function PeopleScreen() {
       .from('hidden_people')
       .select('id, owner_id, person_id, hidden_at, my_people(contact_name, phone_number)')
       .eq('owner_id', userId);
+
+    const { data: userData, error: userErr } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', userId)
+      .single();
+    if (!userErr) setDisplayName(userData?.display_name ?? null);
 
     let failed = !!(peopleErr || circlesErr || hiddenErr);
     let membersData: CircleMember[] = [];
@@ -370,6 +381,26 @@ export default function PeopleScreen() {
     await loadData();
   };
 
+  const handleSaveName = async () => {
+    const name = nameDraft.trim();
+    if (!name || !userId || nameSaving) return;
+
+    setNameSaving(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ display_name: name })
+        .eq('id', userId);
+      if (error) throw error;
+      setDisplayName(name);
+      setShowNameEdit(false);
+    } catch (err: unknown) {
+      showError('Could not save name', err);
+    } finally {
+      setNameSaving(false);
+    }
+  };
+
   const handleSignOut = () => {
     const phone = session?.user?.phone;
     showConfirm(
@@ -550,6 +581,20 @@ export default function PeopleScreen() {
       )}
       <View style={[styles.footer, { borderTopColor: theme.borderLight }]}>
         <TouchableOpacity
+          onPress={() => {
+            setNameDraft(displayName ?? '');
+            setShowNameEdit(true);
+          }}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityLabel={`Your name: ${displayName ?? 'not set'}`}
+          style={styles.footerButton}
+        >
+          <Text style={[styles.footerAction, { color: theme.textSecondary }]}>
+            Your name: {displayName ?? 'Not set'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={handleSignOut}
           activeOpacity={0.6}
           accessibilityRole="button"
@@ -633,6 +678,59 @@ export default function PeopleScreen() {
             />
             <Text style={[styles.manualHint, { color: theme.textTertiary }]}>
               Include the country code for numbers outside the US.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showNameEdit} animationType="slide" presentationStyle="pageSheet">
+        <View
+          style={[
+            styles.modalContainer,
+            { backgroundColor: theme.background, paddingTop: insets.top + 12 },
+          ]}
+        >
+          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+            <TouchableOpacity
+              onPress={() => setShowNameEdit(false)}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Your name</Text>
+            <TouchableOpacity
+              onPress={handleSaveName}
+              disabled={nameSaving || !nameDraft.trim()}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: nameSaving || !nameDraft.trim() }}
+            >
+              <Text
+                style={[
+                  styles.add,
+                  { color: theme.textPrimary },
+                  (nameSaving || !nameDraft.trim()) && { color: theme.textTertiary },
+                ]}
+              >
+                Save
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.manualForm}>
+            <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>Name</Text>
+            <TextInput
+              style={[styles.manualInput, { borderColor: theme.border, color: theme.textPrimary }]}
+              placeholder="Your name"
+              placeholderTextColor={theme.textTertiary}
+              value={nameDraft}
+              onChangeText={(text) => setNameDraft(text.replace(/[\r\n]/g, ''))}
+              maxLength={50}
+              autoCapitalize="words"
+              autoFocus
+              accessibilityLabel="Your name"
+            />
+            <Text style={[styles.manualHint, { color: theme.textTertiary }]}>
+              Friends see this name when you share an event with them.
             </Text>
           </View>
         </View>
