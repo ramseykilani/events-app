@@ -4,20 +4,35 @@ A running list of planned and in-progress features. Each section contains a full
 
 ## Status
 
-| Feature | Status |
-|---------|--------|
-| [Notifications](#notifications) | Implemented |
-| [SMS Invitations](#sms-invitations) | Implemented |
-| [Hide](#hide) | Implemented |
-| [Forwarding Shares](#forwarding-shares) | Implemented |
-| [Sign Out](#sign-out) | Implemented |
-| [Web Support](#web-support) | Implemented |
-| [Display Names](#display-names) | Implemented |
-| [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned |
-| [Add Sharer to Your People](#add-sharer-to-your-people) | Planned |
-| [Contacts Permission Explainer](#contacts-permission-explainer) | Implemented |
-| [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Implemented |
-| [Delete Account](#delete-account) | Implemented |
+The core loop is shipped. Nothing in Planned is required to use the app or to test that loop.
+
+| Feature | Status | What it is |
+|---------|--------|------------|
+| [Notifications](#notifications) | Implemented | |
+| [SMS Invitations](#sms-invitations) | Implemented | |
+| [Hide](#hide) | Implemented | |
+| [Forwarding Shares](#forwarding-shares) | Implemented | |
+| [Sign Out](#sign-out) | Implemented | |
+| [Web Support](#web-support) | Implemented | Dev/staging/CI surface only |
+| [Display Names](#display-names) | Implemented | |
+| [Contacts Permission Explainer](#contacts-permission-explainer) | Implemented | First Share already adds people |
+| [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Implemented | |
+| [Delete Account](#delete-account) | Implemented | |
+| [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
+| [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
+
+## Using and testing
+
+No product feature is blocking the core loop. A new user can sign in, land on the calendar, create an event, add people, share, and receive shares (push + SMS). Hide, forward, edit (fork), remove (own copy only), sign out, and delete account are all shipped.
+
+How people get onto a first share today:
+
+- **Native:** an empty people list on first Share auto-starts the [contacts explainer](#contacts-permission-explainer) → OS prompt → picker. Deny → recovery with Settings and an “Add a number instead” hatch. Then select and send.
+- **Web:** no contacts API, so the empty state goes to People for the manual name+phone form. Web is not a user surface (`docs/distribution-strategy.md`).
+
+**Web testing is unblocked** — local `npx expo start --web`, the staging preview, and the full automated suite (Jest, SQL, Playwright). That is how agents and CI test; it is not how users get the app.
+
+**Native testing is the remaining gate for real use**, not a missing feature. First EAS builds have not been cut, and the native-only paths (contacts picker, datetimepicker, push, notification tap) have never run on a device. Putting a build on a phone needs Apple Developer / Play Console enrollment, then EAS, then `manual-tests/native_device_smoke.md`. Invite testers only after a clean smoke pass (`docs/distribution-strategy.md` → Owner critical path).
 
 ---
 
@@ -236,7 +251,7 @@ Notification SMS identifies the sharer by raw phone number ("+1 416 555 1234 add
 
 Capture a display name with a **hard gate at first share — never at sign-up**. The name is only ever consumed at share time (`send-notification` and calendar attribution are its only readers), so the ask lives in the share screen where it is self-justifying: an inline field with one line of context ("Your friends get a text when you share — this is the name they'll see") appears while `display_name` is null, and Share stays disabled until it's saved. Users who never share are never asked; the no-forced-onboarding rule stays absolute. The gate binds the Share *action*, not the share screen, which is also the mandatory step after event creation.
 
-This supersedes the originally spec'd capture UX ("one skippable field after OTP verification"). A skippable sign-up prompt had the worst of both worlds: friction for recipients who may never share, and a permanent nameless state for skippers (a skip was forever — there was no edit path). The share-time gate guarantees no nameless share can ever go out, asks at the moment the user is most motivated to be recognizable, and composes with [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) (a first-time sharer's screen becomes: your name, their names, send).
+This supersedes the originally spec'd capture UX ("one skippable field after OTP verification"). A skippable sign-up prompt had the worst of both worlds: friction for recipients who may never share, and a permanent nameless state for skippers (a skip was forever — there was no edit path). The share-time gate guarantees no nameless share can ever go out and asks at the moment the user is most motivated to be recognizable. First share already continues into the [contacts explainer](#contacts-permission-explainer) (or People, on web). [Inline add-by-phone](#inline-add-by-phone-in-share-sheet) would fold typing a number into that same screen; it is not required for the gate to work.
 
 ### Decisions (2026-08-12)
 
@@ -271,11 +286,20 @@ This supersedes the originally spec'd capture UX ("one skippable field after OTP
 
 ## Inline Add-by-Phone in Share Sheet
 
-**Status:** Planned
+**Status:** Planned — convenience, not a blocker. A new user can already share.
+
+### What this is not
+
+This is not a missing first-share path. After creating an event, Share is a required step (Cancel is available), and adding people already works:
+
+- **Native:** an empty list auto-starts the [contacts explainer](#contacts-permission-explainer) → OS prompt → picker. Deny → recovery with “Add a number instead.” The empty-state “Add People” button restarts that flow (`onAddPeople`); it does not strand the user on People.
+- **Web:** the empty state goes to People for the manual name+phone form. That is the only add path in the browser because there is no contacts API — and web is not a user surface.
+
+The “dead end” wording that used to live here was true before the explainer shipped (2026-08-12). It is not true now.
 
 ### Problem
 
-The share screen is mandatory after creating an event, but a first-time user with an empty people list hits a dead end: "No people added yet" → navigate to People → fill the manual form → come back → select the person. On web this is the *only* add path; on native it's the fallback when contacts permission is denied. The moment of highest intent (just created an event, want to send it) is where we strand new users.
+Adding someone who isn’t in the contacts picker — or finding someone in a long people list — still takes a detour (picker, manual-add modal, or a trip to People). The share sheet itself has no search field and no inline add.
 
 ### Proposed Solution
 
@@ -286,7 +310,7 @@ A "name or phone number" input at the top of the share sheet ([components/ShareS
 - Reuse `normalizeToE164` ([lib/contacts.ts](lib/contacts.ts)) and the upsert from [app/(app)/people.tsx](app/(app)/people.tsx) (`onConflict: 'owner_id,phone_number'`) — extract a shared helper rather than duplicating
 - Must work identically on web and native; no contacts permission involved
 - Respect the 50-person cap (disable the add row with a message when full)
-- The share screen ([app/(app)/share.tsx](app/(app)/share.tsx)) currently routes the empty state to `/people`; keep that link as secondary ("Manage people") but it stops being the primary path
+- Keep the existing add paths: native empty-state “Add People” still restarts the contacts flow; “Manage” / People stays for editing the list. Inline add is an extra on-sheet path, not a replacement.
 - e2e gotcha applies: row-selection taps can be eaten by re-renders — see `e2e/helpers.ts` selection retry helpers
 
 ### Acceptance Criteria
@@ -304,11 +328,15 @@ A "name or phone number" input at the top of the share sheet ([components/ShareS
 
 ## Add Sharer to Your People
 
-**Status:** Planned
+**Status:** Planned — convenience, not a blocker. Recipients who already know the number can add them via People (or the share-time manual hatch) and share back today.
+
+### What this is not
+
+This is not required for a new user to send or receive events, and it is not required to test the share loop with people who already have each other in My People (the usual tester setup).
 
 ### Problem
 
-A user whose first experience is *receiving* an event has an empty people list. Sharing anything back — even to the person who invited them — means manually entering that person's number. Every invite-acquired user starts with zero network, so the invite channel doesn't compound.
+If your first experience is *receiving* an event, you see "From Alice" but the app does not give you Alice's phone: `my_people` is owner-scoped by RLS, and the notification SMS arrived from Twilio, not from her. Sharing back means typing a number you already know. One-tap add would close that loop when you don't have it handy, so the invite channel compounds without a re-entry.
 
 ### Proposed Solution
 
@@ -316,8 +344,8 @@ On the event detail screen ([app/(app)/event/[id].tsx](app/(app)/event/[id].tsx)
 
 ### Technical Notes
 
-- The event detail screen already loads attribution (`sharedByPersonId`, `sharerName`) and hidden state
-- The sharer's phone number is not currently exposed to recipients: `my_people` rows are owner-scoped by RLS. Expose it via a narrow `SECURITY DEFINER` function (or extend `get_calendar_events`) that returns the sharer's phone only for events actually shared with the caller — they were texted from that number, so this reveals nothing new
+- The event detail screen already loads attribution (`sharedByPersonId`, `sharerName`) and hidden state. `sharer_person_id` is the recipient's own `my_people` row for the sharer — it is null when they aren't in the list yet, which is exactly when this action should show.
+- The sharer's phone is not currently exposed to recipients. Expose it via a narrow `SECURITY DEFINER` function (or extend `get_calendar_events`) that returns the phone only for events actually shared with the caller. The SMS names the person (display name) and arrives from Twilio, not from their number — this is a new read and should stay that narrow.
 - Don't show the action for hidden sharers (unhide stays a separate deliberate act)
 - Pairs naturally with [Display Names](#display-names): pre-fill the person name from attribution when available
 
@@ -351,7 +379,7 @@ A real explainer screen, then the system prompt. New users see this on **first S
 
 Already granted → picker, no explainer. Already denied and the OS will not ask again → recovery. Android `canAskAgain` after a deny still shows the explainer so Continue can fire the OS prompt one more time.
 
-Web is unchanged (no contacts API → manual form). Inline add-by-phone on the share sheet is a separate planned feature.
+Web is unchanged (no contacts API → manual form). [Inline add-by-phone](#inline-add-by-phone-in-share-sheet) on the share sheet is a separate planned convenience — first share already works without it.
 
 ### Technical Notes
 
