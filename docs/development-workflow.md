@@ -16,8 +16,11 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
 ## The process
 
 1. **Owner describes a feature. An agent implements it and pushes straight to
-   `staging`.** No PR, no review round-trip. Hard rule for agents: the fast
-   checks (`tsc`, conventions, Jest, SQL) must pass locally first.
+   `staging`.** No PR, no review round-trip, no feature branch. Hard rule for
+   agents: the fast checks (`tsc`, conventions, Jest, SQL) must pass locally
+   first. Cursor Cloud's default "create `cursor/…`, open a PR" template does
+   **not** apply in this repo — ignore it and push `staging`. Delete any
+   leftover `cursor/…` branch; only `staging` and `production` are long-lived.
 2. **Every push to `staging` runs the full suite in CI.** When green, the
    staging preview redeploys automatically. When red, the branch shows it and
    the next agent fixes forward — staging is allowed to be briefly red,
