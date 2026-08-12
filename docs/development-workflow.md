@@ -132,7 +132,7 @@ The orchestrator instructions an agent follows at ship time live in
 itself:
 
 1. **In-session (default, no setup):** the agent you say "ship it" to runs
-   the phases with `computerUse` subagents (model `cursor-grok-4.5-high-fast`
+   the phases with `computerUse` subagents (model `cursor-grok-4.6-high-fast`
    for the click-through tracks). Runs in the current cloud VM; needs no
    GitHub secrets.
 2. **CI-launched (optional):** `agent-ux-review.yml` fires on release PRs
@@ -140,7 +140,7 @@ itself:
    via the Cloud Agents API with `scripts/agent-ux-review-prompt.md` (the
    single-agent variant of the same checklist). Requires the repo secret
    `CURSOR_API_KEY`; the model comes from the repo variable `UX_REVIEW_MODEL`
-   (default `cursor-grok-4.5-high-fast`), with automatic fallback to the
+   (default `cursor-grok-4.6-high-fast`), with automatic fallback to the
    account default if the ID is rejected.
 
 Either way the output is a report PR against `staging` whose first line is
@@ -157,7 +157,7 @@ fixed and re-reviewed.
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Secrets | Preview + production deploys. The account ID is on the Cloudflare dashboard's right rail; the token is shown once at creation — make a new one (Profile → API Tokens → Create, Account → Cloudflare Pages: Edit) and paste it into both GitHub and Cursor secrets. |
 | `DEPLOY_WEB` = `true` | Variable | Enables both deploy jobs. Requires the four secrets above. |
 | `CURSOR_API_KEY` | Secret | Agentic UX review (Cursor Dashboard → API Keys → new key). |
-| `UX_REVIEW_MODEL` | Variable | Optional override of the UX-review agent's model; defaults to `cursor-grok-4.5-high-fast`. |
+| `UX_REVIEW_MODEL` | Variable | Optional override of the UX-review agent's model; defaults to `cursor-grok-4.6-high-fast`. |
 
 ### Branch protection (Settings → Branches)
 

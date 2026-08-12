@@ -27,7 +27,7 @@ The checklist that defines "complete" is
 
 ## Phase 1 — Smoke sweep (~5–10 min). Stop on any failure.
 
-Launch ONE `computerUse` subagent (model `cursor-grok-4.5-high-fast`) with the
+Launch ONE `computerUse` subagent (model `cursor-grok-4.6-high-fast`) with the
 Phase 1 section of the checklist against
 https://staging.shared-events.pages.dev. If anything fails → write the report
 (see below) with `VERDICT: DON'T SHIP` and STOP. Do not start Phase 2.
@@ -35,7 +35,7 @@ https://staging.shared-events.pages.dev. If anything fails → write the report
 ## Phase 2 — Deep tracks. Halt remaining tracks on a blocker.
 
 Run the five checklist tracks as separate `computerUse` subagents (model
-`cursor-grok-4.5-high-fast`), each with ONLY its track's checklist section plus
+`cursor-grok-4.6-high-fast`), each with ONLY its track's checklist section plus
 the shared rules below. Two platform realities (learned in the first drill):
 (1) a session can only drive ONE computerUse subagent at a time, even with
 `environment: cloud` — so in-session tracks run SEQUENTIALLY; (2) a resumed

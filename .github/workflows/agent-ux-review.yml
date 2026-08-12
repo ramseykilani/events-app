@@ -31,7 +31,7 @@ jobs:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
       # Repo variable UX_REVIEW_MODEL overrides the review agent's model.
       # Screenshot-driven review doesn't need the top coding model;
-      # cursor-grok-4.5-high-fast is the cost-effective default. Discover
+      # cursor-grok-4.6-high-fast is the cost-effective default. Discover
       # valid IDs via GET https://api.cursor.com/v1/models with the API key.
       UX_REVIEW_MODEL: ${{ vars.UX_REVIEW_MODEL }}
     steps:
@@ -44,7 +44,7 @@ jobs:
             echo "Set it (Cursor Dashboard → API Keys) to enable; see docs/development-workflow.md."
             exit 0
           fi
-          MODEL_ID="${UX_REVIEW_MODEL:-cursor-grok-4.5-high-fast}"
+          MODEL_ID="${UX_REVIEW_MODEL:-cursor-grok-4.6-high-fast}"
           build_payload() {
             jq -n \
               --arg prompt "$(cat scripts/agent-ux-review-prompt.md)" \

@@ -67,7 +67,7 @@ Two long-lived branches, named after their environments (see `docs/development-w
 
 The review is batched per release on purpose: one complete click-through at ship time beats a shallow review on every push, and it keeps token spend proportional to releases, not commits.
 
-**Model policy:** use the session's default model for development. For agentic click-through/manual testing (computerUse subagents, the UX-review automation), use `cursor-grok-4.5-high-fast` — screenshot review doesn't need the top coding model. The CI-launched UX review defaults to it too (repo variable `UX_REVIEW_MODEL` overrides; discover IDs via `GET https://api.cursor.com/v1/models`).
+**Model policy:** use the session's default model for development. For agentic click-through/manual testing (computerUse subagents, the UX-review automation), use `cursor-grok-4.6-high-fast` — screenshot review doesn't need the top coding model. The CI-launched UX review defaults to it too (repo variable `UX_REVIEW_MODEL` overrides; discover IDs via `GET https://api.cursor.com/v1/models`).
 
 The full suite (`.github/workflows/full-suite.yml`) = tsc + conventions + Jest + SQL semantics + web build + Playwright e2e on desktop Chrome, Mobile Safari (WebKit), and Mobile Chrome. Branch-protection settings are listed in `docs/development-workflow.md`.
 
