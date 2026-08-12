@@ -37,7 +37,7 @@ Read `docs/events-technical-architecture.md` for the full architecture, data mod
 app/(auth)/          Sign-in and OTP verification
 app/(app)/           Authenticated screens (calendar, events, sharing, people, onboarding walkthrough)
 app/_context/        SessionContext (auth session) and ThemeContext (theme selection + persistence)
-components/          Calendar (with header theme swatch), EventCard, ShareSheet, PeoplePicker
+components/          Calendar (with header theme swatch), EventCard, ShareSheet, PeoplePicker, ContactsPermissionFlow (explainer + recovery)
 constants/           Colors.ts — role-token palettes for paper/evening + the theme registry
 docs/                Architecture, product, philosophy, design-language, and development-workflow docs
 e2e/                 Playwright e2e suite (desktop + mobile-web); shared fixtures in fixtures.ts

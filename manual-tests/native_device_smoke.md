@@ -19,16 +19,21 @@ pass / fail + note.
 
 ## N-002: Contacts permission and import
 
-1. People → Add. The contacts explainer appears before the OS prompt.
-2. Grant permission → the picker lists device contacts → select 2–3 → they
-   appear in My People with names from your contacts.
-3. Fresh install (or second device/account) → People → Add → **deny** the OS
-   prompt → the denial recovery screen appears with an Open Settings path and
-   manual-add option (not a bare dialog).
+1. Fresh account, empty people list: create an event → Share. The contacts
+   explainer appears before the OS prompt (no extra tap on People). Same if
+   you open People with nobody added.
+2. Continue → grant permission → the picker lists device contacts → select
+   2–3 → they appear (on Share, ready to send; on People, in My People) with
+   names from your contacts.
+3. Fresh install (or second device/account) → Share or People → Continue →
+   **deny** the OS prompt → the denial recovery screen appears with Open
+   Settings as the primary action and a quiet “Add a number instead” hatch
+   (not a bare dialog). Not now on the explainer must not show the OS prompt.
 
 ## N-003: Manual add fallback
 
-1. People → Add → add manually: name + phone → Save → person appears.
+1. After denying contacts, tap “Add a number instead” (or on web, Add): name +
+   phone → Save → person appears.
 2. Invalid number → alert, nothing saved.
 
 ## N-004: Event creation with native pickers

@@ -14,6 +14,7 @@ type Props = {
   // not interactive.
   sharedPersonIds?: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
+  onAddPeople?: () => void;
 };
 
 export function ShareSheet({
@@ -23,6 +24,7 @@ export function ShareSheet({
   selectedPersonIds,
   sharedPersonIds,
   onSelectionChange,
+  onAddPeople,
 }: Props) {
   const theme = useTheme();
   const shared = sharedPersonIds ?? new Set<string>();
@@ -125,7 +127,7 @@ export function ShareSheet({
             </Text>
             <TouchableOpacity
               style={[styles.emptyPeopleButton, { backgroundColor: theme.primaryButtonBg }]}
-              onPress={() => router.push('/(app)/people')}
+              onPress={() => (onAddPeople ? onAddPeople() : router.push('/(app)/people'))}
               activeOpacity={0.7}
               accessibilityRole="button"
             >

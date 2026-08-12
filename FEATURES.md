@@ -15,7 +15,7 @@ A running list of planned and in-progress features. Each section contains a full
 | [Display Names](#display-names) | Implemented |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned |
-| [Contacts Permission Explainer](#contacts-permission-explainer) | Planned |
+| [Contacts Permission Explainer](#contacts-permission-explainer) | Implemented |
 | [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Implemented |
 | [Delete Account](#delete-account) | Implemented |
 
@@ -335,32 +335,39 @@ On the event detail screen ([app/(app)/event/[id].tsx](app/(app)/event/[id].tsx)
 
 ## Contacts Permission Explainer
 
-**Status:** Planned
+**Status:** Implemented (2026-08-12)
 
 ### Problem
 
-On native, the contacts ask is a bare system prompt, and denying it produces a small `showConfirm` dialog ([app/(app)/people.tsx](app/(app)/people.tsx)). Neither explains the product reason: Events texts your people for you, and your contacts are how it knows who to text. Users who deny out of reflex never reconsider, and then adding people is manual-forever.
+On native, the contacts ask was a `showConfirm` dialog, and denying it skipped recovery (it opened the manual-add form). Neither explained the product reason, and first share didn't ask at all — empty Share bounced to People, which then required a second Add tap before the OS prompt.
 
-### Proposed Solution
+### Solution (as shipped)
 
-A real explainer screen, framed around the product truth:
+A real explainer screen, then the system prompt. New users see this on **first Share** (or opening People with an empty list) — not at sign-up, not in the walkthrough.
 
-1. **Pre-prompt** (first tap of Add from Contacts): what we access (only the contacts you pick — never the whole address book), why (so Events can text the right people when you share), then the system prompt
-2. **Denial recovery**: a full screen with the same framing, an "Open Settings" path, and the manual-add escape hatch — replacing the current dialog
+1. **Explainer:** “Events uses your contacts so you can pick who to text when you share.” Continue fires the OS prompt. Not now dismisses without calling the OS (so iOS hasn't used up its one ask).
+2. **OS prompt:** Allow → contact picker. Don’t Allow → recovery.
+3. **Recovery:** “Contacts are off,” same why, **Open Settings** as the primary action, “Add a number instead” as a quiet hatch. Returning from Settings with permission granted opens the picker. Manual add is an escape hatch, not a path we sell.
+
+Already granted → picker, no explainer. Already denied and the OS will not ask again → recovery. Android `canAskAgain` after a deny still shows the explainer so Continue can fire the OS prompt one more time.
+
+Web is unchanged (no contacts API → manual form). Inline add-by-phone on the share sheet is a separate planned feature.
 
 ### Technical Notes
 
-- iOS only asks once; denial recovery must deep-link to Settings (`Linking.openSettings()`)
-- Web path is unchanged (no contacts API → straight to the manual form)
-- Copy and layout follow `docs/events-design-language.md`; keep the touch targets and accessibility roles per convention
-- The auto-open-picker-on-focus logic in `people.tsx` (only when permission already granted) stays as-is
+- [`lib/contacts.ts`](lib/contacts.ts): `getContactsPermission()` returns `{ status, canAskAgain }`. `getContactsWithPhones` never calls `requestPermissionsAsync` — the explainer's Continue is the only request site.
+- Flow owner: [`components/ContactsPermissionFlow.tsx`](components/ContactsPermissionFlow.tsx), used by Share and People. AppState `active` while recovery is showing re-checks permission.
+- [`app.config.js`](app.config.js) `NSContactsUsageDescription` matches the explainer why (ships in the next native binary).
+- Jest: [`__tests__/components/ContactsPermissionFlow.test.tsx`](__tests__/components/ContactsPermissionFlow.test.tsx). Playwright is web-only; native acceptance is N-002.
 
 ### Acceptance Criteria
 
-- [ ] First Add tap shows the explainer before the OS prompt, never the OS prompt cold
-- [ ] Denying lands on the recovery screen with Settings + manual-add paths
-- [ ] Granting later via Settings makes Add from Contacts work on return
-- [ ] Web behavior unchanged
+- [x] First Share (empty people) or People (empty list) shows the explainer before the OS prompt, never the OS prompt cold
+- [x] Denying lands on the recovery screen with Settings first and a quiet add-a-number hatch
+- [x] Granting later via Settings makes the picker work on return
+- [x] Web behavior unchanged
+- [x] Not now does not burn the iOS one-shot
+- [x] Fetching contacts never requests permission on its own
 
 ### Open Questions
 

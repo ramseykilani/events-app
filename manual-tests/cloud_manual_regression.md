@@ -144,7 +144,7 @@ For each executed scenario:
 ### E-101 People management
 **Steps**
 1. Open My People.
-2. Add a person. On web, tap **Add** to open the manual "Add person" form (there is no contacts API in the browser) and enter a name + phone number. On native, add from contacts (or use "Add Manually" from the contacts dialog).
+2. Add a person. On web, tap **Add** to open the manual "Add person" form (there is no contacts API in the browser) and enter a name + phone number. On native, first Share or People with an empty list shows the contacts explainer, then the OS prompt; deny lands on recovery (Open Settings, with a quiet add-a-number hatch).
 3. Create a circle and edit circle members.
 4. Remove one person.
 

@@ -51,13 +51,20 @@ jest.mock('../../../lib/contacts', () => {
   return {
     ...actual,
     getContactsPermissionStatus: jest.fn(async () => false),
-    getContactsPermissionDetails: jest.fn(async () => 'denied'),
+    getContactsPermission: jest.fn(async () => ({
+      status: 'denied',
+      canAskAgain: false,
+    })),
     requestContactsPermission: jest.fn(async () => false),
   };
 });
 
 jest.mock('../../../components/PeoplePicker', () => ({
   PeoplePicker: () => null,
+}));
+
+jest.mock('../../../components/ContactsPermissionFlow', () => ({
+  ContactsPermissionFlow: () => null,
 }));
 
 describe('app/(app)/people manual add', () => {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,24 +7,18 @@ import {
   TouchableOpacity,
   FlatList,
   Modal,
-  Linking,
   Platform,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { showAlert, showConfirm } from '../../lib/dialogs';
+import { showConfirm } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { formatPhoneDisplay } from '../../lib/format';
 import { useSession } from '../_context/SessionContext';
-import { PeoplePicker } from '../../components/PeoplePicker';
-import {
-  requestContactsPermission,
-  getContactsPermissionDetails,
-  getContactsPermissionStatus,
-  normalizeToE164,
-} from '../../lib/contacts';
+import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
+import { ManualAddPersonModal } from '../../components/ManualAddPersonModal';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -36,11 +30,9 @@ export default function PeopleScreen() {
   const [people, setPeople] = useState<MyPerson[]>([]);
   const [circles, setCircles] = useState<Circle[]>([]);
   const [circleMembers, setCircleMembers] = useState<CircleMember[]>([]);
-  const [showPicker, setShowPicker] = useState(false);
   const [showManualAdd, setShowManualAdd] = useState(false);
-  const [manualName, setManualName] = useState('');
-  const [manualPhone, setManualPhone] = useState('');
-  const [manualSaving, setManualSaving] = useState(false);
+  const [peopleLoaded, setPeopleLoaded] = useState(false);
+  const [flowRestartKey, setFlowRestartKey] = useState(0);
   const [newCircleName, setNewCircleName] = useState('');
   const [editingCircle, setEditingCircle] = useState<Circle | null>(null);
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
@@ -50,7 +42,6 @@ export default function PeopleScreen() {
   const [showNameEdit, setShowNameEdit] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
-  const hasRequestedContacts = useRef(false);
 
   const loadData = useCallback(async (): Promise<MyPerson[]> => {
     if (!userId) return [];
@@ -120,141 +111,17 @@ export default function PeopleScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
-      loadData().then((peopleList) => {
-        if (hasRequestedContacts.current) return;
-        hasRequestedContacts.current = true;
-        // Only auto-open picker if permission is already granted — never silently
-        // trigger the OS dialog here; the user can tap Add to go through that flow.
-        getContactsPermissionStatus().then((granted) => {
-          if (granted && (!peopleList || peopleList.length === 0)) {
-            setShowPicker(true);
-          }
-        });
-      });
+      loadData().then(() => setPeopleLoaded(true));
     }, [loadData, userId])
   );
 
-  const handleAddPeople = async () => {
+  const handleAddPeople = () => {
     // Web has no contacts API — go straight to the manual form.
     if (Platform.OS === 'web') {
       setShowManualAdd(true);
       return;
     }
-
-    const status = await getContactsPermissionDetails();
-
-    if (status === 'granted') {
-      setShowPicker(true);
-      return;
-    }
-
-    if (status === 'denied' || status === 'restricted') {
-      showConfirm(
-        'Contacts Access Disabled',
-        'Events uses your contacts so you can quickly add people to share events with. You can also add someone manually with just their phone number.',
-        {
-          confirmText: 'Add Manually',
-          cancelText: 'Open Settings',
-          onConfirm: () => setShowManualAdd(true),
-          onCancel: () => Linking.openSettings(),
-        }
-      );
-      return;
-    }
-
-    // undetermined — explain why before triggering the OS dialog
-    showConfirm(
-      'Access Your Contacts?',
-      'Events uses your contacts so you can easily add people to share events with. Your contacts are never uploaded or stored on our servers.',
-      {
-        confirmText: 'Continue',
-        cancelText: 'Add Manually',
-        onConfirm: async () => {
-          const granted = await requestContactsPermission();
-          if (granted) {
-            setShowPicker(true);
-          } else {
-            setShowManualAdd(true);
-          }
-        },
-        onCancel: () => setShowManualAdd(true),
-      }
-    );
-  };
-
-  const handleAddManually = async () => {
-    if (!userId) return;
-
-    const phone = normalizeToE164(manualPhone.trim());
-    if (!phone) {
-      showAlert(
-        'Invalid phone number',
-        'Enter a valid phone number, ideally with the country code (e.g. +1 416 555 1234).'
-      );
-      return;
-    }
-
-    if (people.length >= 50) {
-      showAlert('Limit reached', 'You can add up to 50 people.');
-      return;
-    }
-
-    setManualSaving(true);
-    try {
-      const { error } = await supabase.from('my_people').upsert(
-        [
-          {
-            owner_id: userId,
-            phone_number: phone,
-            contact_name: manualName.trim() || null,
-          },
-        ],
-        { onConflict: 'owner_id,phone_number' }
-      );
-      if (error) {
-        showError('Error adding person', error);
-        return;
-      }
-      setShowManualAdd(false);
-      setManualName('');
-      setManualPhone('');
-      loadData();
-    } finally {
-      setManualSaving(false);
-    }
-  };
-
-  const handleSelectContacts = async (
-    selected: { phoneNumber: string; name: string | null }[]
-  ) => {
-    if (!userId) return;
-
-    const count = people.length + selected.length;
-    if (count > 50) {
-      showAlert(
-        'Limit reached',
-        `You can add up to 50 people. You have ${people.length} and tried to add ${selected.length}.`
-      );
-      setShowPicker(false);
-      return;
-    }
-
-    const rows = selected.map((c) => ({
-      owner_id: userId,
-      phone_number: c.phoneNumber,
-      contact_name: c.name,
-    }));
-    const { error } = await supabase.from('my_people').upsert(rows, {
-      onConflict: 'owner_id,phone_number',
-    });
-    if (error) {
-      // Keep the picker open so the selection isn't lost
-      showError('Error adding people', error);
-      return;
-    }
-
-    setShowPicker(false);
-    loadData();
+    setFlowRestartKey((k) => k + 1);
   };
 
   const handleAddCircle = async () => {
@@ -611,77 +478,28 @@ export default function PeopleScreen() {
           <Text style={[styles.footerAction, { color: theme.destructiveLink }]}>Delete account</Text>
         </TouchableOpacity>
       </View>
-      {showPicker && (
-        <PeoplePicker
-          onSelect={handleSelectContacts}
-          onCancel={() => setShowPicker(false)}
+      {userId && Platform.OS !== 'web' ? (
+        <ContactsPermissionFlow
+          userId={userId}
           existingPhones={people.map((p) => p.phone_number)}
+          peopleCount={people.length}
+          autoStart={peopleLoaded && people.length === 0}
+          restartKey={flowRestartKey}
+          onPeopleChanged={loadData}
         />
-      )}
-      <Modal visible={showManualAdd} animationType="slide" presentationStyle="pageSheet">
-        <View
-          style={[
-            styles.modalContainer,
-            { backgroundColor: theme.background, paddingTop: insets.top + 12 },
-          ]}
-        >
-          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
-            <TouchableOpacity
-              onPress={() => {
-                setShowManualAdd(false);
-                setManualName('');
-                setManualPhone('');
-              }}
-              activeOpacity={0.6}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Add person</Text>
-            <TouchableOpacity
-              onPress={handleAddManually}
-              disabled={manualSaving || !manualPhone.trim()}
-              activeOpacity={0.6}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: manualSaving || !manualPhone.trim() }}
-            >
-              <Text
-                style={[
-                  styles.add,
-                  { color: theme.textPrimary },
-                  (manualSaving || !manualPhone.trim()) && { color: theme.textTertiary },
-                ]}
-              >
-                Save
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.manualForm}>
-            <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>Name (optional)</Text>
-            <TextInput
-              style={[styles.manualInput, { borderColor: theme.border, color: theme.textPrimary }]}
-              placeholder="Name"
-              placeholderTextColor={theme.textTertiary}
-              value={manualName}
-              onChangeText={setManualName}
-              autoFocus
-            />
-            <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>Phone number</Text>
-            <TextInput
-              style={[styles.manualInput, { borderColor: theme.border, color: theme.textPrimary }]}
-              placeholder="+1 416 555 1234"
-              placeholderTextColor={theme.textTertiary}
-              value={manualPhone}
-              onChangeText={setManualPhone}
-              keyboardType="phone-pad"
-              autoCapitalize="none"
-            />
-            <Text style={[styles.manualHint, { color: theme.textTertiary }]}>
-              Include the country code for numbers outside the US.
-            </Text>
-          </View>
-        </View>
-      </Modal>
+      ) : null}
+      {userId && Platform.OS === 'web' ? (
+        <ManualAddPersonModal
+          visible={showManualAdd}
+          userId={userId}
+          peopleCount={people.length}
+          onClose={() => setShowManualAdd(false)}
+          onSaved={() => {
+            setShowManualAdd(false);
+            loadData();
+          }}
+        />
+      ) : null}
       <Modal visible={showNameEdit} animationType="slide" presentationStyle="pageSheet">
         <View
           style={[

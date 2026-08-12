@@ -46,6 +46,12 @@ jest.mock('../../../lib/showError', () => ({
   showError: jest.fn(),
 }));
 
+type FlowProps = { autoStart: boolean; peopleCount: number };
+const mockContactsFlow = jest.fn((_props: FlowProps) => null);
+jest.mock('../../../components/ContactsPermissionFlow', () => ({
+  ContactsPermissionFlow: (props: FlowProps) => mockContactsFlow(props),
+}));
+
 jest.mock('../../../components/ShareSheet', () => {
   const React = require('react');
   const { TouchableOpacity, Text, View } = require('react-native');
@@ -161,6 +167,26 @@ describe('app/(app)/share', () => {
       }
       return {};
     });
+  });
+
+  it('auto-starts the contacts flow on native when the people list is empty', async () => {
+    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+
+    render(<ShareScreen />);
+
+    await waitFor(() => expect(mockContactsFlow).toHaveBeenCalled());
+    const emptyProps = mockContactsFlow.mock.calls[mockContactsFlow.mock.calls.length - 1][0];
+    expect(emptyProps.autoStart).toBe(true);
+    expect(emptyProps.peopleCount).toBe(0);
+  });
+
+  it('does not auto-start the contacts flow when people already exist', async () => {
+    render(<ShareScreen />);
+
+    await waitFor(() => expect(mockContactsFlow).toHaveBeenCalled());
+    const populatedProps = mockContactsFlow.mock.calls[mockContactsFlow.mock.calls.length - 1][0];
+    expect(populatedProps.autoStart).toBe(false);
+    expect(populatedProps.peopleCount).toBe(2);
   });
 
   it('shares via the share_event RPC, notifies, and navigates back', async () => {

@@ -1,5 +1,6 @@
 import * as Contacts from 'expo-contacts';
 import {
+  getContactsPermission,
   getContactsPermissionStatus,
   getContactsWithPhones,
   normalizeToE164,
@@ -61,22 +62,31 @@ describe('lib/contacts', () => {
     await expect(requestContactsPermission()).resolves.toBe(true);
   });
 
-  it('returns empty list when permission remains denied', async () => {
+  it('returns the full permission snapshot including canAskAgain', async () => {
     getPermissionsAsyncMock.mockResolvedValueOnce({
-      status: 'denied',
-      granted: false,
-      expires: 'never',
-      canAskAgain: true,
-    } as Contacts.PermissionResponse);
-    requestPermissionsAsyncMock.mockResolvedValueOnce({
       status: 'denied',
       granted: false,
       expires: 'never',
       canAskAgain: false,
     } as Contacts.PermissionResponse);
 
+    await expect(getContactsPermission()).resolves.toEqual({
+      status: 'denied',
+      canAskAgain: false,
+    });
+  });
+
+  it('returns empty list when permission is not granted without requesting it', async () => {
+    getPermissionsAsyncMock.mockResolvedValueOnce({
+      status: 'denied',
+      granted: false,
+      expires: 'never',
+      canAskAgain: true,
+    } as Contacts.PermissionResponse);
+
     await expect(getContactsWithPhones()).resolves.toEqual([]);
     expect(getContactsAsyncMock).not.toHaveBeenCalled();
+    expect(requestPermissionsAsyncMock).not.toHaveBeenCalled();
   });
 
   it('deduplicates contacts by normalized number and skips invalid values', async () => {

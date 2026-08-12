@@ -18,7 +18,7 @@ export default {
       supportsTablet: true,
       infoPlist: {
         NSContactsUsageDescription:
-          "Events needs access to your contacts to let you select people to share events with.",
+          "Events uses your contacts so you can pick who to text when you share.",
         UIBackgroundModes: ["remote-notification"],
       },
     },

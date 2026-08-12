@@ -57,6 +57,24 @@ describe('components/ShareSheet', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/people');
   });
 
+  it('uses onAddPeople when provided instead of routing to People', () => {
+    const onAddPeople = jest.fn();
+    const screen = render(
+      <ShareSheet
+        people={[]}
+        circles={[]}
+        circleMembers={[]}
+        selectedPersonIds={new Set()}
+        onSelectionChange={jest.fn()}
+        onAddPeople={onAddPeople}
+      />
+    );
+
+    fireEvent.press(screen.getByText('Add People'));
+    expect(onAddPeople).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
   it('toggles a single person selection', () => {
     const onSelectionChange = jest.fn();
 

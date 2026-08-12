@@ -209,7 +209,7 @@ When a user sees an event on their calendar and wants to share it with their own
 
 People are added from the People screen (or when tapping Share) — there is no forced setup step after sign-up.
 
-1. App requests access to device contacts (Expo Contacts API), with an explainer dialog first
+1. App shows an explainer (“Events uses your contacts so you can pick who to text when you share”), then the OS contacts prompt. This fires on first Share or when opening People with an empty list — never at sign-up. Deny lands on a recovery screen (Open Settings, with a quiet add-a-number hatch).
 2. User selects up to 50 contacts from their phone — these become their in-app people list
 3. Phone numbers are normalized to E.164 and stored in my_people
 4. Circles can be set up at any point from the People screen
@@ -374,7 +374,11 @@ events-app/
 │   └── _layout.tsx                 # Root layout — push notification registration + tap handler
 ├── components/
 │   ├── Calendar.tsx                # Calendar view component
+│   ├── ContactsExplainer.tsx       # Pre-OS contacts permission screen
+│   ├── ContactsDeniedRecovery.tsx  # Settings + quiet add-number after deny
+│   ├── ContactsPermissionFlow.tsx  # Native contacts ask (Share + People)
 │   ├── EventCard.tsx               # Event preview (OG image, title, date)
+│   ├── ManualAddPersonModal.tsx    # Name + phone fallback (web + deny hatch)
 │   ├── PeoplePicker.tsx            # Contact selection for adding to people list
 │   └── ShareSheet.tsx              # Sharing UI — people list with circle quick-select
 ├── constants/

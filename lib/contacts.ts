@@ -8,8 +8,14 @@ export interface ContactWithPhone {
   normalized: string;
 }
 
+export type ContactsPermission = {
+  status: string;
+  canAskAgain: boolean;
+};
+
 /**
- * Request contacts permission. Call before accessing contacts.
+ * Request contacts permission. The explainer's Continue is the only caller —
+ * fetching contacts must never prompt on its own.
  */
 export async function requestContactsPermission(): Promise<boolean> {
   const { status } = await Contacts.requestPermissionsAsync();
@@ -25,12 +31,12 @@ export async function getContactsPermissionStatus(): Promise<boolean> {
 }
 
 /**
- * Get the raw contacts permission status string.
- * Returns 'granted' | 'denied' | 'undetermined' | 'restricted'
+ * Full permission snapshot: status plus whether the OS will still show a prompt.
+ * Branch: granted → picker; canAskAgain → explainer; otherwise → recovery.
  */
-export async function getContactsPermissionDetails(): Promise<string> {
-  const { status } = await Contacts.getPermissionsAsync();
-  return status;
+export async function getContactsPermission(): Promise<ContactsPermission> {
+  const { status, canAskAgain } = await Contacts.getPermissionsAsync();
+  return { status, canAskAgain };
 }
 
 /**
@@ -49,13 +55,11 @@ export function normalizeToE164(phone: string, defaultCountry: CountryCode = 'US
 /**
  * Fetch device contacts and normalize phone numbers.
  * Returns contacts that have at least one valid phone number.
+ * Does not request permission — returns [] if it isn't already granted.
  */
 export async function getContactsWithPhones(): Promise<ContactWithPhone[]> {
   const hasPermission = await getContactsPermissionStatus();
-  if (!hasPermission) {
-    const granted = await requestContactsPermission();
-    if (!granted) return [];
-  }
+  if (!hasPermission) return [];
 
   const { data } = await Contacts.getContactsAsync({
     fields: [Contacts.Fields.PhoneNumbers],

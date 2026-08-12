@@ -5,6 +5,7 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +14,7 @@ import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
+import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
 import type { MyPerson, Circle, CircleMember } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -44,6 +46,8 @@ export default function ShareScreen() {
   const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
   const [nameDraft, setNameDraft] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [peopleLoaded, setPeopleLoaded] = useState(false);
+  const [flowRestartKey, setFlowRestartKey] = useState(0);
 
   const firstParamValue = (value?: string | string[]) =>
     Array.isArray(value) ? value[0] : value;
@@ -118,6 +122,7 @@ export default function ShareScreen() {
       console.error('share load error:', peopleErr ?? circlesErr);
     }
     setLoadError(failed);
+    setPeopleLoaded(true);
   }, [userId, params.userEventId]);
 
   useFocusEffect(
@@ -302,6 +307,9 @@ export default function ShareScreen() {
         selectedPersonIds={selectedPersonIds}
         sharedPersonIds={alreadySharedIds}
         onSelectionChange={setSelectedPersonIds}
+        onAddPeople={
+          Platform.OS === 'web' ? undefined : () => setFlowRestartKey((k) => k + 1)
+        }
       />
       {loadError ? (
         <TouchableOpacity onPress={loadData} activeOpacity={0.6} accessibilityRole="button">
@@ -314,6 +322,16 @@ export default function ShareScreen() {
         <Text style={[styles.forwardingNote, { color: theme.textTertiary }]}>
           Sharing delivers people their own copy — it can't be unsent.
         </Text>
+      ) : null}
+      {userId && Platform.OS !== 'web' ? (
+        <ContactsPermissionFlow
+          userId={userId}
+          existingPhones={people.map((p) => p.phone_number)}
+          peopleCount={people.length}
+          autoStart={peopleLoaded && people.length === 0}
+          restartKey={flowRestartKey}
+          onPeopleChanged={loadData}
+        />
       ) : null}
     </View>
   );
