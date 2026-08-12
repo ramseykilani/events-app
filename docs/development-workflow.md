@@ -197,53 +197,67 @@ is superseded by the staging one and will simply stop updating.)
 The native app is the product (see `docs/distribution-strategy.md`); the web
 build is the dev/staging surface. Native builds are produced by EAS Build from
 this same codebase — profiles in `eas.json`, project ID in `app.config.js`
-(`extra.eas.projectId`). Nothing here runs in CI yet; builds are triggered by
-hand.
+(`extra.eas.projectId`). **Builds and submits are agent-run** — not CI, not
+the owner's machine. The ship-it protocol
+(`scripts/release-review-orchestrator.md` → Native rollout) drives them after
+a git promotion; auth setup and exact commands live in AGENTS.md → Native
+builds (agent-run); current enrollment/secrets/build/tester state lives in
+`STATUS.md`.
 
 ### One-time prerequisites (owner)
 
-- Apple Developer Program membership ($99/yr) — for TestFlight.
-- Play Console account ($25 one-time) — for the internal testing track.
-- An Expo access token: Expo dashboard → Access Tokens → create, then add it
-  as `EXPO_TOKEN` (Cursor secret for cloud agents, or `export` locally). The
-  first iOS build also needs Apple credentials — easiest run interactively on
-  the owner's machine (`eas build` prompts for App Store Connect login and
-  manages certificates/provisioning automatically).
-
-### Building
-
-```bash
-# iOS → TestFlight (App Store Connect upload via eas submit)
-eas build --platform ios --profile production
-eas submit --platform ios --profile production
-
-# Android → Play internal testing (AAB)
-eas build --platform android --profile production
-eas submit --platform android --profile production   # needs a Play service account
-
-# Android → instant sideload for your own device (APK, no Play needed)
-eas build --platform android --profile preview       # distribution: internal
-```
-
-`production` auto-increments build numbers (`appVersionSource: remote` in
-`eas.json` — EAS owns the build counter, don't set versions manually).
-
-### Distributing to testers
-
-- **iOS — TestFlight internal:** App Store Connect → Users and Access → add
-  each tester (any role with app access) → TestFlight tab → add them to the
-  internal group. Up to 100, no review, builds installable minutes after
-  processing. Builds expire 90 days after upload — rebuild periodically during
-  a long beta.
-- **Android — Play internal testing:** Play Console → Internal testing → add
-  testers' Gmail addresses → share the opt-in link. Up to ~100, no review.
-- The Play "12 testers for 14 days" closed-test rule gates *production* only
-  (personal accounts created after Nov 2023); internal testing is unaffected.
-- Before Play app setup completes you'll need the privacy policy URL
+- Apple Developer Program membership ($99/yr) — active since 2026-08-12.
+- Play Console account ($25 one-time, **personal**) — identity verification
+  in progress as of 2026-08-12. Personal is correct for this app: the
+  organization-only categories are financial, health, VPN, and government
+  apps. The personal-account "12 testers for 14 days" closed-test rule gates
+  a *production* listing only, not internal testing.
+- `EXPO_TOKEN` (Expo dashboard → Access Tokens) in Cursor + GitHub secrets —
+  done 2026-08-12.
+- App Store Connect API key (lets agents run iOS builds/submits
+  non-interactively): ASC → Users and Access → Integrations → App Store
+  Connect API → Team Keys → Generate (role Admin); download the `.p8` (shown
+  once), note the Key ID and Issuer ID; Team ID from
+  developer.apple.com/account → Membership. Secrets: `EXPO_ASC_KEY_ID`,
+  `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, `EXPO_ASC_API_KEY_P8_BASE64`.
+- Play service account (lets agents submit Android): Google Cloud Console →
+  create a service account + JSON key → Play Console → Users and permissions →
+  grant release access. Secret: `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (base64).
+  Play app setup also needs the privacy policy URL
   (`https://shared-events.pages.dev/privacy.html`), the data-safety form
   (answers follow from that policy), and the content-rating questionnaire.
 
-### After the first build lands
+### The release loop (native part)
 
-Run `manual-tests/native_device_smoke.md` on real hardware before inviting
-anyone — the native-only paths have never been exercised by any test harness.
+1. Git promotion to `production` deploys the **web** app only — no native
+   binary moves on its own.
+2. The agent builds the owner's smoke APK from the promoted commit
+   (`preview` profile → sideloadable APK) and hands over the install link
+   plus the smoke checklist (`manual-tests/native_device_smoke.md`).
+3. On the owner's pass, the agent builds + submits `production` to the Play
+   internal track (TestFlight once iPhone testers exist). On fail, fix
+   forward on staging — testers never see the build.
+
+`production` auto-increments build numbers (`appVersionSource: remote` in
+`eas.json` — EAS owns the build counter, don't set versions manually).
+Builds are metered (free plan: 15 Android + 15 iOS per month) — the loop
+spends 1–2 per release; don't build speculatively.
+
+### Distributing to testers
+
+- **Android — Play internal testing:** Play Console → Internal testing → add
+  testers' Gmail addresses → share the opt-in link. Up to ~100, no review.
+  This is the friends-and-friends-of-friends path.
+- **iOS — TestFlight internal:** up to 100, no review, but testers must hold
+  a role on your App Store Connect team — friends on iPhone go via
+  **external** TestFlight instead (email/public link, up to 10k, Beta App
+  Review ~24–48h on the first build of each version).
+- TestFlight builds expire 90 days after upload — rebuild periodically during
+  a long beta.
+
+### After each build lands on the owner's phone
+
+Run `manual-tests/native_device_smoke.md` before inviting anyone new — the
+native-only paths (contacts picker, datetimepicker, push, notification tap)
+have no automated coverage. The push step has a one-device agent-assisted
+variant (N-005).

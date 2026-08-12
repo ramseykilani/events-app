@@ -32,7 +32,7 @@ How people get onto a first share today:
 
 **Web testing is unblocked** — local `npx expo start --web`, the staging preview, and the full automated suite (Jest, SQL, Playwright). That is how agents and CI test; it is not how users get the app.
 
-**Native testing is the remaining gate for real use**, not a missing feature. First EAS builds have not been cut, and the native-only paths (contacts picker, datetimepicker, push, notification tap) have never run on a device. Putting a build on a phone needs Apple Developer / Play Console enrollment, then EAS, then `manual-tests/native_device_smoke.md`. Invite testers only after a clean smoke pass (`docs/distribution-strategy.md` → Owner critical path).
+**Native testing is the remaining gate for real use**, not a missing feature. First EAS builds have not been cut, and the native-only paths (contacts picker, datetimepicker, push, notification tap) have never run on a device. Builds are agent-run (AGENTS.md → Native builds); enrollment, secrets, and build state live in `STATUS.md`. Invite testers only after a clean smoke pass (`docs/distribution-strategy.md` → Owner critical path).
 
 ---
 

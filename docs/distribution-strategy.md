@@ -41,8 +41,8 @@ Consequence to remember: with no links, there is nothing for universal links / A
 - Play Console app setup requires a privacy policy URL (served from `/privacy.html` on the Pages site), a data-safety form, and content-rating questionnaire.
 - Requires a Play Console account ($25 one-time); identity verification can take days.
 
-## Owner critical path (as of 2026-08-09)
+## Owner critical path (updated 2026-08-12)
 
-1. Enroll in the Apple Developer Program and create the Play Console account — these are the long poles.
-2. First EAS builds (`docs/development-workflow.md` → Native builds), then run `manual-tests/native_device_smoke.md` on real hardware. The native-only paths (contacts picker, datetimepicker, push, notification tap) have never executed on a device — every test harness in this repo exercises the web build.
+1. ~~Enroll in the Apple Developer Program and create the Play Console account~~ — Apple active 2026-08-12; Play personal account created, identity verification in progress. Remaining credential setup (ASC API key, Play service account) is tracked in `STATUS.md`.
+2. Agents run EAS builds (AGENTS.md → Native builds). First: an Android preview APK dry run, then the owner runs `manual-tests/native_device_smoke.md` on real hardware. The native-only paths (contacts picker, datetimepicker, push, notification tap) have never executed on a device — every test harness in this repo exercises the web build.
 3. Invite the first ~3 testers only after a clean smoke pass.
