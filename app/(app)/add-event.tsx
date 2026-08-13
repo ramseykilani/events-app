@@ -52,13 +52,9 @@ export default function AddEventScreen() {
         return;
       }
 
-      // Autofill only wins over untouched fields — the user may have typed
-      // their own title while this fetch was in flight.
-      if (data?.title) setTitle((prev) => (prev.trim() ? prev : data.title));
-      if (data?.description)
-        setDescription((prev) => (prev.trim() ? prev : data.description));
-      if (data?.image_url)
-        setImageUrl((prev) => (prev.trim() ? prev : data.image_url));
+      if (data?.title) setTitle(data.title);
+      if (data?.description) setDescription(data.description ?? '');
+      if (data?.image_url) setImageUrl(data.image_url ?? '');
     } catch (err) {
       console.warn('OG fetch failed:', err);
     } finally {
