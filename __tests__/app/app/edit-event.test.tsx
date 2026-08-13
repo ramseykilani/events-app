@@ -2,7 +2,10 @@ import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { abortable, abortablePromise } from '../../helpers/abortable';
-import { clearEventPreviewCache } from '../../../lib/eventPreviewCache';
+import {
+  clearEventPreviewCache,
+  rememberEventPreview,
+} from '../../../lib/eventPreviewCache';
 import EditEventScreen from '../../../app/(app)/edit-event';
 
 const mockRpc = jest.fn();
@@ -138,6 +141,67 @@ describe('app/(app)/edit-event', () => {
     expect(mockUeUpdate).toHaveBeenCalledWith({ event_id: 'e-new' });
     expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-new');
     expect(mockUeDelete).not.toHaveBeenCalled();
+  });
+
+  it('keeps edits made while the seeded form is still refreshing (B-1 regression)', async () => {
+    // The form seeds from the preview cache and is editable immediately; the
+    // refresh fetch is still in flight (slow network / WebKit). Whatever the
+    // user types before it lands must survive — the fetch returns the same
+    // immutable event the preview already showed.
+    rememberEventPreview({
+      event_id: 'e-old',
+      userEventId: 'ue-old',
+      title: 'Old Title',
+      description: null,
+      image_url: null,
+      url: null,
+      event_date: '2026-05-01',
+      event_time: null,
+    });
+
+    let resolveEvents!: (value: { data: unknown; error: null }) => void;
+    mockEventsSingle.mockReturnValue(
+      new Promise((resolve) => {
+        resolveEvents = resolve;
+      })
+    );
+
+    const screen = render(<EditEventScreen />);
+    const titleInput = await screen.findByPlaceholderText('Event title');
+    expect(titleInput.props.value).toBe('Old Title');
+
+    fireEvent.changeText(titleInput, 'Old Title edited');
+
+    // The slow refresh lands after the user has already typed.
+    resolveEvents({
+      data: {
+        id: 'e-old',
+        created_by_user_id: 'u1',
+        url: null,
+        title: 'Old Title',
+        description: null,
+        image_url: null,
+        event_date: '2026-05-01',
+        event_time: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+      error: null,
+    });
+
+    await waitFor(() => expect(mockEventsSingle).toHaveBeenCalled());
+    expect(screen.getByPlaceholderText('Event title').props.value).toBe(
+      'Old Title edited'
+    );
+
+    fireEvent.press(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'find_or_create_event',
+        expect.objectContaining({ p_title: 'Old Title edited' })
+      );
+    });
+    expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-new');
   });
 
   it('merges shares into the existing copy on a 23505 conflict, then removes the old row', async () => {

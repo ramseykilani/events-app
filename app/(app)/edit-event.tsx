@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -65,17 +65,24 @@ export default function EditEventScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  // A seeded form is editable while the refresh fetch is still in flight, so
+  // the user can type before it lands. Events are immutable — the fetch can
+  // only return what the preview already shows.
+  const seededOnMount = useRef(!!seeded);
 
   const applyEvent = (e: Event) => {
-    const fields = fieldsFromEvent(e);
     setEvent(e);
+    rememberEventPreview(previewFromEvent(e, userEventId));
+    // Never overwrite a seeded form: the fetch resolves after the user has
+    // already typed, and applying it would clobber their edits.
+    if (seededOnMount.current) return;
+    const fields = fieldsFromEvent(e);
     setTitle(fields.title);
     setDescription(fields.description);
     setUrl(fields.url);
     setImageUrl(fields.imageUrl);
     setEventDate(fields.eventDate);
     setEventTime(fields.eventTime);
-    rememberEventPreview(previewFromEvent(e, userEventId));
   };
 
   const load = useCallback(async () => {
