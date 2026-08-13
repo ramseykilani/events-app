@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,13 @@ import { formatEventDate, formatPhoneDisplay } from '../../../lib/format';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
 import { useTheme } from '../../../hooks/useTheme';
+import {
+  eventFromPreview,
+  previewFromEvent,
+  readEventPreview,
+  rememberEventPreview,
+} from '../../../lib/eventPreviewCache';
+import { withRetries, withTimeout } from '../../../lib/timeoutSignal';
 
 type SharedWithPerson = {
   id: string;
@@ -30,103 +37,158 @@ function firstParam(value?: string | string[]): string | undefined {
 }
 
 export default function EventDetailScreen() {
-  const params = useLocalSearchParams<{ id?: string | string[]; sharedByPersonId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    id?: string | string[];
+    userEventId?: string | string[];
+    sharedByPersonId?: string | string[];
+  }>();
   const id = firstParam(params.id);
+  const paramUserEventId = firstParam(params.userEventId);
   const sharedByPersonId = firstParam(params.sharedByPersonId);
+  const preview = id ? readEventPreview(id) : undefined;
+  const seeded = preview ? eventFromPreview(preview) : null;
+
   const { session } = useSession();
   const theme = useTheme();
-  const [event, setEvent] = useState<Event | null>(null);
-  const [userEventId, setUserEventId] = useState<string | null>(null);
+  const [event, setEvent] = useState<Event | null>(seeded);
+  const [userEventId, setUserEventId] = useState<string | null>(
+    paramUserEventId ?? preview?.userEventId ?? null
+  );
   const [sharedWith, setSharedWith] = useState<SharedWithPerson[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!seeded);
   const [accessRevoked, setAccessRevoked] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [sharerName, setSharerName] = useState<string | null>(null);
+  const [sharerName, setSharerName] = useState<string | null>(
+    preview?.sharer_contact_name ?? null
+  );
   const [isHidden, setIsHidden] = useState(false);
+  const loadSeq = useRef(0);
+  const hasContentRef = useRef(!!seeded);
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
+
     if (!id || !session?.user?.id) {
-      setEvent(null);
       setAccessRevoked(false);
       setLoadError(true);
       setLoading(false);
+      if (!hasContentRef.current) setEvent(null);
       return;
     }
 
+    if (!hasContentRef.current) setLoading(true);
+
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          setAccessRevoked(true);
-          setLoadError(false);
-        } else {
-          console.error('Failed to load event:', error);
-          setLoadError(true);
-        }
-        setEvent(null);
-      } else {
-        setEvent(data as Event);
-        setAccessRevoked(false);
-        setLoadError(false);
-      }
-
-      const { data: ue } = await supabase
-        .from('user_events')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .eq('event_id', id)
-        .single();
-      setUserEventId(ue?.id ?? null);
-
-      if (ue?.id) {
-        const { data: shares } = await supabase
-          .from('event_shares')
-          .select('person_id')
-          .eq('user_event_id', ue.id);
-        const personIds = (shares ?? []).map((s) => s.person_id);
-        if (personIds.length > 0) {
-          const { data: people } = await supabase
-            .from('my_people')
-            .select('id, contact_name, phone_number')
-            .in('id', personIds);
-          setSharedWith((people ?? []) as SharedWithPerson[]);
-        } else {
-          setSharedWith([]);
-        }
-      } else {
-        setSharedWith([]);
-      }
-
-      if (sharedByPersonId) {
-        const { data: person } = await supabase
-          .from('my_people')
-          .select('contact_name, phone_number')
-          .eq('id', sharedByPersonId)
+      const result = await withRetries(async (signal) => {
+        const eventQuery = supabase
+          .from('events')
+          .select('*')
+          .eq('id', id)
+          .abortSignal(signal)
           .single();
-        setSharerName(person?.contact_name ?? person?.phone_number ?? null);
 
-        const { data: hidden } = await supabase
-          .from('hidden_people')
-          .select('id')
-          .eq('owner_id', session.user.id)
-          .eq('person_id', sharedByPersonId)
-          .maybeSingle();
-        setIsHidden(!!hidden);
+        const ueQuery = paramUserEventId
+          ? Promise.resolve({ data: { id: paramUserEventId }, error: null })
+          : supabase
+              .from('user_events')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .eq('event_id', id)
+              .abortSignal(signal)
+              .single();
+
+        const [{ data, error }, { data: ue }] = await Promise.all([
+          eventQuery,
+          ueQuery,
+        ]);
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            return { kind: 'revoked' as const };
+          }
+          throw error;
+        }
+
+        const ueId = ue?.id ?? paramUserEventId ?? null;
+        let nextShared: SharedWithPerson[] = [];
+        if (ueId) {
+          const { data: shares } = await supabase
+            .from('event_shares')
+            .select('person_id')
+            .eq('user_event_id', ueId)
+            .abortSignal(signal);
+          const personIds = (shares ?? []).map((s) => s.person_id);
+          if (personIds.length > 0) {
+            const { data: people } = await supabase
+              .from('my_people')
+              .select('id, contact_name, phone_number')
+              .in('id', personIds)
+              .abortSignal(signal);
+            nextShared = (people ?? []) as SharedWithPerson[];
+          }
+        }
+
+        let nextSharer = null as string | null;
+        let nextHidden = false;
+        if (sharedByPersonId) {
+          const [{ data: person }, { data: hidden }] = await Promise.all([
+            supabase
+              .from('my_people')
+              .select('contact_name, phone_number')
+              .eq('id', sharedByPersonId)
+              .abortSignal(signal)
+              .single(),
+            supabase
+              .from('hidden_people')
+              .select('id')
+              .eq('owner_id', session.user.id)
+              .eq('person_id', sharedByPersonId)
+              .abortSignal(signal)
+              .maybeSingle(),
+          ]);
+          nextSharer = person?.contact_name ?? person?.phone_number ?? null;
+          nextHidden = !!hidden;
+        }
+
+        return {
+          kind: 'ok' as const,
+          event: data as Event,
+          userEventId: ueId,
+          sharedWith: nextShared,
+          sharerName: nextSharer,
+          isHidden: nextHidden,
+        };
+      });
+
+      if (seq !== loadSeq.current) return;
+
+      if (result.kind === 'revoked') {
+        hasContentRef.current = false;
+        setEvent(null);
+        setAccessRevoked(true);
+        setLoadError(false);
+        return;
       }
+
+      hasContentRef.current = true;
+      setEvent(result.event);
+      setUserEventId(result.userEventId);
+      setSharedWith(result.sharedWith);
+      if (result.sharerName !== null) setSharerName(result.sharerName);
+      setIsHidden(result.isHidden);
+      setAccessRevoked(false);
+      setLoadError(false);
+      rememberEventPreview(previewFromEvent(result.event, result.userEventId));
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       console.error('Failed to load event:', err);
-      setEvent(null);
       setAccessRevoked(false);
       setLoadError(true);
+      if (!hasContentRef.current) setEvent(null);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
-  }, [id, session?.user?.id, sharedByPersonId]);
+  }, [id, session?.user?.id, sharedByPersonId, paramUserEventId]);
 
   // useFocusEffect (not useEffect) so returning from Edit shows the new
   // snapshot without remounting.
@@ -146,6 +208,15 @@ export default function EventDetailScreen() {
     });
   };
 
+  const handleEdit = () => {
+    if (!id || !userEventId || !event) return;
+    rememberEventPreview(previewFromEvent(event, userEventId));
+    router.push({
+      pathname: '/(app)/edit-event',
+      params: { eventId: id, userEventId },
+    });
+  };
+
   const handleDelete = () => {
     if (!userEventId) return;
     showConfirm(
@@ -157,17 +228,16 @@ export default function EventDetailScreen() {
         onConfirm: async () => {
           setLoading(true);
           try {
-            const { error } = await supabase
-              .from('user_events')
-              .delete()
-              .eq('id', userEventId)
-              .eq('user_id', session?.user?.id ?? '');
+            await withTimeout(async (signal) => {
+              const { error } = await supabase
+                .from('user_events')
+                .delete()
+                .eq('id', userEventId)
+                .eq('user_id', session?.user?.id ?? '')
+                .abortSignal(signal);
 
-            if (error) {
-              console.error('Failed to remove event:', error);
-              showAlert('Error', 'Failed to remove event');
-              return;
-            }
+              if (error) throw error;
+            });
             if (router.canGoBack()) {
               router.back();
             } else {
@@ -186,30 +256,43 @@ export default function EventDetailScreen() {
 
   const handleToggleHide = async () => {
     if (!sharedByPersonId || !session?.user?.id) return;
+    try {
+      await withTimeout(async (signal) => {
+        if (isHidden) {
+          const { error } = await supabase
+            .from('hidden_people')
+            .delete()
+            .eq('owner_id', session.user.id)
+            .eq('person_id', sharedByPersonId)
+            .abortSignal(signal);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('hidden_people')
+            .insert({
+              owner_id: session.user.id,
+              person_id: sharedByPersonId,
+            })
+            .abortSignal(signal);
+          if (error) throw error;
+        }
+      });
+    } catch (err) {
+      showError('Error', err);
+      return;
+    }
     if (isHidden) {
-      const { error } = await supabase
-        .from('hidden_people')
-        .delete()
-        .eq('owner_id', session.user.id)
-        .eq('person_id', sharedByPersonId);
-      if (error) {
-        showError('Error', error);
-        return;
-      }
       setIsHidden(false);
     } else {
-      const { error } = await supabase.from('hidden_people').insert({
-        owner_id: session.user.id,
-        person_id: sharedByPersonId,
-      });
-      if (error) {
-        // Stay put so the user can retry instead of silently navigating back
-        showError('Error', error);
-        return;
-      }
       setIsHidden(true);
       router.back();
     }
+  };
+
+  const handleRetry = () => {
+    setLoadError(false);
+    if (!hasContentRef.current) setLoading(true);
+    void load();
   };
 
   const timeStr = event?.event_time
@@ -219,29 +302,18 @@ export default function EventDetailScreen() {
       })
     : null;
 
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={[styles.container, styles.centered]}>
-          <ActivityIndicator color={theme.textPrimary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const navBack = (
+    <View style={styles.navRow}>
+      <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+        <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   if (accessRevoked) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
-          </TouchableOpacity>
-        </View>
+        {navBack}
         <View style={styles.revokedContainer}>
           <Text style={[styles.revokedTitle, { color: theme.textPrimary }]}>Access removed</Text>
           <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
@@ -253,53 +325,45 @@ export default function EventDetailScreen() {
     );
   }
 
-  if (loadError) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.revokedContainer}>
-          <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
-            Could not load this event.
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              setLoading(true);
-              void load();
-            }}
-            activeOpacity={0.6}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   if (!event) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.navRow}>
-          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
-          </TouchableOpacity>
+        {navBack}
+        <View style={styles.revokedContainer}>
+          {loading ? (
+            <ActivityIndicator color={theme.textPrimary} />
+          ) : (
+            <>
+              <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
+                {loadError ? 'Could not load this event.' : 'Event not found'}
+              </Text>
+              {loadError ? (
+                <TouchableOpacity onPress={handleRetry} activeOpacity={0.6} accessibilityRole="button">
+                  <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
+          )}
         </View>
-        <Text style={[styles.loading, { color: theme.textPrimary }]}>Event not found</Text>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.navRow}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+      {navBack}
+      {loadError ? (
+        <TouchableOpacity
+          style={[styles.refreshBanner, { backgroundColor: theme.surface }]}
+          onPress={handleRetry}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.refreshBannerText, { color: theme.textPrimary }]}>
+            Could not refresh. Retry
+          </Text>
         </TouchableOpacity>
-      </View>
+      ) : null}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.innerContent}>
           {event.image_url ? (
@@ -359,12 +423,7 @@ export default function EventDetailScreen() {
             {userEventId && (
               <TouchableOpacity
                 style={[styles.editButton, { backgroundColor: theme.surfaceSecondary }]}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/edit-event',
-                    params: { eventId: id, userEventId },
-                  })
-                }
+                onPress={handleEdit}
                 activeOpacity={0.7}
                 accessibilityRole="button"
               >
@@ -432,6 +491,14 @@ const styles = StyleSheet.create({
   navBack: {
     fontSize: 16,
   },
+  refreshBanner: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  refreshBannerText: {
+    fontSize: 14,
+  },
   image: {
     width: '100%',
     height: 300,
@@ -489,6 +556,7 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 16,
   },
   revokedTitle: {
     fontSize: 20,

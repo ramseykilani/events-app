@@ -20,29 +20,63 @@ import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
+import {
+  eventFromPreview,
+  previewFromEvent,
+  readEventPreview,
+  rememberEventPreview,
+} from '../../lib/eventPreviewCache';
+import { withRetries, withTimeout } from '../../lib/timeoutSignal';
 
 function firstParam(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function fieldsFromEvent(e: Event) {
+  const [y, m, d] = e.event_date.split('-').map(Number);
+  return {
+    title: e.title ?? '',
+    description: e.description ?? '',
+    url: e.url ?? '',
+    imageUrl: e.image_url ?? '',
+    eventDate: new Date(y, m - 1, d),
+    eventTime: e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null,
+  };
 }
 
 export default function EditEventScreen() {
   const params = useLocalSearchParams<{ eventId?: string | string[]; userEventId?: string | string[] }>();
   const eventId = firstParam(params.eventId);
   const userEventId = firstParam(params.userEventId);
+  const preview = eventId ? readEventPreview(eventId) : undefined;
+  const seeded = preview ? eventFromPreview(preview) : null;
+  const seededFields = seeded ? fieldsFromEvent(seeded) : null;
   const { session } = useSession();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const [event, setEvent] = useState<Event | null>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [url, setUrl] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [eventDate, setEventDate] = useState(new Date());
-  const [eventTime, setEventTime] = useState<Date | null>(null);
+  const [event, setEvent] = useState<Event | null>(seeded);
+  const [title, setTitle] = useState(seededFields?.title ?? '');
+  const [description, setDescription] = useState(seededFields?.description ?? '');
+  const [url, setUrl] = useState(seededFields?.url ?? '');
+  const [imageUrl, setImageUrl] = useState(seededFields?.imageUrl ?? '');
+  const [eventDate, setEventDate] = useState(seededFields?.eventDate ?? new Date());
+  const [eventTime, setEventTime] = useState<Date | null>(seededFields?.eventTime ?? null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+
+  const applyEvent = (e: Event) => {
+    const fields = fieldsFromEvent(e);
+    setEvent(e);
+    setTitle(fields.title);
+    setDescription(fields.description);
+    setUrl(fields.url);
+    setImageUrl(fields.imageUrl);
+    setEventDate(fields.eventDate);
+    setEventTime(fields.eventTime);
+    rememberEventPreview(previewFromEvent(e, userEventId));
+  };
 
   const load = useCallback(async () => {
     if (!eventId) {
@@ -51,35 +85,24 @@ export default function EditEventScreen() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
-        .single();
+      const e = await withRetries(async (signal) => {
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', eventId)
+          .abortSignal(signal)
+          .single();
 
-      if (error) {
-        console.error('Failed to load event:', error);
-        setLoadError(true);
-        return;
-      }
-
+        if (error) throw error;
+        return data as Event;
+      });
       setLoadError(false);
-      const e = data as Event;
-      setEvent(e);
-      setTitle(e.title ?? '');
-      setDescription(e.description ?? '');
-      setUrl(e.url ?? '');
-      setImageUrl(e.image_url ?? '');
-      const [y, m, d] = e.event_date.split('-').map(Number);
-      setEventDate(new Date(y, m - 1, d));
-      setEventTime(
-        e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null
-      );
+      applyEvent(e);
     } catch (err) {
       console.error('Failed to load event:', err);
       setLoadError(true);
     }
-  }, [eventId]);
+  }, [eventId, userEventId]);
 
   useEffect(() => {
     load();
@@ -104,90 +127,114 @@ export default function EditEventScreen() {
 
     setLoading(true);
     try {
-      const timeStr = eventTime
-        ? eventTime.toTimeString().slice(0, 8)
-        : null;
+      await withTimeout(async (signal) => {
+        const timeStr = eventTime
+          ? eventTime.toTimeString().slice(0, 8)
+          : null;
 
-      const year = eventDate.getFullYear();
-      const month = String(eventDate.getMonth() + 1).padStart(2, '0');
-      const day = String(eventDate.getDate()).padStart(2, '0');
-      const localDate = `${year}-${month}-${day}`;
+        const year = eventDate.getFullYear();
+        const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+        const day = String(eventDate.getDate()).padStart(2, '0');
+        const localDate = `${year}-${month}-${day}`;
 
-      const { data: eventId, error: eventErr } = await supabase.rpc(
-        'find_or_create_event',
-        {
-          p_url: url.trim() || null,
-          p_title: title.trim() || null,
-          p_description: description.trim() || null,
-          p_image_url: imageUrl.trim() || null,
-          p_event_date: localDate,
-          p_event_time: timeStr,
-        }
-      );
+        const { data: newEventId, error: eventErr } = await supabase
+          .rpc('find_or_create_event', {
+            p_url: url.trim() || null,
+            p_title: title.trim() || null,
+            p_description: description.trim() || null,
+            p_image_url: imageUrl.trim() || null,
+            p_event_date: localDate,
+            p_event_time: timeStr,
+          })
+          .abortSignal(signal);
 
-      if (eventErr) throw eventErr;
-      if (!eventId) throw new Error('Failed to create event');
+        if (eventErr) throw eventErr;
+        if (!newEventId) throw new Error('Failed to create event');
 
-      const { error: ueErr } = await supabase
-        .from('user_events')
-        .update({ event_id: eventId })
-        .eq('id', userEventId)
-        .eq('user_id', session.user.id);
+        const { error: ueErr } = await supabase
+          .from('user_events')
+          .update({ event_id: newEventId })
+          .eq('id', userEventId)
+          .eq('user_id', session.user.id)
+          .abortSignal(signal);
 
-      if (ueErr) {
-        // If update fails because the user already owns the target snapshot,
-        // merge into that existing user_events row instead of duplicating it:
-        // carry over shares that aren't already there, then drop the old row
-        // (its remaining duplicate shares cascade away).
-        if (ueErr.code === '23505') {
-          const { data: existingUe, error: findErr } = await supabase
-            .from('user_events')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .eq('event_id', eventId)
-            .single();
-          if (findErr || !existingUe) {
-            throw findErr ?? new Error('Failed to find the existing event copy');
+        if (ueErr) {
+          // If update fails because the user already owns the target snapshot,
+          // merge into that existing user_events row instead of duplicating it:
+          // carry over shares that aren't already there, then drop the old row
+          // (its remaining duplicate shares cascade away).
+          if (ueErr.code === '23505') {
+            const { data: existingUe, error: findErr } = await supabase
+              .from('user_events')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .eq('event_id', newEventId)
+              .abortSignal(signal)
+              .single();
+            if (findErr || !existingUe) {
+              throw findErr ?? new Error('Failed to find the existing event copy');
+            }
+
+            const [{ data: targetShares }, { data: sourceShares }] = await Promise.all([
+              supabase
+                .from('event_shares')
+                .select('person_id')
+                .eq('user_event_id', existingUe.id)
+                .abortSignal(signal),
+              supabase
+                .from('event_shares')
+                .select('person_id')
+                .eq('user_event_id', userEventId)
+                .abortSignal(signal),
+            ]);
+
+            const alreadyShared = new Set((targetShares ?? []).map((s) => s.person_id));
+            const toMove = (sourceShares ?? [])
+              .map((s) => s.person_id)
+              .filter((pid) => !alreadyShared.has(pid));
+
+            if (toMove.length > 0) {
+              const { error: moveErr } = await supabase
+                .from('event_shares')
+                .insert(
+                  toMove.map((person_id) => ({
+                    user_event_id: existingUe.id,
+                    person_id,
+                  }))
+                )
+                .abortSignal(signal);
+              if (moveErr) throw moveErr;
+            }
+
+            const { error: delErr } = await supabase
+              .from('user_events')
+              .delete()
+              .eq('id', userEventId)
+              .abortSignal(signal);
+
+            if (delErr) throw delErr;
+          } else {
+            throw ueErr;
           }
-
-          const [{ data: targetShares }, { data: sourceShares }] = await Promise.all([
-            supabase
-              .from('event_shares')
-              .select('person_id')
-              .eq('user_event_id', existingUe.id),
-            supabase
-              .from('event_shares')
-              .select('person_id')
-              .eq('user_event_id', userEventId),
-          ]);
-
-          const alreadyShared = new Set((targetShares ?? []).map((s) => s.person_id));
-          const toMove = (sourceShares ?? [])
-            .map((s) => s.person_id)
-            .filter((pid) => !alreadyShared.has(pid));
-
-          if (toMove.length > 0) {
-            const { error: moveErr } = await supabase.from('event_shares').insert(
-              toMove.map((person_id) => ({
-                user_event_id: existingUe.id,
-                person_id,
-              }))
-            );
-            if (moveErr) throw moveErr;
-          }
-
-          const { error: delErr } = await supabase
-            .from('user_events')
-            .delete()
-            .eq('id', userEventId);
-
-          if (delErr) throw delErr;
-        } else {
-          throw ueErr;
         }
-      }
 
-      router.replace(`/(app)/event/${eventId}`);
+        rememberEventPreview(
+          previewFromEvent(
+            {
+              ...(event as Event),
+              id: newEventId as string,
+              title: title.trim() || null,
+              description: description.trim() || null,
+              url: url.trim() || null,
+              image_url: imageUrl.trim() || null,
+              event_date: localDate,
+              event_time: timeStr,
+            },
+            userEventId
+          )
+        );
+        router.replace(`/(app)/event/${newEventId}`);
+      });
     } catch (err: unknown) {
       showError('Error', err);
     } finally {
@@ -205,17 +252,16 @@ export default function EditEventScreen() {
         onConfirm: async () => {
           setLoading(true);
           try {
-            const { error } = await supabase
-              .from('user_events')
-              .delete()
-              .eq('id', userEventId)
-              .eq('user_id', session?.user?.id ?? '');
+            await withTimeout(async (signal) => {
+              const { error } = await supabase
+                .from('user_events')
+                .delete()
+                .eq('id', userEventId)
+                .eq('user_id', session?.user?.id ?? '')
+                .abortSignal(signal);
 
-            if (error) {
-              console.error('Failed to remove event:', error);
-              showAlert('Error', 'Failed to remove event');
-              return;
-            }
+              if (error) throw error;
+            });
             router.replace('/(app)/');
           } catch (err) {
             console.error('Failed to remove event:', err);
@@ -234,20 +280,9 @@ export default function EditEventScreen() {
         <Text style={[styles.loadErrorText, { color: theme.textSecondary }]}>
           Could not load this event.
         </Text>
-        <TouchableOpacity onPress={load} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity onPress={() => void load()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.retry, { color: theme.textSecondary }]}>Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!event) {
-    return (
-      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.textPrimary} />
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.retry, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
@@ -271,22 +306,27 @@ export default function EditEventScreen() {
         <Text style={[styles.title, { color: theme.textPrimary }]}>Edit event</Text>
         <TouchableOpacity
           onPress={handleSave}
-          disabled={loading || (!title.trim() && !url.trim())}
+          disabled={loading || !event || (!title.trim() && !url.trim())}
           activeOpacity={0.6}
           accessibilityRole="button"
-          accessibilityState={{ disabled: loading || (!title.trim() && !url.trim()) }}
+          accessibilityState={{ disabled: loading || !event || (!title.trim() && !url.trim()) }}
         >
           <Text
             style={[
               styles.save,
               { color: theme.textPrimary },
-              (loading || (!title.trim() && !url.trim())) && { color: theme.textTertiary },
+              (loading || !event || (!title.trim() && !url.trim())) && { color: theme.textTertiary },
             ]}
           >
             Save
           </Text>
         </TouchableOpacity>
-      </View>
+        </View>
+        {!event ? (
+          <View style={[styles.centered, { paddingTop: 48 }]}>
+            <ActivityIndicator color={theme.textPrimary} />
+          </View>
+        ) : (
       <View style={styles.form}>
         <Text style={[styles.label, { color: theme.textSecondary }]}>URL (optional)</Text>
         <TextInput
@@ -380,6 +420,7 @@ export default function EditEventScreen() {
           <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
         </TouchableOpacity>
         </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

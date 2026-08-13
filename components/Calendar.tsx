@@ -12,6 +12,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { EventCard } from './EventCard';
 import type { CalendarEvent } from '../lib/types';
+import {
+  previewFromCalendarEvent,
+  rememberEventPreview,
+} from '../lib/eventPreviewCache';
 import { useTheme } from '../hooks/useTheme';
 import { useThemePreference } from '../app/_context/ThemeContext';
 import { Colors, THEME_REGISTRY } from '../constants/Colors';
@@ -221,17 +225,19 @@ export function Calendar({
           <EventCard
             key={event.id}
             event={event}
-            onPress={() =>
+            onPress={() => {
+              rememberEventPreview(previewFromCalendarEvent(event));
               router.push({
                 pathname: '/(app)/event/[id]',
                 params: {
                   id: event.event_id,
+                  userEventId: event.id,
                   ...(event.sharer_person_id
                     ? { sharedByPersonId: event.sharer_person_id }
                     : {}),
                 },
-              })
-            }
+              });
+            }}
           />
         ))}
       </ScrollView>

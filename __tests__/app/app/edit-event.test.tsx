@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { abortable, abortablePromise } from '../../helpers/abortable';
+import { clearEventPreviewCache } from '../../../lib/eventPreviewCache';
 import EditEventScreen from '../../../app/(app)/edit-event';
 
 const mockRpc = jest.fn();
@@ -57,6 +59,7 @@ describe('app/(app)/edit-event', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    clearEventPreviewCache();
     useLocalSearchParamsMock.mockReturnValue({ eventId: 'e-old', userEventId: 'ue-old' });
 
     mockEventsSingle.mockResolvedValue({
@@ -73,26 +76,36 @@ describe('app/(app)/edit-event', () => {
       },
       error: null,
     });
-    mockEventsEq.mockReturnValue({ single: mockEventsSingle });
+    mockEventsEq.mockReturnValue(abortable({ single: mockEventsSingle }));
     mockEventsSelect.mockReturnValue({ eq: mockEventsEq });
 
-    mockUeUpdateEqUser.mockResolvedValue({ error: null });
+    mockUeUpdateEqUser.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
     mockUeUpdateEqId.mockReturnValue({ eq: mockUeUpdateEqUser });
     mockUeUpdate.mockReturnValue({ eq: mockUeUpdateEqId });
 
     mockUeSelectSingle.mockResolvedValue({ data: { id: 'ue-existing' }, error: null });
-    mockUeSelectEqEvent.mockReturnValue({ single: mockUeSelectSingle });
+    mockUeSelectEqEvent.mockReturnValue(abortable({ single: mockUeSelectSingle }));
     mockUeSelectEqUser.mockReturnValue({ eq: mockUeSelectEqEvent });
     mockUeSelect.mockReturnValue({ eq: mockUeSelectEqUser });
 
-    mockUeDeleteEq.mockResolvedValue({ error: null });
+    mockUeDeleteEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
     mockUeDelete.mockReturnValue({ eq: mockUeDeleteEq });
 
-    mockEsSelectEq.mockResolvedValue({ data: [], error: null });
+    mockEsSelectEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockEsSelect.mockReturnValue({ eq: mockEsSelectEq });
-    mockEsInsert.mockResolvedValue({ error: null });
+    mockEsInsert.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
 
-    mockRpc.mockResolvedValue({ data: 'e-new', error: null });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: 'e-new', error: null }))
+    );
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'events') return { select: mockEventsSelect };
@@ -128,16 +141,26 @@ describe('app/(app)/edit-event', () => {
   });
 
   it('merges shares into the existing copy on a 23505 conflict, then removes the old row', async () => {
-    mockUeUpdateEqUser.mockResolvedValue({
-      error: { code: '23505', message: 'duplicate key value' },
-    });
+    mockUeUpdateEqUser.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          error: { code: '23505', message: 'duplicate key value' },
+        })
+      )
+    );
     // Target copy already shared with p1; source copy shared with p1 and p2.
     mockEsSelectEq
-      .mockResolvedValueOnce({ data: [{ person_id: 'p1' }], error: null })
-      .mockResolvedValueOnce({
-        data: [{ person_id: 'p1' }, { person_id: 'p2' }],
-        error: null,
-      });
+      .mockImplementationOnce(() =>
+        abortablePromise(Promise.resolve({ data: [{ person_id: 'p1' }], error: null }))
+      )
+      .mockImplementationOnce(() =>
+        abortablePromise(
+          Promise.resolve({
+            data: [{ person_id: 'p1' }, { person_id: 'p2' }],
+            error: null,
+          })
+        )
+      );
 
     const screen = render(<EditEventScreen />);
     const save = await screen.findByText('Save');
@@ -155,10 +178,16 @@ describe('app/(app)/edit-event', () => {
 
   it('surfaces an error instead of navigating when the merge fails', async () => {
     const { showError } = require('../../../lib/showError');
-    mockUeUpdateEqUser.mockResolvedValue({
-      error: { code: '23505', message: 'duplicate key value' },
-    });
-    mockUeDeleteEq.mockResolvedValue({ error: { message: 'delete failed' } });
+    mockUeUpdateEqUser.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          error: { code: '23505', message: 'duplicate key value' },
+        })
+      )
+    );
+    mockUeDeleteEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: { message: 'delete failed' } }))
+    );
 
     const screen = render(<EditEventScreen />);
     const save = await screen.findByText('Save');
@@ -186,7 +215,7 @@ describe('app/(app)/edit-event', () => {
     expect(screen.getByText('Back')).toBeTruthy();
   });
 
-  it('keeps Back available while the event is still loading', async () => {
+  it('keeps Cancel available while the event is still loading', async () => {
     let resolveEvents!: (value: {
       data: {
         id: string;
@@ -208,8 +237,8 @@ describe('app/(app)/edit-event', () => {
     );
 
     const screen = render(<EditEventScreen />);
-    const back = await screen.findByText('Back');
-    fireEvent.press(back);
+    const cancel = await screen.findByText('Cancel');
+    fireEvent.press(cancel);
     expect(router.back).toHaveBeenCalled();
 
     resolveEvents({

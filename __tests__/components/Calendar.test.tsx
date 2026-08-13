@@ -115,6 +115,21 @@ describe('components/Calendar', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/add-event');
   });
 
+  it('opens event detail with the calendar row userEventId', () => {
+    const onMonthChange = jest.fn();
+    const screen = render(<Calendar events={events} onMonthChange={onMonthChange} />);
+
+    fireEvent.press(screen.getByText('April 15 Event'));
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/(app)/event/[id]',
+      params: {
+        id: 'e-1',
+        userEventId: 'ce-1',
+        sharedByPersonId: 'mp-1',
+      },
+    });
+  });
+
   it('renders the theme swatch and persists a switch to the next theme', async () => {
     const onMonthChange = jest.fn();
     const screen = render(
