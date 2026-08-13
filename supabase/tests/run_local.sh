@@ -1,6 +1,7 @@
 #!/bin/bash
 # Run the SQL semantics tests against a scratch local PostgreSQL.
-# Requires: a local postgresql server (apt install postgresql) — no Docker needed.
+# Self-sufficient: installs and starts PostgreSQL if the machine lacks it
+# (same logic as CI's "Set up PostgreSQL" step) — no Docker needed.
 #
 # Sets up a scratch DB with a mocked Supabase auth schema (auth.users table +
 # auth.uid() reading the request.jwt.claim.sub GUC), applies every migration in
@@ -8,6 +9,22 @@
 # forwarding_semantics.sql file with ON_ERROR_STOP so any failed assertion
 # (RAISE EXCEPTION 'FAIL ...') aborts with a nonzero exit code.
 set -euo pipefail
+
+# Fresh cloud-agent VMs have no PostgreSQL at all (the environment install
+# script only runs npm install); a fresh install also leaves the cluster
+# stopped. Mirror .github/workflows/full-suite.yml's setup so the suite runs
+# identically everywhere.
+if ! command -v psql >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "PostgreSQL not found; installing (sudo apt-get install -y postgresql)..."
+    sudo apt-get update && sudo apt-get install -y postgresql
+  else
+    echo "PostgreSQL is not installed. Install it (e.g. brew install postgresql) and re-run." >&2
+    exit 1
+  fi
+fi
+sudo systemctl start postgresql 2>/dev/null || sudo service postgresql start 2>/dev/null || true
+sudo -u postgres psql -c 'SELECT 1' >/dev/null
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT/supabase/migrations"
