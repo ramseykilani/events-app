@@ -2,7 +2,10 @@ import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { abortable, abortablePromise } from '../../helpers/abortable';
-import { clearEventPreviewCache } from '../../../lib/eventPreviewCache';
+import {
+  clearEventPreviewCache,
+  rememberEventPreview,
+} from '../../../lib/eventPreviewCache';
 import EditEventScreen from '../../../app/(app)/edit-event';
 
 const mockRpc = jest.fn();
@@ -138,6 +141,41 @@ describe('app/(app)/edit-event', () => {
     expect(mockUeUpdate).toHaveBeenCalledWith({ event_id: 'e-new' });
     expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-new');
     expect(mockUeDelete).not.toHaveBeenCalled();
+  });
+
+  it('never refetches a seeded form, and saves what the user typed (B-1 regression)', async () => {
+    // The form seeds from the preview cache (written by the detail screen
+    // moments ago). Events are immutable, so the seed is authoritative: no
+    // refresh fetch may fire, and the user is the only writer to the fields.
+    // Before this, an in-flight refresh landing between typing and Save
+    // clobbered the edit, and the save deduped to the old snapshot.
+    rememberEventPreview({
+      event_id: 'e-old',
+      userEventId: 'ue-old',
+      title: 'Old Title',
+      description: null,
+      image_url: null,
+      url: null,
+      event_date: '2026-05-01',
+      event_time: null,
+    });
+
+    const screen = render(<EditEventScreen />);
+    const titleInput = await screen.findByPlaceholderText('Event title');
+    expect(titleInput.props.value).toBe('Old Title');
+    expect(mockEventsSelect).not.toHaveBeenCalled();
+
+    fireEvent.changeText(titleInput, 'Old Title edited');
+    fireEvent.press(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'find_or_create_event',
+        expect.objectContaining({ p_title: 'Old Title edited' })
+      );
+    });
+    expect(mockEventsSelect).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-new');
   });
 
   it('merges shares into the existing copy on a 23505 conflict, then removes the old row', async () => {

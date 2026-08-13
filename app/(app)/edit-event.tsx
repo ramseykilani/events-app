@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -65,6 +65,12 @@ export default function EditEventScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  // A seeded form never refetches: events are immutable, so the preview
+  // (written from the calendar/detail fetch moments ago) already holds
+  // everything the fetch could return — and skipping it means no late
+  // response can overwrite what the user has typed. `seeded` is rebuilt on
+  // every render, so capture it once in a ref.
+  const hadSeedOnMount = useRef(!!seeded);
 
   const applyEvent = (e: Event) => {
     const fields = fieldsFromEvent(e);
@@ -79,6 +85,7 @@ export default function EditEventScreen() {
   };
 
   const load = useCallback(async () => {
+    if (hadSeedOnMount.current) return;
     if (!eventId) {
       setLoadError(true);
       return;
