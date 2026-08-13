@@ -36,6 +36,31 @@ never added: a blocker must be fixed, not accepted.
   react-native-screens/react-native-web transition raster quirk. Cosmetic,
   web-only. Do not chase unless it becomes reproducible.
 
+### KI-002 — An edit can silently drop the typed description/image when the dedup key collides
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-13, while diagnosing the B-1 blocker in
+  `manual-tests/manual_test_report_2026-08-13-release.md`
+- Expected: editing an event's description or image always ends up on the
+  snapshot you own.
+- Actual: `find_or_create_event` dedupes on `(url, title, event_date,
+  event_time)` only — `description` and `image_url` are not part of the key
+  (`supabase/migrations/20240216000008_find_or_create_event.sql`). If an
+  edit's four key fields match an existing snapshot (e.g. two people
+  independently added the same listing, or the edited values happen to match
+  an older snapshot), the caller is attached to that existing row, and a
+  differing typed description/image_url is silently dropped in favor of the
+  existing row's values. This is also the only path where a preview-cache
+  seed can differ from the server row (the seeded detail briefly shows the
+  typed description, then the fetch swaps in the row's).
+- Repro: user A creates "Lunch" (url null, date D, time T, description
+  " theirs"); user B creates "Lunch" (same url/date/time, description
+  "mine") — B dedupes onto A's row and B's calendar shows "theirs".
+- Fix (separate task, not yet scheduled): include description/image_url in
+  the dedup key, or have the RPC return the full row so the client seeds and
+  navigates from the actual database row rather than the form values.
+
 ## Known limitations (by design — do not flag)
 
 - **The native date/time picker never opens on web.**
