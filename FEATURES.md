@@ -20,7 +20,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Delete Account](#delete-account) | Implemented | |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
-| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Not a tester blocker. |
+| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 
 ## Using and testing
@@ -565,7 +565,28 @@ If we do want a time fix to reach the people you told, do **not** build this hos
 
 ## Per-User Events (Copy + Follow)
 
-**Status:** Planned (2026-08-13) — **incomplete, do not implement.** Testers should get the current forwarding/fork build. This is a later storage-and-edit rewrite. What follows is a direction from a design conversation, not a complete spec. A dedicated design pass has to finish it before anyone writes a migration. Listing it is not a commitment to the exact shape below.
+**Status:** Planned (2026-08-13) — **incomplete, do not implement.** Testers should get the current forwarding/fork build. This is a later storage-and-edit rewrite. What follows is a direction from a design conversation, not a complete spec. A dedicated design pass has to finish it before anyone writes a migration. Listing it is not a commitment to the exact shape below. **And the design pass itself is gated: confirm the why with the owner first (next section).**
+
+### Confirm the WHY with the owner first (gate, 2026-08-13)
+
+The question "does this rewrite actually make sense?" is deliberately left **unanswered** — the owner wants to be asked before anyone builds this. Before any design pass, spec, or migration, the agent picking this up must put that question to the owner and walk the trade-off:
+
+- **For:** deletes the B-1 bug class (multi-call client-side saves), [KI-002](manual-tests/known_issues.md), the disappearing "From X" attribution, and the re-share double-copy. Storage finally matches the product story ("your calendar is yours; a share is a send"). Edit becomes a one-row UPDATE of your own row.
+- **Against:** the largest change in the project — schema replacement, backfill from a lossy fork graph, cutover, test rewrites. And it ships a product change (edits propagate to followers) inside what looks like a storage refactor. The interim B-1 fixes (below) may also make day-to-day pain low enough that the rewrite can wait — or be descoped entirely.
+
+Work starts only after the owner confirms why we are doing this. An agent that skips that conversation is doing it wrong, however good the write-up below looks.
+
+### Why this is on the roadmap — the B-1 postmortem (2026-08-13)
+
+This entry stopped being theoretical on 2026-08-13, when the release review ([manual-tests/manual_test_report_2026-08-13-release.md](manual-tests/manual_test_report_2026-08-13-release.md)) returned DON'T SHIP on B-1: edit Save was aborted client-side at the 2s *read* budget, the user got an `AbortError` stack dump, and the old title persisted even though the server may have committed.
+
+The five-call save (`find_or_create_event` → re-point `user_events` → on unique conflict, merge shares → delete the old row) exists only because events are global immutable blobs and calendars are pointers. It dates to the initial commit (2026-02-16 — the `2024…` migration timestamps are a scaffolding year-typo, not inherited legacy) and was **not a mistake when written**: under the original share-by-reference model, many calendars pointed at ONE row, and immutability was the only thing stopping a sharer's edit from rewriting strangers' calendars. The forwarding rewrite (2026-08-07) gave every recipient their own copy and removed that justification — but nobody revisited the foundation. Share got a server-side transaction RPC (`share_event`) on 2026-08-07; edit never did. That asymmetry is B-1's real parent, and it is why the durable fix belongs at the data-model level, not in another timeout tweak.
+
+### Interim B-1 fix (ships first, on the current model)
+
+Decided 2026-08-13: B-1 is a release blocker and cannot wait for this rewrite, so the current model gets the cheap, model-independent fixes: split `lib/timeoutSignal.ts` into `withFetchTimeout` / `withWriteTimeout` (no defaults, so the wrong budget cannot be typed), friendly write failures (`showAlert` + reconcile-read, never a stack dump), reads that fail fast without blanking the screen, a latency e2e spec (a delayed `find_or_create_event` must still save), and conventions rules so the patterns cannot regress. Every one of those layers survives this rewrite unchanged — none of it is throwaway.
+
+**Considered and rejected:** an interim `edit_event` SECURITY DEFINER RPC wrapping the five-call fork sequence in one server transaction. It would be throwaway work the day this rewrite lands. Do not build it while this feature is live on the roadmap; if this feature is descoped, build that RPC instead — the B-1 class is not acceptable as a permanent resident.
 
 ### What this is not
 
@@ -617,6 +638,18 @@ That cascade is the rule applied twice, not a hosted object. Sarah never “mess
 
 **Dedup:** per-user “already have this listing” is enough. Drop the global unique index on `(url, title, date, time)`. Two people adding “Lunch” at the same slot are two heads-ups, not one shared blob (KI-002 goes away).
 
+### Follow propagation is ONE server call, not a client loop
+
+Design answer to "how does the follow cascade avoid N database calls" (2026-08-13): the client makes a single call — a SECURITY DEFINER RPC (e.g. `save_event`). Inside **one transaction** the function:
+
+1. UPDATEs the caller's own row with the new field values and marks it `frozen` (an edit ends following);
+2. propagates with a set-based recursive UPDATE (`WITH RECURSIVE` over `from_event_id`, restricted to non-`frozen` rows, carrying a visited-id set — which also answers the cycles open question by construction: a row is never updated twice, so A↔B loops terminate);
+3. commits — the whole follow tree updates or nothing does. There is no partial-propagation state.
+
+It must be SECURITY DEFINER because the cascade writes *other people's* rows — impossible under RLS from the client. The function verifies `auth.uid()` owns the source row, then runs the tree update with definer rights. Notifications deliberately do **not** cascade: after commit, only the caller's direct `sends` are pinged, and only for date/time changes; further followers are pull-only. Data walks the tree; pings go one hop.
+
+The client write is a set-to-value update of one row, so it is naturally idempotent — silent retry + reconcile-read on timeout are safe with no idempotency key. That is what removes the B-1 failure mode by construction rather than by budget tuning.
+
 ### User-visible vs not
 
 Calendar, share sheet, hide, remove, SMS, display names stay. No new onboarding.
@@ -650,6 +683,7 @@ A later design pass, then a later implementation, has to cover:
 
 Remaining design work. An agent that starts coding from this list is doing it wrong.
 
+- **Does this rewrite still make sense?** (Owner question, deliberately open since 2026-08-13 — see "Confirm the WHY with the owner first" above. Nothing below is touched until the owner answers it.)
 - Exact new schema and RLS.
 - Exact backfill SQL: how to pick `from_event_id` when several people shared the same snapshot; what to do when the sender’s pointer already moved (fork).
 - Whether `frozen` is a flag, or “I saved,” or “any local field change.”
