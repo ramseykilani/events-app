@@ -20,6 +20,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Delete Account](#delete-account) | Implemented | |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
+| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 
 ## Using and testing
@@ -557,3 +558,105 @@ Today, sharing is forwarding (see [Forwarding Shares](#forwarding-shares)): ever
 ### Decision
 
 Undecided — maybe never. Revisit only if real users turn out to be confused by edits not reaching the people they shared with.
+
+If we do want a time fix to reach the people you told, do **not** build this hosted-event version (one shared mutable row, creator owns it, everyone is a subscriber). The direction is [Per-User Events (Copy + Follow)](#per-user-events-copy--follow): everyone already has their own row; copies follow the sender until someone edits locally. That keeps remove personal and answers “whose version wins” (the person who hit Save). This Considering entry stays as the thing we are *not* building unless we change our minds about hosting.
+
+---
+
+## Per-User Events (Copy + Follow)
+
+**Status:** Planned (2026-08-13) — **incomplete, do not implement.** Testers should get the current forwarding/fork build. This is a later storage-and-edit rewrite. What follows is a direction from a design conversation, not a complete spec. A dedicated design pass has to finish it before anyone writes a migration. Listing it is not a commitment to the exact shape below.
+
+### What this is not
+
+- A tester blocker. The core loop is shipped. Invite testers on the current model.
+- A new Share button. Re-share is the Share control that already sits on an event you received.
+- Partiful-style hosted events. That idea lives under [Creator-Linked Events](#creator-linked-events-edits-propagate) and is Considering / maybe never.
+- A license to start coding or run a migration from this write-up.
+
+### Problem
+
+The product is a heads-up: you tell people about a listing (or a park hang), they keep it on their calendar, taking it off yours never takes it off theirs. That is already how we talk about [Forwarding Shares](#forwarding-shares).
+
+The storage does not match. Events are three tables doing git for a calendar:
+
+| Table | What it actually is |
+|-------|---------------------|
+| `events` | A global, frozen blob. Same title+date+time+url = one row for the whole world. Never updated. |
+| `user_events` | Your pointer at that blob. Your calendar is a list of pointers. |
+| `event_shares` | A log of who you told — except the calendar also uses it to reconstruct “From X” and hide, because the copy never recorded who sent it. |
+
+Those three fight, so we piled on compensations: fork-on-edit (new blob, move *your* pointer, everyone else stays on the old one), a client-side merge when pointers collide, orphan-snapshot GC (`cleanup-events`), `find_or_create_event`, and `SECURITY DEFINER` RPCs that rebuild “your calendar” by joining other people’s rows. Symptoms already in the wild: [KI-002](manual-tests/known_issues.md) (dedup drops description/image), “From X” can vanish after the sender edits, re-sharing after an edit can plant a second copy.
+
+We do not want event history. The blob+pointer split is not buying us a feature; it is there because the blob is global.
+
+### Why change (later)
+
+Same screens. Storage matches the story we already tell: your calendar is yours; a share is a send; if you got the time wrong, the people you told — and people still following them — see the right time. Simpler backend, a few behavior fixes, one small product change (follow until local edit). Testers on today’s build will barely notice the difference after a future ship.
+
+### Proposed direction (draft)
+
+Keep `users`, `my_people`, circles, `hidden_people`. Replace the three event tables with two:
+
+- **`events`**: a row on **your** calendar. The listing fields, plus `from_event_id` (the sender’s row this was copied from; `NULL` if you created it), `from_person_id` (so the UI can say “From Bob”), and `frozen` (you edited this yourself; stop following `from_event_id`).
+- **`sends`**: who you told. Share-sheet ✓ Shared, the “Shared with” list, and the pending queue for people with no account yet.
+
+Incoming and outgoing are opposite arrows. `from_event_id` is where it came from. `sends` is who you sent it to. Putting both on the event row is what makes this feel like mush.
+
+**Create:** insert your row; `from_event_id` empty.
+
+**Share (including today’s re-share):** copy **your** current row onto their calendar with `from_event_id = your row`, and write a send-log line. Sarah sends to Bob; Bob has his own row, From Sarah. Bob taps Share, picks Carol; Carol gets a copy of **Bob’s** row, From Bob. If they don’t have an account, only the send-log line exists until they sign up — then we copy from your row as it is *now*.
+
+**Follow until local edit:** Save updates your row and sets `frozen`. Then update every row that still points at you and isn’t frozen. Those updates walk the same way to *their* followers. Sarah hits Save → Bob still following Sarah → Bob’s row updates → Carol still following Bob → Carol’s row updates. Bob hits Save → he stops following Sarah, and Carol (still following him) gets *his* version. Carol hits Save → she stops following Bob.
+
+That cascade is the rule applied twice, not a hosted object. Sarah never “messages” Carol. Carol is still looking at the concert Bob sent her. The time field changing is the listing getting corrected.
+
+**Remove / delete account:** delete your row. Followers already have the fields on their own rows, so they keep the event; `from_event_id` goes dangling and they no longer receive updates. Same personal-remove rule as today. This is why share must **copy** at send time, not grant access to your row — access is the old pointer model forwarding was written to kill.
+
+**Notifications:** data can cascade; pings should not. Date/time change: notify the people **you** told. Further followers see it the next time they open the app. Title-only fixes stay silent.
+
+**Dedup:** per-user “already have this listing” is enough. Drop the global unique index on `(url, title, date, time)`. Two people adding “Lunch” at the same slot are two heads-ups, not one shared blob (KI-002 goes away).
+
+### User-visible vs not
+
+Calendar, share sheet, hide, remove, SMS, display names stay. No new onboarding.
+
+| Situation | Today | After a future ship of this |
+|-----------|--------|------------------------------|
+| You fix the time after sending | They keep 7pm (you forked) | People still following you get 8pm; that walks the follow tree |
+| Date/time change | No extra ping | Ping people you told; further followers are pull-only |
+| You edit, then they open the event | “From you” can vanish | Attribution stays |
+| Re-share after you edited | Can plant a second copy | Same event; ✓ Shared for people you already sent it to |
+| Two people add “Lunch” at the same slot | One can steal the other’s description | Two independent rows |
+
+### Making it work — the cutover is part of the feature
+
+This is not “build the new tables and start fresh.” Existing calendars (staging, tester data, later production) must survive. The feature is the target shape **plus** backfill **plus** cutover **plus** verification. None of that is designed yet; it still has to be in scope so nobody ships an empty new schema.
+
+A later design pass, then a later implementation, has to cover:
+
+- **Backfill.** Every `user_events` + snapshot join becomes a real per-user `events` row (copy title, url, date, time, description, image onto that owner). No empty new table.
+- **Sends + follow pointers.** Each `event_shares` row becomes a `sends` line on the *sender’s* new row, and (when the recipient already has a copy) `from_event_id` / `from_person_id` on the recipient’s row. Pending contacts (no account) stay send-log-only until signup.
+- **Forks already in the wild.** If the sender already forked, recipients still pointing at the old blob are *not* following the sender’s current row. The migration must decide frozen vs dangling `from_event_id` vs “best-effort relink.” Today’s graph is already lossy after edits; the backfill will be too. That’s a design problem, not a surprise at ship time.
+- **Cutover.** One migration when this ships: rewrite `share_event`, `get_calendar_events`, pending delivery, RLS; delete `find_or_create_event`, the global unique index, the client-side edit merge, and orphan-snapshot GC. Client and backend move together. No long dual-write. Architecture docs / agent context update in the same change — they stay the source of truth for **shipped** behavior until then.
+- **Verify.** Rewrite [`supabase/tests/forwarding_semantics.sql`](supabase/tests/forwarding_semantics.sql) and the Jest/e2e paths that assume snapshot ids / `userEventId`. Manual pass: existing shared events still on both calendars, ✓ Shared intact, hide/remove/delete-account still personal. Old events keep their details; they do not get a silent rewrite of history beyond stamping follow/send as best we can.
+
+### Acceptance Criteria
+
+- [ ] Do not implement from this section. A dedicated design pass must close the open questions and produce a real spec (schema, backfill SQL, cutover order, tests) before any migration is written.
+- [ ] When that spec exists, the implementation includes data migration as above — not a follow-up someone will remember later.
+
+### Open Questions
+
+Remaining design work. An agent that starts coding from this list is doing it wrong.
+
+- Exact new schema and RLS.
+- Exact backfill SQL: how to pick `from_event_id` when several people shared the same snapshot; what to do when the sender’s pointer already moved (fork).
+- Whether `frozen` is a flag, or “I saved,” or “any local field change.”
+- Cycles (A and B share the same listing to each other).
+- Two people send you the same concert — one row or two; who you follow.
+- Hide + a correction walking in through someone else.
+- Pending SMS users and edits before they sign up.
+- Notification copy, and whether date/time pings are in scope at all for v1 of this.
+- Rollback / expand-contract if the migration is wrong on live tester data.
+- What, if anything, remains of [Creator-Linked Events](#creator-linked-events-edits-propagate) after this.
