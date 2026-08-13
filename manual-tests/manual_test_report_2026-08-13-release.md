@@ -1,134 +1,190 @@
 VERDICT: DON'T SHIP
 
-# Release Review: staging @ 2265ab1
+# Release Review: staging @ fc6393a
 
-- Reviewed staging commit: 2265ab1e9f5b83ab38208c2eec8865dc65a0c64a
+- Reviewed staging commit: `fc6393a51f877a4fc482f33337a10a5b420507c3`
 - Date: 2026-08-13
-- Runner: Cursor cloud agent (orchestrator). Halted at Phase 0 — no click-through tracks launched.
+- Runner: Cursor cloud agent (orchestrator). Halted at Phase 2 Track 2.
 - Target: https://staging.shared-events.pages.dev
 
 The verdict certifies ONLY the reviewed commit. If `staging` moved past it
 (anything other than this report commit and docs/tests-only changes), this
 review is void — re-run the protocol from Phase 0.
 
-This report supersedes the earlier same-day DON'T SHIP for `f4335ac`
-(commit `8227208`, event-detail infinite spinner). Two fix commits landed
-after that (`8877adf`, then `2265ab1`). Phase 0 against the new tip is red.
+This report supersedes the earlier same-day DON'T SHIP reports for
+`2265ab1` (commit `65b5c2a`, Phase 0 red e2e / edit fork stale title on
+Mobile Safari) and `f4335ac` (commit `8227208`, event-detail infinite
+spinner). Those tips were reverted/fixed forward; this run is against the
+current green staging tip `fc6393a` ("Log KI-002: dedup key excludes
+description/image_url").
 
 ## Executive summary
 
-Phase 0 failed: the Staging pipeline for `2265ab1` is **red**. `full-suite /
-checks` (tsc, conventions, Jest, SQL) passed; `full-suite / e2e` failed.
-Deploy staging preview was skipped. Per the orchestrator, a red pipeline
-stops the review — Phase 1–3 were not started, production was not promoted,
-and no APK was built.
+Phase 0 green (full suite including e2e + staging preview deploy). Phase 1
+smoke sweep PASS (create / share / remove / independent copies). Track 1
+(auth & first-run, fresh OTP `+15555550999`) PASS. Track 2 (event
+lifecycle) **FAIL** on item 4: **Edit Save aborts after 2s, shows a stack
+trace to the user, and does not persist the new title.** Remaining tracks
+were not started. Production was not promoted. No APK was built.
 
-The e2e failure is a **core edit-fork regression** introduced by `2265ab1`
-("Paint event detail immediately and abort hung fetches"). After editing an
-event title and tapping Save, Mobile Safari still shows the **pre-edit**
-title on the detail screen. The same spec passed on desktop Chrome and
-Mobile Chrome in the same run, and the previous staging tip (`8877adf`) had
-a green full suite including this spec.
+This is a different symptom than B-1 on `2265ab1` (WebKit showed the old
+title after a save that appeared to succeed, with no error dialog). Here
+the write is aborted client-side and `showError` dumps `AbortError: Timed
+out` plus a stack. Do not treat a "paint the preview" fix as the solution.
 
 ## Checklist evidence
 
 ### Phase 0 — Gates
 
-- [x] Staging tip recorded: `2265ab1e9f5b83ab38208c2eec8865dc65a0c64a`
-- [ ] Staging pipeline green including `full-suite / e2e` — **FAIL**. Run
-      [31662043947](https://github.com/ramseykilani/events-app/actions/runs/31662043947)
-      (`Paint event detail immediately and abort hung fetches`), conclusion
-      **failure**. Jobs: `full-suite / checks` success; `full-suite / e2e`
-      failure; `Deploy staging preview` skipped. Pixel-diff baselines are
-      inside that e2e job, so they did not certify this tip.
+- [x] Staging tip recorded: `fc6393a51f877a4fc482f33337a10a5b420507c3`
+- [x] Staging pipeline green including `full-suite / e2e`. Run
+      [31675306382](https://github.com/ramseykilani/events-app/actions/runs/31675306382)
+      (`Log KI-002: dedup key excludes description/image_url`), conclusion
+      **success**. Jobs: `full-suite / checks` success; `full-suite / e2e`
+      success (Playwright desktop Chrome + Mobile Safari + Mobile Chrome,
+      including pixel-diff baselines); `Deploy staging preview` success.
 - [x] Short-circuit not applicable: last SHIP report
-      (`manual_test_report_2026-08-09-release.md`) is an ancestor, but the
-      delta includes `app/`, `components/`, `lib/`, and `supabase/`. The
-      earlier 2026-08-13 report was `VERDICT: DON'T SHIP` for `f4335ac`, not
-      a SHIP ancestor of this tip.
+      (`manual_test_report_2026-08-09-release.md`, reviewed `483a419`) is
+      an ancestor, but the delta includes `app/`, `components/`, `lib/`,
+      and `supabase/`. Same-day reports were DON'T SHIP, not SHIP.
 
 ### Phase 1 — Smoke sweep
 
-Not run (halted at Phase 0).
+Target: https://staging.shared-events.pages.dev, desktop ~1280px, Paper.
+Accounts A `+15555550100` / B `+15555550103`. Event
+`Ship smoke 2026-08-13 7842` created, shared, removed on both sides
+(cleanup complete).
+
+- [x] App loads at the staging URL; sign-in with test OTP works
+- [x] Calendar renders; today's day list shows expected state (A had
+      existing events)
+- [x] Create an event (title only, today) → appears on calendar
+- [x] Share it to account B → B sees it ("From E2E Account A")
+- [x] Remove the event on A → gone on A, still on B; remove on B (cleanup)
+- [x] No browser permission prompts, no visible errors, no app console errors
+      (framework warnings only: expo-notifications-on-web, font CDN)
+
+### Phase 2 Track 1 — Auth & first-run
+
+Phone viewport 390×844. Throwaway test OTP `+15555550999` / `123456`
+(added via Management API for this track, **removed after** — project
+`sms_test_otp` restored to A+B only).
+
+- [x] Sign-in: invalid phone → friendly alert ("Invalid phone number");
+      valid phone → OTP screen
+- [x] OTP: wrong code `000000` → friendly alert ("That code is incorrect
+      or no longer valid…"); no debug dump. Resend showed ~60s countdown.
+      Correct `123456` → in; walkthrough auto-showed
+- [x] Brand-new account: walkthrough auto-showed once; Next advanced
+      pages 1→2→3; Get Started landed on calendar
+- [x] Reopen walkthrough via Help (`?`); Skip returned to calendar
+- [x] Sign back in later: walkthrough did NOT auto-show
+- [x] Offline/edge: DevTools Offline + reload showed Chrome's
+      ERR_INTERNET_DISCONNECTED / retry UI, not a blank screen or
+      spinner-forever; returning online recovered the calendar
+- [x] Expired/old OTP → N/A: test-OTP pair always accepts `123456`;
+      cannot force true expiry without waiting `sms_otp_exp` (240s).
+      Wrong-code friendly alert already evidenced on item 2.
+
+### Phase 2 Track 2 — Event lifecycle (halted at item 4)
+
+Phone viewport 390×844, Paper, account A. Prefix `ShipT2`.
+
+- [x] Add event: empty title+URL → Save disabled; title-only
+      `ShipT2 title-only 8347` worked; URL `https://example.com` autofilled
+      title "Example Domain" without blocking save
+- [x] Date/time inputs: HTML date/time; `ShipT2 dated 5192` set to
+      2026-08-20 15:30 landed on Aug 20 (not 19/21); detail showed
+      "Thu, Aug 20 · 3:30 PM"
+- [x] Event detail: formatted date, Share / Edit / Remove present, Open
+      link opened example.com, Share opened the sheet
+- [ ] Edit: change title → detail shows new title — **FAIL / BLOCKER**
+      (see B-1). Stopped here.
+- [ ] Remove: confirm dialog → event gone; cancellation leaves it
+- [ ] Content stress: 200-char title, 2000-char description, URL-only
+- [ ] Many events on one day (create 8+)
+- [ ] Calendar: month navigation, event dots, pull-to-refresh
 
 ## Blockers
 
-### B-1 — Edit Save on Mobile Safari returns to the old title (fork not shown)
+### B-1 — Edit Save times out, dumps a stack trace, and does not keep the new title
 
-- Expected: Editing an event title and tapping Save forks a new snapshot and
-  the detail screen shows the **new** title (Share / Edit / Remove still
-  present). Covered by `e2e/event-detail.spec.ts` ("event detail: share
-  sheet, edit fork, formatted date, remove") on all three Playwright
-  projects, including `mobile-safari`.
-- Actual: On `[mobile-safari]`, after `titleInput.fill(editedTitle)` and
-  Save, `visibleText(page, editedTitle)` is not found within 15s. The
-  screenshot and accessibility tree show the **original** title (no
-  ` edited` suffix), formatted date `Thu, Aug 13`, and Share / Edit / Remove
-  Event — not a spinner, not the "Could not load this event" Retry UI, not
-  the edit form. Failed on the first attempt and on retry #1 (same shape).
-  Same CI run: 57 passed / 1 failed; desktop Chrome and Mobile Chrome passed
-  this spec. Parent tip `8877adf` ("Fix event detail hanging on an infinite
-  spinner") had a green Staging run including this spec
-  ([31657475297](https://github.com/ramseykilani/events-app/actions/runs/31657475297)).
+- Expected: Editing an event title and tapping Save forks a new snapshot
+  (`find_or_create_event` + `user_events.event_id` update). The detail
+  screen shows the **new** title within a few seconds. Failures, if any,
+  are a short friendly message — never a stack trace.
+- Actual: Save on the edit form raises a `window.alert` titled **Error**
+  with body **Timed out** plus **Stack: AbortError: Timed out at
+  AbortSignal…** (the `showError` dump). The form still shows the typed
+  new title. After dismissing and returning to detail, the **old** title
+  is still shown, with a "Could not refresh. Retry." banner. Chrome
+  Network (DevTools open) marked `find_or_create_event` (and related
+  `user_events` / `get_calendar_events` calls) red — the client aborted
+  the write. Reproduced twice in the same session. Create in the same
+  session (items 1–3) had succeeded.
 - Repro:
-  1. Build and run Playwright against the `2265ab1` web bundle (CI already
-     did this): `npm run build:web && npx playwright test e2e/event-detail.spec.ts --project=mobile-safari`.
-  2. The spec signs in via the e2e fixture (account A `+15555550100`),
-     creates `E2E detail mobile-safari <timestamp>`, opens detail, taps
-     Edit, appends ` edited` to the title, taps Save.
-  3. Observe: detail still shows the pre-edit title. CI titles:
-     `E2E detail mobile-safari 1786589696151` (attempt 1) and
-     `E2E detail mobile-safari 1786589714666` (retry 1). Expected visible
-     text was those strings plus ` edited`.
-  4. Viewport: Mobile Safari (Playwright WebKit). Theme: default Paper.
+  1. Open https://staging.shared-events.pages.dev at phone viewport
+     ~390×844, Paper theme.
+  2. Sign in as account A: `+15555550100` / OTP `123456`.
+  3. Add event, title `ShipT2 title-only 8347` (or any unique title),
+     Save, Cancel the share sheet, open the event from today's list.
+  4. Tap Edit. Append ` edited` to the title. Tap Save.
+  5. Observe: browser alert "Error / Timed out / Stack: AbortError…".
+     Dismiss. Detail still has the pre-edit title (and may show
+     "Could not refresh. Retry.").
+  6. Account: A. Viewport: 390×844 (Chrome device emulation). Theme: Paper.
 - Evidence:
-  - CI run: https://github.com/ramseykilani/events-app/actions/runs/31662043947
-  - Playwright report artifact: https://github.com/ramseykilani/events-app/actions/runs/31662043947/artifacts/9166660274
-  - `manual-tests/evidence/2026-08-13-release-2265ab1/b1-edit-save-shows-old-title-attempt1.png`
-  - `manual-tests/evidence/2026-08-13-release-2265ab1/b1-edit-save-shows-old-title-retry1.png`
-  - Accessibility snapshot from CI (both attempts): `button "Back"`; text
-    `E2E detail mobile-safari <ts> Thu, Aug 13`; `button "Share"`;
-    `button "Edit"`; `button "Remove Event"`. No `edited` substring.
-- Reviewed commit: `2265ab1e9f5b83ab38208c2eec8865dc65a0c64a`
+  - `manual-tests/evidence/2026-08-13-release-fc6393a/b1-edit-save-timeout-dialog.webp`
+    — edit URL still
+    `/edit-event?eventId=1938fcec-a62c-46c6-a8ef-e8f5ec8a66c3&userEventId=f808168e-0115-4c5d-a876-00cc9dd51c20`;
+    title field `ShipT2 title-only 8347 edited`; alert Error / Timed out
+    / stack; Network: `find_or_create_event` red.
+  - `manual-tests/evidence/2026-08-13-release-fc6393a/b1-detail-old-title-after-failed-edit.webp`
+    — `/event/1938fcec-…` (same old id); title **ShipT2 title-only 8347**
+    (no ` edited`); "Could not refresh. Retry."; Share / Edit / Remove
+    still present.
+- Reviewed commit: `fc6393a51f877a4fc482f33337a10a5b420507c3`
 - Likely code (for the fixer — do not treat as the only cause):
-  `2265ab1` seeds event detail from `lib/eventPreviewCache.ts` and aborts
-  fetches after `FETCH_TIMEOUT_MS` (2s) with retries
-  (`lib/timeoutSignal.ts`). Edit save in `app/(app)/edit-event.tsx` writes a
-  preview for `newEventId` then `router.replace(\`/(app)/event/${newEventId}\`)`.
-  `app/(app)/event/[id].tsx` initializes `event` / `userEventId` /
-  `hasContentRef` from the preview **once** (`useState(seeded)`). Expo
-  Router on web often **reuses** the `[id]` screen when replacing Edit with
-  another `/event/:id`, so React state can keep the **old** snapshot. If
-  `load()` for the new id is aborted, times out, or does not re-run,
-  `hasContentRef.current` stays true and the catch path keeps the stale
-  event with Share/Edit/Remove — matching the screenshot (old title, actions
-  present, no error UI). WebKit is slower than Chromium, which would explain
-  why only `mobile-safari` failed. Also confirm Save actually persisted the
-  fork (if `find_or_create_event` returned the old id because the edited
-  title never made it into the form state, replace would reopen the old
-  snapshot). The previous spinner hang (B-1 on `f4335ac`) is a different
-  symptom; do not ship a "paint immediately" fix that trades an infinite
-  spinner for a silent stale snapshot.
-- Cleanup: e2e creates unique titles and tries to remove them; leftover
-  `E2E detail mobile-safari *` rows on account A are possible if Save forked
-  but the spec died before Remove. Safe to delete the caller's `user_events`
-  for those titles; do not delete `events` rows.
+  `app/(app)/edit-event.tsx` `handleSave` wraps **both**
+  `find_or_create_event` and the follow-up `user_events` update in a
+  single `withTimeout` (`lib/timeoutSignal.ts`, `FETCH_TIMEOUT_MS = 2000`)
+  and passes that `AbortSignal` into supabase-js. When the 2s budget
+  fires, the RPC is aborted, `catch` calls `showError('Error', err)`, and
+  `showError` (`lib/showError.ts`) always appends `err.stack` — that is
+  the dialog in the screenshot. `add-event.tsx` uses the same 2s wrapper
+  around create; create worked in this session, so the budget is
+  **borderline**, not universally dead. Event detail `load()` also uses
+  `withTimeout` / `withRetries`, which matches the "Could not refresh"
+  banner after the failed save.
+  Do **not** retry aborted writes blindly: the server may have committed
+  `find_or_create_event` after the client aborted, and a retry could
+  attach the user to a different snapshot or drop description/image
+  (KI-002). Write paths should not share the 2s "people hit refresh"
+  fetch budget; user-facing failures on Save must go through a short
+  alert, not `showError`'s stack dump. This is also **not** the
+  `2265ab1` stale-state reuse bug (no error, old title painted from a
+  reused `[id]` screen) — that commit is not on this tip.
+- Cleanup: Track 2 halted before removing its events. On account A
+  (`+15555550100`), leftover rows to ignore or delete via the app's
+  Remove Event (caller's `user_events` only — never delete `events`
+  rows): `ShipT2 title-only 8347`, the "Example Domain" event from
+  `https://example.com`, `ShipT2 dated 5192` on 2026-08-20. Harmless if
+  left; titles are unique enough that the next review will not collide.
 
 ## Known minor issues
 
-None confirmed this run (halted at Phase 0). KI-001 was not re-checked.
+None confirmed this run (halted at Track 2). KI-001 and KI-002 were not
+re-checked.
 
 ## Ledger updates
 
-- Added to `manual-tests/known_issues.md`: none
+- Added to `manual-tests/known_issues.md`: none (blockers never enter the ledger)
 - Verified fixed and removed: none
-- Still present (kept): KI-001 (not re-checked this run)
+- Still present (kept): KI-001, KI-002 (not re-checked this run)
 
 ## Tracks not run
 
-- Phase 1: Smoke sweep
-- Track 1: Auth & first-run
-- Track 2: Event lifecycle
+- Track 2 items 5–8 (remove, content stress, 8+ events, calendar nav)
 - Track 3: Sharing, people, circles
 - Track 4: Visual sweep matrix
 - Track 5: Edge & platform checks
@@ -136,10 +192,13 @@ None confirmed this run (halted at Phase 0). KI-001 was not re-checked.
 
 ## Notes for the next ship-it
 
-Fix B-1 on staging through the normal flow (fast checks **and** a green
-`full-suite / e2e`, including `mobile-safari` `e2e/event-detail.spec.ts`).
-Do not promote. The next "ship it" re-runs this protocol from Phase 0
-against the new tip. Staging preview was **not** redeployed for `2265ab1`
-(deploy job skipped on the red e2e); https://staging.shared-events.pages.dev
-is still the last green bundle (`8877adf` or earlier), so a click-through
-against that URL would not be testing this tip.
+Fix B-1 on staging through the normal flow (fast checks first, then a
+green `full-suite / e2e`). Do not promote. The next "ship it" re-runs
+this protocol from Phase 0 against the new tip. Early phases are cheap;
+re-running is expected.
+
+The throwaway Track 1 OTP `+15555550999` was removed from
+`sms_test_otp` after the track. That auth user may still exist
+(harmless). Re-add a **fresh unused** 555 number if Track 1 needs a
+zero-event account again — do not reuse `50102` or `50999` if those
+users already have the onboarding flag / events.
