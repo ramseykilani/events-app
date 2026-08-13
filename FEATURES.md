@@ -4,7 +4,7 @@ A running list of planned and in-progress features. Each section contains a full
 
 ## Status
 
-The core loop is shipped. Nothing in Planned is required to use the app or to test that loop.
+The core loop is shipped. Nothing in Planned is required to use the app or to test that loop. Listing an idea here is not a commitment to build it: Planned means "intended, when someone picks it up," and Considering means "recorded so the idea isn't lost — we may never do it."
 
 | Feature | Status | What it is |
 |---------|--------|------------|
@@ -20,6 +20,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Delete Account](#delete-account) | Implemented | |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
+| [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 
 ## Using and testing
 
@@ -530,3 +531,29 @@ A web-first beta is attractive: nobody has to install anything, and notification
   - *Shareable event invite links*: duplicates the group-chat behavior the app replaces with extra steps; not a contacts bootstrap worth building
   - *Bulk paste of contact lists*: target users don't maintain such lists
 - [Sign Out](#sign-out) — implemented separately
+
+---
+
+## Creator-Linked Events (Edits Propagate)
+
+**Status:** Considering (2026-08-13) — we don't know if we want this. The current forwarding model is intentional and accepted; this entry exists only so the idea isn't lost. It is not roadmap and not a commitment.
+
+### What this would be
+
+Today, sharing is forwarding (see [Forwarding Shares](#forwarding-shares)): every recipient gets their own independent copy, and nobody's edit ever reaches anyone else's calendar. The idea: an event stays tied to its creator, so when the creator edits the time, title, or any other detail, the update propagates to everyone who received a copy.
+
+### Why it might be wanted
+
+- Fixing a detail after sharing leaves every recipient with the stale version. Today the only repair paths are re-sharing (which delivers a second, divergent copy) or telling people out of band.
+- It matches the hosted-event mental model (Partiful, Facebook events) some users will bring: "it's Sarah's event, and Sarah updated it."
+
+### Why it's questionable
+
+- It cuts against the model's load-bearing properties: "a share is a completed action" and "your data is your data — nobody else can change it." Forwarding is precisely what makes edit-cascades impossible (one person's edit can never rewrite a hundred calendars) and removal purely personal.
+- It introduces the first cross-user write path: someone else's edit would re-point or rewrite your `user_events` row. Today that is impossible by construction (RLS + immutable snapshots + fork-on-edit).
+- The conflict question has no good answer: a recipient can edit their own copy — when the creator's edit then propagates, whose version wins? Overwriting the recipient's edit violates "your calendar is yours"; skipping their copy makes propagation patchy and unpredictable.
+- Notification questions: a creator edit is person-triggered, so notifying recipients would fit the notification rule — but every edit becoming a message to every recipient is a volume problem the forwarding model never has.
+
+### Decision
+
+Undecided — maybe never. Revisit only if real users turn out to be confused by edits not reaching the people they shared with.
