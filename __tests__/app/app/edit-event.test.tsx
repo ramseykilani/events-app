@@ -1,11 +1,12 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { abortable, abortablePromise } from '../../helpers/abortable';
 import {
   clearEventPreviewCache,
   rememberEventPreview,
 } from '../../../lib/eventPreviewCache';
+import { FETCH_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '../../../lib/timeoutSignal';
 import EditEventScreen from '../../../app/(app)/edit-event';
 
 const mockRpc = jest.fn();
@@ -47,6 +48,11 @@ jest.mock('../../../lib/supabase', () => ({
 
 jest.mock('../../../lib/showError', () => ({
   showError: jest.fn(),
+}));
+
+jest.mock('../../../lib/dialogs', () => ({
+  showAlert: jest.fn(),
+  showConfirm: jest.fn(),
 }));
 
 jest.mock('@react-native-community/datetimepicker', () => {
@@ -215,6 +221,7 @@ describe('app/(app)/edit-event', () => {
   });
 
   it('surfaces an error instead of navigating when the merge fails', async () => {
+    const { showAlert } = require('../../../lib/dialogs');
     const { showError } = require('../../../lib/showError');
     mockUeUpdateEqUser.mockImplementation(() =>
       abortablePromise(
@@ -233,12 +240,87 @@ describe('app/(app)/edit-event', () => {
     fireEvent.press(save);
 
     await waitFor(() => {
-      expect(showError).toHaveBeenCalledWith(
-        'Error',
-        expect.objectContaining({ message: 'delete failed' })
+      expect(showAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'Something went wrong. Try again.'
       );
     });
+    expect(showError).not.toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('completes a save that takes longer than the 2s load-fetch budget (B-1)', async () => {
+    const { showAlert } = require('../../../lib/dialogs');
+    const { showError } = require('../../../lib/showError');
+    rememberEventPreview({
+      event_id: 'e-old',
+      userEventId: 'ue-old',
+      title: 'Old Title',
+      description: null,
+      image_url: null,
+      url: null,
+      event_date: '2026-05-01',
+      event_time: null,
+    });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(
+        new Promise((resolve) => {
+          setTimeout(
+            () => resolve({ data: 'e-new', error: null }),
+            FETCH_TIMEOUT_MS + 400
+          );
+        })
+      )
+    );
+
+    const screen = render(<EditEventScreen />);
+    const titleInput = await screen.findByPlaceholderText('Event title');
+    fireEvent.changeText(titleInput, 'Old Title edited');
+    fireEvent.press(screen.getByText('Save'));
+
+    await waitFor(
+      () => {
+        expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-new');
+      },
+      { timeout: 8000 }
+    );
+    expect(showAlert).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+  }, 10000);
+
+  it('shows a short alert, not a stack dump, if the write itself times out', async () => {
+    jest.useFakeTimers();
+    try {
+      const { showAlert } = require('../../../lib/dialogs');
+      const { showError } = require('../../../lib/showError');
+      rememberEventPreview({
+        event_id: 'e-old',
+        userEventId: 'ue-old',
+        title: 'Old Title',
+        description: null,
+        image_url: null,
+        url: null,
+        event_date: '2026-05-01',
+        event_time: null,
+      });
+      mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
+
+      const screen = render(<EditEventScreen />);
+      fireEvent.press(screen.getByText('Save'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS);
+      });
+
+      expect(showAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'That took too long. Check your connection and try again.'
+      );
+      expect(showError).not.toHaveBeenCalled();
+      expect(router.replace).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('shows retry instead of spinning forever when the events fetch throws', async () => {

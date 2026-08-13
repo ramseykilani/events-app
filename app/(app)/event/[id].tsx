@@ -24,7 +24,7 @@ import {
   readEventPreview,
   rememberEventPreview,
 } from '../../../lib/eventPreviewCache';
-import { withRetries, withTimeout } from '../../../lib/timeoutSignal';
+import { withRetries, withTimeout, WRITE_TIMEOUT_MS } from '../../../lib/timeoutSignal';
 
 type SharedWithPerson = {
   id: string;
@@ -237,7 +237,7 @@ export default function EventDetailScreen() {
                 .abortSignal(signal);
 
               if (error) throw error;
-            });
+            }, WRITE_TIMEOUT_MS);
             if (router.canGoBack()) {
               router.back();
             } else {
@@ -276,7 +276,7 @@ export default function EventDetailScreen() {
             .abortSignal(signal);
           if (error) throw error;
         }
-      });
+      }, WRITE_TIMEOUT_MS);
     } catch (err) {
       showError('Error', err);
       return;

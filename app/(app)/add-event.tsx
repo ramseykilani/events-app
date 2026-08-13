@@ -17,10 +17,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { WebDateInput, WebTimeInput, isPlausibleEventDate } from '../../components/WebDateTimeInputs';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
-import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import { useTheme } from '../../hooks/useTheme';
-import { withTimeout } from '../../lib/timeoutSignal';
+import { isAbortError, withTimeout, WRITE_TIMEOUT_MS } from '../../lib/timeoutSignal';
 
 export default function AddEventScreen() {
   const { session } = useSession();
@@ -149,9 +148,15 @@ export default function AddEventScreen() {
                 }
                 userEventId = existingUserEvent.id;
               }
-            });
+            }, WRITE_TIMEOUT_MS);
           } catch (err) {
-            showError('Error', err);
+            console.error('Failed to save event:', err);
+            showAlert(
+              'Could not save',
+              isAbortError(err)
+                ? 'That took too long. Check your connection and try again.'
+                : 'Something went wrong. Try again.'
+            );
             return;
           }
 
@@ -176,6 +181,8 @@ export default function AddEventScreen() {
 
     setLoading(true);
     try {
+      let createdEventId: string | undefined;
+      let createdUserEventId: string | undefined;
       await withTimeout(async (signal) => {
         const timeStr = eventTime
           ? eventTime.toTimeString().slice(0, 8)
@@ -228,13 +235,25 @@ export default function AddEventScreen() {
           userEventId = existingUserEvent.id;
         }
 
-        router.replace({
-          pathname: '/(app)/share',
-          params: { eventId, userEventId },
-        });
+        createdEventId = eventId as string;
+        createdUserEventId = userEventId;
+      }, WRITE_TIMEOUT_MS);
+
+      if (!createdEventId || !createdUserEventId) {
+        throw new Error('Failed to create event');
+      }
+      router.replace({
+        pathname: '/(app)/share',
+        params: { eventId: createdEventId, userEventId: createdUserEventId },
       });
     } catch (err: unknown) {
-      showError('Error', err);
+      console.error('Failed to create event:', err);
+      showAlert(
+        'Could not save',
+        isAbortError(err)
+          ? 'That took too long. Check your connection and try again.'
+          : 'Something went wrong. Try again.'
+      );
     } finally {
       setLoading(false);
     }

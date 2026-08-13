@@ -16,7 +16,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { WebDateInput, WebTimeInput, isPlausibleEventDate } from '../../components/WebDateTimeInputs';
 import { supabase } from '../../lib/supabase';
 import { showAlert, showConfirm } from '../../lib/dialogs';
-import { showError } from '../../lib/showError';
 import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
@@ -26,7 +25,12 @@ import {
   readEventPreview,
   rememberEventPreview,
 } from '../../lib/eventPreviewCache';
-import { withRetries, withTimeout } from '../../lib/timeoutSignal';
+import {
+  isAbortError,
+  withRetries,
+  withTimeout,
+  WRITE_TIMEOUT_MS,
+} from '../../lib/timeoutSignal';
 
 function firstParam(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -134,6 +138,7 @@ export default function EditEventScreen() {
 
     setLoading(true);
     try {
+      let savedEventId: string | undefined;
       await withTimeout(async (signal) => {
         const timeStr = eventTime
           ? eventTime.toTimeString().slice(0, 8)
@@ -225,11 +230,12 @@ export default function EditEventScreen() {
           }
         }
 
+        savedEventId = newEventId as string;
         rememberEventPreview(
           previewFromEvent(
             {
               ...(event as Event),
-              id: newEventId as string,
+              id: savedEventId,
               title: title.trim() || null,
               description: description.trim() || null,
               url: url.trim() || null,
@@ -240,10 +246,18 @@ export default function EditEventScreen() {
             userEventId
           )
         );
-        router.replace(`/(app)/event/${newEventId}`);
-      });
+      }, WRITE_TIMEOUT_MS);
+
+      if (!savedEventId) throw new Error('Failed to create event');
+      router.replace(`/(app)/event/${savedEventId}`);
     } catch (err: unknown) {
-      showError('Error', err);
+      console.error('Failed to save event:', err);
+      showAlert(
+        'Could not save',
+        isAbortError(err)
+          ? 'That took too long. Check your connection and try again.'
+          : 'Something went wrong. Try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -268,7 +282,7 @@ export default function EditEventScreen() {
                 .abortSignal(signal);
 
               if (error) throw error;
-            });
+            }, WRITE_TIMEOUT_MS);
             router.replace('/(app)/');
           } catch (err) {
             console.error('Failed to remove event:', err);

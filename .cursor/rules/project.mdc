@@ -42,7 +42,7 @@ constants/           Colors.ts — role-token palettes for paper/evening + the t
 docs/                Architecture, product, philosophy, design-language, and development-workflow docs
 e2e/                 Playwright e2e suite (desktop + mobile-web); shared fixtures in fixtures.ts
 hooks/               useTheme (active theme palette from ThemeContext) and other shared hooks
-lib/                 supabase.ts, types.ts, contacts.ts, showError.ts, dialogs.ts, format.ts, applyWebBrowserChrome.ts
+lib/                 supabase.ts, types.ts, contacts.ts, showError.ts, dialogs.ts, format.ts, applyWebBrowserChrome.ts, timeoutSignal.ts
 app/+html.tsx        Web HTML shell (default Paper theme-color / body background)
 manual-tests/        Cloud manual regression suite, report templates, known-issues ledger
 scripts/             Helper scripts (e.g. manual test preflight runner)
@@ -67,7 +67,8 @@ supabase/functions/  Edge Functions (send-notification, og-metadata, cleanup-peo
 - Supabase client is initialized in `lib/supabase.ts` with AsyncStorage for session persistence.
 - All Supabase queries from the client go through RLS. Server-side operations use `SECURITY DEFINER` functions.
 - Edge functions are locked down: `send-notification` and `og-metadata` require a valid user JWT (send-notification also verifies caller ownership of the `user_event`); `cleanup-people`/`cleanup-events` require the `CRON_SECRET` header and fail closed when unset.
-- User-facing failures surface via `showError` or inline error + retry banners — not console-only. Expected auth mistakes (wrong/expired OTP, SMS rate limits, SMS send failure) use a short `showAlert` via `lib/authErrors.ts` (`getAuthUserMessage`); reserve `showError` for unexpected failures.
+- User-facing failures surface via `showError` or inline error + retry banners — not console-only. Expected auth mistakes (wrong/expired OTP, SMS rate limits, SMS send failure) use a short `showAlert` via `lib/authErrors.ts` (`getAuthUserMessage`); reserve `showError` for unexpected failures. Create/edit Save failures are also a short `showAlert` ("Could not save") — never `showError`'s stack dump.
+- Load fetches use `withTimeout`/`withRetries` at `FETCH_TIMEOUT_MS` (2s, then retry). Writes (create/edit/delete/hide) use `WRITE_TIMEOUT_MS` (15s) and must not share the load budget or retry on abort — `find_or_create_event` may have already committed (KI-002).
 - OTP resend starts a 60s cooldown after the initial send (`sent=1` param from sign-in) and after each resend, so an accidental tap on "Try again" cannot fire a second SMS immediately.
 - Never call `Alert.alert` directly (react-native-web makes it a no-op). Use `showAlert`/`showConfirm` from `lib/dialogs.ts` so dialogs also render in the browser via `window.alert`/`window.confirm`.
 - Dates and phone numbers are formatted for display via `lib/format.ts` (`formatEventDate`, `formatPhoneDisplay`) — never render raw `YYYY-MM-DD` dates or E.164 numbers to users.
