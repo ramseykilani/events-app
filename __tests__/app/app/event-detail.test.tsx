@@ -36,11 +36,13 @@ const mockHiddenDelete = jest.fn();
 
 const mockFrom = jest.fn();
 
+const mockSessionState: { session: { user: { id: string } } | null } = {
+  session: { user: { id: 'u1' } },
+};
+
 jest.mock('../../../app/_context/SessionContext', () => ({
   useSession: () => ({
-    session: {
-      user: { id: 'u1' },
-    },
+    session: mockSessionState.session,
   }),
 }));
 
@@ -73,6 +75,7 @@ describe('app/(app)/event/[id]', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSessionState.session = { user: { id: 'u1' } };
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1' });
 
@@ -194,5 +197,57 @@ describe('app/(app)/event/[id]', () => {
     await screen.findByText('Access removed');
     fireEvent.press(screen.getByText('Back'));
     expect(router.back).toHaveBeenCalled();
+  });
+
+  it('shows retry instead of spinning forever when the events fetch throws', async () => {
+    mockEventsSingle.mockRejectedValue(
+      new TypeError('NetworkError when attempting to fetch resource.')
+    );
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Could not load this event.');
+    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.getByText('Back')).toBeTruthy();
+  });
+
+  it('shows retry instead of spinning forever when session is missing', async () => {
+    mockSessionState.session = null;
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Could not load this event.');
+    expect(screen.getByText('Retry')).toBeTruthy();
+  });
+
+  it('retries a failed load and then shows the event', async () => {
+    mockEventsSingle.mockRejectedValueOnce(
+      new TypeError('NetworkError when attempting to fetch resource.')
+    );
+
+    const screen = render(<EventDetailScreen />);
+    await screen.findByText('Could not load this event.');
+
+    fireEvent.press(screen.getByText('Retry'));
+
+    await screen.findByText('Remove Event');
+    expect(screen.getByText('Board Game Night')).toBeTruthy();
+  });
+
+  it('keeps Back available while the detail is still loading', async () => {
+    let resolveEvents!: (value: { data: typeof eventRow; error: null }) => void;
+    mockEventsSingle.mockReturnValue(
+      new Promise((resolve) => {
+        resolveEvents = resolve;
+      })
+    );
+
+    const screen = render(<EventDetailScreen />);
+    const back = await screen.findByText('Back');
+    fireEvent.press(back);
+    expect(router.back).toHaveBeenCalled();
+
+    resolveEvents({ data: eventRow, error: null });
+    await screen.findByText('Remove Event');
   });
 });

@@ -173,4 +173,59 @@ describe('app/(app)/edit-event', () => {
     });
     expect(router.replace).not.toHaveBeenCalled();
   });
+
+  it('shows retry instead of spinning forever when the events fetch throws', async () => {
+    mockEventsSingle.mockRejectedValue(
+      new TypeError('NetworkError when attempting to fetch resource.')
+    );
+
+    const screen = render(<EditEventScreen />);
+
+    await screen.findByText('Could not load this event.');
+    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.getByText('Back')).toBeTruthy();
+  });
+
+  it('keeps Back available while the event is still loading', async () => {
+    let resolveEvents!: (value: {
+      data: {
+        id: string;
+        created_by_user_id: string;
+        url: null;
+        title: string;
+        description: null;
+        image_url: null;
+        event_date: string;
+        event_time: null;
+        created_at: string;
+      };
+      error: null;
+    }) => void;
+    mockEventsSingle.mockReturnValue(
+      new Promise((resolve) => {
+        resolveEvents = resolve;
+      })
+    );
+
+    const screen = render(<EditEventScreen />);
+    const back = await screen.findByText('Back');
+    fireEvent.press(back);
+    expect(router.back).toHaveBeenCalled();
+
+    resolveEvents({
+      data: {
+        id: 'e-old',
+        created_by_user_id: 'u1',
+        url: null,
+        title: 'Old Title',
+        description: null,
+        image_url: null,
+        event_date: '2026-05-01',
+        event_time: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+      },
+      error: null,
+    });
+    await screen.findByText('Save');
+  });
 });

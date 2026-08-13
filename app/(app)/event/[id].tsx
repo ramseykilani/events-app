@@ -25,8 +25,14 @@ type SharedWithPerson = {
   phone_number: string;
 };
 
+function firstParam(value?: string | string[]): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default function EventDetailScreen() {
-  const { id, sharedByPersonId } = useLocalSearchParams<{ id: string; sharedByPersonId?: string }>();
+  const params = useLocalSearchParams<{ id?: string | string[]; sharedByPersonId?: string | string[] }>();
+  const id = firstParam(params.id);
+  const sharedByPersonId = firstParam(params.sharedByPersonId);
   const { session } = useSession();
   const theme = useTheme();
   const [event, setEvent] = useState<Event | null>(null);
@@ -39,73 +45,87 @@ export default function EventDetailScreen() {
   const [isHidden, setIsHidden] = useState(false);
 
   const load = useCallback(async () => {
-    if (!id || !session?.user?.id) return;
-
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        setAccessRevoked(true);
-        setLoadError(false);
-      } else {
-        console.error('Failed to load event:', error);
-        setLoadError(true);
-      }
+    if (!id || !session?.user?.id) {
       setEvent(null);
-    } else {
-      setEvent(data as Event);
       setAccessRevoked(false);
-      setLoadError(false);
+      setLoadError(true);
+      setLoading(false);
+      return;
     }
 
-    const { data: ue } = await supabase
-      .from('user_events')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .eq('event_id', id)
-      .single();
-    setUserEventId(ue?.id ?? null);
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-    if (ue?.id) {
-      const { data: shares } = await supabase
-        .from('event_shares')
-        .select('person_id')
-        .eq('user_event_id', ue.id);
-      const personIds = (shares ?? []).map((s) => s.person_id);
-      if (personIds.length > 0) {
-        const { data: people } = await supabase
-          .from('my_people')
-          .select('id, contact_name, phone_number')
-          .in('id', personIds);
-        setSharedWith((people ?? []) as SharedWithPerson[]);
+      if (error) {
+        if (error.code === 'PGRST116') {
+          setAccessRevoked(true);
+          setLoadError(false);
+        } else {
+          console.error('Failed to load event:', error);
+          setLoadError(true);
+        }
+        setEvent(null);
+      } else {
+        setEvent(data as Event);
+        setAccessRevoked(false);
+        setLoadError(false);
+      }
+
+      const { data: ue } = await supabase
+        .from('user_events')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('event_id', id)
+        .single();
+      setUserEventId(ue?.id ?? null);
+
+      if (ue?.id) {
+        const { data: shares } = await supabase
+          .from('event_shares')
+          .select('person_id')
+          .eq('user_event_id', ue.id);
+        const personIds = (shares ?? []).map((s) => s.person_id);
+        if (personIds.length > 0) {
+          const { data: people } = await supabase
+            .from('my_people')
+            .select('id, contact_name, phone_number')
+            .in('id', personIds);
+          setSharedWith((people ?? []) as SharedWithPerson[]);
+        } else {
+          setSharedWith([]);
+        }
       } else {
         setSharedWith([]);
       }
-    } else {
-      setSharedWith([]);
-    }
 
-    if (sharedByPersonId) {
-      const { data: person } = await supabase
-        .from('my_people')
-        .select('contact_name, phone_number')
-        .eq('id', sharedByPersonId)
-        .single();
-      setSharerName(person?.contact_name ?? person?.phone_number ?? null);
+      if (sharedByPersonId) {
+        const { data: person } = await supabase
+          .from('my_people')
+          .select('contact_name, phone_number')
+          .eq('id', sharedByPersonId)
+          .single();
+        setSharerName(person?.contact_name ?? person?.phone_number ?? null);
 
-      const { data: hidden } = await supabase
-        .from('hidden_people')
-        .select('id')
-        .eq('owner_id', session.user.id)
-        .eq('person_id', sharedByPersonId)
-        .maybeSingle();
-      setIsHidden(!!hidden);
+        const { data: hidden } = await supabase
+          .from('hidden_people')
+          .select('id')
+          .eq('owner_id', session.user.id)
+          .eq('person_id', sharedByPersonId)
+          .maybeSingle();
+        setIsHidden(!!hidden);
+      }
+    } catch (err) {
+      console.error('Failed to load event:', err);
+      setEvent(null);
+      setAccessRevoked(false);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [id, session?.user?.id, sharedByPersonId]);
 
   // useFocusEffect (not useEffect) so returning from Edit shows the new
@@ -136,22 +156,28 @@ export default function EventDetailScreen() {
         destructive: true,
         onConfirm: async () => {
           setLoading(true);
-          const { error } = await supabase
-            .from('user_events')
-            .delete()
-            .eq('id', userEventId)
-            .eq('user_id', session?.user?.id ?? '');
+          try {
+            const { error } = await supabase
+              .from('user_events')
+              .delete()
+              .eq('id', userEventId)
+              .eq('user_id', session?.user?.id ?? '');
 
-          if (error) {
-            console.error('Failed to remove event:', error);
-            showAlert('Error', 'Failed to remove event');
-            setLoading(false);
-          } else {
+            if (error) {
+              console.error('Failed to remove event:', error);
+              showAlert('Error', 'Failed to remove event');
+              return;
+            }
             if (router.canGoBack()) {
               router.back();
             } else {
               router.replace('/(app)/');
             }
+          } catch (err) {
+            console.error('Failed to remove event:', err);
+            showAlert('Error', 'Failed to remove event');
+          } finally {
+            setLoading(false);
           }
         },
       }
@@ -195,9 +221,16 @@ export default function EventDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.textPrimary} />
-      </View>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.navRow}>
+          <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+            <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator color={theme.textPrimary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -232,7 +265,14 @@ export default function EventDetailScreen() {
           <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
             Could not load this event.
           </Text>
-          <TouchableOpacity onPress={load} activeOpacity={0.6} accessibilityRole="button">
+          <TouchableOpacity
+            onPress={() => {
+              setLoading(true);
+              void load();
+            }}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+          >
             <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
           </TouchableOpacity>
         </View>

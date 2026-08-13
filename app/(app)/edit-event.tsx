@@ -21,8 +21,14 @@ import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 
+function firstParam(value?: string | string[]): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default function EditEventScreen() {
-  const params = useLocalSearchParams<{ eventId: string; userEventId: string }>();
+  const params = useLocalSearchParams<{ eventId?: string | string[]; userEventId?: string | string[] }>();
+  const eventId = firstParam(params.eventId);
+  const userEventId = firstParam(params.userEventId);
   const { session } = useSession();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -39,33 +45,41 @@ export default function EditEventScreen() {
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
-    if (!params.eventId) return;
-
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('id', params.eventId)
-      .single();
-
-    if (error) {
-      console.error('Failed to load event:', error);
+    if (!eventId) {
       setLoadError(true);
       return;
     }
 
-    setLoadError(false);
-    const e = data as Event;
-    setEvent(e);
-    setTitle(e.title ?? '');
-    setDescription(e.description ?? '');
-    setUrl(e.url ?? '');
-    setImageUrl(e.image_url ?? '');
-    const [y, m, d] = e.event_date.split('-').map(Number);
-    setEventDate(new Date(y, m - 1, d));
-    setEventTime(
-      e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null
-    );
-  }, [params.eventId]);
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+
+      if (error) {
+        console.error('Failed to load event:', error);
+        setLoadError(true);
+        return;
+      }
+
+      setLoadError(false);
+      const e = data as Event;
+      setEvent(e);
+      setTitle(e.title ?? '');
+      setDescription(e.description ?? '');
+      setUrl(e.url ?? '');
+      setImageUrl(e.image_url ?? '');
+      const [y, m, d] = e.event_date.split('-').map(Number);
+      setEventDate(new Date(y, m - 1, d));
+      setEventTime(
+        e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null
+      );
+    } catch (err) {
+      console.error('Failed to load event:', err);
+      setLoadError(true);
+    }
+  }, [eventId]);
 
   useEffect(() => {
     load();
@@ -77,7 +91,7 @@ export default function EditEventScreen() {
       return;
     }
 
-    if (!session?.user?.id || !params.userEventId || !event) return;
+    if (!session?.user?.id || !userEventId || !event) return;
 
     if (!isPlausibleEventDate(eventDate)) {
       // Same web year-typo guard as add-event (2026 -> 1906 is one slip away).
@@ -117,7 +131,7 @@ export default function EditEventScreen() {
       const { error: ueErr } = await supabase
         .from('user_events')
         .update({ event_id: eventId })
-        .eq('id', params.userEventId)
+        .eq('id', userEventId)
         .eq('user_id', session.user.id);
 
       if (ueErr) {
@@ -144,7 +158,7 @@ export default function EditEventScreen() {
             supabase
               .from('event_shares')
               .select('person_id')
-              .eq('user_event_id', params.userEventId),
+              .eq('user_event_id', userEventId),
           ]);
 
           const alreadyShared = new Set((targetShares ?? []).map((s) => s.person_id));
@@ -165,7 +179,7 @@ export default function EditEventScreen() {
           const { error: delErr } = await supabase
             .from('user_events')
             .delete()
-            .eq('id', params.userEventId);
+            .eq('id', userEventId);
 
           if (delErr) throw delErr;
         } else {
@@ -190,18 +204,24 @@ export default function EditEventScreen() {
         destructive: true,
         onConfirm: async () => {
           setLoading(true);
-          const { error } = await supabase
-            .from('user_events')
-            .delete()
-            .eq('id', params.userEventId)
-            .eq('user_id', session?.user?.id ?? '');
+          try {
+            const { error } = await supabase
+              .from('user_events')
+              .delete()
+              .eq('id', userEventId)
+              .eq('user_id', session?.user?.id ?? '');
 
-          if (error) {
-            console.error('Failed to remove event:', error);
-            showAlert('Error', 'Failed to remove event');
-            setLoading(false);
-          } else {
+            if (error) {
+              console.error('Failed to remove event:', error);
+              showAlert('Error', 'Failed to remove event');
+              return;
+            }
             router.replace('/(app)/');
+          } catch (err) {
+            console.error('Failed to remove event:', err);
+            showAlert('Error', 'Failed to remove event');
+          } finally {
+            setLoading(false);
           }
         },
       }
@@ -228,6 +248,9 @@ export default function EditEventScreen() {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
         <ActivityIndicator color={theme.textPrimary} />
+        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+          <Text style={[styles.retry, { color: theme.textSecondary }]}>Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
