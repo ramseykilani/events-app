@@ -10,7 +10,7 @@ import {
 } from '../lib/contacts';
 import { supabase } from '../lib/supabase';
 import { showAlert } from '../lib/dialogs';
-import { showError } from '../lib/showError';
+import { isAbortError, withWriteTimeout } from '../lib/timeoutSignal';
 
 type Phase = 'idle' | 'explainer' | 'picker' | 'recovery' | 'manual';
 
@@ -35,6 +35,7 @@ export function ContactsPermissionFlow({
   const [continuing, setContinuing] = useState(false);
   const hasAutoStarted = useRef(false);
   const prevRestartKey = useRef(0);
+  const importInFlightRef = useRef(false);
 
   const startFlow = useCallback(async () => {
     try {
@@ -107,17 +108,34 @@ export function ContactsPermissionFlow({
       return;
     }
 
-    const rows = selected.map((c) => ({
-      owner_id: userId,
-      phone_number: c.phoneNumber,
-      contact_name: c.name,
-    }));
-    const { error } = await supabase.from('my_people').upsert(rows, {
-      onConflict: 'owner_id,phone_number',
-    });
-    if (error) {
-      showError('Error adding people', error);
+    if (importInFlightRef.current) return;
+    importInFlightRef.current = true;
+    try {
+      const rows = selected.map((c) => ({
+        owner_id: userId,
+        phone_number: c.phoneNumber,
+        contact_name: c.name,
+      }));
+      await withWriteTimeout(async (signal) => {
+        const { error } = await supabase
+          .from('my_people')
+          .upsert(rows, {
+            onConflict: 'owner_id,phone_number',
+          })
+          .abortSignal(signal);
+        if (error) throw error;
+      });
+    } catch (err) {
+      console.error('Failed to add people:', err);
+      showAlert(
+        'Could not add people',
+        isAbortError(err)
+          ? 'That took too long. Check your connection and try again.'
+          : 'Something went wrong. Try again.'
+      );
       return;
+    } finally {
+      importInFlightRef.current = false;
     }
     setPhase('idle');
     onPeopleChanged();

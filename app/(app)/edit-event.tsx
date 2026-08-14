@@ -28,12 +28,34 @@ import {
 import {
   isAbortError,
   withRetries,
-  withTimeout,
-  WRITE_TIMEOUT_MS,
+  withWriteTimeout,
 } from '../../lib/timeoutSignal';
 
 function firstParam(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+type IntendedEventFields = {
+  title: string | null;
+  description: string | null;
+  url: string | null;
+  imageUrl: string | null;
+  eventDate: string;
+  eventTime: string | null;
+};
+
+// Dedup (find_or_create_event) keys on url+title+date+time only and ignores
+// description/image_url (KI-002), so a subset compare can false-confirm —
+// check every field. Server time may carry fractional seconds.
+function eventMatchesIntended(e: Event, intended: IntendedEventFields): boolean {
+  return (
+    (e.title ?? '') === (intended.title ?? '') &&
+    (e.description ?? '') === (intended.description ?? '') &&
+    (e.url ?? '') === (intended.url ?? '') &&
+    (e.image_url ?? '') === (intended.imageUrl ?? '') &&
+    e.event_date === intended.eventDate &&
+    (e.event_time ? e.event_time.slice(0, 8) : null) === intended.eventTime
+  );
 }
 
 function fieldsFromEvent(e: Event) {
@@ -75,6 +97,7 @@ export default function EditEventScreen() {
   // response can overwrite what the user has typed. `seeded` is rebuilt on
   // every render, so capture it once in a ref.
   const hadSeedOnMount = useRef(!!seeded);
+  const saveInFlightRef = useRef(false);
 
   const applyEvent = (e: Event) => {
     const fields = fieldsFromEvent(e);
@@ -119,6 +142,69 @@ export default function EditEventScreen() {
     load();
   }, [load]);
 
+  // A timed-out write may still have committed server-side, and it must never
+  // be retried (KI-002). Reconcile by reading instead: confirmation comes
+  // from the user_events pointer, never from the RPC result. Returns the
+  // owned copy when the server already holds the intended snapshot, else
+  // null. Retried like any read — an abort can land while the server is
+  // still committing; a false negative just means the user sees the alert.
+  const reconcileTimedOutSave = async (
+    candidateEventId: string | undefined,
+    intended: IntendedEventFields
+  ): Promise<{ event: Event; eventId: string; userEventId: string } | null> => {
+    if (!session?.user?.id || !userEventId) return null;
+    try {
+      return await withRetries(async (signal) => {
+        const { data: ue, error: ueErr } = await supabase
+          .from('user_events')
+          .select('id, event_id, events(*)')
+          .eq('id', userEventId)
+          .eq('user_id', session.user.id)
+          .abortSignal(signal)
+          .single();
+
+        if (!ueErr && ue) {
+          const row = ue as unknown as {
+            id: string;
+            event_id: string;
+            events: Event | null;
+          };
+          if (row.events && eventMatchesIntended(row.events, intended)) {
+            return { event: row.events, eventId: row.event_id, userEventId: row.id };
+          }
+          // The row still points at another snapshot: the save is
+          // incomplete (or a partial merge) — never navigate.
+          throw new Error('save not committed');
+        }
+
+        // Row gone: the 23505 merge path deletes the original row on
+        // success, so check ownership of the candidate snapshot.
+        if (ueErr?.code === 'PGRST116' && candidateEventId) {
+          const { data: owned, error: ownedErr } = await supabase
+            .from('user_events')
+            .select('id, event_id, events(*)')
+            .eq('user_id', session.user.id)
+            .eq('event_id', candidateEventId)
+            .abortSignal(signal)
+            .maybeSingle();
+          if (!ownedErr && owned) {
+            const row = owned as unknown as {
+              id: string;
+              event_id: string;
+              events: Event | null;
+            };
+            if (row.events && eventMatchesIntended(row.events, intended)) {
+              return { event: row.events, eventId: row.event_id, userEventId: row.id };
+            }
+          }
+        }
+        throw new Error('save not committed');
+      });
+    } catch {
+      return null;
+    }
+  };
+
   const handleSave = async () => {
     if (!title.trim() && !url.trim()) {
       showAlert('Required', 'Enter a title or URL.');
@@ -136,25 +222,43 @@ export default function EditEventScreen() {
       return;
     }
 
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+
+    const timeStr = eventTime
+      ? eventTime.toTimeString().slice(0, 8)
+      : null;
+
+    const year = eventDate.getFullYear();
+    const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+    const day = String(eventDate.getDate()).padStart(2, '0');
+    const localDate = `${year}-${month}-${day}`;
+
+    const intended: IntendedEventFields = {
+      title: title.trim() || null,
+      description: description.trim() || null,
+      url: url.trim() || null,
+      imageUrl: imageUrl.trim() || null,
+      eventDate: localDate,
+      eventTime: timeStr,
+    };
+    // A no-op Save has nothing to reconcile — the server matches by
+    // definition, so a timeout there goes straight to the alert.
+    const isNoOpSave = eventMatchesIntended(event, intended);
+
+    // Set inside the write callback when the RPC returns in time; the
+    // reconcile-read uses it to recognize a completed 23505 merge.
+    let savedEventId: string | undefined;
+
     setLoading(true);
     try {
-      let savedEventId: string | undefined;
-      await withTimeout(async (signal) => {
-        const timeStr = eventTime
-          ? eventTime.toTimeString().slice(0, 8)
-          : null;
-
-        const year = eventDate.getFullYear();
-        const month = String(eventDate.getMonth() + 1).padStart(2, '0');
-        const day = String(eventDate.getDate()).padStart(2, '0');
-        const localDate = `${year}-${month}-${day}`;
-
+      await withWriteTimeout(async (signal) => {
         const { data: newEventId, error: eventErr } = await supabase
           .rpc('find_or_create_event', {
-            p_url: url.trim() || null,
-            p_title: title.trim() || null,
-            p_description: description.trim() || null,
-            p_image_url: imageUrl.trim() || null,
+            p_url: intended.url,
+            p_title: intended.title,
+            p_description: intended.description,
+            p_image_url: intended.imageUrl,
             p_event_date: localDate,
             p_event_time: timeStr,
           })
@@ -162,6 +266,10 @@ export default function EditEventScreen() {
 
         if (eventErr) throw eventErr;
         if (!newEventId) throw new Error('Failed to create event');
+        // Capture the candidate immediately: if the abort lands during the
+        // follow-up calls, the reconcile-read uses this to recognize a
+        // completed merge.
+        savedEventId = newEventId as string;
 
         const { error: ueErr } = await supabase
           .from('user_events')
@@ -230,28 +338,37 @@ export default function EditEventScreen() {
           }
         }
 
-        savedEventId = newEventId as string;
         rememberEventPreview(
           previewFromEvent(
             {
               ...(event as Event),
-              id: savedEventId,
-              title: title.trim() || null,
-              description: description.trim() || null,
-              url: url.trim() || null,
-              image_url: imageUrl.trim() || null,
+              id: newEventId as string,
+              title: intended.title,
+              description: intended.description,
+              url: intended.url,
+              image_url: intended.imageUrl,
               event_date: localDate,
               event_time: timeStr,
             },
             userEventId
           )
         );
-      }, WRITE_TIMEOUT_MS);
+      });
 
       if (!savedEventId) throw new Error('Failed to create event');
       router.replace(`/(app)/event/${savedEventId}`);
     } catch (err: unknown) {
       console.error('Failed to save event:', err);
+      if (isAbortError(err) && !isNoOpSave) {
+        const confirmed = await reconcileTimedOutSave(savedEventId, intended);
+        if (confirmed) {
+          rememberEventPreview(
+            previewFromEvent(confirmed.event, confirmed.userEventId)
+          );
+          router.replace(`/(app)/event/${confirmed.eventId}`);
+          return;
+        }
+      }
       showAlert(
         'Could not save',
         isAbortError(err)
@@ -259,6 +376,7 @@ export default function EditEventScreen() {
           : 'Something went wrong. Try again.'
       );
     } finally {
+      saveInFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -271,9 +389,11 @@ export default function EditEventScreen() {
         confirmText: 'Remove',
         destructive: true,
         onConfirm: async () => {
+          if (saveInFlightRef.current) return;
+          saveInFlightRef.current = true;
           setLoading(true);
           try {
-            await withTimeout(async (signal) => {
+            await withWriteTimeout(async (signal) => {
               const { error } = await supabase
                 .from('user_events')
                 .delete()
@@ -282,12 +402,13 @@ export default function EditEventScreen() {
                 .abortSignal(signal);
 
               if (error) throw error;
-            }, WRITE_TIMEOUT_MS);
+            });
             router.replace('/(app)/');
           } catch (err) {
             console.error('Failed to remove event:', err);
             showAlert('Error', 'Failed to remove event');
           } finally {
+            saveInFlightRef.current = false;
             setLoading(false);
           }
         },

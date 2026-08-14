@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { abortable, abortablePromise } from '../../helpers/abortable';
 import ShareScreen from '../../../app/(app)/share';
 
 const mockMyPeopleOrder = jest.fn();
@@ -42,8 +43,9 @@ jest.mock('../../../lib/supabase', () => ({
   },
 }));
 
-jest.mock('../../../lib/showError', () => ({
-  showError: jest.fn(),
+jest.mock('../../../lib/dialogs', () => ({
+  showAlert: jest.fn(),
+  showConfirm: jest.fn(),
 }));
 
 type FlowProps = { autoStart: boolean; peopleCount: number };
@@ -101,46 +103,58 @@ describe('app/(app)/share', () => {
     useLocalSearchParamsMock.mockReturnValue({ eventId: 'e1', userEventId: 'ue1' });
 
     mockFunctionsInvoke.mockResolvedValue({ data: null, error: null });
-    mockRpc.mockResolvedValue({ data: 2, error: null });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: 2, error: null }))
+    );
 
-    mockMyPeopleOrder.mockResolvedValue({
-      data: [
-        {
-          id: 'p1',
-          owner_id: 'u1',
-          phone_number: '+14165550001',
-          user_id: null,
-          contact_name: 'Alice',
-          added_at: '2026-01-01T00:00:00.000Z',
-          last_shared_at: null,
-        },
-        {
-          id: 'p2',
-          owner_id: 'u1',
-          phone_number: '+14165550002',
-          user_id: null,
-          contact_name: 'Bob',
-          added_at: '2026-01-02T00:00:00.000Z',
-          last_shared_at: null,
-        },
-      ],
-      error: null,
-    });
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: [
+            {
+              id: 'p1',
+              owner_id: 'u1',
+              phone_number: '+14165550001',
+              user_id: null,
+              contact_name: 'Alice',
+              added_at: '2026-01-01T00:00:00.000Z',
+              last_shared_at: null,
+            },
+            {
+              id: 'p2',
+              owner_id: 'u1',
+              phone_number: '+14165550002',
+              user_id: null,
+              contact_name: 'Bob',
+              added_at: '2026-01-02T00:00:00.000Z',
+              last_shared_at: null,
+            },
+          ],
+          error: null,
+        })
+      )
+    );
     mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
     mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
 
-    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
-    mockEventSharesEq.mockResolvedValue({ data: [], error: null });
+    mockEventSharesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockEventSharesSelect.mockReturnValue({ eq: mockEventSharesEq });
     mockEventSharesDelete.mockReturnValue({ eq: jest.fn() });
 
     mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
-    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
     mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
     mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
-    mockUsersUpdateEq.mockResolvedValue({ error: null });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'my_people') {
@@ -170,7 +184,9 @@ describe('app/(app)/share', () => {
   });
 
   it('auto-starts the contacts flow on native when the people list is empty', async () => {
-    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
 
     render(<ShareScreen />);
 
@@ -218,7 +234,9 @@ describe('app/(app)/share', () => {
   });
 
   it('never deletes event_shares (sharing is forwarding, not revocable)', async () => {
-    mockEventSharesEq.mockResolvedValue({ data: [{ person_id: 'p1' }], error: null });
+    mockEventSharesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [{ person_id: 'p1' }], error: null }))
+    );
 
     const screen = render(<ShareScreen />);
     await waitFor(() =>
@@ -237,7 +255,9 @@ describe('app/(app)/share', () => {
   });
 
   it('marks already-shared people as completed and excludes them from the RPC', async () => {
-    mockEventSharesEq.mockResolvedValue({ data: [{ person_id: 'p1' }], error: null });
+    mockEventSharesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [{ person_id: 'p1' }], error: null }))
+    );
 
     const screen = render(<ShareScreen />);
     await waitFor(() =>
@@ -260,21 +280,25 @@ describe('app/(app)/share', () => {
     expect(router.back).toHaveBeenCalled();
   });
 
-  it('calls showError when the share_event RPC fails', async () => {
-    const { showError } = require('../../../lib/showError');
-    mockRpc.mockResolvedValue({
-      data: null,
-      error: { code: '42501', message: 'Not your event' },
-    });
+  it('shows a short alert, not a stack dump, when the share_event RPC fails', async () => {
+    const { showAlert } = require('../../../lib/dialogs');
+    mockRpc.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: null,
+          error: { code: '42501', message: 'Not your event' },
+        })
+      )
+    );
 
     const screen = render(<ShareScreen />);
     fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
     fireEvent.press(screen.getByText('Share'));
 
     await waitFor(() => {
-      expect(showError).toHaveBeenCalledWith(
-        'Error',
-        expect.objectContaining({ code: '42501' })
+      expect(showAlert).toHaveBeenCalledWith(
+        'Could not share',
+        'Something went wrong. Try again.'
       );
     });
     expect(router.back).not.toHaveBeenCalled();
@@ -339,12 +363,14 @@ describe('app/(app)/share', () => {
       expect(input.props.value).toBe('BadName');
     });
 
-    it('calls showError and keeps the gate when saving the name fails', async () => {
-      const { showError } = require('../../../lib/showError');
+    it('shows a short alert and keeps the gate when saving the name fails', async () => {
+      const { showAlert } = require('../../../lib/dialogs');
       mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
-      mockUsersUpdateEq.mockResolvedValue({
-        error: { code: '23514', message: 'check violation' },
-      });
+      mockUsersUpdateEq.mockImplementation(() =>
+        abortablePromise(
+          Promise.resolve({ error: { code: '23514', message: 'check violation' } })
+        )
+      );
 
       const screen = render(<ShareScreen />);
       await waitFor(() => expect(screen.getByLabelText('Your name')).toBeTruthy());
@@ -353,9 +379,9 @@ describe('app/(app)/share', () => {
       fireEvent.press(screen.getByText('Save'));
 
       await waitFor(() => {
-        expect(showError).toHaveBeenCalledWith(
+        expect(showAlert).toHaveBeenCalledWith(
           'Could not save name',
-          expect.objectContaining({ code: '23514' })
+          'Something went wrong. Try again.'
         );
       });
       // Gate still up, Share still blocked.
@@ -395,9 +421,9 @@ describe('app/(app)/share', () => {
 
       mockUserEventsSelect.mockReturnValue({ eq: mockUserEventsEqUserId });
       mockUserEventsEqUserId.mockReturnValue({ eq: mockUserEventsEqEventId });
-      mockUserEventsEqEventId.mockReturnValue({ single: mockUserEventsSingle });
+      mockUserEventsEqEventId.mockReturnValue(abortable({ single: mockUserEventsSingle }));
       mockUserEventsInsert.mockReturnValue({ select: mockUserEventsInsertSelect });
-      mockUserEventsInsertSelect.mockReturnValue({ single: mockUserEventsInsertSingle });
+      mockUserEventsInsertSelect.mockReturnValue(abortable({ single: mockUserEventsInsertSingle }));
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'my_people') {
@@ -458,8 +484,8 @@ describe('app/(app)/share', () => {
       expect(router.back).toHaveBeenCalled();
     });
 
-    it('calls showError when insert fails with a non-conflict error', async () => {
-      const { showError } = require('../../../lib/showError');
+    it('shows a short alert when insert fails with a non-conflict error', async () => {
+      const { showAlert } = require('../../../lib/dialogs');
       mockUserEventsSingle.mockResolvedValueOnce({ data: null, error: null });
       mockUserEventsInsertSingle.mockResolvedValueOnce({
         data: null,
@@ -471,9 +497,9 @@ describe('app/(app)/share', () => {
       fireEvent.press(screen.getByText('Share'));
 
       await waitFor(() => {
-        expect(showError).toHaveBeenCalledWith(
-          'Error',
-          expect.objectContaining({ code: '42501' })
+        expect(showAlert).toHaveBeenCalledWith(
+          'Could not share',
+          'Something went wrong. Try again.'
         );
       });
       expect(router.back).not.toHaveBeenCalled();

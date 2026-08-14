@@ -2,6 +2,7 @@ import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { abortablePromise } from '../../helpers/abortable';
 import CalendarScreen from '../../../app/(app)/index';
 
 const mockRpc = jest.fn();
@@ -72,7 +73,9 @@ describe('app/(app)/index', () => {
   });
 
   it('fetches events for selected month via a single RPC and refreshes using last range', async () => {
-    mockRpc.mockResolvedValue({ data: [sampleRow], error: null });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [sampleRow], error: null }))
+    );
 
     const screen = render(<CalendarScreen />);
     fireEvent.press(screen.getByTestId('trigger-month'));
@@ -93,7 +96,9 @@ describe('app/(app)/index', () => {
 
   it('shows the walkthrough once when the user has no events at all', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
-    mockRpc.mockResolvedValue({ data: [], error: null });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
 
     const screen = render(<CalendarScreen />);
     fireEvent.press(screen.getByTestId('trigger-month'));
@@ -109,8 +114,12 @@ describe('app/(app)/index', () => {
   it('does not show the walkthrough when events exist outside the current month', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
     mockRpc
-      .mockResolvedValueOnce({ data: [], error: null })
-      .mockResolvedValueOnce({ data: [sampleRow], error: null });
+      .mockImplementationOnce(() =>
+        abortablePromise(Promise.resolve({ data: [], error: null }))
+      )
+      .mockImplementationOnce(() =>
+        abortablePromise(Promise.resolve({ data: [sampleRow], error: null }))
+      );
 
     const screen = render(<CalendarScreen />);
     fireEvent.press(screen.getByTestId('trigger-month'));
@@ -121,7 +130,9 @@ describe('app/(app)/index', () => {
   });
 
   it('does not show the walkthrough when it was already completed', async () => {
-    mockRpc.mockResolvedValue({ data: [], error: null });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
 
     const screen = render(<CalendarScreen />);
     fireEvent.press(screen.getByTestId('trigger-month'));
@@ -132,7 +143,9 @@ describe('app/(app)/index', () => {
 
   it('does not show the walkthrough while the current month has events', async () => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
-    mockRpc.mockResolvedValue({ data: [sampleRow], error: null });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [sampleRow], error: null }))
+    );
 
     const screen = render(<CalendarScreen />);
     fireEvent.press(screen.getByTestId('trigger-month'));
@@ -143,14 +156,18 @@ describe('app/(app)/index', () => {
   });
 
   it('shows an error banner on RPC failure and retries on tap', async () => {
-    mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: null, error: { message: 'boom' } }))
+    );
 
     const screen = render(<CalendarScreen />);
     fireEvent.press(screen.getByTestId('trigger-month'));
 
     const banner = await screen.findByText('Could not load events. Tap to retry.');
 
-    mockRpc.mockResolvedValue({ data: [sampleRow], error: null });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [sampleRow], error: null }))
+    );
     fireEvent.press(banner);
 
     await waitFor(() => expect(screen.getByText('Spring Concert')).toBeTruthy());

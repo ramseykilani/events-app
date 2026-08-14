@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { showAlert, showConfirm } from '../../../lib/dialogs';
-import { showError } from '../../../lib/showError';
 import { formatEventDate, formatPhoneDisplay } from '../../../lib/format';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
@@ -24,7 +23,7 @@ import {
   readEventPreview,
   rememberEventPreview,
 } from '../../../lib/eventPreviewCache';
-import { withRetries, withTimeout, WRITE_TIMEOUT_MS } from '../../../lib/timeoutSignal';
+import { isAbortError, withRetries, withWriteTimeout } from '../../../lib/timeoutSignal';
 
 type SharedWithPerson = {
   id: string;
@@ -64,6 +63,7 @@ export default function EventDetailScreen() {
   const [isHidden, setIsHidden] = useState(false);
   const loadSeq = useRef(0);
   const hasContentRef = useRef(!!seeded);
+  const writeInFlightRef = useRef(false);
 
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;
@@ -226,9 +226,11 @@ export default function EventDetailScreen() {
         confirmText: 'Remove',
         destructive: true,
         onConfirm: async () => {
+          if (writeInFlightRef.current) return;
+          writeInFlightRef.current = true;
           setLoading(true);
           try {
-            await withTimeout(async (signal) => {
+            await withWriteTimeout(async (signal) => {
               const { error } = await supabase
                 .from('user_events')
                 .delete()
@@ -237,7 +239,7 @@ export default function EventDetailScreen() {
                 .abortSignal(signal);
 
               if (error) throw error;
-            }, WRITE_TIMEOUT_MS);
+            });
             if (router.canGoBack()) {
               router.back();
             } else {
@@ -247,6 +249,7 @@ export default function EventDetailScreen() {
             console.error('Failed to remove event:', err);
             showAlert('Error', 'Failed to remove event');
           } finally {
+            writeInFlightRef.current = false;
             setLoading(false);
           }
         },
@@ -256,8 +259,10 @@ export default function EventDetailScreen() {
 
   const handleToggleHide = async () => {
     if (!sharedByPersonId || !session?.user?.id) return;
+    if (writeInFlightRef.current) return;
+    writeInFlightRef.current = true;
     try {
-      await withTimeout(async (signal) => {
+      await withWriteTimeout(async (signal) => {
         if (isHidden) {
           const { error } = await supabase
             .from('hidden_people')
@@ -276,10 +281,18 @@ export default function EventDetailScreen() {
             .abortSignal(signal);
           if (error) throw error;
         }
-      }, WRITE_TIMEOUT_MS);
+      });
     } catch (err) {
-      showError('Error', err);
+      console.error('Failed to update hidden people:', err);
+      showAlert(
+        'Could not update',
+        isAbortError(err)
+          ? 'That took too long. Check your connection and try again.'
+          : 'Something went wrong. Try again.'
+      );
       return;
+    } finally {
+      writeInFlightRef.current = false;
     }
     if (isHidden) {
       setIsHidden(false);

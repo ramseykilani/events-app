@@ -16,6 +16,15 @@
 //      the OS emoji font and ignore role-token tints; use a vector icon
 //      (@expo/vector-icons) colored by a theme token instead. Text-font
 //      dingbats like ✓ (U+2713) are not pictographic and remain fine.
+//   5. No importing withTimeout/timeoutSignal outside lib/timeoutSignal.ts —
+//      they take a raw budget, and B-1 was a write wrapped in the 2s read
+//      default. Use withFetchTimeout / withWriteTimeout / withRetries, which
+//      fix the budget per kind. (Prevents the wrong-budget class; it does NOT
+//      prove every future bare Supabase call carries a timeout.)
+//   6. No showError(...) outside app/(auth)/**, app/_context/SessionContext.tsx,
+//      lib/** — showError dumps stack traces, which is right for unexpected
+//      auth/boot failures and wrong for user-triggered action failures (those
+//      get a short showAlert). Intentional exceptions need conventions-ok.
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -27,6 +36,13 @@ const HEX_RE = /#[0-9a-fA-F]{3}\b|#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
 // lib/dialogs.ts and lib/showError.ts are the dialog implementations.
 const ALERT_ALLOWED_FILES = new Set(['lib/dialogs.ts', 'lib/showError.ts']);
+const TIMEOUT_MODULE_RE = /(^|\/)timeoutSignal$/;
+const BANNED_TIMEOUT_NAMES = new Set(['withTimeout', 'timeoutSignal']);
+const SHOWERROR_MODULE_RE = /(^|\/)showError$/;
+const SHOWERROR_ALLOWED = (relPath) =>
+  relPath.startsWith('app/(auth)/') ||
+  relPath === 'app/_context/SessionContext.tsx' ||
+  relPath.startsWith('lib/');
 
 function* walk(dir) {
   for (const entry of readdirSync(dir)) {
@@ -65,6 +81,86 @@ function checkAccessibilityRoles(path, source) {
       if (!hasRole && !hasSpread) {
         violations.push(
           `${rel(path)}:${lineOf(source, node.getStart())} — <${node.tagName.text}> without accessibilityRole`
+        );
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+function checkTimeoutImports(path, source) {
+  const relPath = rel(path);
+  if (relPath === 'lib/timeoutSignal.ts') return;
+  const visit = (node) => {
+    if (
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      TIMEOUT_MODULE_RE.test(node.moduleSpecifier.text)
+    ) {
+      const named = node.importClause?.namedBindings;
+      if (named && ts.isNamespaceImport(named)) {
+        violations.push(
+          `${relPath}:${lineOf(source, node.getStart())} — namespace import of the timeout module reaches the raw withTimeout/timeoutSignal; import withFetchTimeout/withWriteTimeout/withRetries instead`
+        );
+      } else if (named && ts.isNamedImports(named)) {
+        for (const el of named.elements) {
+          // propertyName covers `withTimeout as wt` aliases.
+          const imported = (el.propertyName ?? el.name).text;
+          if (BANNED_TIMEOUT_NAMES.has(imported)) {
+            violations.push(
+              `${relPath}:${lineOf(source, el.getStart())} — withTimeout/timeoutSignal take a raw budget (B-1 was a write on the 2s read budget); use withFetchTimeout/withWriteTimeout`
+            );
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+function checkShowErrorCalls(path, source, text) {
+  const relPath = rel(path);
+  if (SHOWERROR_ALLOWED(relPath)) return;
+  const lines = text.split('\n');
+
+  // Track the local bindings showError is imported as, so aliases and
+  // namespace imports can't bypass the rule.
+  const localNames = new Set();
+  const namespaces = new Set();
+  const collect = (node) => {
+    if (
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      SHOWERROR_MODULE_RE.test(node.moduleSpecifier.text)
+    ) {
+      const named = node.importClause?.namedBindings;
+      if (named && ts.isNamedImports(named)) {
+        for (const el of named.elements) {
+          if ((el.propertyName ?? el.name).text === 'showError') {
+            localNames.add(el.name.text);
+          }
+        }
+      } else if (named && ts.isNamespaceImport(named)) {
+        namespaces.add(named.name.text);
+      }
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(source);
+
+  const visit = (node) => {
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const isLocalBinding = ts.isIdentifier(callee) && localNames.has(callee.text);
+      // `ns.showError(...)` via a namespace import, or any member call — no
+      // other type in this tree has a showError method, so this is safe.
+      const isPropertyAccess =
+        ts.isPropertyAccessExpression(callee) && callee.name.text === 'showError';
+      if ((isLocalBinding || isPropertyAccess) && !hasAllowComment(lines, lineOf(source, node.getStart()))) {
+        violations.push(
+          `${relPath}:${lineOf(source, node.getStart())} — showError dumps a stack trace; user-triggered action failures use a short showAlert (allowlisted: app/(auth), SessionContext, lib)`
         );
       }
     }
@@ -125,6 +221,8 @@ for (const dir of SCAN_DIRS) {
     );
     checkAccessibilityRoles(path, source);
     checkRegexRules(path, text, source);
+    checkTimeoutImports(path, source);
+    checkShowErrorCalls(path, source, text);
   }
 }
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,14 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { showConfirm } from '../../lib/dialogs';
-import { showError } from '../../lib/showError';
+import { showAlert, showConfirm } from '../../lib/dialogs';
 import { formatPhoneDisplay } from '../../lib/format';
 import { useSession } from '../_context/SessionContext';
 import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
 import { ManualAddPersonModal } from '../../components/ManualAddPersonModal';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
+import { isAbortError, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
 
 export default function PeopleScreen() {
   const { session } = useSession();
@@ -42,70 +42,110 @@ export default function PeopleScreen() {
   const [showNameEdit, setShowNameEdit] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // State alone admits same-tick double taps; the ref guards synchronously.
+  const busyRef = useRef(false);
+
+  const runMutation = useCallback(async (fn: () => Promise<void>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, []);
+
+  const showMutationError = useCallback((title: string, err: unknown) => {
+    console.error(`${title}:`, err);
+    showAlert(
+      title,
+      isAbortError(err)
+        ? 'That took too long. Check your connection and try again.'
+        : 'Something went wrong. Try again.'
+    );
+  }, []);
 
   const loadData = useCallback(async (): Promise<MyPerson[]> => {
     if (!userId) return [];
 
-    const { data: peopleData, error: peopleErr } = await supabase
-      .from('my_people')
-      .select('*')
-      .eq('owner_id', userId)
-      .order('contact_name');
+    try {
+      const staged = await withRetries(async (signal) => {
+        const [peopleRes, circlesRes, hiddenRes, userRes] = await Promise.all([
+          supabase
+            .from('my_people')
+            .select('*')
+            .eq('owner_id', userId)
+            .order('contact_name')
+            .abortSignal(signal),
+          supabase.from('circles').select('*').eq('owner_id', userId).abortSignal(signal),
+          supabase
+            .from('hidden_people')
+            .select('id, owner_id, person_id, hidden_at, my_people(contact_name, phone_number)')
+            .eq('owner_id', userId)
+            .abortSignal(signal),
+          supabase
+            .from('users')
+            .select('display_name')
+            .eq('id', userId)
+            .abortSignal(signal)
+            .single(),
+        ]);
+        if (peopleRes.error) throw peopleRes.error;
+        if (circlesRes.error) throw circlesRes.error;
+        if (hiddenRes.error) throw hiddenRes.error;
 
-    const { data: circlesData, error: circlesErr } = await supabase
-      .from('circles')
-      .select('*')
-      .eq('owner_id', userId);
+        let membersData: CircleMember[] = [];
+        const circleIds = (circlesRes.data ?? []).map((c) => c.id);
+        if (circleIds.length > 0) {
+          const { data, error: membersErr } = await supabase
+            .from('circle_members')
+            .select('*')
+            .in('circle_id', circleIds)
+            .abortSignal(signal);
+          if (membersErr) throw membersErr;
+          membersData = data ?? [];
+        }
 
-    const { data: hiddenData, error: hiddenErr } = await supabase
-      .from('hidden_people')
-      .select('id, owner_id, person_id, hidden_at, my_people(contact_name, phone_number)')
-      .eq('owner_id', userId);
-
-    const { data: userData, error: userErr } = await supabase
-      .from('users')
-      .select('display_name')
-      .eq('id', userId)
-      .single();
-    if (!userErr) setDisplayName(userData?.display_name ?? null);
-
-    let failed = !!(peopleErr || circlesErr || hiddenErr);
-    let membersData: CircleMember[] = [];
-    const circleIds = (circlesData ?? []).map((c) => c.id);
-    if (circleIds.length > 0) {
-      const { data, error: membersErr } = await supabase
-        .from('circle_members')
-        .select('*')
-        .in('circle_id', circleIds);
-      if (membersErr) failed = true;
-      membersData = data ?? [];
-    }
-
-    if (failed) {
-      console.error('people load error:', peopleErr ?? circlesErr ?? hiddenErr);
-      setLoadError(true);
-    } else {
-      setLoadError(false);
-    }
-
-    const peopleList = peopleData ?? [];
-    setPeople(peopleList);
-    setCircles(circlesData ?? []);
-    setHiddenPeople(
-      (hiddenData ?? []).map((row: Record<string, unknown>) => {
-        const person = row.my_people as Record<string, unknown> | null;
         return {
-          id: row.id as string,
-          owner_id: row.owner_id as string,
-          person_id: row.person_id as string,
-          hidden_at: row.hidden_at as string,
-          contact_name: (person?.contact_name as string | null) ?? null,
-          phone_number: (person?.phone_number as string) ?? '',
+          people: (peopleRes.data ?? []) as MyPerson[],
+          circles: (circlesRes.data ?? []) as Circle[],
+          hidden: (hiddenRes.data ?? []).map((row: Record<string, unknown>) => {
+            const person = row.my_people as Record<string, unknown> | null;
+            return {
+              id: row.id as string,
+              owner_id: row.owner_id as string,
+              person_id: row.person_id as string,
+              hidden_at: row.hidden_at as string,
+              contact_name: (person?.contact_name as string | null) ?? null,
+              phone_number: (person?.phone_number as string) ?? '',
+            };
+          }),
+          members: membersData,
+          // The name read only feeds the footer — its failure must not fail
+          // the load. undefined = read failed, keep the previous value.
+          displayName: userRes.error
+            ? undefined
+            : (userRes.data?.display_name ?? null),
         };
-      })
-    );
-    setCircleMembers(membersData);
-    return peopleList;
+      });
+
+      // Commit only a fully successful load — a failed refresh keeps the
+      // last-good lists instead of blanking the screen.
+      setPeople(staged.people);
+      setCircles(staged.circles);
+      setHiddenPeople(staged.hidden);
+      setCircleMembers(staged.members);
+      if (staged.displayName !== undefined) setDisplayName(staged.displayName);
+      setLoadError(false);
+      return staged.people;
+    } catch (err) {
+      console.error('people load error:', err);
+      setLoadError(true);
+      return [];
+    }
   }, [userId]);
 
   useFocusEffect(
@@ -126,16 +166,24 @@ export default function PeopleScreen() {
 
   const handleAddCircle = async () => {
     if (!newCircleName.trim() || !userId) return;
-    const { error } = await supabase.from('circles').insert({
-      owner_id: userId,
-      name: newCircleName.trim(),
+    await runMutation(async () => {
+      try {
+        await withWriteTimeout(async (signal) => {
+          const { error } = await supabase
+            .from('circles')
+            .insert({
+              owner_id: userId,
+              name: newCircleName.trim(),
+            })
+            .abortSignal(signal);
+          if (error) throw error;
+        });
+        setNewCircleName('');
+        loadData();
+      } catch (err) {
+        showMutationError('Could not create circle', err);
+      }
     });
-    if (error) {
-      showError('Error creating circle', error);
-      return;
-    }
-    setNewCircleName('');
-    loadData();
   };
 
   const handleRemoveCircle = async (circle: Circle) => {
@@ -146,12 +194,21 @@ export default function PeopleScreen() {
         confirmText: 'Delete',
         destructive: true,
         onConfirm: async () => {
-          const { error } = await supabase.from('circles').delete().eq('id', circle.id);
-          if (error) {
-            showError('Error deleting circle', error);
-            return;
-          }
-          loadData();
+          await runMutation(async () => {
+            try {
+              await withWriteTimeout(async (signal) => {
+                const { error } = await supabase
+                  .from('circles')
+                  .delete()
+                  .eq('id', circle.id)
+                  .abortSignal(signal);
+                if (error) throw error;
+              });
+              loadData();
+            } catch (err) {
+              showMutationError('Could not delete circle', err);
+            }
+          });
         },
       }
     );
@@ -165,24 +222,42 @@ export default function PeopleScreen() {
         confirmText: 'Remove',
         destructive: true,
         onConfirm: async () => {
-          const { error } = await supabase.from('my_people').delete().eq('id', person.id);
-          if (error) {
-            showError('Error removing person', error);
-            return;
-          }
-          loadData();
+          await runMutation(async () => {
+            try {
+              await withWriteTimeout(async (signal) => {
+                const { error } = await supabase
+                  .from('my_people')
+                  .delete()
+                  .eq('id', person.id)
+                  .abortSignal(signal);
+                if (error) throw error;
+              });
+              loadData();
+            } catch (err) {
+              showMutationError('Could not remove person', err);
+            }
+          });
         },
       }
     );
   };
 
   const handleUnhide = async (hiddenId: string) => {
-    const { error } = await supabase.from('hidden_people').delete().eq('id', hiddenId);
-    if (error) {
-      showError('Error', error);
-      return;
-    }
-    loadData();
+    await runMutation(async () => {
+      try {
+        await withWriteTimeout(async (signal) => {
+          const { error } = await supabase
+            .from('hidden_people')
+            .delete()
+            .eq('id', hiddenId)
+            .abortSignal(signal);
+          if (error) throw error;
+        });
+        loadData();
+      } catch (err) {
+        showMutationError('Could not unhide person', err);
+      }
+    });
   };
 
   const getCircleMemberIds = (circleId: string) =>
@@ -210,62 +285,79 @@ export default function PeopleScreen() {
     if (!editingCircle) return;
 
     const previousIds = getCircleMemberIds(editingCircle.id);
+    const circle = editingCircle;
 
-    const { error: delError } = await supabase
-      .from('circle_members')
-      .delete()
-      .eq('circle_id', editingCircle.id);
-    if (delError) {
-      showError('Error', delError);
-      return;
-    }
+    await runMutation(async () => {
+      try {
+        await withWriteTimeout(async (signal) => {
+          const { error: delError } = await supabase
+            .from('circle_members')
+            .delete()
+            .eq('circle_id', circle.id)
+            .abortSignal(signal);
+          if (delError) throw delError;
 
-    if (selectedMemberIds.size > 0) {
-      const rows = Array.from(selectedMemberIds).map((personId) => ({
-        circle_id: editingCircle.id,
-        person_id: personId,
-      }));
-      const { error } = await supabase.from('circle_members').insert(rows);
-      if (error) {
-        // The delete-then-insert sequence isn't atomic: restore the previous
-        // members so the circle isn't left empty by a failed save.
-        if (previousIds.length > 0) {
-          await supabase.from('circle_members').insert(
-            previousIds.map((personId) => ({
-              circle_id: editingCircle.id,
+          if (selectedMemberIds.size > 0) {
+            const rows = Array.from(selectedMemberIds).map((personId) => ({
+              circle_id: circle.id,
               person_id: personId,
-            }))
-          );
-        }
-        showError('Error', error);
+            }));
+            const { error } = await supabase
+              .from('circle_members')
+              .insert(rows)
+              .abortSignal(signal);
+            if (error) {
+              // The delete-then-insert sequence isn't atomic: restore the
+              // previous members so the circle isn't left empty by a failed
+              // save.
+              if (previousIds.length > 0) {
+                await supabase
+                  .from('circle_members')
+                  .insert(
+                    previousIds.map((personId) => ({
+                      circle_id: circle.id,
+                      person_id: personId,
+                    }))
+                  )
+                  .abortSignal(signal);
+              }
+              throw error;
+            }
+          }
+        });
+        setEditingCircle(null);
+        setSelectedMemberIds(new Set());
         await loadData();
-        return;
+      } catch (err) {
+        showMutationError('Could not save circle', err);
+        await loadData();
       }
-    }
-
-    setEditingCircle(null);
-    setSelectedMemberIds(new Set());
-    await loadData();
+    });
   };
 
   const handleSaveName = async () => {
     const name = nameDraft.trim();
     if (!name || !userId || nameSaving) return;
 
-    setNameSaving(true);
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({ display_name: name })
-        .eq('id', userId);
-      if (error) throw error;
-      setDisplayName(name);
-      setShowNameEdit(false);
-    } catch (err: unknown) {
-      showError('Could not save name', err);
-    } finally {
-      setNameSaving(false);
-    }
+    await runMutation(async () => {
+      setNameSaving(true);
+      try {
+        await withWriteTimeout(async (signal) => {
+          const { error } = await supabase
+            .from('users')
+            .update({ display_name: name })
+            .eq('id', userId)
+            .abortSignal(signal);
+          if (error) throw error;
+        });
+        setDisplayName(name);
+        setShowNameEdit(false);
+      } catch (err: unknown) {
+        showMutationError('Could not save name', err);
+      } finally {
+        setNameSaving(false);
+      }
+    });
   };
 
   const handleSignOut = () => {
@@ -277,9 +369,10 @@ export default function PeopleScreen() {
         confirmText: 'Sign Out',
         onConfirm: async () => {
           // SessionContext reacts to the auth state change and routes back to
-          // /(auth)/sign-in — no navigation code needed here.
+          // /(auth)/sign-in — no navigation code needed here. auth.signOut is
+          // not abortSignal-aware, so it stays unwrapped.
           const { error } = await supabase.auth.signOut();
-          if (error) showError('Error', error);
+          if (error) showAlert('Could not sign out', 'Something went wrong. Try again.');
         },
       }
     );
@@ -293,15 +386,26 @@ export default function PeopleScreen() {
         confirmText: 'Delete Account',
         destructive: true,
         onConfirm: async () => {
-          const { error } = await supabase.rpc('delete_my_account');
-          if (error) {
-            showError('Error deleting account', error);
-            return;
-          }
-          // The server-side deletion doesn't reach the client — clear the
-          // local session so SessionContext routes to sign-in.
-          const { error: signOutError } = await supabase.auth.signOut();
-          if (signOutError) showError('Error', signOutError);
+          await runMutation(async () => {
+            try {
+              await withWriteTimeout(async (signal) => {
+                const { error } = await supabase
+                  .rpc('delete_my_account')
+                  .abortSignal(signal);
+                if (error) throw error;
+              });
+            } catch (err) {
+              showMutationError('Could not delete account', err);
+              return;
+            }
+            // The server-side deletion doesn't reach the client — clear the
+            // local session so SessionContext routes to sign-in. auth.signOut
+            // is not abortSignal-aware, so it stays unwrapped.
+            const { error: signOutError } = await supabase.auth.signOut();
+            if (signOutError) {
+              showAlert('Could not sign out', 'Your account was deleted, but signing out failed. Try again.');
+            }
+          });
         },
       }
     );
@@ -403,7 +507,7 @@ export default function PeopleScreen() {
                 style={[styles.addCircleBtn, { backgroundColor: theme.primaryButtonBg }]}
                 accessibilityRole="button"
                 onPress={handleAddCircle}
-                disabled={!newCircleName.trim()}
+                disabled={!newCircleName.trim() || busy}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.addCircleBtnText, { color: theme.primaryButtonText }]}>Add</Text>
@@ -565,8 +669,22 @@ export default function PeopleScreen() {
               <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[styles.title, { color: theme.textPrimary }]}>{editingCircle?.name ?? 'Circle'}</Text>
-            <TouchableOpacity onPress={handleSaveCircleMembers} activeOpacity={0.6} accessibilityRole="button">
-              <Text style={[styles.add, { color: theme.textPrimary }]}>Save</Text>
+            <TouchableOpacity
+              onPress={handleSaveCircleMembers}
+              disabled={busy}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy }}
+            >
+              <Text
+                style={[
+                  styles.add,
+                  { color: theme.textPrimary },
+                  busy && { color: theme.textTertiary },
+                ]}
+              >
+                Save
+              </Text>
             </TouchableOpacity>
           </View>
           <FlatList

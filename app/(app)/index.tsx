@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar } from '../../components/Calendar';
 import { useSession } from '../_context/SessionContext';
 import { supabase } from '../../lib/supabase';
+import { withRetries } from '../../lib/timeoutSignal';
 import type { CalendarEvent } from '../../lib/types';
 
 const ONBOARDING_KEY = 'onboarding_complete';
@@ -28,13 +29,27 @@ export default function CalendarScreen() {
     const flag = await AsyncStorage.getItem(ONBOARDING_KEY);
     if (flag === 'true') return;
 
-    const year = new Date().getFullYear();
-    const { data, error } = await supabase.rpc('get_calendar_events', {
-      p_user_id: session.user.id,
-      p_start_date: `${year - 1}-01-01`,
-      p_end_date: `${year + 1}-12-31`,
-    });
-    if (error || (data ?? []).length > 0) return;
+    let rowCount = 0;
+    try {
+      const year = new Date().getFullYear();
+      rowCount = await withRetries(async (signal) => {
+        const { data, error } = await supabase
+          .rpc('get_calendar_events', {
+            p_user_id: session.user.id,
+            p_start_date: `${year - 1}-01-01`,
+            p_end_date: `${year + 1}-12-31`,
+          })
+          .abortSignal(signal);
+        if (error) throw error;
+        return (data ?? []).length;
+      });
+    } catch (err) {
+      // Best-effort check: a failed read must not crash the calendar or turn
+      // into an unhandled rejection.
+      console.error('onboarding check failed:', err);
+      return;
+    }
+    if (rowCount > 0) return;
 
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
     router.push('/(app)/onboarding');
@@ -45,41 +60,48 @@ export default function CalendarScreen() {
       if (!session?.user?.id) return;
       const seq = ++fetchSeq.current;
 
-      const { data, error } = await supabase.rpc('get_calendar_events', {
-        p_user_id: session.user.id,
-        p_start_date: startDate,
-        p_end_date: endDate,
-      });
+      try {
+        const data = await withRetries(async (signal) => {
+          const { data, error } = await supabase
+            .rpc('get_calendar_events', {
+              p_user_id: session.user.id,
+              p_start_date: startDate,
+              p_end_date: endDate,
+            })
+            .abortSignal(signal);
+          if (error) throw error;
+          return data ?? [];
+        });
 
-      if (seq !== fetchSeq.current) return;
+        if (seq !== fetchSeq.current) return;
 
-      if (error) {
-        console.error('get_calendar_events RPC error:', error);
+        setFetchError(null);
+        const mapped: CalendarEvent[] = data.map(
+          (row: Record<string, unknown>) => ({
+            id: row.id as string,
+            event_id: row.event_id as string,
+            title: row.title as string | null,
+            description: row.description as string | null,
+            image_url: row.image_url as string | null,
+            url: row.url as string | null,
+            event_date: row.event_date as string,
+            event_time: row.event_time as string | null,
+            sharer_contact_name: row.sharer_contact_name as string | null,
+            sharer_person_id: row.sharer_person_id as string | null,
+            sharer_user_id: row.sharer_user_id as string,
+          })
+        );
+        setEvents(mapped);
+
+        if (!onboardCheckedRef.current) {
+          onboardCheckedRef.current = true;
+          if (mapped.length === 0) maybeShowOnboarding();
+        }
+      } catch (err) {
+        if (seq !== fetchSeq.current) return;
+        // Keep last-good events on screen; the banner offers a manual retry.
+        console.error('get_calendar_events RPC error:', err);
         setFetchError('Could not load events. Tap to retry.');
-        return;
-      }
-
-      setFetchError(null);
-      const mapped: CalendarEvent[] = (data ?? []).map(
-        (row: Record<string, unknown>) => ({
-          id: row.id as string,
-          event_id: row.event_id as string,
-          title: row.title as string | null,
-          description: row.description as string | null,
-          image_url: row.image_url as string | null,
-          url: row.url as string | null,
-          event_date: row.event_date as string,
-          event_time: row.event_time as string | null,
-          sharer_contact_name: row.sharer_contact_name as string | null,
-          sharer_person_id: row.sharer_person_id as string | null,
-          sharer_user_id: row.sharer_user_id as string,
-        })
-      );
-      setEvents(mapped);
-
-      if (!onboardCheckedRef.current) {
-        onboardCheckedRef.current = true;
-        if (mapped.length === 0) maybeShowOnboarding();
       }
     },
     [session?.user?.id, maybeShowOnboarding]

@@ -58,10 +58,6 @@ jest.mock('../../../lib/supabase', () => ({
   },
 }));
 
-jest.mock('../../../lib/showError', () => ({
-  showError: jest.fn(),
-}));
-
 const eventRow = {
   id: 'e1',
   created_by_user_id: 'u1',
@@ -164,8 +160,7 @@ describe('app/(app)/event/[id]', () => {
     expect(router.back).toHaveBeenCalled();
   });
 
-  it('shows an error instead of navigating back when hide fails', async () => {
-    const { showError } = require('../../../lib/showError');
+  it('shows a short alert instead of navigating back when hide fails', async () => {
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
     mockUeSingle.mockResolvedValue({ data: null, error: null });
     mockHiddenInsert.mockImplementation(() =>
@@ -178,9 +173,9 @@ describe('app/(app)/event/[id]', () => {
     fireEvent.press(hideButton);
 
     await waitFor(() => {
-      expect(showError).toHaveBeenCalledWith(
-        'Error',
-        expect.objectContaining({ message: 'insert failed' })
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Could not update',
+        'Something went wrong. Try again.'
       );
     });
     expect(router.back).not.toHaveBeenCalled();

@@ -7,6 +7,7 @@ import {
   requestContactsPermission,
 } from '../../lib/contacts';
 import { showAlert } from '../../lib/dialogs';
+import { abortablePromise } from '../helpers/abortable';
 
 jest.mock('../../lib/contacts', () => ({
   getContactsPermission: jest.fn(),
@@ -25,10 +26,6 @@ jest.mock('../../lib/supabase', () => ({
 jest.mock('../../lib/dialogs', () => ({
   showAlert: jest.fn(),
   showConfirm: jest.fn(),
-}));
-
-jest.mock('../../lib/showError', () => ({
-  showError: jest.fn(),
 }));
 
 jest.mock('../../components/PeoplePicker', () => {
@@ -86,7 +83,9 @@ describe('ContactsPermissionFlow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     Platform.OS = 'ios';
-    mockUpsert.mockResolvedValue({ error: null });
+    mockUpsert.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
   });
 
   afterEach(() => {

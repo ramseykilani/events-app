@@ -14,6 +14,7 @@ import { getContactsWithPhones } from '../lib/contacts';
 import type { ContactWithPhone } from '../lib/contacts';
 import { formatPhoneDisplay } from '../lib/format';
 import { useTheme } from '../hooks/useTheme';
+import { withFetchTimeout } from '../lib/timeoutSignal';
 
 type Props = {
   onSelect: (contacts: { phoneNumber: string; name: string | null }[]) => void;
@@ -56,7 +57,10 @@ export function PeoplePicker({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getContactsWithPhones()
+    // expo-contacts can't consume an AbortSignal, so a single bounded
+    // attempt — not withRetries, which would stack three overlapping
+    // address-book reads it can't cancel.
+    withFetchTimeout(() => getContactsWithPhones())
       .then((data) => {
         if (cancelled) return;
         const existing = new Set(existingKey ? existingKey.split(',') : []);

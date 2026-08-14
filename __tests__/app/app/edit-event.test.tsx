@@ -19,6 +19,7 @@ const mockUeUpdateEqId = jest.fn();
 const mockUeUpdateEqUser = jest.fn();
 const mockUeUpdate = jest.fn();
 const mockUeSelectSingle = jest.fn();
+const mockUeSelectMaybeSingle = jest.fn();
 const mockUeSelectEqEvent = jest.fn();
 const mockUeSelectEqUser = jest.fn();
 const mockUeSelect = jest.fn();
@@ -95,7 +96,10 @@ describe('app/(app)/edit-event', () => {
     mockUeUpdate.mockReturnValue({ eq: mockUeUpdateEqId });
 
     mockUeSelectSingle.mockResolvedValue({ data: { id: 'ue-existing' }, error: null });
-    mockUeSelectEqEvent.mockReturnValue(abortable({ single: mockUeSelectSingle }));
+    mockUeSelectMaybeSingle.mockResolvedValue({ data: null, error: null });
+    mockUeSelectEqEvent.mockReturnValue(
+      abortable({ single: mockUeSelectSingle, maybeSingle: mockUeSelectMaybeSingle })
+    );
     mockUeSelectEqUser.mockReturnValue({ eq: mockUeSelectEqEvent });
     mockUeSelect.mockReturnValue({ eq: mockUeSelectEqUser });
 
@@ -317,6 +321,266 @@ describe('app/(app)/edit-event', () => {
         'That took too long. Check your connection and try again.'
       );
       expect(showError).not.toHaveBeenCalled();
+      expect(router.replace).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('navigates as if saved when a timed-out write already committed (reconcile)', async () => {
+    jest.useFakeTimers();
+    try {
+      const { showAlert } = require('../../../lib/dialogs');
+      rememberEventPreview({
+        event_id: 'e-old',
+        userEventId: 'ue-old',
+        title: 'Old Title',
+        description: null,
+        image_url: null,
+        url: null,
+        event_date: '2026-05-01',
+        event_time: null,
+      });
+      // The fork RPC hangs, so the write aborts at the write budget...
+      mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
+      // ...but the server committed: our copy points at the new snapshot and
+      // every field matches what was typed.
+      mockUeSelectSingle.mockResolvedValue({
+        data: {
+          id: 'ue-old',
+          event_id: 'e-new',
+          events: {
+            id: 'e-new',
+            created_by_user_id: 'u1',
+            url: null,
+            title: 'Old Title edited',
+            description: null,
+            image_url: null,
+            event_date: '2026-05-01',
+            event_time: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        },
+        error: null,
+      });
+
+      const screen = render(<EditEventScreen />);
+      const titleInput = await screen.findByPlaceholderText('Event title');
+      fireEvent.changeText(titleInput, 'Old Title edited');
+      fireEvent.press(screen.getByText('Save'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS);
+      });
+
+      expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-new');
+      expect(showAlert).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('navigates as if saved when a timed-out merge already completed', async () => {
+    jest.useFakeTimers();
+    try {
+      const { showAlert } = require('../../../lib/dialogs');
+      rememberEventPreview({
+        event_id: 'e-old',
+        userEventId: 'ue-old',
+        title: 'Old Title',
+        description: null,
+        image_url: null,
+        url: null,
+        event_date: '2026-05-01',
+        event_time: null,
+      });
+      // The RPC returns the candidate in time; the user_events update hangs.
+      mockUeUpdateEqUser.mockImplementation(() =>
+        abortablePromise(new Promise(() => {}))
+      );
+      // The merge path deletes the original row on success...
+      mockUeSelectSingle.mockResolvedValue({
+        data: null,
+        error: { code: 'PGRST116', message: 'row not found' },
+      });
+      // ...and we own the candidate snapshot with the intended values.
+      mockUeSelectMaybeSingle.mockResolvedValue({
+        data: {
+          id: 'ue-existing',
+          event_id: 'e-new',
+          events: {
+            id: 'e-new',
+            created_by_user_id: 'u1',
+            url: null,
+            title: 'Old Title edited',
+            description: null,
+            image_url: null,
+            event_date: '2026-05-01',
+            event_time: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        },
+        error: null,
+      });
+
+      const screen = render(<EditEventScreen />);
+      const titleInput = await screen.findByPlaceholderText('Event title');
+      fireEvent.changeText(titleInput, 'Old Title edited');
+      fireEvent.press(screen.getByText('Save'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS);
+      });
+
+      expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-new');
+      expect(showAlert).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('alerts without navigating when the timed-out write did not commit', async () => {
+    jest.useFakeTimers();
+    try {
+      const { showAlert } = require('../../../lib/dialogs');
+      rememberEventPreview({
+        event_id: 'e-old',
+        userEventId: 'ue-old',
+        title: 'Old Title',
+        description: null,
+        image_url: null,
+        url: null,
+        event_date: '2026-05-01',
+        event_time: null,
+      });
+      mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
+      // Reconcile keeps finding the old snapshot (incomplete save).
+      mockUeSelectSingle.mockResolvedValue({
+        data: {
+          id: 'ue-old',
+          event_id: 'e-old',
+          events: {
+            id: 'e-old',
+            created_by_user_id: 'u1',
+            url: null,
+            title: 'Old Title',
+            description: null,
+            image_url: null,
+            event_date: '2026-05-01',
+            event_time: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        },
+        error: null,
+      });
+
+      const screen = render(<EditEventScreen />);
+      const titleInput = await screen.findByPlaceholderText('Event title');
+      fireEvent.changeText(titleInput, 'Old Title edited');
+      fireEvent.press(screen.getByText('Save'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS);
+      });
+
+      expect(showAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'That took too long. Check your connection and try again.'
+      );
+      expect(router.replace).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not treat a dedup collision as success (KI-002)', async () => {
+    jest.useFakeTimers();
+    try {
+      const { showAlert } = require('../../../lib/dialogs');
+      rememberEventPreview({
+        event_id: 'e-old',
+        userEventId: 'ue-old',
+        title: 'Old Title',
+        description: null,
+        image_url: null,
+        url: null,
+        event_date: '2026-05-01',
+        event_time: null,
+      });
+      mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
+      // The pointer moved and the title matches, but the snapshot's
+      // description is someone else's — dedup ignores description/image_url,
+      // so a title-only compare would false-confirm here.
+      mockUeSelectSingle.mockResolvedValue({
+        data: {
+          id: 'ue-old',
+          event_id: 'e-new',
+          events: {
+            id: 'e-new',
+            created_by_user_id: 'u1',
+            url: null,
+            title: 'Old Title edited',
+            description: 'pre-existing snapshot text',
+            image_url: null,
+            event_date: '2026-05-01',
+            event_time: null,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        },
+        error: null,
+      });
+
+      const screen = render(<EditEventScreen />);
+      const titleInput = await screen.findByPlaceholderText('Event title');
+      fireEvent.changeText(titleInput, 'Old Title edited');
+      fireEvent.press(screen.getByText('Save'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS);
+      });
+
+      expect(showAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'That took too long. Check your connection and try again.'
+      );
+      expect(router.replace).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('alerts when the reconcile read itself fails', async () => {
+    jest.useFakeTimers();
+    try {
+      const { showAlert } = require('../../../lib/dialogs');
+      rememberEventPreview({
+        event_id: 'e-old',
+        userEventId: 'ue-old',
+        title: 'Old Title',
+        description: null,
+        image_url: null,
+        url: null,
+        event_date: '2026-05-01',
+        event_time: null,
+      });
+      mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
+      mockUeSelectSingle.mockRejectedValue(
+        new TypeError('NetworkError when attempting to fetch resource.')
+      );
+
+      const screen = render(<EditEventScreen />);
+      const titleInput = await screen.findByPlaceholderText('Event title');
+      fireEvent.changeText(titleInput, 'Old Title edited');
+      fireEvent.press(screen.getByText('Save'));
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS);
+      });
+
+      expect(showAlert).toHaveBeenCalledWith(
+        'Could not save',
+        'That took too long. Check your connection and try again.'
+      );
       expect(router.replace).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();

@@ -1,11 +1,11 @@
 import { Modal, View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { showAlert } from '../lib/dialogs';
-import { showError } from '../lib/showError';
 import { normalizeToE164 } from '../lib/contacts';
 import { useTheme } from '../hooks/useTheme';
+import { isAbortError, withWriteTimeout } from '../lib/timeoutSignal';
 
 type Props = {
   visible: boolean;
@@ -27,6 +27,8 @@ export function ManualAddPersonModal({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
+  // State alone admits same-tick double taps; the ref guards synchronously.
+  const saveInFlightRef = useRef(false);
 
   const handleClose = () => {
     setName('');
@@ -49,26 +51,39 @@ export function ManualAddPersonModal({
       return;
     }
 
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setSaving(true);
     try {
-      const { error } = await supabase.from('my_people').upsert(
-        [
-          {
-            owner_id: userId,
-            phone_number: normalized,
-            contact_name: name.trim() || null,
-          },
-        ],
-        { onConflict: 'owner_id,phone_number' }
-      );
-      if (error) {
-        showError('Error adding person', error);
-        return;
-      }
+      await withWriteTimeout(async (signal) => {
+        const { error } = await supabase
+          .from('my_people')
+          .upsert(
+            [
+              {
+                owner_id: userId,
+                phone_number: normalized,
+                contact_name: name.trim() || null,
+              },
+            ],
+            { onConflict: 'owner_id,phone_number' }
+          )
+          .abortSignal(signal);
+        if (error) throw error;
+      });
       setName('');
       setPhone('');
       onSaved();
+    } catch (err) {
+      console.error('Failed to add person:', err);
+      showAlert(
+        'Could not add person',
+        isAbortError(err)
+          ? 'That took too long. Check your connection and try again.'
+          : 'Something went wrong. Try again.'
+      );
     } finally {
+      saveInFlightRef.current = false;
       setSaving(false);
     }
   };

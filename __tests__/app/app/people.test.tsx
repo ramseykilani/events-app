@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Platform } from 'react-native';
+import { abortable, abortablePromise } from '../../helpers/abortable';
 import PeopleScreen from '../../../app/(app)/people';
 import { showAlert, showConfirm } from '../../../lib/dialogs';
 
@@ -42,10 +43,6 @@ jest.mock('../../../lib/dialogs', () => ({
   showConfirm: jest.fn(),
 }));
 
-jest.mock('../../../lib/showError', () => ({
-  showError: jest.fn(),
-}));
-
 jest.mock('../../../lib/contacts', () => {
   const actual = jest.requireActual('../../../lib/contacts');
   return {
@@ -73,23 +70,33 @@ describe('app/(app)/people manual add', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
     mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
 
-    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
-    mockHiddenEq.mockResolvedValue({ data: [], error: null });
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
     mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
-    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
     mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
     mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
-    mockUsersUpdateEq.mockResolvedValue({ error: null });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
 
-    mockMyPeopleUpsert.mockResolvedValue({ data: null, error: null });
+    mockMyPeopleUpsert.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: null, error: null }))
+    );
     mockSignOut.mockResolvedValue({ error: null });
 
     mockFrom.mockImplementation((table: string) => {
@@ -168,21 +175,29 @@ describe('app/(app)/people empty state', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
     mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
 
-    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
-    mockHiddenEq.mockResolvedValue({ data: [], error: null });
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
     mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
-    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
     mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
     mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
-    mockUsersUpdateEq.mockResolvedValue({ error: null });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'my_people') {
@@ -218,21 +233,29 @@ describe('app/(app)/people sign out', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
     mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
 
-    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
-    mockHiddenEq.mockResolvedValue({ data: [], error: null });
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
     mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
-    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
     mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
     mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
-    mockUsersUpdateEq.mockResolvedValue({ error: null });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
 
     mockSignOut.mockResolvedValue({ error: null });
 
@@ -291,23 +314,33 @@ describe('app/(app)/people delete account', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
     mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
 
-    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
-    mockHiddenEq.mockResolvedValue({ data: [], error: null });
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
     mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
-    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
     mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
     mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
-    mockUsersUpdateEq.mockResolvedValue({ error: null });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
 
-    mockRpc.mockResolvedValue({ data: null, error: null });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: null, error: null }))
+    );
     mockSignOut.mockResolvedValue({ error: null });
 
     mockFrom.mockImplementation((table: string) => {
@@ -363,10 +396,11 @@ describe('app/(app)/people delete account', () => {
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
-  it('surfaces an RPC failure and keeps the session', async () => {
+  it('surfaces an RPC failure as a short alert and keeps the session', async () => {
     Platform.OS = 'web';
-    mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
-    const { showError } = jest.requireMock('../../../lib/showError');
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: null, error: { message: 'boom' } }))
+    );
     const { getByText } = render(<PeopleScreen />);
 
     await waitFor(() => expect(getByText('Delete account')).toBeTruthy());
@@ -376,7 +410,10 @@ describe('app/(app)/people delete account', () => {
     await options.onConfirm();
 
     expect(mockRpc).toHaveBeenCalledTimes(1);
-    expect(showError).toHaveBeenCalledTimes(1);
+    expect(showAlert).toHaveBeenCalledWith(
+      'Could not delete account',
+      'Something went wrong. Try again.'
+    );
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 });
@@ -387,21 +424,29 @@ describe('app/(app)/people display name', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockMyPeopleOrder.mockResolvedValue({ data: [], error: null });
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
     mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
 
-    mockCirclesEq.mockResolvedValue({ data: [], error: null });
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
-    mockHiddenEq.mockResolvedValue({ data: [], error: null });
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
     mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
 
     mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
-    mockUsersEq.mockReturnValue({ single: mockUsersSingle });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
     mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
     mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
-    mockUsersUpdateEq.mockResolvedValue({ error: null });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'my_people') {
@@ -463,9 +508,12 @@ describe('app/(app)/people display name', () => {
     expect(mockUsersUpdate).not.toHaveBeenCalled();
   });
 
-  it('surfaces a save failure and keeps the modal open', async () => {
-    const { showError } = jest.requireMock('../../../lib/showError');
-    mockUsersUpdateEq.mockResolvedValue({ error: { code: '23514', message: 'check violation' } });
+  it('surfaces a save failure as a short alert and keeps the modal open', async () => {
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({ error: { code: '23514', message: 'check violation' } })
+      )
+    );
     const { getByText, getByLabelText } = render(<PeopleScreen />);
 
     await waitFor(() => expect(getByText('Your name: Test User')).toBeTruthy());
@@ -474,9 +522,9 @@ describe('app/(app)/people display name', () => {
     fireEvent.press(getByText('Save'));
 
     await waitFor(() => {
-      expect(showError).toHaveBeenCalledWith(
+      expect(showAlert).toHaveBeenCalledWith(
         'Could not save name',
-        expect.objectContaining({ code: '23514' })
+        'Something went wrong. Try again.'
       );
     });
     expect(getByLabelText('Your name')).toBeTruthy();

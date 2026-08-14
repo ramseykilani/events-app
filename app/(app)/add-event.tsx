@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
 import { useSession } from '../_context/SessionContext';
 import { useTheme } from '../../hooks/useTheme';
-import { isAbortError, withTimeout, WRITE_TIMEOUT_MS } from '../../lib/timeoutSignal';
+import { isAbortError, withFetchTimeout, withWriteTimeout } from '../../lib/timeoutSignal';
 
 export default function AddEventScreen() {
   const { session } = useSession();
@@ -35,6 +35,7 @@ export default function AddEventScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loadingOg, setLoadingOg] = useState(false);
   const [loading, setLoading] = useState(false);
+  const createInFlightRef = useRef(false);
 
   const fetchOgMetadata = async () => {
     if (!url.trim()) return;
@@ -63,12 +64,22 @@ export default function AddEventScreen() {
 
   const checkExistingEvents = async (): Promise<{ id: string; title: string | null; event_date: string }[] | null> => {
     if (!url.trim()) return null;
-    const { data } = await supabase
-      .from('events')
-      .select('id, title, event_date')
-      .eq('url', url.trim())
-      .limit(5);
-    return data ?? [];
+    try {
+      return await withFetchTimeout(async (signal) => {
+        const { data, error } = await supabase
+          .from('events')
+          .select('id, title, event_date')
+          .eq('url', url.trim())
+          .abortSignal(signal)
+          .limit(5);
+        if (error) throw error;
+        return data ?? [];
+      });
+    } catch (err) {
+      // Best-effort dedup check: failing open to "no match" keeps Save usable.
+      console.warn('Existing-event check skipped:', err);
+      return [];
+    }
   };
 
   const chooseExistingEvent = async (
@@ -109,81 +120,83 @@ export default function AddEventScreen() {
     }
 
     if (!session?.user?.id) return;
+    if (createInFlightRef.current) return;
+    createInFlightRef.current = true;
+    setLoading(true);
 
-    if (url.trim()) {
-      const existing = await checkExistingEvents();
-      if (existing && existing.length > 0) {
-        const eventId = await chooseExistingEvent(existing);
-        if (eventId) {
-          let userEventId: string | null = null;
-          try {
-            await withTimeout(async (signal) => {
-              const { data: inserted, error: ueErr } = await supabase
-                .from('user_events')
-                .insert({
-                  user_id: session.user.id,
-                  event_id: eventId,
-                })
-                .select('id')
-                .abortSignal(signal)
-                .single();
-
-              // If the user already has this event, reuse that ownership row.
-              if (ueErr && ueErr.code !== '23505') {
-                throw ueErr;
-              }
-
-              userEventId = inserted?.id ?? null;
-              if (!userEventId) {
-                const { data: existingUserEvent, error: fetchErr } = await supabase
+    try {
+      if (url.trim()) {
+        const existing = await checkExistingEvents();
+        if (existing && existing.length > 0) {
+          const eventId = await chooseExistingEvent(existing);
+          if (eventId) {
+            let userEventId: string | null = null;
+            try {
+              await withWriteTimeout(async (signal) => {
+                const { data: inserted, error: ueErr } = await supabase
                   .from('user_events')
+                  .insert({
+                    user_id: session.user.id,
+                    event_id: eventId,
+                  })
                   .select('id')
-                  .eq('user_id', session.user.id)
-                  .eq('event_id', eventId)
                   .abortSignal(signal)
                   .single();
 
-                if (fetchErr || !existingUserEvent?.id) {
-                  throw fetchErr ?? new Error('Failed to prepare sharing');
+                // If the user already has this event, reuse that ownership row.
+                if (ueErr && ueErr.code !== '23505') {
+                  throw ueErr;
                 }
-                userEventId = existingUserEvent.id;
-              }
-            }, WRITE_TIMEOUT_MS);
-          } catch (err) {
-            console.error('Failed to save event:', err);
-            showAlert(
-              'Could not save',
-              isAbortError(err)
-                ? 'That took too long. Check your connection and try again.'
-                : 'Something went wrong. Try again.'
-            );
+
+                userEventId = inserted?.id ?? null;
+                if (!userEventId) {
+                  const { data: existingUserEvent, error: fetchErr } = await supabase
+                    .from('user_events')
+                    .select('id')
+                    .eq('user_id', session.user.id)
+                    .eq('event_id', eventId)
+                    .abortSignal(signal)
+                    .single();
+
+                  if (fetchErr || !existingUserEvent?.id) {
+                    throw fetchErr ?? new Error('Failed to prepare sharing');
+                  }
+                  userEventId = existingUserEvent.id;
+                }
+              });
+            } catch (err) {
+              console.error('Failed to save event:', err);
+              showAlert(
+                'Could not save',
+                isAbortError(err)
+                  ? 'That took too long. Check your connection and try again.'
+                  : 'Something went wrong. Try again.'
+              );
+              return;
+            }
+
+            router.replace({
+              pathname: '/(app)/share',
+              params: { eventId, userEventId },
+            });
             return;
           }
-
-          router.replace({
-            pathname: '/(app)/share',
-            params: { eventId, userEventId },
-          });
-          return;
         }
       }
-    }
 
-    if (!isPlausibleEventDate(eventDate)) {
-      // The web date widget makes year typos easy (2026 -> 1906) and the event
-      // would silently land a century off; block with a clear message.
-      showAlert(
-        'Check the date',
-        `That date is in ${eventDate.getFullYear()}. The date field can mistype years — please pick the date again.`
-      );
-      return;
-    }
+      if (!isPlausibleEventDate(eventDate)) {
+        // The web date widget makes year typos easy (2026 -> 1906) and the event
+        // would silently land a century off; block with a clear message.
+        showAlert(
+          'Check the date',
+          `That date is in ${eventDate.getFullYear()}. The date field can mistype years — please pick the date again.`
+        );
+        return;
+      }
 
-    setLoading(true);
-    try {
       let createdEventId: string | undefined;
       let createdUserEventId: string | undefined;
-      await withTimeout(async (signal) => {
+      await withWriteTimeout(async (signal) => {
         const timeStr = eventTime
           ? eventTime.toTimeString().slice(0, 8)
           : null;
@@ -237,7 +250,7 @@ export default function AddEventScreen() {
 
         createdEventId = eventId as string;
         createdUserEventId = userEventId;
-      }, WRITE_TIMEOUT_MS);
+      });
 
       if (!createdEventId || !createdUserEventId) {
         throw new Error('Failed to create event');
@@ -255,6 +268,7 @@ export default function AddEventScreen() {
           : 'Something went wrong. Try again.'
       );
     } finally {
+      createInFlightRef.current = false;
       setLoading(false);
     }
   };

@@ -11,7 +11,11 @@ export const FETCH_ATTEMPTS = 3;
 // (KI-002). Navigation stays outside this timer.
 export const WRITE_TIMEOUT_MS = 15000;
 
-export function timeoutSignal(ms = FETCH_TIMEOUT_MS): {
+// The budget is fixed per kind on purpose: withFetchTimeout/withWriteTimeout
+// take no ms argument, so a call site cannot pass the wrong one (B-1 was a
+// write wrapped in the read default). The generic helpers stay
+// module-private — importing them is a conventions violation.
+function timeoutSignal(ms: number): {
   signal: AbortSignal;
   cancel: () => void;
 } {
@@ -32,9 +36,9 @@ export function isAbortError(err: unknown): boolean {
   );
 }
 
-export async function withTimeout<T>(
+async function withTimeoutMs<T>(
   fn: (signal: AbortSignal) => Promise<T>,
-  ms = FETCH_TIMEOUT_MS
+  ms: number
 ): Promise<T> {
   const { signal, cancel } = timeoutSignal(ms);
   try {
@@ -63,15 +67,33 @@ export async function withTimeout<T>(
   }
 }
 
+/** Reads: the 2s "people hit refresh" budget. Load paths use withRetries. */
+export function withFetchTimeout<T>(
+  fn: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  return withTimeoutMs(fn, FETCH_TIMEOUT_MS);
+}
+
+/**
+ * Writes: 15s, and never retried — find_or_create_event may have already
+ * committed (KI-002), so an aborted write is reconciled by reading, not by
+ * trying again.
+ */
+export function withWriteTimeout<T>(
+  fn: (signal: AbortSignal) => Promise<T>
+): Promise<T> {
+  return withTimeoutMs(fn, WRITE_TIMEOUT_MS);
+}
+
+/** Reads only: a few short attempts, then the caller's "Could not load" UI. */
 export async function withRetries<T>(
   fn: (signal: AbortSignal) => Promise<T>,
-  attempts = FETCH_ATTEMPTS,
-  ms = FETCH_TIMEOUT_MS
+  attempts = FETCH_ATTEMPTS
 ): Promise<T> {
   let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
-      return await withTimeout(fn, ms);
+      return await withFetchTimeout(fn);
     } catch (err) {
       lastError = err;
     }
