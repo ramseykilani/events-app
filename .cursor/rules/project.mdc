@@ -45,7 +45,8 @@ hooks/               useTheme (active theme palette from ThemeContext) and other
 lib/                 supabase.ts, types.ts, contacts.ts, showError.ts, dialogs.ts, format.ts, applyWebBrowserChrome.ts, timeoutSignal.ts
 app/+html.tsx        Web HTML shell (default Paper theme-color / body background)
 manual-tests/        Cloud manual regression suite, report templates, known-issues ledger
-scripts/             Helper scripts (e.g. manual test preflight runner)
+assets/              Launcher icon, adaptive foreground, splash, favicon, notification glyph (Paper E’s)
+scripts/             Helper scripts (e.g. manual test preflight runner, generate-app-icons.py)
 supabase/migrations/ SQL migrations (schema, RLS, triggers, RPCs) — run in order
 supabase/functions/  Edge Functions (send-notification, og-metadata, cleanup-people, cleanup-events)
 ```

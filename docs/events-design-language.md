@@ -158,4 +158,12 @@ The escape routes are closed, deliberately:
 
 ---
 
+## 10. App icon
+
+The launcher mark is a Paper monogram: serif **E’s** (typographic apostrophe) in `textPrimary` on `background`. One icon everywhere — iOS, Android, splash, favicon — because Paper is the default mood and the home-screen icon cannot follow the in-app theme. Android has no light/dark pair, and iOS appearance is the OS, not the named mood.
+
+Android notifications use a white-on-transparent cut of the same lockup (`assets/notification-icon.png`). Regenerate the set with `python3 scripts/generate-app-icons.py`.
+
+---
+
 *The philosophy will not change; the implementation will evolve. When in doubt, return to §1 — color is a treat, never a hook.*

@@ -11,7 +11,8 @@ export default {
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff",
+      // Paper background — Colors.paper.background
+      backgroundColor: "#faf7f0",
     },
     ios: {
       bundleIdentifier: "com.rkilani.events",
@@ -27,7 +28,9 @@ export default {
       permissions: ["READ_CONTACTS"],
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff",
+        monochromeImage: "./assets/adaptive-icon.png",
+        // Paper background — Colors.paper.background
+        backgroundColor: "#faf7f0",
       },
       edgeToEdgeEnabled: false,
       predictiveBackGestureEnabled: false,
@@ -44,8 +47,9 @@ export default {
       [
         "expo-notifications",
         {
-          icon: "./assets/icon.png",
-          color: "#ffffff",
+          icon: "./assets/notification-icon.png",
+          // Paper ink — Colors.paper.textPrimary (tints the Android notification disc)
+          color: "#1a1815",
           sounds: [],
         },
       ],
