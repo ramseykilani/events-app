@@ -237,9 +237,10 @@ builds (agent-run); current enrollment/secrets/build/tester state lives in
 - App Store Connect API key — **done 2026-08-15.** Admin Team Key; `.p8` on
   the owner's machine (`F:\Code\Events\events-keys`). Secrets:
   `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`,
-  `EXPO_ASC_API_KEY_P8_BASE64`. ASC listing name is **Shared Events**
-  (`Events` was taken); bundle ID `com.rkilani.events`; home-screen name
-  stays `Events`.
+  `EXPO_ASC_API_KEY_P8_BASE64`. This key submits IPAs to App Store Connect.
+  It is **not** an APNs push key — Expo still has `pushKey: null` (STATUS.md).
+  ASC listing name is **Shared Events** (`Events` was taken); bundle ID
+  `com.rkilani.events`; home-screen name stays `Events`.
 - Play service account — **done 2026-08-15.** GCP project `rkilani-events`,
   invited in Play Console with release access. Secret:
   `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (base64). Privacy policy / data-safety /
@@ -269,10 +270,17 @@ spends 1–2 per release; don't build speculatively.
   testers' Gmail addresses → share the opt-in link (Play does not email
   them). Up to ~100, no review. Talk to people first; the owner Gmail is
   already on the list. This is the friends-and-friends-of-friends path.
-- **iOS — TestFlight internal:** up to 100, no review, but testers must hold
-  a role on your App Store Connect team — friends on iPhone go via
-  **external** TestFlight instead (email/public link, up to 10k, Beta App
-  Review ~24–48h on the first build of each version).
+- **iOS — TestFlight internal (the friends path):** up to 100, **no Beta App
+  Review**. Testers must be App Store Connect users with Account Holder,
+  Admin, App Manager, Developer, or Marketing. Invite each iPhone tester
+  under Users and Access as **Marketing** with **Shared Events** only (not
+  Admin, not All Apps), wait until they accept, then add them to internal
+  group **Team (Expo)**. Apple emails the TestFlight invite. Do not submit
+  the build for External Testing just to reach the first testers — that
+  queues Beta App Review (~24–48h) for no gain.
+- **iOS — TestFlight external:** email/public link, up to 10k, first build
+  of each version goes through Beta App Review. Use later, when the list
+  outgrows “people we will put on the ASC team.”
 - TestFlight builds expire 90 days after upload — rebuild periodically during
   a long beta.
 
