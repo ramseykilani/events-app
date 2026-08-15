@@ -27,17 +27,16 @@ Play "Finish setting up your app" (privacy policy URL, data-safety form, content
 
 ## Code state
 
-- `staging`: `c4fc7fe` — smoke-state correction on top of the People List Scrolling note and launch-crash fix. Full suite green on `d7f9433` (2026-08-15).
-- `production`: `7e7c2b4` — deployed 2026-08-15 (https://shared-events.pages.dev).
-  Release review: `manual-tests/manual_test_report_2026-08-15-release.md`.
+- `staging` / `production`: `8f3b660` — 2026-08-15 ship. Reviewed product commit `577426c` (People 44pt targets + footer safe-area) plus this release report. Live: https://shared-events.pages.dev. Review: `manual-tests/manual_test_report_2026-08-15-release-577426c.md`.
 
 ## Latest native builds
 
 | Profile | Platform | Date | Link | State |
 |---------|----------|------|------|-------|
-| preview (internal APK) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/5f477380-e794-46e1-a5cc-1b8ba70cb336 | Built from `d7f9433` (full suite green). Owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`): all scenarios pass except N-007's recipient side (needs a second account). Push verified end-to-end after the FCM v1 key upload. Known non-blocking (owner ruling): People footer can sit under 3-button nav. Testers must not get this until the smoke closes out. |
+| preview (internal APK) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/eab4bcd7-0900-4517-986b-28657dccbe49 | Built from promoted `8f3b660` (0.1.0 / 1). Includes the People touch-target + footer safe-area fix. **Waiting on owner device smoke** (`manual-tests/native_device_smoke.md`) before any tester build. Testers must not get this until that smoke passes. |
+| preview (superseded — do not distribute) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/5f477380-e794-46e1-a5cc-1b8ba70cb336 | Built from `d7f9433`. Owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`): all scenarios pass except N-007's recipient side. Known non-blocking on that build (owner ruling, now fixed on `577426c`): People footer can sit under 3-button nav. |
 | preview (superseded — do not distribute) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/3c0f99e5-aa69-464c-a204-9166682e5974 | FAILED owner smoke: crashed instantly at launch. Root cause: the EAS project had no `EXPO_PUBLIC_SUPABASE_*` environment variables, so the bundle inlined empty values and `createClient` threw at module scope before React mounted. Fixed by creating the vars on all EAS environments + the `lib/supabase.ts` fallback (`7b7517b`). |
-| production (Play internal) | Android | — | — | Waits on the pre-tester touch-target fix (FEATURES.md → Touch Targets & Footer Safe Area) and N-007's recipient-side check (second account). Credentials are in. After that, a **fresh** session: `eas build --platform android --profile production --non-interactive --wait` then `eas submit --platform android --profile production --non-interactive --latest`. |
+| production (Play internal) | Android | — | — | Waits on owner smoke of preview `eab4bcd7` (this ship includes the pre-tester touch-target fix). N-007 recipient-side still needs a second account. Credentials are in. After a smoke pass: `eas build --platform android --profile production --non-interactive --wait` then `eas submit --platform android --profile production --non-interactive --latest`. |
 | production (TestFlight) | iOS | — | — | Credentials are in. Wait until the smoke checklist passes **and** at least one iPhone tester has said yes. Friends who are not on the App Store Connect team go via **external** TestFlight (Beta App Review on the first build of each version). First agent iOS build may need one interactive `eas build --platform ios --profile production` on the owner's machine if non-interactive credential bootstrap fails (bundle ID / APNs). |
 
 ## Testers
