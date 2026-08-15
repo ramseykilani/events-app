@@ -23,7 +23,7 @@ this file is where things stand right now.
 
 ## Code state
 
-- `staging`: `7e7c2b4` — SHIP report on `329276e`; full suite green 2026-08-15.
+- `staging`: `d7f9433` — launch-crash fix (EAS Supabase env vars + `lib/supabase.ts` placeholder fallback); full suite green 2026-08-15.
 - `production`: `7e7c2b4` — deployed 2026-08-15 (https://shared-events.pages.dev).
   Release review: `manual-tests/manual_test_report_2026-08-15-release.md`.
 
@@ -31,7 +31,8 @@ this file is where things stand right now.
 
 | Profile | Platform | Date | Link | State |
 |---------|----------|------|------|-------|
-| preview (internal APK) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/3c0f99e5-aa69-464c-a204-9166682e5974 | Built from `7e7c2b4`. Awaiting owner smoke (`manual-tests/native_device_smoke.md`). Testers must not get this until that pass. |
+| preview (internal APK) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/5f477380-e794-46e1-a5cc-1b8ba70cb336 | Built from `d7f9433` (full suite green). Bundle verified to contain the real Supabase URL. Awaiting owner smoke (`manual-tests/native_device_smoke.md`). Testers must not get this until that pass. |
+| preview (superseded — do not distribute) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/3c0f99e5-aa69-464c-a204-9166682e5974 | FAILED owner smoke: crashed instantly at launch. Root cause: the EAS project had no `EXPO_PUBLIC_SUPABASE_*` environment variables, so the bundle inlined empty values and `createClient` threw at module scope before React mounted. Fixed by creating the vars on all EAS environments + the `lib/supabase.ts` fallback (`7b7517b`). |
 | production (Play internal / TestFlight) | — | — | — | Not started — waits on owner smoke pass, then Play identity verification for submit. |
 
 ## Testers
