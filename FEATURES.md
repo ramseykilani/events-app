@@ -20,6 +20,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Delete Account](#delete-account) | Implemented | |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
+| [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 
@@ -360,6 +361,48 @@ On the event detail screen ([app/(app)/event/[id].tsx](app/(app)/event/[id].tsx)
 ### Open Questions
 
 - None
+
+---
+
+## People List Scrolling
+
+**Status:** Planned — polish, not a blocker. Adding people, circles, hide/unhide, and the account footer all work today.
+
+### What this is not
+
+This is not a missing People-screen capability and not a tester blocker. Do not treat it as a rewrite of My People, circles, or hide. The owner asked to record that the list *feel* is off so a later pass can fix the scroll, not invent new people features.
+
+### Problem
+
+The People screen ([app/(app)/people.tsx](app/(app)/people.tsx)) does not scroll as one page. Circles live in a pinned block above a nested `FlatList` that only scrolls the people rows (Hidden is that list's footer). Header, count, circles, and the account footer stay put; only the middle pane moves.
+
+That split is what feels wrong: the people list is a cramped inner scroller, not a document. A few circles shrink the people viewport; a long list means scrolling a hole in the middle of the screen while circles sit frozen above it. On web (`react-native-web`) a nested `FlatList` also picks up odd overscroll.
+
+### Proposed Solution
+
+Treat Circles, People, and Hidden as one scrollable document between the pinned chrome (Back / My People / Add, plus the count) and the pinned account footer (Your name / Sign out / Delete account). Pick the list primitive on the implementation pass — a page-level `ScrollView`, a `SectionList`, or a `FlatList` with Circles as the header are all fine if the result is one motion.
+
+Do not change add/remove/hide semantics, the 50-person cap, or the empty state (already a non-scrolling centered block).
+
+### Technical Notes
+
+- Today's tree: pinned header + count → `circlesSection` `View` (maps circles + the new-circle input) → `peopleSection` (`flex: 1`) wrapping a `FlatList` of people, with Hidden as `ListFooterComponent` → pinned footer.
+- Keep the header and account footer reachable without scrolling. Those are chrome, not list content.
+- The new-circle name field currently sits in the pinned circles block. If the whole middle scrolls, decide whether that input travels with the Circles section or stays pinned — see Open Questions.
+- `e2e/people.spec.ts`, `e2e/hide.spec.ts` (Hidden / Unhide scoping), and People visual snapshots will need a look if the layout changes. Selection-retry helpers in `e2e/helpers.ts` still apply.
+- Native is the product; judge the feel on a phone-sized viewport, not desktop Chrome alone.
+
+### Acceptance Criteria
+
+- [ ] Circles, people, and hidden scroll together as one list — no inner pane that moves while circles stay frozen
+- [ ] Header (Back / title / Add) and account footer stay on screen
+- [ ] Existing people, circle, and hide/unhide actions still work; no data-model change
+- [ ] Jest + e2e stay green; People visual snapshots updated only if the layout actually moves pixels
+
+### Open Questions
+
+- Should the "New circle name" input scroll away with Circles, or stay pinned under the header?
+- Is the odd feel only the split scroll, or also row spacing / section weight? Owner flagged scrolling and "how the people list feels" — start with one document scroll; don't restyle rows unless that pass still feels off.
 
 ---
 
