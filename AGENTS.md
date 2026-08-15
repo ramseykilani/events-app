@@ -151,12 +151,13 @@ Prerequisites (Cursor secrets — injected into new cloud-agent VMs only; a runn
 
 - `EXPO_TOKEN` — Expo access token (Expo dashboard → Account settings → Access Tokens). Authenticates every `eas` command.
 - EAS project environment variables `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` (plaintext; development + preview + production) — created 2026-08-15. EAS builds do not read local `.env`; without these the bundle has no Supabase config. (Pre-hardening this was an instant launch crash — `createClient` threw at module scope; `lib/supabase.ts` now falls back to a placeholder, but the app is useless without real values.) Inspect with `eas env:list --environment preview`; recreate per SETUP.md → EAS Builds.
-- iOS (App Store Connect API key): `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, and `EXPO_ASC_API_KEY_P8_BASE64` (base64 of the `.p8`). Decode the key and export the set the CLI reads:
+- iOS (App Store Connect API key): `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, and `EXPO_ASC_API_KEY_P8_BASE64` (base64 of the `.p8`). Decode to the gitignored path `eas.json` submit uses, and export the env vars the CLI also reads:
   ```bash
-  echo "$EXPO_ASC_API_KEY_P8_BASE64" | base64 -d > /tmp/AuthKey.p8
-  export EXPO_ASC_API_KEY_PATH=/tmp/AuthKey.p8
+  echo "$EXPO_ASC_API_KEY_P8_BASE64" | base64 -d > AuthKey.p8
+  export EXPO_ASC_API_KEY_PATH="$PWD/AuthKey.p8"
   export EXPO_APPLE_TEAM_TYPE=INDIVIDUAL
   ```
+  Distribution cert + provisioning profile for `com.rkilani.events` were created 2026-08-15; non-interactive `eas build --platform ios` works. `submit.production.ios.ascAppId` is `6801756936` (Shared Events). Do not pass `--what-to-test` (EAS changelog is Enterprise-only).
 - Android submit (Play service account): decode `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (base64) to the path `eas.json` expects — `echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" | base64 -d > google-play-service-account.json`. The file is gitignored; never commit it.
 
 Commands:
@@ -169,14 +170,14 @@ eas build --platform android --profile preview --non-interactive --wait
 eas build --platform android --profile production --non-interactive --wait
 eas submit --platform android --profile production --non-interactive --latest
 
-# iOS → TestFlight (ASC key env vars above authenticate both build and submit)
+# iOS → TestFlight (ASC key file + eas.json submit.production.ios)
 eas build --platform ios --profile production --non-interactive --wait
 eas submit --platform ios --profile production --non-interactive --latest
 ```
 
 - `--wait` blocks until the build finishes and prints the artifact page URL — hand that link to the owner. Builds are metered (free plan: 15 Android + 15 iOS per month); never build speculatively.
 - Preview produces an APK (sideload); production produces an AAB (Play) / IPA (TestFlight). Same commit, same code — preview is the owner's smoke surface, production is what testers get.
-- First iOS build fallback: if non-interactive credential bootstrap fails (bundle ID registration, APNs key), the owner runs `eas build --platform ios --profile production` once interactively on their machine; after that the env-var path works. Once the ASC key exists, its IDs may also be added to the `submit.production.ios` profile in `eas.json` (`ascApiKeyPath`/`ascApiKeyId`/`ascApiKeyIssuerId`) — optional; env vars suffice.
+- iOS credentials (dist cert + profile) and `eas.json` `submit.production.ios` (`ascAppId` / `ascApiKeyPath` / `ascApiKeyId` / `ascApiKeyIssuerId`) were set up 2026-08-15. If a later non-interactive build still fails on certificates, the owner can run `eas build --platform ios --profile production` once interactively.
 - If a required secret is missing, stop and tell the owner exactly which one to add (Cursor Dashboard → Cloud Agents → Secrets, and GitHub repo secrets if CI ever builds). Do not half-run a release.
 
 ### Key gotchas
