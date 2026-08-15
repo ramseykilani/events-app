@@ -1,0 +1,62 @@
+{
+  "t2-6a": {
+    "status": "PASS",
+    "note": "200-char title saved; visible on calendar (may wrap/truncate)"
+  },
+  "t2-6b": {
+    "status": "PASS",
+    "note": "long description renders on detail"
+  },
+  "t2-6c": {
+    "status": "PASS",
+    "note": "URL-only save worked (https://example.org/ship-t2s-1786760596911)"
+  },
+  "t2-7": {
+    "status": "PASS",
+    "note": "8 events on today; last title reachable"
+  },
+  "t2-8-nav": {
+    "status": "FAIL",
+    "note": "month before=\"August 2026\" after=\"August 2026\""
+  },
+  "t2-8-refresh": {
+    "status": "PASS",
+    "note": "pull gesture did not crash calendar"
+  },
+  "t3-1-disabled": {
+    "status": "PASS",
+    "note": "Share disabled with zero selection"
+  },
+  "t3-1-enabled": {
+    "status": "PASS",
+    "note": "selecting B enabled Share"
+  },
+  "t3-1-already": {
+    "status": "PASS",
+    "note": "already-shared row shows ✓ Shared"
+  },
+  "t5-a11y": {
+    "status": "PASS",
+    "note": "{\"help\":\"Help\",\"add\":\"Add event\",\"swatch\":\"Switch to Evening theme\"}"
+  },
+  "t5-console-notif": {
+    "status": "PASS",
+    "note": "notification requests=0"
+  },
+  "t4-matrix": {
+    "status": "PASS",
+    "note": "matrix captured phone+desktop × Paper+Evening plus landscape"
+  },
+  "t2-8-arrow-dump": {
+    "status": "PASS",
+    "note": "[]"
+  },
+  "t5-back": {
+    "status": "PASS",
+    "note": "browser back from event detail returned to calendar"
+  },
+  "cleanup": {
+    "status": "PASS",
+    "note": "attempted leftover ship-it event removal"
+  }
+}
