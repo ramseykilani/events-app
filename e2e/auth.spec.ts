@@ -1,5 +1,5 @@
 import { expect, newExtraContext, test } from './fixtures';
-import { ACCOUNT_A } from './helpers';
+import { ACCOUNT_B } from './helpers';
 
 // Signed-out auth flows (M-001, M-002) run in a fresh context with no stored
 // session. None of these complete a successful OTP verify — the setup project
@@ -56,7 +56,7 @@ test('verify screen starts the resend cooldown and rejects a wrong code (M-002)'
   try {
     const page = await context.newPage();
     await page.goto('/');
-    await page.getByLabel('Phone number').fill(ACCOUNT_A.phone);
+    await page.getByLabel('Phone number').fill(ACCOUNT_B.phone);
     await page.getByRole('button', { name: 'Send code' }).click();
 
     // The initial send starts the 60s cooldown so an accidental tap can't

@@ -1,10 +1,8 @@
 import type { Dialog } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
-  ACCOUNT_A,
   expectCalendar,
   openEventFromCalendar,
-  signIn,
   uniqueTitle,
   visibleText,
 } from './helpers';
@@ -25,7 +23,7 @@ test('write latency: a 3s find_or_create_event still saves, with no alert', asyn
   const title = uniqueTitle('E2E write-latency', testInfo.project.name);
   const editedTitle = `${title} edited`;
 
-  await signIn(page, ACCOUNT_A);
+  await page.goto('/');
 
   // Create and open an event before any route is installed.
   await expectCalendar(page);
@@ -98,8 +96,7 @@ test('read latency: a delayed calendar fetch keeps events and shows the retry ba
 }, testInfo) => {
   const title = uniqueTitle('E2E read-latency', testInfo.project.name);
 
-  await signIn(page, ACCOUNT_A);
-
+  await page.goto('/');
   await expectCalendar(page);
   await page.getByRole('button', { name: 'Add event' }).click();
   await page.getByPlaceholder('Event title').fill(title);
