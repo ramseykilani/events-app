@@ -177,7 +177,7 @@ eas submit --platform ios --profile production --non-interactive --latest
 
 - `--wait` blocks until the build finishes and prints the artifact page URL — hand that link to the owner. Builds are metered (free plan: 15 Android + 15 iOS per month); never build speculatively.
 - Preview produces an APK (sideload); production produces an AAB (Play) / IPA (TestFlight). Same commit, same code — preview is the owner's smoke surface, production is what testers get.
-- iOS credentials (dist cert + profile) and `eas.json` `submit.production.ios` (`ascAppId` / `ascApiKeyPath` / `ascApiKeyId` / `ascApiKeyIssuerId`) were set up 2026-08-15. If a later non-interactive build still fails on certificates, the owner can run `eas build --platform ios --profile production` once interactively.
+- iOS credentials (dist cert + profile) and `eas.json` `submit.production.ios.ascAppId` were set up 2026-08-15. Submit still needs the decoded `AuthKey.p8` (gitignored) plus `EXPO_ASC_KEY_ID` / `EXPO_ASC_ISSUER_ID` in the environment. If a later non-interactive build still fails on certificates, the owner can run `eas build --platform ios --profile production` once interactively.
 - If a required secret is missing, stop and tell the owner exactly which one to add (Cursor Dashboard → Cloud Agents → Secrets, and GitHub repo secrets if CI ever builds). Do not half-run a release.
 
 ### Key gotchas
