@@ -41,7 +41,7 @@ How people get onto a first share today:
 
 **Web testing is unblocked** — local `npx expo start --web`, the staging preview, and the full automated suite (Jest, SQL, Playwright). That is how agents and CI test; it is not how users get the app.
 
-**Native distribution is the remaining gate for real use**, not a missing feature. The first Android preview APK crashed at launch (missing EAS Supabase env vars); the replacement build launches, and the owner device smoke (2026-08-15, `manual-tests/manual_test_report_2026-08-15-device.md`) is mostly complete — sign-in, contacts import, native pickers, edit/remove, sign-out, and themes all pass on a real phone. Still open: push arrival + notification tap (N-005) and the recipient side of edit/remove (N-007). Store enrollment and submit secrets landed the same day (`STATUS.md`). After the smoke closes out: production AAB → Play internal track, then ~3 friends. Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
+**Native distribution is the remaining gate for real use**, not a missing feature. Owner device smoke of preview `eab4bcd7` (promoted `8f3b660`, 2026-08-15) passed; the earlier N-005 push/tap path is green. Accepted on that build: KI-003 (additive share re-notifies existing recipients). N-007 recipient-side still needs a second account. Next: production AAB → Play internal track, then ~3 friends (see `STATUS.md`). Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
 
 ---
 
@@ -70,6 +70,11 @@ When a user shares an event with someone, the recipient receives a push notifica
 - In `app/_layout.tsx`: set notification tap handler to navigate to `/(app)/event/[eventId]`
 - In `app/(app)/share.tsx`: call edge function fire-and-forget after share creation
 - Handle `DeviceNotRegistered` errors from Expo Push API by clearing the stale token
+- **Gap (KI-003):** the function is invoked with only `{ userEventId }` and
+  iterates every `event_shares` row for that copy. Additive shares therefore
+  re-notify people already on the event (including a self-share). The client
+  already filters to new person ids for `share_event`; the notify path does
+  not. Fix is a later task — accepted on the 2026-08-15 tester build.
 
 ### Acceptance Criteria
 
@@ -78,6 +83,7 @@ When a user shares an event with someone, the recipient receives a push notifica
 - [x] Tapping the notification opens the event detail screen
 - [x] No notification is sent if the sharer is hidden by the recipient
 - [x] No notification is sent if the recipient has no push token
+- [ ] Only newly shared recipients are notified on an additive share (KI-003)
 
 ### Open Questions
 

@@ -61,6 +61,30 @@ never added: a blocker must be fixed, not accepted.
   the dedup key, or have the RPC return the full row so the client seeds and
   navigates from the actual database row rather than the form values.
 
+### KI-003 — Additive share re-notifies people already on the event (including yourself)
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-15, owner device smoke of preview `eab4bcd7` (promoted
+  `8f3b660`). Owner ruling: accepted for this release; do not halt testers.
+- Expected: sharing an event with additional people notifies **only those new
+  recipients**. People already marked ✓ Shared — including a self-share
+  (your own number in My People) — are not pinged again.
+- Actual: `share.tsx` correctly sends only new person ids to `share_event`,
+  then fire-and-forgets `send-notification` with `{ userEventId }`. The edge
+  function loads **every** `event_shares` row for that `user_event` and
+  sends push + SMS to each, with no "already notified" filter and no skip
+  when `recipient user_id === sharer user_id`. So adding new people to an
+  event you previously shared (including with yourself) re-delivers the
+  original "X added you to …" notification to existing recipients.
+- Repro: create an event, share it to your own number (or any recipient);
+  later open Share, add someone new, confirm. You (and every prior
+  recipient) get the notification again.
+- Fix (separate task, not this release): pass the newly-shared person ids
+  into `send-notification` (or have the RPC return them) and only notify
+  those; skip the sharer. Optionally persist a notified-at on `event_shares`
+  so retries cannot double-send either.
+
 ## Known limitations (by design — do not flag)
 
 - **The native date/time picker never opens on web.**
