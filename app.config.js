@@ -21,6 +21,9 @@ export default {
         NSContactsUsageDescription:
           "Events uses your contacts so you can pick who to text when you share.",
         UIBackgroundModes: ["remote-notification"],
+        // HTTPS-only; skips the App Store Connect encryption questionnaire
+        // so TestFlight can start without a manual export-compliance click.
+        ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {

@@ -77,9 +77,11 @@ never added: a blocker must be fixed, not accepted.
   when `recipient user_id === sharer user_id`. So adding new people to an
   event you previously shared (including with yourself) re-delivers the
   original "X added you to …" notification to existing recipients.
-- Repro: create an event, share it to your own number (or any recipient);
-  later open Share, add someone new, confirm. You (and every prior
-  recipient) get the notification again.
+- Repro: add your own number as a person. Share an event with yourself →
+  you get a notification (correct — you were a new recipient). Later open
+  Share, add someone new, confirm. You get the same "X added you to …"
+  notification again (incorrect). Nothing about the event changed; only
+  new people were added. Those new people should be the only ones notified.
 - Fix (separate task, not this release): pass the newly-shared person ids
   into `send-notification` (or have the RPC return them) and only notify
   those; skip the sharer. Optionally persist a notified-at on `event_shares`
