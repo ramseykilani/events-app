@@ -1,0 +1,22 @@
+{
+  "reviewedCommit": "577426cc061ef05ede53bbfdf1bec660f9c10200",
+  "phase0Run": "31870985914",
+  "phase1": "computerUse PASS — smoke create/share/remove A↔B",
+  "track1": "computerUse PASS — throwaway +15555550816, walkthrough auto-show, OTP cooldown, offline dinosaur",
+  "track2": {
+    "computerUse": "items 1–3, 5 confirm, 8 dots; empty-Save flag dismissed by skeptic",
+    "playwrightStaging": "items 4 (B-1 edit), 5 cancel+confirm, 6 stress, 7 eight events, reload"
+  },
+  "track3": {
+    "phase1": "A→B forwarding + B keeps copy after A removes",
+    "playwrightStaging": "share disabled/enabled/✓ Shared, people upsert+remove, circles, 8-person scroll",
+    "hide": "completed in the 7m staging harness before T5; CI hide.spec.ts green on this tip"
+  },
+  "track4": "Playwright screenshots phone+desktop × Paper+Evening + landscape",
+  "track5": "a11y labels, back, signed-out deep link, notificationRequests=0",
+  "skeptic": {
+    "emptySave": "false alarm — e2e add-event.spec.ts toBeDisabled; CI green; Save never becomes a spinner",
+    "emptyPeopleMatrix": "false alarm — second A OTP in extra context; populated People is t3-people-list.png",
+    "forkRemoveStack": "expected — matches write-latency.spec.ts; Back to calendar"
+  }
+}
