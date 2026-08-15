@@ -26,12 +26,13 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Planned | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
+| [Notification Channel Preferences](#notification-channel-preferences) | Planned | Choose push, SMS, both, or neither. Draft — several decisions still open. Not a tester blocker. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 
 ## Using and testing
 
-No product feature is blocking the core loop. A new user can sign in, land on the calendar, create an event, add people, share, and receive shares (push + SMS). Hide, forward, edit (fork), remove (own copy only), sign out, and delete account are all shipped.
+No product feature is blocking the core loop. A new user can sign in, land on the calendar, create an event, add people, share, and receive shares (push + SMS; [channel choice](#notification-channel-preferences) is planned, not shipped). Hide, forward, edit (fork), remove (own copy only), sign out, and delete account are all shipped.
 
 How people get onto a first share today:
 
@@ -80,7 +81,7 @@ When a user shares an event with someone, the recipient receives a push notifica
 
 ### Open Questions
 
-- None
+- None. Choosing *which* channel fires is a separate planned feature: [Notification Channel Preferences](#notification-channel-preferences).
 
 ---
 
@@ -124,7 +125,7 @@ This means the only person who needs the app is the one sending events. Friends 
 
 ### Open Questions
 
-- None
+- None. App users getting SMS as well as push is current behavior; turning either off is [Notification Channel Preferences](#notification-channel-preferences).
 
 ---
 
@@ -843,3 +844,125 @@ One pass over the screen: real padding/min-height (≥44pt) on row and header te
 - [ ] Every People-screen action has a ≥44pt effective touch target
 - [ ] The footer actions clear the 3-button nav bar and the iOS home indicator
 - [ ] Visual-diff baselines regenerated and reviewed if any snapshotted screen shifted
+
+---
+
+## Notification Channel Preferences
+
+**Status:** Planned (2026-08-15) — not a tester blocker. Current behavior stays until this ships: app users get push (when a token exists) **and** SMS; non-app users get SMS only. This entry is a draft so the idea is specified enough to implement later, not a locked design. Several calls below are proposed; see [Open Questions (channel prefs)](#open-questions-channel-prefs).
+
+### What this is not
+
+- **Not Hide.** Hide already mutes one person across every channel (calendar + push + SMS). Channel prefs are global: "how do I want to hear about shares," not "mute this person."
+- **Not the OS permission dialog.** Turning push off in-app is our preference. Denying the system prompt is the device's. Both can produce "no push"; they are not the same control.
+- **Not Twilio STOP.** `Reply STOP to unsubscribe` is the carrier-level opt-out for people who have no app (and the nuclear SMS off for anyone). In-app SMS off is finer and reversible without texting START.
+- **Not sign-in OTP.** Auth codes always send. This feature only gates *share* notifications from `send-notification`.
+- **Not a Settings screen.** The app has no settings surface and should not grow one for two toggles. Account prefs already live on the People footer (display name, sign out, delete account).
+- **Not a way to unsend or withhold a share.** A share still delivers the recipient their `user_events` copy. Notifications are a courtesy on top of that copy. Choosing neither does not hide the event; it just means they see it the next time they open the app.
+
+### Problem
+
+App users currently get two pings for every share: a tappable push and a plain SMS. That was the right default when SMS was the only reliable path (and it still is — Android push is not arriving today because the Expo project has no FCM v1 key; see N-005 / `STATUS.md`). Once both channels work, the double notify is noise. Some people will want only push, some only text, some both, some neither.
+
+There is no in-app way to say so. The only existing escapes are Hide (per person, also removes their events from the calendar) and Twilio STOP (all SMS from that sender, including to people without the app). Neither is "I have the app, just text me" or "I'll open the calendar when I want."
+
+### Philosophy
+
+Person-triggered notifications are the one exception to anti-engagement (`docs/events-philosophy.md`): the app is the delivery mechanism for something another person is trying to tell you. That exception is about *whether a share may ping*, not *which pipe we force*. Letting someone choose the pipe — or decline the ping and keep the calendar — is more abundance-aligned than today's always-both.
+
+Constraints that stay:
+
+- **Don't withhold to drive opens, and don't lure either.** Turning a channel off must not produce "you're missing notifications" banners, badges, or re-engagement copy. A quiet factual line on the pref sheet if both are off ("You'll see new events the next time you open the app") is information, not guilt.
+- **The SMS stays a pure notification** (`docs/distribution-strategy.md`). Channel prefs do not put app/web/store links back into the text.
+- **No social implication.** The sharer never learns which channels a recipient chose, the same way they never learn they were hidden.
+- **No forced onboarding.** Do not ask for channel prefs at sign-up. Defaults cover first use; the control is there when someone wants it.
+
+### Proposed direction (draft)
+
+Two independent account-level booleans on `users`, default **both on** (preserves today's behavior; existing testers are not surprised):
+
+| `notify_push` | `notify_sms` | What happens on a share (app-user recipient, sharer not hidden) |
+|---------------|--------------|------------------------------------------------------------------|
+| on | on | Push (if a token exists) and SMS — today's behavior |
+| on | off | Push only. No share SMS. |
+| off | on | SMS only. No push; do not keep a push token. |
+| off | off | Neither. Event still lands on their calendar. |
+
+`send-notification` already has the two send paths; this is a gate in front of each, plus a small UI to write the flags.
+
+**Who the flags apply to**
+
+- **App users** (`my_people.user_id IS NOT NULL`): honor their flags. Hidden still wins — skip both channels when the recipient has hidden the sharer, regardless of prefs.
+- **Non-app users** (`user_id IS NULL`): unchanged. They have no account and no UI. SMS is the whole message; opt-out is STOP. When they sign up they get the defaults (both on) and can change them.
+- **Web sessions:** SMS flag applies (web users already get SMS, never browser push). The push control is native-only — hidden or disabled with a one-line "Push is on the phone." Never request browser notification permission (standing rule).
+
+**Where the UI lives**
+
+A single "Notifications" row on the People footer (next to "Your name"), opening a small sheet with two toggles — not two always-visible switches in a footer that is already crowded and has a known safe-area bug ([Touch Targets & Footer Safe Area](#touch-targets--footer-safe-area-people-screen)). Suggested labels, owner-approved at implement time:
+
+- Heading: "When someone shares an event with you"
+- "Push" / "Text message" (avoid "SMS" in the UI)
+- If both off: "You'll see new events the next time you open the app."
+
+Do not put this on the calendar, in onboarding, or behind the first share.
+
+**OS permission and the token**
+
+Today `app/_layout.tsx` requests notification permission on every authenticated native launch and upserts `users.expo_push_token`. With prefs:
+
+- If `notify_push` is on: keep today's register-and-upsert path (native only).
+- If `notify_push` is off: do not request permission, do not refresh the token, and **clear** `expo_push_token` so a forgotten flag check cannot still send. `send-notification` must read the flag, not just token presence.
+- If the OS prompt is denied while the in-app toggle is on: nothing is delivered on that channel. Proposed: leave the toggle on and offer a short "Notifications are off in system Settings" recovery (same shape as the contacts-denied recovery). Syncing the toggle to off would lie the next time they grant the OS permission.
+
+Deferring the *first* OS prompt until the user has a reason (first incoming share, or first visit to this sheet) is more no-forced-onboarding than asking on launch. That is a separable call — see open questions. Do not block this feature on it.
+
+**Twilio STOP vs the in-app SMS toggle**
+
+Independent. STOP is carrier-level and still required for non-app recipients (CASL). In-app SMS off does not text STOP for them; STOP does not flip the in-app flag. If someone has STOP'd and then turns SMS on in-app, Twilio will keep dropping those sends — already silent, already `.catch(console.error)`. We do not look up Twilio opt-out state (extra API, extra secret, not worth it for v1).
+
+### What does not change
+
+- Share still delivers a `user_events` copy. Pending copies still arrive on sign-up via `deliver_pending_shares`. Sign-up does **not** burst a notification per pending event (today it doesn't; keep it that way — a pile of pings on first launch is the opposite of this product).
+- Hide, forwarding, display-name attribution, link-free SMS, fire-and-forget `send-notification`, and "missing Twilio secrets silently skip SMS."
+- Auth OTP SMS.
+- The standing "web never requests browser notification permission" rule.
+
+### Overlaps
+
+- **[Share SMS Content & Formatting](#share-sms-content--formatting)** rewrites the text; this gates whether it sends. Independent; either order. The STOP-footer-on-app-user-SMS question stays on that spec.
+- **[Touch Targets & Footer Safe Area](#touch-targets--footer-safe-area-people-screen)** is the same footer. Prefer shipping the row/sheet in the same People-screen pass if both are in flight, so the footer is touched once.
+- **N-005 / FCM v1.** Android push is currently dropped server-side (`STATUS.md`). Channel prefs do not fix that. Do not change the default to "SMS only" as a workaround — fix the credentials, then let people turn SMS off if they want.
+
+### Technical notes (when implementing — not a brief to start coding)
+
+- Migration: `users.notify_push boolean not null default true`, `users.notify_sms boolean not null default true`. Existing `users_update_own` RLS already lets a user write their own row (same path as `display_name` / `expo_push_token`).
+- `send-notification`: select the two flags with the recipient's `expo_push_token`. Gate the push queue on `notify_push` **and** a token; gate the app-user SMS on `notify_sms` **and** a phone number **and** Twilio configured. Non-app branch unchanged.
+- Client: People footer row + sheet; persist with `withWriteTimeout` and `showAlert` on failure (never `showError`). Read flags on focus with the existing user-row fetch.
+- `app/_layout.tsx`: honor `notify_push` before `registerForPushNotifications()`; clear the token when the flag flips off.
+- SQL tests for the four combinations + hidden-wins + non-app-unchanged. Jest for the sheet. E2e can cover the footer row on web (SMS toggle only).
+- `public/privacy.html` at ship time: say the user can choose push, SMS, both, or neither. Today's text ("push if they have the app, SMS if they don't") becomes wrong the day this lands.
+- Product / architecture / distribution docs already point here as planned. When this ships, replace those pointers with the shipped behavior (and drop this sentence).
+
+### Acceptance Criteria
+
+- [ ] An app user can set push, SMS, both, or neither, and the next share honors that combination
+- [ ] Neither still delivers the event to their calendar; the sharer cannot tell
+- [ ] Hide still suppresses both channels regardless of prefs
+- [ ] Non-app recipients still get SMS (STOP remains their opt-out)
+- [ ] Sign-in OTP is unaffected
+- [ ] Turning push off clears the stored token and stops the OS permission / registration path
+- [ ] Web never shows a working push toggle and never requests browser notification permission
+- [ ] No "you're missing notifications" / re-engagement copy anywhere
+- [ ] Privacy policy updated in the same change
+
+### Open Questions (channel prefs)
+
+These are the calls to make before anyone writes the migration. Proposed answers are above; none are locked.
+
+1. **Defaults.** Both-on is proposed so nothing changes until the user acts. Alternative once Android push actually arrives: push-on / SMS-off for app users, SMS-on for everyone else. That would make "I just got a text and a banner" stop being the first impression.
+2. **First OS permission prompt.** Keep asking on authenticated native launch (today), or defer until the user has a reason? Deferral is nicer and is not required to ship the flags.
+3. **OS-denied vs in-app push-on.** Recovery copy pointing at system Settings (proposed) vs. forcing the toggle off.
+4. **Per-person channel overrides** ("push from this person, SMS from that one"). Proposed **no** — Hide is the per-person control; two global toggles are the whole feature. Recorded so it is not "discovered" mid-implementation.
+5. **Copy.** Exact toggle labels and the both-off sentence need an owner pass at implement time. Do not invent a Settings vocabulary ("alerts," "channels," "preferences") the rest of the app does not use.
+6. **Detecting Twilio STOP in-app.** Proposed **no** for v1. Revisit only if testers turn SMS on and still receive nothing.
+7. **People footer vs. a later account screen.** Proposed: footer row now. If the footer keeps growing (name, notifications, sign out, delete), that is a signal to group account actions, not a reason to block this.
