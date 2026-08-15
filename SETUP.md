@@ -226,18 +226,26 @@ EAS (Expo Application Services) produces native APK/AAB/IPA builds that run with
 - [EAS CLI](https://docs.expo.dev/eas/): `npm install -g eas-cli`
 - An [Expo](https://expo.dev/) account
 
+### Supabase environment variables (required)
+
+EAS builds do not read your local `.env` — and `eas.json` carries no `env` block — so the Supabase config must exist as EAS project environment variables. Without them the bundle inlines empty values and the app crashes instantly at launch (`createClient` throws at module scope). Do this once:
+
+```bash
+eas env:create --environment development --environment preview --environment production \
+  --name EXPO_PUBLIC_SUPABASE_URL --value https://your-project.supabase.co --visibility plaintext
+eas env:create --environment development --environment preview --environment production \
+  --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value sb_publishable_... --visibility plaintext
+```
+
+Both values are publishable (they ship inside every client bundle), so plaintext visibility is correct. Inspect or manage them in the EAS dashboard under your project → **Environment variables**, or with `eas env:list --environment preview`.
+
 ### google-services.json
 
-`google-services.json` is gitignored and must be uploaded to EAS as a file environment variable before building. Do this once:
+`google-services.json` is committed to the repo, so EAS builds pick it up automatically. `app.config.js` also honors a `GOOGLE_SERVICES_JSON` file environment variable if an override is ever needed per environment:
 
 ```bash
 eas env:create --name GOOGLE_SERVICES_JSON --type file --value "$(cat google-services.json)" --environment preview
-eas env:create --name GOOGLE_SERVICES_JSON --type file --value "$(cat google-services.json)" --environment production
 ```
-
-EAS will write the file to a temp path during the build. `app.config.js` reads `process.env.GOOGLE_SERVICES_JSON` and falls back to `./google-services.json` for local development.
-
-You can also manage this in the EAS dashboard under your project → **Environment variables**.
 
 ### Login and build
 
@@ -257,6 +265,7 @@ The following are needed in EAS builds but not in Expo Go (which bundles them it
 
 | Requirement | Why | Fix |
 |------------|-----|-----|
+| `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` as EAS environment variables | The bundle inlines them at build time; with neither set, `createClient` used to throw at module scope = instant crash (2026-08-15 incident; the client now falls back to a placeholder so a missing config degrades to failing data calls instead). | See "Supabase environment variables (required)" above |
 | `expo-splash-screen` | Expo Router uses it to control when the splash screen hides. Missing = instant crash. | `npx expo install expo-splash-screen` |
 | `edgeToEdgeEnabled: true` in `app.config.js` | Requires `react-native-edge-to-edge` in native builds. Expo Go ignores it. | Install `react-native-edge-to-edge` or remove the flag |
 | New architecture (`newArchEnabled`) | **Currently set to `false`** — disabled due to a `react-native-screens` bug ([`ScreenStack.getChildDrawingOrder()` off-by-one](https://github.com/software-mansion/react-native-screens/issues)) that causes an instant crash on Android in native builds. Re-enable once `react-native-screens` ships a fix. When re-enabling, test with a development build on Android first. | Set `newArchEnabled: true` in `app.config.js` and rebuild |

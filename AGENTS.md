@@ -150,6 +150,7 @@ Native binaries are built on EAS **by agents** — not by CI, not on the owner's
 Prerequisites (Cursor secrets — injected into new cloud-agent VMs only; a running VM never picks up newly added secrets):
 
 - `EXPO_TOKEN` — Expo access token (Expo dashboard → Account settings → Access Tokens). Authenticates every `eas` command.
+- EAS project environment variables `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` (plaintext; development + preview + production) — created 2026-08-15. EAS builds do not read local `.env`; without these the bundle has no Supabase config. (Pre-hardening this was an instant launch crash — `createClient` threw at module scope; `lib/supabase.ts` now falls back to a placeholder, but the app is useless without real values.) Inspect with `eas env:list --environment preview`; recreate per SETUP.md → EAS Builds.
 - iOS (App Store Connect API key): `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, and `EXPO_ASC_API_KEY_P8_BASE64` (base64 of the `.p8`). Decode the key and export the set the CLI reads:
   ```bash
   echo "$EXPO_ASC_API_KEY_P8_BASE64" | base64 -d > /tmp/AuthKey.p8
