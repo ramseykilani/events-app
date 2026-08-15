@@ -212,6 +212,7 @@ export function Calendar({
               onPress={() => router.push('/(app)/add-event')}
               activeOpacity={0.6}
               accessibilityRole="button"
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <Text style={[styles.emptyAction, { color: theme.linkText }]}>Add an event</Text>
             </TouchableOpacity>
@@ -297,7 +298,10 @@ const styles = StyleSheet.create({
   },
   peopleButton: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    // 44pt touch target; the 48px-tall header row (fab) absorbs the extra
+    // height, so this moves no pixels.
+    minHeight: 44,
+    justifyContent: 'center',
   },
   peopleButtonText: {
     fontSize: 16,

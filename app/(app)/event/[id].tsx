@@ -317,7 +317,13 @@ export default function EventDetailScreen() {
 
   const navBack = (
     <View style={styles.navRow}>
-      <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+      <TouchableOpacity
+        onPress={() => router.back()}
+        activeOpacity={0.6}
+        accessibilityRole="button"
+        // hitSlop (not padding): this screen has a pixel-diff baseline.
+        hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+      >
         <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
       </TouchableOpacity>
     </View>
@@ -351,7 +357,12 @@ export default function EventDetailScreen() {
                 {loadError ? 'Could not load this event.' : 'Event not found'}
               </Text>
               {loadError ? (
-                <TouchableOpacity onPress={handleRetry} activeOpacity={0.6} accessibilityRole="button">
+                <TouchableOpacity
+                  onPress={handleRetry}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+                >
                   <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
                 </TouchableOpacity>
               ) : null}

@@ -114,6 +114,7 @@ export function ShareSheet({
               onPress={() => router.push('/(app)/people')}
               activeOpacity={0.6}
               accessibilityRole="button"
+              hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
             >
               <Text style={[styles.manageLink, { color: theme.linkText }]}>Manage</Text>
             </TouchableOpacity>
@@ -200,7 +201,11 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 22,
+    // 44pt touch target — the pills grow slightly taller; no pixel baseline
+    // covers the share sheet.
+    minHeight: 44,
+    justifyContent: 'center',
   },
   chipText: {
     fontSize: 14,

@@ -422,10 +422,20 @@ export default function EditEventScreen() {
         <Text style={[styles.loadErrorText, { color: theme.textSecondary }]}>
           Could not load this event.
         </Text>
-        <TouchableOpacity onPress={() => void load()} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity
+          onPress={() => void load()}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+        >
           <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+        >
           <Text style={[styles.retry, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
       </View>
@@ -442,7 +452,13 @@ export default function EditEventScreen() {
     >
       <ScrollView keyboardShouldPersistTaps="handled">
         <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          // hitSlop (not padding): pairs with the baselined add-event form.
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+        >
           <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Edit event</Text>
@@ -452,6 +468,7 @@ export default function EditEventScreen() {
           activeOpacity={0.6}
           accessibilityRole="button"
           accessibilityState={{ disabled: loading || !event || (!title.trim() && !url.trim()) }}
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
         >
           <Text
             style={[

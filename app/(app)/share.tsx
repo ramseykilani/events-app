@@ -298,11 +298,12 @@ export default function ShareScreen() {
       ]}
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity style={styles.headerAction} onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
         <TouchableOpacity
+          style={styles.headerAction}
           onPress={handleConfirm}
           disabled={loading || selectedPersonIds.size === 0 || displayName === null}
           activeOpacity={0.6}
@@ -364,7 +365,7 @@ export default function ShareScreen() {
         }
       />
       {loadError ? (
-        <TouchableOpacity onPress={loadData} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity style={styles.headerAction} onPress={loadData} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.loadError, { color: theme.textSecondary }]}>
             Could not load people. Tap to retry.
           </Text>
@@ -403,6 +404,12 @@ const styles = StyleSheet.create({
   },
   cancel: {
     fontSize: 16,
+  },
+  // 44pt minimum touch target for the bare-text header actions (and the
+  // load-error retry). No pixel baseline covers this screen.
+  headerAction: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
   title: {
     fontSize: 18,

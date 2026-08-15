@@ -419,11 +419,12 @@ export default function PeopleScreen() {
       ]}
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity style={styles.textAction} onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.back, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>My People</Text>
         <TouchableOpacity
+          style={styles.textAction}
           onPress={handleAddPeople}
           disabled={people.length >= 50}
           activeOpacity={0.6}
@@ -445,7 +446,7 @@ export default function PeopleScreen() {
         {people.length} / 50 people
       </Text>
       {loadError ? (
-        <TouchableOpacity onPress={() => loadData()} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity style={styles.textAction} onPress={() => loadData()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.loadError, { color: theme.destructiveLink }]}>
             Could not refresh. Tap to retry.
           </Text>
@@ -486,10 +487,10 @@ export default function PeopleScreen() {
                   </Text>
                 </View>
                 <View style={styles.circleActions}>
-                  <TouchableOpacity onPress={() => handleEditCircleMembers(circle)} activeOpacity={0.6} accessibilityRole="button">
+                  <TouchableOpacity style={styles.textAction} onPress={() => handleEditCircleMembers(circle)} activeOpacity={0.6} accessibilityRole="button">
                     <Text style={[styles.manage, { color: theme.linkText }]}>Edit</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleRemoveCircle(circle)} activeOpacity={0.6} accessibilityRole="button">
+                  <TouchableOpacity style={styles.textAction} onPress={() => handleRemoveCircle(circle)} activeOpacity={0.6} accessibilityRole="button">
                     <Text style={[styles.remove, { color: theme.destructiveLink }]}>Delete</Text>
                   </TouchableOpacity>
                 </View>
@@ -524,7 +525,7 @@ export default function PeopleScreen() {
                   <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                   </Text>
-                  <TouchableOpacity onPress={() => handleRemovePerson(item)} activeOpacity={0.6} accessibilityRole="button">
+                  <TouchableOpacity style={styles.textAction} onPress={() => handleRemovePerson(item)} activeOpacity={0.6} accessibilityRole="button">
                     <Text style={[styles.remove, { color: theme.destructiveLink }]}>Remove</Text>
                   </TouchableOpacity>
                 </View>
@@ -538,7 +539,7 @@ export default function PeopleScreen() {
                         <Text style={[styles.personName, { color: theme.textPrimary }]}>
                           {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                         </Text>
-                        <TouchableOpacity onPress={() => handleUnhide(item.id)} activeOpacity={0.6} accessibilityRole="button">
+                        <TouchableOpacity style={styles.textAction} onPress={() => handleUnhide(item.id)} activeOpacity={0.6} accessibilityRole="button">
                           <Text style={[styles.unhide, { color: theme.linkText }]}>Unhide</Text>
                         </TouchableOpacity>
                       </View>
@@ -550,7 +551,17 @@ export default function PeopleScreen() {
           </View>
         </>
       )}
-      <View style={[styles.footer, { borderTopColor: theme.borderLight }]}>
+      <View
+        style={[
+          styles.footer,
+          {
+            borderTopColor: theme.borderLight,
+            // Keep the footer actions clear of 3-button nav / the home
+            // indicator. 0 on web, so desktop pixels are unchanged.
+            paddingBottom: 4 + insets.bottom,
+          },
+        ]}
+      >
         <TouchableOpacity
           onPress={() => {
             setNameDraft(displayName ?? '');
@@ -613,6 +624,7 @@ export default function PeopleScreen() {
         >
           <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
             <TouchableOpacity
+              style={styles.textAction}
               onPress={() => setShowNameEdit(false)}
               activeOpacity={0.6}
               accessibilityRole="button"
@@ -621,6 +633,7 @@ export default function PeopleScreen() {
             </TouchableOpacity>
             <Text style={[styles.title, { color: theme.textPrimary }]}>Your name</Text>
             <TouchableOpacity
+              style={styles.textAction}
               onPress={handleSaveName}
               disabled={nameSaving || !nameDraft.trim()}
               activeOpacity={0.6}
@@ -665,11 +678,12 @@ export default function PeopleScreen() {
           ]}
         >
           <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
-            <TouchableOpacity onPress={() => setEditingCircle(null)} activeOpacity={0.6} accessibilityRole="button">
+            <TouchableOpacity style={styles.textAction} onPress={() => setEditingCircle(null)} activeOpacity={0.6} accessibilityRole="button">
               <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[styles.title, { color: theme.textPrimary }]}>{editingCircle?.name ?? 'Circle'}</Text>
             <TouchableOpacity
+              style={styles.textAction}
               onPress={handleSaveCircleMembers}
               disabled={busy}
               activeOpacity={0.6}
@@ -811,7 +825,14 @@ const styles = StyleSheet.create({
   footer: {
     borderTopWidth: 1,
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingTop: 4,
+  },
+  // 44pt minimum touch target for bare-text buttons (header actions, row
+  // Remove/Edit/Delete/Unhide). Rows are already ≥44 tall, so this grows the
+  // tap area without shifting row layout.
+  textAction: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
   footerButton: {
     minHeight: 44,

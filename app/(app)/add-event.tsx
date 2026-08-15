@@ -283,7 +283,13 @@ export default function AddEventScreen() {
     >
       <ScrollView keyboardShouldPersistTaps="handled">
         <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          // hitSlop (not padding): this screen has a pixel-diff baseline.
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+        >
           <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Add event</Text>
@@ -293,6 +299,7 @@ export default function AddEventScreen() {
           activeOpacity={0.6}
           accessibilityRole="button"
           accessibilityState={{ disabled: loading || (!title.trim() && !url.trim()) }}
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
         >
           <Text
             style={[
