@@ -23,6 +23,7 @@ Play "Finish setting up your app" (privacy policy URL, data-safety form, content
 | `EXPO_TOKEN` | Cursor + GitHub | Added 2026-08-12 |
 | `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, `EXPO_ASC_API_KEY_P8_BASE64` | Cursor + GitHub | **Added 2026-08-15** (Admin Team Key). A running cloud-agent VM does not pick up newly added secrets — iOS build/submit needs a **fresh** session. |
 | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | Cursor + GitHub | **Added 2026-08-15**. Same fresh-session rule for `eas submit`. |
+| Expo push credentials — Android FCM v1 key (and iOS APNs key later) | Expo project credentials | **Missing** — confirmed 2026-08-15 as the reason N-005 push never arrived: Expo accepts the push but cannot authenticate to FCM, so Android pushes drop server-side. Upload via Expo dashboard → Credentials → Android → FCM V1 service account key (GCP/Firebase project `rkilani-events`), then re-run N-005's push portion. |
 
 ## Code state
 
