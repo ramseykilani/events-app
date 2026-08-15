@@ -23,16 +23,16 @@ this file is where things stand right now.
 
 ## Code state
 
-- `staging`: `3dccff5` — Staging pipeline green 2026-08-12. Ahead of
-  production by the Display Names, contacts-explainer, and docs commits;
-  awaiting the owner's "ship it".
-- `production`: `d43e11d` — deployed 2026-08-09 (https://shared-events.pages.dev).
+- `staging`: `7e7c2b4` — SHIP report on `329276e`; full suite green 2026-08-15.
+- `production`: `7e7c2b4` — deployed 2026-08-15 (https://shared-events.pages.dev).
+  Release review: `manual-tests/manual_test_report_2026-08-15-release.md`.
 
 ## Latest native builds
 
-None yet. First build is the Android preview APK dry run that validates the
-agent-run EAS loop, then the owner runs `manual-tests/native_device_smoke.md`
-on real hardware.
+| Profile | Platform | Date | Link | State |
+|---------|----------|------|------|-------|
+| preview (internal APK) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/3c0f99e5-aa69-464c-a204-9166682e5974 | Built from `7e7c2b4`. Awaiting owner smoke (`manual-tests/native_device_smoke.md`). Testers must not get this until that pass. |
+| production (Play internal / TestFlight) | — | — | — | Not started — waits on owner smoke pass, then Play identity verification for submit. |
 
 ## Testers
 
