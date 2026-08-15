@@ -20,6 +20,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Delete Account](#delete-account) | Implemented | |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
+| [Richer Link Autofill](#richer-link-autofill) | Planned | Upgrade. Paste already stores the URL; OG title/image already work on open pages. |
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. |
 | [Branded OTP SMS](#branded-otp-sms) | Planned | The verification text doesn't say it's from Events. Config, not code. |
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Planned | Nicer share text; consider including the event description. Server-side only. |
@@ -366,6 +367,61 @@ On the event detail screen ([app/(app)/event/[id].tsx](app/(app)/event/[id].tsx)
 ### Open Questions
 
 - None
+
+---
+
+## Richer Link Autofill
+
+**Status:** Planned — upgrade, not a blocker. Paste-a-link already works: the URL is stored, Open Graph title/description/image fill when the page allows it, and the user can always type a title and pick a date.
+
+### What this is not
+
+This is not a new add-event path. [Add Event](app/(app)/add-event.tsx) already pastes a URL, calls `og-metadata` on blur, and saves `url` / `title` / `description` / `image_url`. Failures are best-effort and must stay that way — a dead preview must never block Save.
+
+This is also not a license to scrape Ticketmaster (or anyone else) with a headless browser. Walled gardens go through their official APIs or they stay "URL stored, type the rest."
+
+### Problem
+
+Onboarding says "Paste an event link and the details fill in automatically." That is only true for pages that serve `og:title` / `og:description` / `og:image` to a plain GET from a datacenter IP (blogs, many Eventbrite/Luma/Partiful pages, `example.com`). The links people actually paste — Ticketmaster, AXS, and similar — usually return a 403 or a challenge page. Even a successful OG fetch never sets date or time; those stay "today" / empty unless the user edits them.
+
+So a Ticketmaster paste often lands as **Untitled event** on today, with the listing URL attached. The URL is worth keeping (Open link, SMS). The walkthrough oversells the rest.
+
+### Proposed Solution
+
+Keep the current paste → blur → preview → confirm → Save flow. Make the preview actually fill a calendar row for real event listings.
+
+Do it in two layers, cheapest first:
+
+1. **JSON-LD Event parse (open web).** In `og-metadata`, also read `application/ld+json` `Event` / `MusicEvent` / `TheaterEvent` and return `startDate` (and end/venue later if we want). Add Event sets date and time from that when present. This is the same edge function, no new vendors. Helps any host that already publishes schema.org in the HTML we can fetch.
+
+2. **First-party APIs for walled gardens.** For hosts that block the HTML fetch, parse the URL and call their official API. Ticketmaster Discovery (`/event/{id}` → name, `localDate`, `localTime`, image) is the first candidate. Eventbrite is the obvious second. Artist/tour pages that list many nights must not silently pick a date — show a picker or fall back to "URL stored, you pick the night."
+
+Until layer 2 ships for a host, soften the onboarding line so it matches today: paste a link, confirm the title and date. The product doc already says that.
+
+### Technical Notes
+
+- `og-metadata` (`supabase/functions/og-metadata/index.ts`) stays JWT-gated, 5s / 1MB capped, fail-open. Extend the JSON body to `{ title, description, image_url, event_date, event_time }` — all nullable.
+- Client: `fetchOgMetadata` in [app/(app)/add-event.tsx](app/(app)/add-event.tsx) already writes title/description/image. Also set the date/time fields when the response has them; never overwrite a date the user already changed.
+- Edit Event does not fetch OG today. Decide in Open Questions whether a URL change on edit should.
+- Ticketmaster: API key as a function secret; parse `/event/{id}` only for the automatic path. Do not add a scraping/bypass dependency.
+- Timezones: prefer the listing's local date/time (Discovery's `localDate` / `localTime`, JSON-LD `startDate` without forcing UTC). Same "land on the day the user meant" rule as the web date inputs.
+- Dedup is unchanged: `find_or_create_event` still keys on `(url, title, event_date, event_time)`. Better autofill makes collisions more likely and more correct.
+- Tests: this is the gap. Jest the parser (OG + JSON-LD fixtures, including a TM-shaped Event block). Playwright: paste a fixture URL (mock `og-metadata`) and assert title + date fill; a failed preview still saves. Manual E-102 stays best-effort against live hosts.
+
+### Acceptance Criteria
+
+- [ ] Open-web event pages that publish JSON-LD fill title and date/time, not just OG title
+- [ ] A Ticketmaster `/event/{id}` link fills title, date/time, and image via Discovery (or we explicitly do not claim TM in onboarding)
+- [ ] A blocked/failed preview still saves the URL; Save never waits on the fetch
+- [ ] Artist/tour multi-date URLs do not invent a single night
+- [ ] Onboarding copy matches what we actually do
+- [ ] Autofill is covered by Jest (parser) and Playwright (form wiring), not only E-102
+
+### Open Questions
+
+- Ticketmaster only, or Eventbrite in the same slice?
+- Does a URL change on Edit Event refetch (architecture says yes; the screen does not today)?
+- Venue/location: we have no field. Leave it in description, or add a field later?
 
 ---
 
