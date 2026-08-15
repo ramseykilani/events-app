@@ -35,7 +35,7 @@ How people get onto a first share today:
 
 **Web testing is unblocked** — local `npx expo start --web`, the staging preview, and the full automated suite (Jest, SQL, Playwright). That is how agents and CI test; it is not how users get the app.
 
-**Native testing is the remaining gate for real use**, not a missing feature. First EAS builds have not been cut, and the native-only paths (contacts picker, datetimepicker, push, notification tap) have never run on a device. Builds are agent-run (AGENTS.md → Native builds); enrollment, secrets, and build state live in `STATUS.md`. Invite testers only after a clean smoke pass (`docs/distribution-strategy.md` → Owner critical path).
+**Native distribution is the remaining gate for real use**, not a missing feature. The first Android preview APK crashed at launch (missing EAS Supabase env vars); the replacement build launches (2026-08-15) but the full device smoke checklist has not been run. Store enrollment and submit secrets landed the same day (`STATUS.md`). After that checklist passes: production AAB → Play internal track, then ~3 friends. Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
 
 ---
 

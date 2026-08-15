@@ -38,11 +38,11 @@ Consequence to remember: with no links, there is nothing for universal links / A
 **Google Play (Android):**
 - Internal testing track: up to ~100 testers, no review, available within seconds of upload.
 - Personal developer accounts created after 2023-11-13 must run a *closed* test with ≥12 testers opted in for 14 continuous days before production access unlocks. Internal testing does not count toward this; it gates production only, not beta distribution.
-- Play Console app setup requires a privacy policy URL (served from `/privacy.html` on the Pages site), a data-safety form, and content-rating questionnaire.
-- Requires a Play Console account ($25 one-time); identity verification can take days.
+- Play Console app setup (privacy policy URL at `/privacy.html`, data-safety form, content-rating questionnaire, App access) is required for a **closed test or production listing**, not for internal testing. Current enrollment is in `STATUS.md`.
+- Requires a Play Console account ($25 one-time); identity verification completed 2026-08-15.
 
-## Owner critical path (updated 2026-08-12)
+## Owner critical path (updated 2026-08-15)
 
-1. ~~Enroll in the Apple Developer Program and create the Play Console account~~ — Apple active 2026-08-12; Play personal account created, identity verification in progress. Remaining credential setup (ASC API key, Play service account) is tracked in `STATUS.md`.
-2. Agents run EAS builds (AGENTS.md → Native builds). First: an Android preview APK dry run, then the owner runs `manual-tests/native_device_smoke.md` on real hardware. The native-only paths (contacts picker, datetimepicker, push, notification tap) have never executed on a device — every test harness in this repo exercises the web build.
-3. Invite the first ~3 testers only after a clean smoke pass.
+1. ~~Enroll in the Apple Developer Program and create the Play Console account~~ — Apple active 2026-08-12; Play identity verification complete 2026-08-15. App records, service account, ASC API key, and submit secrets are in (`STATUS.md`).
+2. Android preview APK — first build `3c0f99e5` crashed at launch; replacement `5f477380` launches (2026-08-15). Full `manual-tests/native_device_smoke.md` checklist is still outstanding.
+3. **After that checklist:** production Android AAB → Play internal track, then invite ~3 friends (talk first; owner shares the opt-in link — Play does not email). TestFlight once iPhone testers exist. Closed-test / store-listing forms (data safety, content rating, reviewer sign-in) wait until then.

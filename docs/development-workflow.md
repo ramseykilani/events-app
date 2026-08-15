@@ -228,24 +228,24 @@ builds (agent-run); current enrollment/secrets/build/tester state lives in
 
 - Apple Developer Program membership ($99/yr) — active since 2026-08-12.
 - Play Console account ($25 one-time, **personal**) — identity verification
-  in progress as of 2026-08-12. Personal is correct for this app: the
+  complete 2026-08-15. Personal is correct for this app: the
   organization-only categories are financial, health, VPN, and government
   apps. The personal-account "12 testers for 14 days" closed-test rule gates
   a *production* listing only, not internal testing.
 - `EXPO_TOKEN` (Expo dashboard → Access Tokens) in Cursor + GitHub secrets —
   done 2026-08-12.
-- App Store Connect API key (lets agents run iOS builds/submits
-  non-interactively): ASC → Users and Access → Integrations → App Store
-  Connect API → Team Keys → Generate (role Admin); download the `.p8` (shown
-  once), note the Key ID and Issuer ID; Team ID from
-  developer.apple.com/account → Membership. Secrets: `EXPO_ASC_KEY_ID`,
-  `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`, `EXPO_ASC_API_KEY_P8_BASE64`.
-- Play service account (lets agents submit Android): Google Cloud Console →
-  create a service account + JSON key → Play Console → Users and permissions →
-  grant release access. Secret: `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (base64).
-  Play app setup also needs the privacy policy URL
-  (`https://shared-events.pages.dev/privacy.html`), the data-safety form
-  (answers follow from that policy), and the content-rating questionnaire.
+- App Store Connect API key — **done 2026-08-15.** Admin Team Key; `.p8` on
+  the owner's machine (`F:\Code\Events\events-keys`). Secrets:
+  `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`,
+  `EXPO_ASC_API_KEY_P8_BASE64`. ASC listing name is **Shared Events**
+  (`Events` was taken); bundle ID `com.rkilani.events`; home-screen name
+  stays `Events`.
+- Play service account — **done 2026-08-15.** GCP project `rkilani-events`,
+  invited in Play Console with release access. Secret:
+  `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (base64). Privacy policy / data-safety /
+  content-rating / App access are still open and wait for a closed test or
+  production listing — not internal testing. Reviewer sign-in is unsolved
+  (phone OTP); do not put CI test OTPs in Play or App Store Connect.
 
 ### The release loop (native part)
 
@@ -266,8 +266,9 @@ spends 1–2 per release; don't build speculatively.
 ### Distributing to testers
 
 - **Android — Play internal testing:** Play Console → Internal testing → add
-  testers' Gmail addresses → share the opt-in link. Up to ~100, no review.
-  This is the friends-and-friends-of-friends path.
+  testers' Gmail addresses → share the opt-in link (Play does not email
+  them). Up to ~100, no review. Talk to people first; the owner Gmail is
+  already on the list. This is the friends-and-friends-of-friends path.
 - **iOS — TestFlight internal:** up to 100, no review, but testers must hold
   a role on your App Store Connect team — friends on iPhone go via
   **external** TestFlight instead (email/public link, up to 10k, Beta App
