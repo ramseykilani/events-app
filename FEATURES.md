@@ -21,6 +21,11 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. |
+| [Branded OTP SMS](#branded-otp-sms) | Planned | The verification text doesn't say it's from Events. Config, not code. |
+| [Share SMS Content & Formatting](#share-sms-content--formatting) | Planned | Nicer share text; consider including the event description. Server-side only. |
+| [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
+| [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
+| [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Planned | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 
@@ -35,7 +40,7 @@ How people get onto a first share today:
 
 **Web testing is unblocked** — local `npx expo start --web`, the staging preview, and the full automated suite (Jest, SQL, Playwright). That is how agents and CI test; it is not how users get the app.
 
-**Native distribution is the remaining gate for real use**, not a missing feature. The first Android preview APK crashed at launch (missing EAS Supabase env vars); the replacement build launches (2026-08-15) but the full device smoke checklist has not been run. Store enrollment and submit secrets landed the same day (`STATUS.md`). After that checklist passes: production AAB → Play internal track, then ~3 friends. Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
+**Native distribution is the remaining gate for real use**, not a missing feature. The first Android preview APK crashed at launch (missing EAS Supabase env vars); the replacement build launches, and the owner device smoke (2026-08-15, `manual-tests/manual_test_report_2026-08-15-device.md`) is mostly complete — sign-in, contacts import, native pickers, edit/remove, sign-out, and themes all pass on a real phone. Still open: push arrival + notification tap (N-005) and the recipient side of edit/remove (N-007). Store enrollment and submit secrets landed the same day (`STATUS.md`). After the smoke closes out: production AAB → Play internal track, then ~3 friends. Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
 
 ---
 
@@ -737,3 +742,104 @@ Remaining design work. An agent that starts coding from this list is doing it wr
 - Notification copy, and whether date/time pings are in scope at all for v1 of this.
 - Rollback / expand-contract if the migration is wrong on live tester data.
 - What, if anything, remains of [Creator-Linked Events](#creator-linked-events-edits-propagate) after this.
+
+---
+
+## Branded OTP SMS
+
+**Status:** Planned — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`).
+
+### Problem
+
+The sign-in verification SMS does not identify the app. A bare "123456 is your code"-style message reads like a wrong number on a phone full of texts, and first-time testers will not connect it to the app they just installed.
+
+### Proposed Solution
+
+Edit the phone-auth SMS template in the Supabase dashboard (Authentication → Sign In / Up → SMS template) or via the Management API auth-config PATCH so the message names the app, e.g. "Your Events code: 123456". No app code changes; no EAS rebuild. Keep it to one SMS segment and keep the code prominent — carrier filters and Twilio toll-free verification both care.
+
+### Acceptance Criteria
+
+- [ ] A real sign-in SMS names Events and contains the code
+- [ ] Test-OTP accounts (`+15555550100` / `+15555550103`) still verify — they bypass the template, but confirm after the change anyway
+
+---
+
+## Share SMS Content & Formatting
+
+**Status:** Planned — server-side only (edge function; no app rebuild). Found in the 2026-08-15 owner device smoke.
+
+### Problem
+
+The share notification SMS reads plainly and omits the event description. Current template (`supabase/functions/send-notification/index.ts`): `{name} added you to {title} on {date}{time}` + the event URL when present, plus "Reply STOP to unsubscribe" on the non-app-user variant only.
+
+### Proposed Solution
+
+Rewrite the template for readability and consider including the event description (truncated to a line or so). Decide at the same time whether app-user SMS should also carry the STOP footer (today only non-app recipients get it; Twilio still intercepts STOP account-wide either way).
+
+Standing constraints from `docs/distribution-strategy.md` (2026-08-09): the SMS carries the event's own URL but **no app/web links** — it is a pure notification, not an acquisition channel — and it must not read like spam to carrier filters.
+
+### Acceptance Criteria
+
+- [ ] New template includes a short description excerpt when the event has one
+- [ ] Owner approves the exact wording on a real text before it ships
+- [ ] Any `send-notification` tests/SQL covering message shape are updated in the same change
+
+---
+
+## Screen Transition Polish (Android)
+
+**Status:** Planned — polish; not a tester blocker. Found in the 2026-08-15 owner device smoke.
+
+### Problem
+
+On Android, swiping between screens shows a brief white bar on the right edge of the display and the motion reads as janky.
+
+### Proposed Solution
+
+Investigate on a development build before changing anything. Likely suspects: the stack card background not matching the theme background during the slide, or an old-architecture `react-native-screens` artifact (the app runs `newArchEnabled: false`; the new-arch migration may make this moot — see SETUP.md → Required for native builds). Reproduce in both Paper and Evening; a hard-coded light background would be invisible in Paper and glaring in Evening, which is itself diagnostic.
+
+### Acceptance Criteria
+
+- [ ] No white flash at the screen edge during push/pop transitions on Android, in either theme
+
+---
+
+## Manual Add Discoverability on Native
+
+**Status:** Planned — acceptable for early testers as-is (owner ruling 2026-08-15: most users will use the contacts flow). Found in the 2026-08-15 owner device smoke; the owner could not find manual add at all until told the path.
+
+### Problem
+
+On native, the only route to the manual name+phone form is: contacts explainer → Continue → **Deny** the OS prompt → recovery screen → "Add a number instead" (`components/ContactsPermissionFlow.tsx`). Choosing "Not now" on the explainer dismisses the flow with no manual-add offer, and once contacts permission is granted the People screen's Add goes straight to the contacts picker — there is no way to add someone whose number you know but who isn't in your contacts.
+
+### Proposed Solution
+
+Offer the manual form from more than the denial recovery: a quiet entry on the native People screen and/or from the picker's empty/search-miss state, and reconsider what "Not now" should offer. Overlaps [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) — pick them up together so the entry points stay consistent. The web People screen already has the manual form; this is about native parity of *access*, not new capability.
+
+### Acceptance Criteria
+
+- [ ] A user who never grants contacts permission can still add a person without hunting through a denial flow
+- [ ] Entry points match wherever the app offers contact import (People, share sheet)
+
+---
+
+## Touch Targets & Footer Safe Area (People Screen)
+
+**Status:** Planned — owner calls the touch targets the main pre-tester item (2026-08-15). The footer overlap is explicitly *not* a tester blocker (testers are expected to use gesture nav) but is the same one-screen pass.
+
+### Problem
+
+Two tap/edge hygiene defects on the People screen (`app/(app)/people.tsx`), both found in the 2026-08-15 owner device smoke:
+
+- Text-only actions (person-row Remove, circle Edit/Delete, Hidden Unhide, header Back/Add) are tappable only on the glyph bounds — roughly 20px tall, under the 44pt convention in `.cursor/rules/project.mdc`. The owner found them hard to tap on a real phone.
+- The fixed account footer has no bottom safe-area inset, so on devices with 3-button navigation (and on iOS with the home indicator) the system bar covers the Delete account button.
+
+### Proposed Solution
+
+One pass over the screen: real padding/min-height (≥44pt) on row and header text buttons (or `hitSlop` where layout must not shift), and `paddingBottom` from `useSafeAreaInsets()` on the footer. Then audit the same bare-text-button pattern on the other screens (share sheet, event detail, calendar header) — carefully: `e2e/visual.spec.ts` baselines cover some of those screens, so intentional pixel movement needs regenerated snapshots (`npx playwright test e2e/visual.spec.ts --update-snapshots`) reviewed like any other change.
+
+### Acceptance Criteria
+
+- [ ] Every People-screen action has a ≥44pt effective touch target
+- [ ] The footer actions clear the 3-button nav bar and the iOS home indicator
+- [ ] Visual-diff baselines regenerated and reviewed if any snapshotted screen shifted
