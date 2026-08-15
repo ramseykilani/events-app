@@ -266,10 +266,20 @@ spends 1–2 per release; don't build speculatively.
 
 ### Distributing to testers
 
-- **Android — Play internal testing:** Play Console → Internal testing → add
-  testers' Gmail addresses → share the opt-in link (Play does not email
-  them). Up to ~100, no review. Talk to people first; the owner Gmail is
-  already on the list. This is the friends-and-friends-of-friends path.
+- **Android — Play internal testing track:** Play Console → Internal testing
+  → Testers → add Gmails to an email list → copy the **opt-in** link (Play
+  does not email). Up to ~100, no review. The link is not open: Play still
+  checks the list, so add each friend's Play Store Gmail first, then send
+  everyone the same link. Owner Gmail is already on it. This is the
+  friends-and-friends-of-friends path. `eas submit` lands here; testers
+  then get Play updates on the next submit.
+- **Do not use Play Internal app sharing** (Internal testing → Internal app
+  sharing → “Anyone you shared the link with can download”) as the friends
+  path. Different product: separate upload (not the submitted AAB), testers
+  must enable a hidden Play Store setting (tap Play Store version 7 times),
+  links expire in 60 days / 100 downloads each, Play re-signs with a
+  different cert (breaks the FCM SHA we just verified), and Google can
+  refuse the download if the person has no access to the store listing.
 - **iOS — TestFlight internal (the friends path):** up to 100, **no Beta App
   Review**. Testers must be App Store Connect users with Account Holder,
   Admin, App Manager, Developer, or Marketing. Invite each iPhone tester
