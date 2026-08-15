@@ -26,7 +26,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Planned | Nicer share text; consider including the event description. Server-side only. |
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
-| [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Planned | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
+| [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 
@@ -881,7 +881,9 @@ Offer the manual form from more than the denial recovery: a quiet entry on the n
 
 ## Touch Targets & Footer Safe Area (People Screen)
 
-**Status:** Planned — owner calls the touch targets the main pre-tester item (2026-08-15). The footer overlap is explicitly *not* a tester blocker (testers are expected to use gesture nav) but is the same one-screen pass.
+**Status:** Implemented (2026-08-15). Was the owner's main pre-tester item; the footer overlap was explicitly *not* a tester blocker (testers are expected to use gesture nav) but shipped in the same one-screen pass.
+
+**As shipped:** the People screen gets real `minHeight: 44` targets on every bare-text action (header Back/Add, circle Edit/Delete, person Remove, hidden Unhide, modal Cancel/Save, retry banner) via a shared `textAction` style — rows were already ≥44 tall, so only the screen header grew — and the account footer now pads `4 + insets.bottom` so 3-button nav / the home indicator can't cover Delete account. The audit pass over the same bare-text pattern elsewhere used zero-pixel-shift fixes so no `visual.spec.ts` baseline moved: calendar People button grew to 44 inside the 48px header row, event-detail Back/Retry and the add/edit-event Cancel/Save pairs got `hitSlop`, share-screen header actions got real `minHeight: 44` (unbaselined), and share-sheet chips grew to 44 with `Manage` on hitSlop. Caveat for the next agent: react-native-web only honors `hitSlop` for move/up boundary checks — the *initial* tap on web is still DOM-hit-tested, so hitSlop'd targets stay glyph-sized in the browser (a dev surface); on native they get the full expanded target. Verified by DOM measurement at 390×844 (every People/share action ≥44px, footer fully on screen) plus a full green e2e run with unchanged baselines.
 
 ### Problem
 
@@ -896,6 +898,6 @@ One pass over the screen: real padding/min-height (≥44pt) on row and header te
 
 ### Acceptance Criteria
 
-- [ ] Every People-screen action has a ≥44pt effective touch target
-- [ ] The footer actions clear the 3-button nav bar and the iOS home indicator
-- [ ] Visual-diff baselines regenerated and reviewed if any snapshotted screen shifted
+- [x] Every People-screen action has a ≥44pt effective touch target
+- [x] The footer actions clear the 3-button nav bar and the iOS home indicator
+- [x] Visual-diff baselines regenerated and reviewed if any snapshotted screen shifted — vacuous: no snapshotted screen shifted (the suite passed without regenerating)
