@@ -3,8 +3,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+// createClient throws on an empty URL, and a module-level throw in a release
+// binary is an instant launch crash before React mounts. A build missing the
+// env vars (e.g. an EAS profile without them) must degrade to failing data
+// calls instead, so empty config resolves to a syntactically valid placeholder.
+export function resolveClientConfig(
+  url: string,
+  key: string
+): { url: string; key: string; isConfigured: boolean } {
+  const isConfigured = url.length > 0 && key.length > 0;
+  return {
+    url: isConfigured ? url : 'https://placeholder.supabase.co',
+    key: isConfigured ? key : 'placeholder-anon-key',
+    isConfigured,
+  };
+}
+
+const {
+  url: clientUrl,
+  key: clientKey,
+  isConfigured,
+} = resolveClientConfig(
+  process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? ''
+);
 
 // Web Locks (navigator.locks) are browser-process-wide per origin and are not
 // reliably released when a tab reloads/closes mid-auth-operation — the orphan
@@ -21,7 +43,7 @@ async function noOpLock<T>(
   return fn();
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(clientUrl, clientKey, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
@@ -31,7 +53,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!isConfigured) {
   console.warn(
     'Supabase is not configured: set EXPO_PUBLIC_SUPABASE_URL and ' +
       'EXPO_PUBLIC_SUPABASE_ANON_KEY in .env (see .env.example), then restart ' +
