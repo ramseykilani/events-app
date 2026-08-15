@@ -46,7 +46,9 @@ You tap the button, paste a link, confirm the title and date, and pick who to sh
 
 ### Notifications
 
-When someone shares an event with you, you receive a push notification showing the event title and date. Tapping it takes you directly to the event detail screen. This is the only notification the app sends — it is always triggered by another person, never by the app itself.
+When someone shares an event with you, you are notified — a push on the phone (tappable, opens the event) and a plain SMS with the same facts. This is the only notification the app sends. It is always triggered by another person, never by the app itself.
+
+Today both channels fire for app users (SMS only for people who do not have the app). Choosing push, SMS, both, or neither is a planned control — see FEATURES.md → Notification Channel Preferences. The event still lands on your calendar either way.
 
 ---
 

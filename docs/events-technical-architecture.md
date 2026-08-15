@@ -320,6 +320,8 @@ SMS deliberately carries no app or web links (decision 2026-08-09, see `docs/dis
 
 **Required Supabase secrets:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender (`TWILIO_MESSAGING_SERVICE_SID` preferred, `TWILIO_PHONE_NUMBER` as fallback). No other secrets gate SMS.
 
+**Planned — channel preferences:** app users cannot yet choose a channel. A later change (FEATURES.md → Notification Channel Preferences) adds account-level `notify_push` / `notify_sms` flags so a recipient can take push, SMS, both, or neither. Non-app SMS, Hide, OTP, and the share-delivers-a-copy rule stay as above. Do not implement from this paragraph — the spec and open questions live in FEATURES.md.
+
 ---
 
 ## Link Preview Edge Function
