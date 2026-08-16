@@ -64,7 +64,10 @@ never added: a blocker must be fixed, not accepted.
 ### KI-003 — Additive share re-notifies people already on the event (including yourself)
 
 - Severity: minor
-- Status: open
+- Status: fixed 2026-08-16 — pending release-review re-check. The share
+  screen now passes the newly shared person ids to `send-notification`,
+  which scopes its `event_shares` query to them; verified live against the
+  deployed function (additive share notified only the new recipient).
 - Found: 2026-08-15, owner device smoke of preview `eab4bcd7` (promoted
   `8f3b660`). Owner ruling: accepted for this release; do not halt testers.
 - Expected: sharing an event with additional people notifies **only those new
@@ -90,7 +93,10 @@ never added: a blocker must be fixed, not accepted.
 ### KI-004 — Edit Event URL field cannot be changed
 
 - Severity: minor
-- Status: open
+- Status: fixed 2026-08-16 — pending release-review re-check. The field is
+  editable again (it shipped read-only in the initial commit; the save path
+  always supported URL edits). Regression coverage: the e2e edit spec and
+  manual M-007 now exercise every edit-form field.
 - Found: 2026-08-16, friend testing (owner classified as a bug).
 - Expected: the URL on Edit Event can be changed, the same as title, date,
   time, and description. Edits already fork a new snapshot
