@@ -2,6 +2,7 @@ import { expect, test } from './fixtures';
 import {
   expectCalendar,
   openEventFromCalendar,
+  removeOpenEvent,
   uniqueTitle,
   visibleText,
 } from './helpers';
@@ -9,7 +10,10 @@ import {
 // Event detail actions (M-007, with M-006's disabled-state check): Share opens
 // the share sheet (which refuses to share with zero selection), Edit forks the
 // event and the detail shows the new snapshot, Remove deletes only the
-// caller's copy. Dates must render formatted, never raw YYYY-MM-DD.
+// caller's copy. Dates must render formatted, never raw YYYY-MM-DD. The edit
+// step exercises EVERY field — KI-004 shipped a read-only URL input while
+// every test layer only ever edited the title; fill() fails on a read-only
+// input, so this is the guard.
 test('event detail: share sheet, edit fork, formatted date, remove', async ({
   page,
 }, testInfo) => {
@@ -44,31 +48,68 @@ test('event detail: share sheet, edit fork, formatted date, remove', async ({
     page.getByRole('button', { name: 'Remove Event' })
   ).toBeVisible();
 
-  // Edit creates a fork; the detail shows the new snapshot.
+  // Edit creates a fork; the detail shows the new snapshot. Every field is
+  // edited, not just the title. The date moves to a different day in the
+  // same month (the calendar lists events per selected day, so the date
+  // edit is proven by where the event lands afterwards).
+  const editedUrl = 'https://example.com/e2e-edited';
+  const editedDescription = `${title} details updated`;
+  const now = new Date();
+  const newDay = now.getDate() === 15 ? 16 : 15;
+  const editedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(newDay).padStart(2, '0')}`;
+  // Same formatting calls the detail screen makes (lib/format.ts).
+  const expectedDate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    newDay
+  ).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  const expectedTime = new Date('1970-01-01T18:30:00').toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
   await page.getByRole('button', { name: 'Edit' }).click();
   const titleInput = page.getByPlaceholder('Event title');
   await expect(titleInput).toHaveValue(title);
+  await page.getByPlaceholder('https://...').fill(editedUrl);
   await titleInput.fill(editedTitle);
+  await page.getByPlaceholder('Description').fill(editedDescription);
+  await page.getByLabel('Date', { exact: true }).fill(editedDate);
+  await page.getByLabel('Time (optional)').fill('18:30');
   await page.getByRole('button', { name: 'Save' }).click();
+
+  // The fork's detail shows every edited value. The URL renders as a
+  // fixed-label link, so the button's appearance proves the URL persisted.
   await expect(visibleText(page, editedTitle)).toBeVisible({
     timeout: 15000,
   });
+  await expect(visibleText(page, editedDescription)).toBeVisible();
+  await expect(
+    visibleText(page, `${expectedDate} · ${expectedTime}`)
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Open link' }).filter({ visible: true })
+  ).toBeVisible();
 
-  // Remove cleans up the caller's copy. The edit forked the event and
-  // replaced the screen, so removing pops back to the PRE-EDIT detail (which
-  // we no longer own — no Edit/Remove buttons); Back lands on the calendar.
-  page.once('dialog', (dialog) => dialog.accept());
+  // Back out (past the pre-edit detail the replace left underneath), select
+  // the new day on the calendar, and the edited event is listed there.
   await page
-    .getByRole('button', { name: 'Remove Event' })
+    .getByRole('button', { name: 'Back' })
     .filter({ visible: true })
     .click();
-  await expect(
-    page.getByRole('button', { name: 'Back' }).filter({ visible: true })
-  ).toBeVisible({ timeout: 15000 });
   await page
     .getByRole('button', { name: 'Back' })
     .filter({ visible: true })
     .click();
   await expectCalendar(page);
+  await page.getByText(String(newDay), { exact: true }).click();
+  await expect(page.getByText(editedTitle, { exact: true })).toBeVisible();
+
+  // Remove cleans up the caller's copy; the title is gone from its day.
+  // Re-select the day first in case the replace remounted the calendar on
+  // today — absence must be asserted on the day the event was on.
+  await openEventFromCalendar(page, editedTitle);
+  await removeOpenEvent(page);
+  await page.getByText(String(newDay), { exact: true }).click();
   await expect(page.getByText(editedTitle, { exact: true })).not.toBeVisible();
 });

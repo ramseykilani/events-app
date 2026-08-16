@@ -494,7 +494,8 @@ export default function EditEventScreen() {
           placeholderTextColor={theme.textTertiary}
           value={url}
           onChangeText={setUrl}
-          editable={false}
+          keyboardType="url"
+          autoCapitalize="none"
         />
         <Text style={[styles.label, { color: theme.textSecondary }]}>Title</Text>
         <TextInput

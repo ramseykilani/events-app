@@ -131,11 +131,11 @@ For each executed scenario:
 **Steps**
 1. Open an event detail page.
 2. Tap **Share** and return.
-3. If editable, tap **Edit**, change title/date, save.
+3. If editable, tap **Edit**, change EVERY field — URL, title, description, date, time — and save. (KI-004: the URL field shipped read-only while every test layer only ever edited the title. Exercise them all.)
 
 **Expected**
 - Share action opens share screen.
-- Edit save returns to updated event detail.
+- Edit save returns to the updated event detail, and every edited value persisted: new title and description, new date and time (formatted, never raw ISO), and the URL shown as an "Open link" button.
 
 ---
 
