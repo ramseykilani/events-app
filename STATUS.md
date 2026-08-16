@@ -28,14 +28,15 @@ Play "Finish setting up your app" (privacy policy URL, data-safety form, content
 
 ## Code state
 
-- `production`: `8f3b660` — 2026-08-15 ship. Live: https://shared-events.pages.dev.
-- `staging`: ahead on docs/config (KI-003, iOS export-compliance flag, TestFlight submit profile). App behavior matches production except the iOS `ITSAppUsesNonExemptEncryption` plist bit (TestFlight-only).
+- `production`: `0baab0e` — 2026-08-16 ship (reviewed `e36a0cb`). Live: https://shared-events.pages.dev. Includes KI-003 (notify only new recipients) and KI-004 (edit URL editable).
+- `staging`: same commit plus this STATUS note. Preview APK `0c242921` awaits owner smoke before any tester rebuild.
 
 ## Latest native builds
 
 | Profile | Platform | Date | Link | State |
 |---------|----------|------|------|-------|
-| preview (internal APK) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/eab4bcd7-0900-4517-986b-28657dccbe49 | Owner smoke **passed**. KI-003 accepted. |
+| preview (internal APK) | Android | 2026-08-16 | https://expo.dev/accounts/rkilani/projects/events-app/builds/0c242921-5afb-4e1e-89e0-b5998d0811c1 | **Awaiting owner smoke** of promoted `0baab0e` (KI-003 + KI-004). APK https://expo.dev/artifacts/eas/lU0gemdHBwVKkCZhLpgCS8iVI8l6ZjNnOMGaR73g4bM.apk. Do not distribute to testers until the owner passes. |
+| preview (superseded) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/eab4bcd7-0900-4517-986b-28657dccbe49 | Owner smoke **passed** on `8f3b660`. KI-003 was accepted on that build; do not use for this release. |
 | production (Play internal) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/6d41b098-dd4c-40d7-b715-94380cc8728e | **On the internal track.** 0.1.0 / versionCode 2. Submit https://expo.dev/accounts/rkilani/projects/events-app/submissions/de5a90ef-cf34-4455-ad38-a507d41a8a0b succeeded after testing-track + manage-user-lists. Play Console → Testing → Internal testing → copy the opt-in link (Play does not email testers). |
 | production (TestFlight) | iOS | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/bea7755e-c7e5-4286-a8e0-78a7e23d1677 | **Ready for internal testing.** 0.1.0 / build 2 (`internalBuildState: READY_FOR_BETA_TESTING`). https://appstoreconnect.apple.com/apps/6801756936/testflight/ios. Dist cert + profile created 2026-08-15. Internal group **Team (Expo)** (`hasAccessToAllBuilds`). First iPhone testers go on this internal group — **no Beta App Review**. Do not submit this build for external review. |
 | preview (superseded) | Android | 2026-08-15 | https://expo.dev/accounts/rkilani/projects/events-app/builds/5f477380-e794-46e1-a5cc-1b8ba70cb336 | Earlier smoke; do not distribute. |
