@@ -219,7 +219,7 @@ describe('app/(app)/share', () => {
     });
 
     expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-notification', {
-      body: { userEventId: 'ue1' },
+      body: { userEventId: 'ue1', personIds: ['p1', 'p2'] },
     });
     expect(router.back).toHaveBeenCalled();
   });
@@ -276,6 +276,11 @@ describe('app/(app)/share', () => {
         p_user_event_id: 'ue1',
         p_person_ids: ['p2'],
       });
+    });
+    // KI-003: only the newly shared person is notified — people already on
+    // the event must not be re-pinged by an additive share.
+    expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-notification', {
+      body: { userEventId: 'ue1', personIds: ['p2'] },
     });
     expect(router.back).toHaveBeenCalled();
   });

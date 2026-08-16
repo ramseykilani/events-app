@@ -203,6 +203,10 @@ export default function ShareScreen() {
     try {
       let userEventId = firstParamValue(params.userEventId);
       let shared = false;
+      // Captured inside the write so the notification below names exactly
+      // the new recipients — notifying every event_shares row re-pings
+      // people who were already on the event (KI-003).
+      let notifiedPersonIds: string[] = [];
 
       await withWriteTimeout(async (signal) => {
         if (!userEventId) {
@@ -264,14 +268,17 @@ export default function ShareScreen() {
 
           if (shareErr) throw shareErr;
           shared = true;
+          notifiedPersonIds = toShare;
         }
       });
 
       // Fire-and-forget, outside the write budget: notify the people just
-      // shared with.
+      // shared with — and only them.
       if (shared && userEventId) {
         supabase.functions
-          .invoke('send-notification', { body: { userEventId } })
+          .invoke('send-notification', {
+            body: { userEventId, personIds: notifiedPersonIds },
+          })
           .catch((err) => console.error('send-notification error:', err));
       }
 

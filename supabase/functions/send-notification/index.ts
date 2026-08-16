@@ -112,9 +112,20 @@ serve(async (req) => {
   const db = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    const { userEventId } = await req.json();
+    const { userEventId, personIds } = await req.json();
     if (!userEventId || typeof userEventId !== 'string') {
       return jsonResponse({ error: 'userEventId is required' }, 400);
+    }
+    // Optional scoping: the share screen passes the person ids it just
+    // shared to, so an additive share notifies only the new recipients
+    // instead of every event_shares row (KI-003). Absent = all rows, the
+    // pre-fix behavior, kept for legacy callers.
+    if (
+      personIds !== undefined &&
+      (!Array.isArray(personIds) ||
+        personIds.some((id: unknown) => typeof id !== 'string'))
+    ) {
+      return jsonResponse({ error: 'personIds must be an array of strings' }, 400);
     }
 
     // Load the user_event to get the sharer and event
@@ -130,6 +141,11 @@ serve(async (req) => {
 
     if (userEvent.user_id !== caller.id) {
       return jsonResponse({ error: 'Forbidden' }, 403);
+    }
+
+    // Nothing new was shared — no one to notify.
+    if (Array.isArray(personIds) && personIds.length === 0) {
+      return jsonResponse({ sent: 0, sms: 0 });
     }
 
     const sharerUserId = userEvent.user_id;
@@ -154,11 +170,17 @@ serve(async (req) => {
     const sharerPhone = sharerUser?.phone_number ?? 'Someone';
     const sharerDisplayName = (sharerUser?.display_name as string | null) ?? null;
 
-    // Load all shares for this user_event, including each recipient's phone number
-    const { data: shares, error: sharesErr } = await db
+    // Load the shares to notify for this user_event, including each
+    // recipient's phone number — scoped to the just-shared person ids when
+    // the client passes them.
+    let sharesQuery = db
       .from('event_shares')
       .select('person_id, my_people(user_id, owner_id, phone_number)')
       .eq('user_event_id', userEventId);
+    if (personIds) {
+      sharesQuery = sharesQuery.in('person_id', personIds);
+    }
+    const { data: shares, error: sharesErr } = await sharesQuery;
 
     if (sharesErr || !shares?.length) {
       return jsonResponse({ sent: 0, sms: 0 });

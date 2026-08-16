@@ -226,7 +226,7 @@ People are added from the People screen (or when tapping Share) — there is no 
 6. **Sharing screen (mandatory):** Shows the user's people list (up to 50). Circles appear as quick-select buttons at the top — tapping one selects everyone in that group. The user can also tap individual people. Any combination works.
 7. The `share_event` RPC records event_shares rows (one per person, circles resolved to individuals) and delivers each recipient who has an account their own user_events copy — contacts without an account get theirs on sign-up
 8. last_shared_at updated on relevant my_people rows (inside the RPC)
-9. `send-notification` Edge Function is called fire-and-forget to notify recipients
+9. `send-notification` Edge Function is called fire-and-forget with the newly shared person ids, and notifies only those recipients (KI-003 — an additive share must not re-ping people already on the event)
 
 ### 4. Share an Existing Event (From Calendar)
 
