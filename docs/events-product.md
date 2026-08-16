@@ -54,7 +54,7 @@ When someone shares an event with you, you receive a push notification showing t
 
 ### Signing Up
 
-You sign up with your phone number. You select up to 50 contacts from your phone — these become your people list. You can optionally organize them into circles. If someone is already on the app, the connection is live immediately. If they're not, that's fine — they're on your list, and as soon as they sign up, everything just works without you having to do anything.
+You sign up with your phone number. The sign-in screen explains what the app is and why the number (it is your account, and how friends share events with you) before sending the code. You select up to 50 contacts from your phone — these become your people list. You can optionally organize them into circles. If someone is already on the app, the connection is live immediately. If they're not, that's fine — they're on your list, and as soon as they sign up, everything just works without you having to do anything.
 
 ### The One-Friend Bootstrap
 

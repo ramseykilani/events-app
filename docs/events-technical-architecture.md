@@ -197,7 +197,7 @@ When a user sees an event on their calendar and wants to share it with their own
 
 ### 1. Sign Up
 
-1. User enters phone number
+1. User enters phone number. The sign-in screen shows a short orientation first (what the app is, plus why the number — it is the account and how friends share events with you) before the OTP send.
 2. Supabase sends SMS OTP
 3. User enters code → Supabase creates auth user
 4. User record created in users table

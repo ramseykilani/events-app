@@ -29,6 +29,27 @@ describe('app/(auth)/sign-in', () => {
     jest.restoreAllMocks();
   });
 
+  it('shows orientation copy for what the app is and why the phone number', () => {
+    const screen = render(<SignInScreen />);
+
+    expect(
+      screen.getByText(
+        'Found something you want to go to? Add it here and share it with the right people — instead of texting them one by one.'
+      )
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        'When your people share something, it shows up on your calendar too.'
+      )
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Your phone number is your account. We'll text a code to sign in, and it's how a friend shares an event with you."
+      )
+    ).toBeTruthy();
+    expect(screen.queryByText('Enter your phone number to continue')).toBeNull();
+  });
+
   it('shows validation alert for invalid phone numbers', () => {
     const screen = render(<SignInScreen />);
 

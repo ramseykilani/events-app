@@ -8,7 +8,9 @@ import {
   KeyboardAvoidingView,
   Linking,
   Platform,
+  ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { router } from 'expo-router';
 import { getAuthUserMessage } from '../../lib/authErrors';
@@ -19,11 +21,18 @@ import { useTheme } from '../../hooks/useTheme';
 
 const PRIVACY_POLICY_URL = 'https://shared-events.pages.dev/privacy.html';
 
+const ORIENTATION_LINES = [
+  'Found something you want to go to? Add it here and share it with the right people — instead of texting them one by one.',
+  'When your people share something, it shows up on your calendar too.',
+  "Your phone number is your account. We'll text a code to sign in, and it's how a friend shares an event with you.",
+];
+
 export default function SignInScreen() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const submittingRef = useRef(false);
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const normalizePhone = (input: string): string | null => {
     try {
@@ -78,7 +87,16 @@ export default function SignInScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <View style={styles.content}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + 24,
+            paddingBottom: Math.max(insets.bottom, 24),
+          },
+        ]}
+      >
         <Text
           style={[
             styles.title,
@@ -88,10 +106,17 @@ export default function SignInScreen() {
               fontWeight: theme.titleFontWeight,
             },
           ]}
+          accessibilityRole="header"
         >
           Events
         </Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Enter your phone number to continue</Text>
+        <View style={styles.orientation}>
+          {ORIENTATION_LINES.map((line) => (
+            <Text key={line} style={[styles.body, { color: theme.textSecondary }]}>
+              {line}
+            </Text>
+          ))}
+        </View>
         <TextInput
           style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="+1 (555) 123-4567"
@@ -125,7 +150,7 @@ export default function SignInScreen() {
             Privacy policy
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -133,18 +158,22 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
   },
   content: {
-    padding: 24,
+    paddingHorizontal: 24,
   },
   title: {
     fontSize: 32,
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  subtitle: {
+  orientation: {
+    gap: 16,
+    marginBottom: 28,
+    maxWidth: 420,
+  },
+  body: {
     fontSize: 16,
-    marginBottom: 24,
+    lineHeight: 24,
   },
   input: {
     borderWidth: 1,
