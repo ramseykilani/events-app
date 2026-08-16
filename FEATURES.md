@@ -47,7 +47,7 @@ How people get onto a first share today:
 
 **Web testing is unblocked** — local `npx expo start --web`, the staging preview, and the full automated suite (Jest, SQL, Playwright). That is how agents and CI test; it is not how users get the app.
 
-**Native distribution is the remaining gate for real use**, not a missing feature. Owner device smoke of preview `eab4bcd7` (promoted `8f3b660`, 2026-08-15) passed; the earlier N-005 push/tap path is green. Accepted on that build: KI-003 (additive share re-notifies existing recipients). N-007 recipient-side still needs a second account. Next: production AAB → Play internal track, then ~3 friends (see `STATUS.md`). Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
+**Native distribution is the remaining gate for real use**, not a missing feature. Owner device smoke of preview `eab4bcd7` (promoted `8f3b660`, 2026-08-15) passed; the earlier N-005 push/tap path is green. KI-003 (additive share re-notify) and KI-004 (edit URL read-only) are fixed on staging as of the 2026-08-16 release review — they still exist on the 2026-08-15 native binaries until the post-promotion rebuild. N-007 recipient-side still needs a second account. Next: production AAB → Play internal track, then ~3 friends (see `STATUS.md`). Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
 
 ---
 
@@ -76,11 +76,9 @@ When a user shares an event with someone, the recipient receives a push notifica
 - In `app/_layout.tsx`: set notification tap handler to navigate to `/(app)/event/[eventId]`
 - In `app/(app)/share.tsx`: call edge function fire-and-forget after share creation
 - Handle `DeviceNotRegistered` errors from Expo Push API by clearing the stale token
-- **Gap (KI-003):** the function is invoked with only `{ userEventId }` and
-  iterates every `event_shares` row for that copy. Additive shares therefore
-  re-notify people already on the event (including a self-share). The client
-  already filters to new person ids for `share_event`; the notify path does
-  not. Fix is a later task — accepted on the 2026-08-15 tester build.
+- Additive shares pass the newly shared person ids into `send-notification`,
+  which scopes its `event_shares` query to those ids (KI-003, verified
+  2026-08-16 release review).
 
 ### Acceptance Criteria
 
@@ -89,7 +87,7 @@ When a user shares an event with someone, the recipient receives a push notifica
 - [x] Tapping the notification opens the event detail screen
 - [x] No notification is sent if the sharer is hidden by the recipient
 - [x] No notification is sent if the recipient has no push token
-- [ ] Only newly shared recipients are notified on an additive share (KI-003)
+- [x] Only newly shared recipients are notified on an additive share (KI-003)
 
 ### Open Questions
 
@@ -414,7 +412,8 @@ Until layer 2 ships for a host, soften the onboarding line so it matches today: 
 
 - `og-metadata` (`supabase/functions/og-metadata/index.ts`) stays JWT-gated, 5s / 1MB capped, fail-open. Extend the JSON body to `{ title, description, image_url, event_date, event_time }` — all nullable.
 - Client: `fetchOgMetadata` in [app/(app)/add-event.tsx](app/(app)/add-event.tsx) already writes title/description/image. Also set the date/time fields when the response has them; never overwrite a date the user already changed.
-- Edit Event does not fetch OG today. URL change on edit is currently impossible ([KI-004](manual-tests/known_issues.md)); that bug is separate from this upgrade.
+- Edit Event does not fetch OG today. URL is editable on Edit (KI-004 fixed
+  2026-08-16); refetching OG on a URL change is this upgrade, not the bugfix.
 - Ticketmaster: API key as a function secret; parse `/event/{id}` only for the automatic path. Do not add a scraping/bypass dependency.
 - Timezones: prefer the listing's local date/time (Discovery's `localDate` / `localTime`, JSON-LD `startDate` without forcing UTC). Same "land on the day the user meant" rule as the web date inputs.
 - Dedup is unchanged: `find_or_create_event` still keys on `(url, title, event_date, event_time)`. Better autofill makes collisions more likely and more correct.
@@ -432,7 +431,8 @@ Until layer 2 ships for a host, soften the onboarding line so it matches today: 
 ### Open Questions
 
 - Ticketmaster only, or Eventbrite in the same slice?
-- After [KI-004](manual-tests/known_issues.md) (edit URL is locked today), should a URL change on Edit Event refetch OG (architecture says yes; the screen does not today)?
+- After a URL change on Edit Event, should OG refetch (architecture says yes;
+  the screen does not today)? KI-004 (URL field was read-only) is fixed.
 - Venue/location: we have no field. Leave it in description, or add a field later?
 
 ---
@@ -981,7 +981,7 @@ Before they send — especially the first time — explain that you can’t unsh
 
 ## Share Delivery Status
 
-**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Related: [Share Sent Confirmation](#share-sent-confirmation) (that you sent it) and KI-003 (additive shares re-notify people already on the event).
+**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Related: [Share Sent Confirmation](#share-sent-confirmation) (that you sent it). Additive-share re-notify (KI-003) is fixed.
 
 ### Problem
 

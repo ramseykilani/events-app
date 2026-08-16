@@ -91,8 +91,5 @@ requires one).
 - Notification SMS leads with the sharer's display name. A raw phone number
   appears only for accounts that last shared before display names shipped
   (2026-08-12) — the share gate prevents any new nameless share.
-- Adding new people to an already-shared event re-notifies everyone already
-  on it, including a self-share (KI-003). Testers will see a second push/SMS
-  with the same "added you to" copy. Accepted for this release.
 - The web app is not a supported user surface; anything web-specific goes
   through `manual-tests/cloud_manual_regression.md` instead.
