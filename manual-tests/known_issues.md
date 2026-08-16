@@ -87,6 +87,26 @@ never added: a blocker must be fixed, not accepted.
   those; skip the sharer. Optionally persist a notified-at on `event_shares`
   so retries cannot double-send either.
 
+### KI-004 — Edit Event URL field cannot be changed
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-16, friend testing (owner classified as a bug).
+- Expected: the URL on Edit Event can be changed, the same as title, date,
+  time, and description. Edits already fork a new snapshot
+  (`find_or_create_event`); a URL change is a valid edit.
+- Actual: Edit Event shows a "URL (optional)" field but it does not accept
+  input. `app/(app)/edit-event.tsx` sets `editable={false}` on that
+  `TextInput`. Add Event's URL field is editable. A tester could not fix or
+  replace the listing URL after save.
+- Repro: create an event with a URL (or without). Open Edit. Tap the URL
+  field and try to type or paste. Nothing changes. Save cannot persist a
+  different URL because the field never updates.
+- Fix (separate task): make the URL field editable. Related planned work
+  ([Richer Link Autofill](../FEATURES.md#richer-link-autofill)) asks whether
+  a URL change on edit should refetch OG — that is a later question; this
+  bug is that the URL cannot be changed at all.
+
 ## Known limitations (by design — do not flag)
 
 - **The native date/time picker never opens on web.**

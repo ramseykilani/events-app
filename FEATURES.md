@@ -26,6 +26,12 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Planned | Nicer share text; consider including the event description. Server-side only. |
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
+| [Notification Permission Explainer](#notification-permission-explainer) | Planned | Upgrade. Push already works; the OS prompt currently fires cold on launch. |
+| [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Planned | First share never says you can't take it back. |
+| [Share Delivery Status](#share-delivery-status) | Planned | ✓ Shared only means recorded, not received. |
+| [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
+| [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
+| [Share Sent Confirmation](#share-sent-confirmation) | Planned | After Share, the screen just goes back. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
@@ -408,7 +414,7 @@ Until layer 2 ships for a host, soften the onboarding line so it matches today: 
 
 - `og-metadata` (`supabase/functions/og-metadata/index.ts`) stays JWT-gated, 5s / 1MB capped, fail-open. Extend the JSON body to `{ title, description, image_url, event_date, event_time }` — all nullable.
 - Client: `fetchOgMetadata` in [app/(app)/add-event.tsx](app/(app)/add-event.tsx) already writes title/description/image. Also set the date/time fields when the response has them; never overwrite a date the user already changed.
-- Edit Event does not fetch OG today. Decide in Open Questions whether a URL change on edit should.
+- Edit Event does not fetch OG today. URL change on edit is currently impossible ([KI-004](manual-tests/known_issues.md)); that bug is separate from this upgrade.
 - Ticketmaster: API key as a function secret; parse `/event/{id}` only for the automatic path. Do not add a scraping/bypass dependency.
 - Timezones: prefer the listing's local date/time (Discovery's `localDate` / `localTime`, JSON-LD `startDate` without forcing UTC). Same "land on the day the user meant" rule as the web date inputs.
 - Dedup is unchanged: `find_or_create_event` still keys on `(url, title, event_date, event_time)`. Better autofill makes collisions more likely and more correct.
@@ -426,7 +432,7 @@ Until layer 2 ships for a host, soften the onboarding line so it matches today: 
 ### Open Questions
 
 - Ticketmaster only, or Eventbrite in the same slice?
-- Does a URL change on Edit Event refetch (architecture says yes; the screen does not today)?
+- After [KI-004](manual-tests/known_issues.md) (edit URL is locked today), should a URL change on Edit Event refetch OG (architecture says yes; the screen does not today)?
 - Venue/location: we have no field. Leave it in description, or add a field later?
 
 ---
@@ -907,3 +913,162 @@ One pass over the screen: real padding/min-height (≥44pt) on row and header te
 - [x] Every People-screen action has a ≥44pt effective touch target
 - [x] The footer actions clear the 3-button nav bar and the iOS home indicator
 - [x] Visual-diff baselines regenerated and reviewed if any snapshotted screen shifted — vacuous: no snapshotted screen shifted (the suite passed without regenerating)
+
+---
+
+## Notification Permission Explainer
+
+**Status:** Planned — upgrade, not a blocker. Push registration, delivery, and tap-to-event already work (N-005). Recorded 2026-08-16 from internal testing. Same “explain, then ask” idea as [Contacts Permission Explainer](#contacts-permission-explainer).
+
+### What this is not
+
+Not a new notification type, not an onboarding page, and not a change to when we *send* pushes. Person-triggered shares still notify; the app still never manufactures its own urgency. Web still never requests browser notification permission. Recipients who decline still get SMS.
+
+### Problem
+
+On native, the first authenticated launch fires the OS notification prompt with no in-app reason (`registerForPushNotifications` in `app/_layout.tsx`). Contacts used to do the same; we replaced that with an explainer because the OS dialog does not carry our why. Notifications are worse: iOS has no usage-description equivalent, so the system copy is only “Allow Notifications.” A cold ask also burns iOS’s one-shot if the user taps Don’t Allow before they know what the ping is for.
+
+### Proposed Solution
+
+Explain why we need notification access **before** asking the OS. Continue is the only moment the system prompt fires. Not now must not call the OS (so iOS hasn’t used its one ask) and must not nag on every subsequent launch — this ask is app-initiated, unlike Share/People which the user just tapped.
+
+Do not fold this into the walkthrough or ask at sign-up. Do not stack on the empty-calendar walkthrough. Already granted → register the token with no extra UI. Web unchanged.
+
+Draft copy direction (not final): “Events notifies you when someone shares an event with you — never anything else.”
+
+### Acceptance Criteria
+
+- [ ] Native first ask shows an in-app explanation before the OS prompt, never the OS prompt cold
+- [ ] Not now does not burn the iOS one-shot and does not reappear on every launch
+- [ ] Already granted still registers the push token with no extra UI
+- [ ] Web behavior unchanged (no browser permission prompt)
+- [ ] Copy states the only trigger: someone shared an event with you
+
+### Open Questions
+
+- Exact copy.
+- Not now: persist forever, or one later re-ask in a contextual moment?
+- Recovery after OS deny: skip for v1 (SMS covers it), or a later “Notifications are off” path?
+
+---
+
+## Explain Before Share (No Unshare)
+
+**Status:** Planned — copy / first-share education, not a blocker. Recorded 2026-08-16 from internal testing. No-unshare is already how sharing works ([Forwarding Shares](#forwarding-shares)).
+
+### Problem
+
+Sharing is like sending a text: once you’ve shared it, they know about the event, and you can’t take it back. The product enforces that (`✓ Shared`, additive-only, no unshare) but does not say so **before** the first send.
+
+Today a one-liner appears only after someone is already marked ✓ Shared: “Sharing delivers people their own copy — it can't be unsent” (`app/(app)/share.tsx`). First Share is silent. The walkthrough never mentions it. Remove-event copy only explains the other direction (“this only affects you”).
+
+### Proposed Solution
+
+Before they send — especially the first time — explain that you can’t unshare because it’s like a text. Once you’ve shared it with them, they now know about the event. User-facing copy should use that metaphor, not the storage model (“their own copy”).
+
+### Acceptance Criteria
+
+- [ ] Before the first Share send, the user is told they can’t take it back
+- [ ] The explanation uses the text metaphor, not implementation language
+- [ ] Later opens of an already-shared event still make the completed, non-unsendable state obvious
+
+### Open Questions
+
+- Always-visible line vs first-share-only vs a confirm on the first send. First share can already stack the display-name gate and the contacts explainer.
+- Whether this belongs on the share screen only, not in the walkthrough (the walkthrough auto-shows only when the calendar is empty).
+
+---
+
+## Share Delivery Status
+
+**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Related: [Share Sent Confirmation](#share-sent-confirmation) (that you sent it) and KI-003 (additive shares re-notify people already on the event).
+
+### Problem
+
+After you share, those people show as ✓ Shared. That only means the share was recorded. The sender cannot tell who actually got the message.
+
+`send-notification` is fire-and-forget after `share_event`. SMS failures — including Twilio STOP / unsubscribed — are swallowed. The sender is sent back as if it went through.
+
+### Proposed Solution
+
+Like Partiful: after you’ve shared with people, instead of only a checkmark, show whether each person received it or not. If someone has replied STOP / unsubscribed, it should be visible that the message never made it to them.
+
+### Acceptance Criteria
+
+- [ ] After sharing, the sender can see per person whether the message was received
+- [ ] A recipient who has unsubscribed (STOP) is shown as not having received it
+- [ ] ✓ Shared is no longer the only signal
+
+### Open Questions
+
+- What “received” means for app users (push vs SMS vs calendar copy already delivered).
+- How STOP / bounce / no-token states are distinguished, if at all.
+
+---
+
+## US Phone Numbers
+
+**Status:** Planned — needs investigation, not a blocker. Recorded 2026-08-16 from internal testing.
+
+### Problem
+
+US phone numbers are not working for testers. The client already parses with a US default (`lib/contacts.ts` `normalizeToE164(..., 'US')`, sign-in `parsePhoneNumber(input, 'US')`) and stores E.164. Manual-add placeholder is `+1 416 555 1234`. The failure is suspected to be on the Twilio path (or something in that path), not a missing US default in the parser.
+
+### Proposed Solution
+
+Support US phone numbers end-to-end (add person, sign-in, share SMS). Look into Twilio as part of this upgrade. Do not assume the client parser is the bug until that’s checked.
+
+### Acceptance Criteria
+
+- [ ] A real US number can be added and shared to
+- [ ] Share SMS to that number is delivered (or a visible failure — see [Share Delivery Status](#share-delivery-status))
+- [ ] Sign-in with a US number works when the number is a real user, not only a 555 test OTP
+
+### Open Questions
+
+- What exactly fails today (Twilio geo permissions, A2P/toll-free, sender pool, Auth SMS vs `send-notification` SMS, number format at send time). Not diagnosed yet — that’s the work.
+
+---
+
+## Add to Other Calendars
+
+**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing.
+
+### Problem
+
+Events live only on the in-app calendar. Event detail can open the listing URL; there is no way to add the event to Google Calendar, Apple Calendar, or other calendar apps.
+
+### Proposed Solution
+
+Let the user add an event to Google Calendar and other calendar apps.
+
+### Acceptance Criteria
+
+- [ ] From an event, the user can add it to Google Calendar
+- [ ] Other calendar apps are supported too (Apple Calendar and the usual phone calendars)
+
+### Open Questions
+
+- Which calendars in the first slice, and whether this is an export the user triggers vs a sync.
+
+---
+
+## Share Sent Confirmation
+
+**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Related: [Share Delivery Status](#share-delivery-status) (whether each person received it).
+
+### Problem
+
+After Share succeeds, the screen just goes back (`router.back()` in `app/(app)/share.tsx`). There is no confirmation that it was sent.
+
+### Proposed Solution
+
+When you send a share, confirm that it has been sent.
+
+### Acceptance Criteria
+
+- [ ] After a successful share, the sender sees a confirmation that it was sent
+
+### Open Questions
+
+- How this sits next to per-person received status — a one-shot “sent” vs the lasting ✓ / received rows.
