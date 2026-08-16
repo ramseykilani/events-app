@@ -1,9 +1,9 @@
 export interface User {
   id: string;
   phone_number: string;
-  // Self-chosen attribution name ("X added you to ..."). NULL until the
-  // user's first share — the share screen gates on it. Editable from the
-  // People screen footer; never removable.
+  // Self-chosen attribution name ("X wants to go to ... with you"). NULL
+  // until the user's first share — the share screen gates on it. Editable
+  // from the People screen footer; never removable.
   display_name: string | null;
   expo_push_token: string | null;
   created_at: string;

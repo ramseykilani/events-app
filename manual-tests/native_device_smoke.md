@@ -63,8 +63,8 @@ requires one).
 
 1. Device A: share an event (with a URL set) to your own real second number,
    or a friend's non-app number.
-2. The SMS reads: who added you, event title, date/time, the event URL — and
-   **no app/web links**, with a Reply STOP footer.
+2. The SMS reads: who wants to go with you, the event title, date/time, the
+   event URL — and **no app/web links**, with a Reply STOP footer.
 3. Eyeball check: it does not read like spam.
 
 ## N-007: Edit and remove

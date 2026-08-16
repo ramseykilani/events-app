@@ -228,13 +228,13 @@ For each executed scenario:
 
 ### E-107 SMS contains the event URL
 **Steps**
-1. Requires Twilio credentials configured on the `send-notification` edge function and at least one store URL secret.
+1. Requires Twilio credentials configured on the `send-notification` edge function.
 2. As account A, create an event **with a URL** and share it with a phone number that is not an app user.
 3. Inspect the SMS delivered (or Twilio message logs).
 
 **Expected**
-- SMS body includes the event title, date/time, and the event URL itself — the recipient can act without installing the app.
-- Store links follow the event URL; message ends with `Reply STOP to unsubscribe.`
+- SMS body opens with `[Name] wants to go to "[title]" with you`, then the date/time line, then the event URL itself — the recipient can act without installing the app.
+- No app/web links anywhere in the message; it ends with `Reply STOP to unsubscribe.`
 
 ---
 
