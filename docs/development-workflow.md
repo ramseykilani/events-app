@@ -273,6 +273,15 @@ spends 1–2 per release; don't build speculatively.
   everyone the same link. Owner Gmail is already on it. This is the
   friends-and-friends-of-friends path. `eas submit` lands here; testers
   then get Play updates on the next submit.
+- **Play Store “Item not found” (sleeping satellite):** that screen is the
+  public listing 404, not a missing AAB. There is no production listing, so
+  `https://play.google.com/store/apps/details?id=com.rkilani.events` and
+  Play search both fail until the person is on the email list **and** has
+  tapped **Become a tester**. Send only the Console opt-in link (or
+  `https://play.google.com/apps/testing/com.rkilani.events`). If they
+  already hit Item not found: confirm Play Store is signed into the invited
+  Gmail (profile picture → account), open the opt-in link, join, then retry
+  install. Wrong Google account on the phone is the usual leftover cause.
 - **Do not use Play Internal app sharing** (Internal testing → Internal app
   sharing → “Anyone you shared the link with can download”) as the friends
   path. Different product: separate upload (not the submitted AAB), testers
