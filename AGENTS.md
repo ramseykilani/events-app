@@ -157,7 +157,7 @@ Prerequisites (Cursor secrets — injected into new cloud-agent VMs only; a runn
   export EXPO_ASC_API_KEY_PATH="$PWD/AuthKey.p8"
   export EXPO_APPLE_TEAM_TYPE=INDIVIDUAL
   ```
-  Distribution cert + provisioning profile for `com.rkilani.events` were created 2026-08-15; non-interactive `eas build --platform ios` works. `submit.production.ios.ascAppId` is `6801756936` (Shared Events). Do not pass `--what-to-test` (EAS changelog is Enterprise-only).
+  Distribution cert + provisioning profile for `com.rkilani.events` were created 2026-08-15; non-interactive `eas build --platform ios` works. `submit.production.ios.ascAppId` is `6801756936` (Shared Events). eas-cli 22 non-interactive submit ignores env-only ASC keys — temporarily add `ascApiKeyPath` / `ascApiKeyId` / `ascApiKeyIssuerId` / `appleTeamId` to local `eas.json`, then `git checkout -- eas.json` after (never commit). Strip whitespace from `EXPO_APPLE_TEAM_ID` (a leading newline makes EAS reject it). Pass `--groups "Team (Expo)"`. Do not pass `--what-to-test` (EAS changelog is Enterprise-only).
 - Android submit (Play service account): decode `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (base64) to the path `eas.json` expects — `echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" | base64 -d > google-play-service-account.json`. The file is gitignored; never commit it.
 
 Commands:
@@ -172,12 +172,12 @@ eas submit --platform android --profile production --non-interactive --latest
 
 # iOS → TestFlight (ASC key file + eas.json submit.production.ios)
 eas build --platform ios --profile production --non-interactive --wait
-eas submit --platform ios --profile production --non-interactive --latest
+eas submit --platform ios --profile production --non-interactive --latest --groups "Team (Expo)"
 ```
 
 - `--wait` blocks until the build finishes and prints the artifact page URL — hand that link to the owner. Builds are metered (free plan: 15 Android + 15 iOS per month); never build speculatively.
 - Preview produces an APK (sideload); production produces an AAB (Play) / IPA (TestFlight). Same commit, same code — preview is the owner's smoke surface, production is what testers get.
-- iOS credentials (dist cert + profile) and `eas.json` `submit.production.ios.ascAppId` were set up 2026-08-15. Submit still needs the decoded `AuthKey.p8` (gitignored) plus `EXPO_ASC_KEY_ID` / `EXPO_ASC_ISSUER_ID` in the environment. If a later non-interactive build still fails on certificates, the owner can run `eas build --platform ios --profile production` once interactively.
+- iOS credentials (dist cert + profile) and `eas.json` `submit.production.ios.ascAppId` were set up 2026-08-15. Submit still needs the decoded `AuthKey.p8` (gitignored) plus the local `eas.json` ASC fields above. If a later non-interactive build still fails on certificates, the owner can run `eas build --platform ios --profile production` once interactively.
 - If a required secret is missing, stop and tell the owner exactly which one to add (Cursor Dashboard → Cloud Agents → Secrets, and GitHub repo secrets if CI ever builds). Do not half-run a release.
 
 ### Key gotchas
