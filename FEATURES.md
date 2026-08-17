@@ -1018,6 +1018,14 @@ After you share, those people show as ✓ Shared. That only means the share was 
 
 Like Partiful: after you’ve shared with people, instead of only a checkmark, show whether each person received it or not. If someone has replied STOP / unsubscribed, it should be visible that the message never made it to them.
 
+### Foundation (from the 2026-08-17 Twilio diagnosis)
+
+`sendSms()` in `supabase/functions/send-notification/index.ts` discards the Twilio Messages API response, so every failure mode is invisible outside the Twilio console. Empirical evidence from the account's last 30 days: 5 real share-notification SMS carrier-blocked (`30034`, unregistered 10DLC — 4 of them to one person who received nothing), 1 landline rejection (`30006`), zero of it visible in our own logs.
+
+Layer 1 (independently shippable): parse the response — capture the message `sid` on accept, log `error_code` / `error_message` on synchronous rejection (21xxx). Failures become visible in Supabase edge-function logs in seconds.
+
+Layer 2 (the feature itself): persist per-recipient status. Store the message SID against each `(user_event, person)` at send time; add a `twilio-status` edge function as the StatusCallback webhook (verifying the Twilio request signature) to record terminal states (`delivered` / `failed` / `undelivered` + error code, incl. `21610` STOP); the share sheet renders per-person received/not-received from that table instead of a bare ✓.
+
 ### Acceptance Criteria
 
 - [ ] After sharing, the sender can see per person whether the message was received
@@ -1028,6 +1036,7 @@ Like Partiful: after you’ve shared with people, instead of only a checkmark, s
 
 - What “received” means for app users (push vs SMS vs calendar copy already delivered).
 - How STOP / bounce / no-token states are distinguished, if at all.
+- Does layer 1 ship alone first, or land with the feature? (Recommendation: alone — a few lines, immediately useful.)
 
 ---
 
@@ -1052,6 +1061,7 @@ Support US phone numbers end-to-end (add person, sign-in, share SMS). Look into 
 ### Open Questions
 
 - What exactly fails today (Twilio geo permissions, A2P/toll-free, sender pool, Auth SMS vs `send-notification` SMS, number format at send time). Not diagnosed yet — that’s the work.
+- 2026-08-17 diagnosis (Twilio API pull) answers a big chunk of that: the sender `+15709385240` is an unregistered 10DLC long code — no A2P brand, no campaign on the “Events” Messaging Service — and US carriers are hard-blocking some real share SMS with `30034` (5 blocked in 30 days, 4 to one person) while other US numbers still deliver. Completing A2P registration (the starter Trust Hub profile has been stuck `in-review` since 2026-02-16; owner is chasing) is the likely fix for the share-SMS leg. The Auth-OTP leg to real US numbers goes through the same sender, so it likely benefits too. Same pull found the account’s “fair” messaging health was ~95% self-inflicted: e2e/manual test sign-ins firing SMS at the fictional 555 test numbers (`21211`) — fixed 2026-08-17 by once-per-run e2e sign-in (`e2e/auth.setup.ts`).
 
 ---
 
