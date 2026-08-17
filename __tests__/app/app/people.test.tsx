@@ -530,3 +530,104 @@ describe('app/(app)/people display name', () => {
     expect(getByLabelText('Your name')).toBeTruthy();
   });
 });
+
+describe('app/(app)/people notification toggles', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
+    mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
+
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
+
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
+
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
+    mockUsersSingle.mockResolvedValue({
+      data: { display_name: 'Test User', notify_push: true, notify_sms: false },
+      error: null,
+    });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'my_people') {
+        return { select: mockMyPeopleSelect, upsert: mockMyPeopleUpsert };
+      }
+      if (table === 'circles') {
+        return { select: mockCirclesSelect };
+      }
+      if (table === 'hidden_people') {
+        return { select: mockHiddenSelect };
+      }
+      if (table === 'users') {
+        return { select: mockUsersSelect, update: mockUsersUpdate };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+  });
+
+  it('renders both toggles with the loaded values', async () => {
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Notifications')).toBeTruthy());
+    fireEvent.press(getByText('Notifications'));
+    expect(getByLabelText('Push notifications').props.value).toBe(true);
+    expect(getByLabelText('Text messages (SMS)').props.value).toBe(false);
+  });
+
+  it('flipping a toggle writes the pref scoped to the caller', async () => {
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Notifications')).toBeTruthy());
+    fireEvent.press(getByText('Notifications'));
+    fireEvent(getByLabelText('Text messages (SMS)'), 'onValueChange', true);
+
+    await waitFor(() => {
+      expect(mockUsersUpdate).toHaveBeenCalledWith({ notify_sms: true });
+    });
+    expect(mockUsersUpdateEq).toHaveBeenCalledWith('id', 'u1');
+    expect(getByLabelText('Text messages (SMS)').props.value).toBe(true);
+  });
+
+  it('a failed write reverts the switch and shows a short alert', async () => {
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: { message: 'boom' } }))
+    );
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('Notifications')).toBeTruthy());
+    fireEvent.press(getByText('Notifications'));
+    fireEvent(getByLabelText('Push notifications'), 'onValueChange', false);
+
+    await waitFor(() => {
+      expect(showAlert).toHaveBeenCalledWith(
+        'Could not update notification setting',
+        'Something went wrong. Try again.'
+      );
+    });
+    expect(getByLabelText('Push notifications').props.value).toBe(true);
+  });
+
+  it('a failed prefs read keeps the defaults instead of failing the load', async () => {
+    mockUsersSingle.mockResolvedValue({ data: null, error: { message: 'boom' } });
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByText('No people yet')).toBeTruthy());
+    fireEvent.press(getByText('Notifications'));
+    expect(getByLabelText('Push notifications').props.value).toBe(true);
+    expect(getByLabelText('Text messages (SMS)').props.value).toBe(true);
+  });
+});

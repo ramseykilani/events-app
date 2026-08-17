@@ -84,3 +84,72 @@ test('add person, manage a circle, then remove both', async ({
     }
   }
 });
+
+// Notification On/Off: the People footer's Notifications modal carries
+// independent push and SMS toggles persisted on the users row. Flips must
+// survive a reload (server state, not local), and the shared account must end
+// with both channels back where they started.
+test('notification toggles persist across reload', async ({ page }) => {
+  await page.goto('/');
+  await expectCalendar(page);
+  await page.getByRole('button', { name: 'People' }).click();
+  await expect(page.getByText('My People')).toBeVisible();
+
+  // The toggles live in a modal (role=dialog) over the People screen.
+  const dialog = page.getByRole('dialog');
+  const smsToggle = dialog.getByRole('switch', { name: 'Text messages (SMS)' });
+  const pushToggle = dialog.getByRole('switch', { name: 'Push notifications' });
+  const openPrefs = async () => {
+    await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+    await expect(smsToggle).toBeVisible();
+  };
+  await openPrefs();
+
+  const smsWasChecked = await smsToggle.isChecked();
+  const pushWasChecked = await pushToggle.isChecked();
+
+  try {
+    // The write disables both switches mid-flight; Playwright's click waits
+    // out the disabled state on its own. The checked assertion right after a
+    // flip only proves the optimistic update — wait for the switch to be
+    // re-enabled, which means the server write landed, before reloading.
+    await smsToggle.click();
+    await expect(smsToggle).toBeChecked({ checked: !smsWasChecked });
+    await expect(smsToggle).toBeEnabled();
+    await pushToggle.click();
+    await expect(pushToggle).toBeChecked({ checked: !pushWasChecked });
+    await expect(pushToggle).toBeEnabled();
+
+    // Reload lands back on /people (expo-router web URLs): the values must
+    // come back from the server, not local state.
+    await page.reload();
+    await expect(page.getByText('My People')).toBeVisible({ timeout: 15000 });
+    await openPrefs();
+    await expect(smsToggle).toBeChecked({ checked: !smsWasChecked, timeout: 15000 });
+    await expect(pushToggle).toBeChecked({ checked: !pushWasChecked });
+  } finally {
+    // Restore the starting state, recovering the screen/modal if a mid-test
+    // failure left us elsewhere. Best-effort: the assertions already failed.
+    try {
+      if (!(await page.getByText('My People').isVisible().catch(() => false))) {
+        await page.goto('/');
+        await expectCalendar(page);
+        await page.getByRole('button', { name: 'People' }).click();
+      }
+      if (!(await smsToggle.isVisible().catch(() => false))) {
+        await openPrefs();
+      }
+      if ((await smsToggle.isChecked()) !== smsWasChecked) {
+        await smsToggle.click();
+        await expect(smsToggle).toBeChecked({ checked: smsWasChecked });
+      }
+      if ((await pushToggle.isChecked()) !== pushWasChecked) {
+        await pushToggle.click();
+        await expect(pushToggle).toBeChecked({ checked: pushWasChecked });
+      }
+    } catch {
+      // Restore failed — the shared account may have flipped prefs; the next
+      // run's isChecked() baseline read makes any state self-correcting.
+    }
+  }
+});

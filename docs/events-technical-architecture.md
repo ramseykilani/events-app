@@ -37,6 +37,8 @@ Every piece of data in Events is subjective. There is no centralized source of t
 | phone_number | text (unique) | E.164 format, e.g. +14165551234 |
 | display_name | text (nullable) | Self-chosen attribution name ("X wants to go to ... with you"). Captured by a hard gate on the first share — never at sign-up, and users who never share are never asked. Editable from the People screen footer; never removable. CHECK constraint: non-empty after trim, ≤50 chars, no newlines (the value is interpolated unescaped into SMS bodies, and RLS lets users write their own row via raw REST) |
 | expo_push_token | text (nullable) | Expo push token, upserted on authenticated app launch |
+| notify_push | boolean (not null, default true) | Recipient pref: gate the Expo push for shares. Toggled from the People footer → Notifications modal |
+| notify_sms | boolean (not null, default true) | Recipient pref: gate the share SMS. Same toggle location |
 | created_at | timestamptz | |
 
 A user's name is never revealed in response to a phone-number lookup: `users` rows are select/update own-only via RLS, and the only cross-user reads are `send-notification` (service role) and the calendar RPC's share attribution — both limited to people the user actually shared with. Names are not verified; a user can call themselves anything, which is acceptable because shares only reach their own chosen contacts (the same trust model as contact names).
@@ -303,7 +305,7 @@ The `send-notification` Edge Function sends a push notification and/or SMS to ea
 4. Fetches the sharer's `users.phone_number` and `users.display_name` once. Attribution order for app users: the recipient's own `contact_name` for the sharer → `display_name` → phone. For non-app users: `display_name` → phone. (The share screen gates sharing on a saved display name, so the phone fallback is pre-feature legacy state.)
 5. For each recipient:
    - **Non-app user** (`my_people.user_id IS NULL`): sends an SMS with event info and the event URL (when present) — no app/web links; the SMS is the whole message
-   - **App user** (`my_people.user_id IS NOT NULL`): checks whether the sharer is in the recipient's hidden_people (lookup is by the recipient's my_people; skips both push and SMS if hidden), then queues a push notification when a token exists and an SMS containing the event URL (when present). Push is the tappable path into the event; the SMS is a plain notification with no links. A missing push token never suppresses the SMS.
+   - **App user** (`my_people.user_id IS NOT NULL`): checks whether the sharer is in the recipient's hidden_people (lookup is by the recipient's my_people; skips both push and SMS if hidden), then queues a push notification when a token exists and the recipient's `users.notify_push` is on, and an SMS containing the event URL (when present) when `users.notify_sms` is on. Push is the tappable path into the event; the SMS is a plain notification with no links. A missing push token never suppresses the SMS. The two prefs are independent per-account toggles (People footer → Notifications); events land on the recipient's calendar regardless — they only gate the pings.
 6. Push messages are batch-sent to the Expo Push API; SMS messages are fired concurrently via the Twilio REST API
 7. `DeviceNotRegistered` errors from Expo Push API clear the stale token
 8. SMS failures are logged via `console.error` and never propagate — missing Twilio credentials silently disable SMS

@@ -316,15 +316,17 @@ serve(async (req) => {
       const displayName =
         sharerName?.contact_name ?? sharerDisplayName ?? sharerPhone;
 
-      // Queue push notification when the recipient has a token. A missing token
-      // must not suppress the SMS below.
+      // Queue push notification when the recipient has a token and has push
+      // enabled. A missing token must not suppress the SMS below. The pref
+      // columns are NOT NULL DEFAULT true; !== false keeps a missing users
+      // row (shouldn't happen for an app user) on today's behavior.
       const { data: recipientUser } = await db
         .from('users')
-        .select('expo_push_token')
+        .select('expo_push_token, notify_push, notify_sms')
         .eq('id', recipientUserId)
         .single();
 
-      if (recipientUser?.expo_push_token) {
+      if (recipientUser?.expo_push_token && recipientUser.notify_push !== false) {
         messages.push({
           to: recipientUser.expo_push_token,
           title: eventTitle
@@ -335,10 +337,10 @@ serve(async (req) => {
         });
       }
 
-      // Queue the same SMS. Push is the tappable path for app users — the
-      // SMS is a pure notification. Skipped gracefully if Twilio is not
-      // configured.
-      if (twilioConfigured && person.phone_number) {
+      // Queue the same SMS unless the recipient turned text messages off.
+      // Push is the tappable path for app users — the SMS is a pure
+      // notification. Skipped gracefully if Twilio is not configured.
+      if (twilioConfigured && person.phone_number && recipientUser?.notify_sms !== false) {
         smsSends.push(
           sendSms(
             person.phone_number,

@@ -266,6 +266,23 @@ For each executed scenario:
 
 ---
 
+### E-111 Notification on/off toggles gate push and SMS independently
+**Steps**
+1. As account B, open People → **Notifications** and turn **Text messages (SMS)** off; leave push on. Close the modal, reopen it — the setting persists.
+2. As account A, create an event and share it with B.
+3. Confirm B's copy lands on B's calendar regardless, and B gets no SMS (push still allowed). The share's `send-notification` call reports `sms: 0` for B.
+4. As B, turn SMS back on and turn **Push notifications** off.
+5. As A, share another event with B.
+6. Confirm B gets the SMS but no push.
+7. Restore both toggles to on.
+
+**Expected**
+- Each channel is gated independently; both off means neither is sent.
+- The event appears on B's calendar in every combination — the toggles only gate the pings.
+- Toggling persists across reload/sign-in (stored on the `users` row), and a failed save reverts the switch with a short alert.
+
+---
+
 ## Pass Criteria
 
 Manual suite passes when:

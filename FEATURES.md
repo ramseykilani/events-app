@@ -27,7 +27,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
-| [Notification On/Off](#notification-onoff) | Planned | Separate push and SMS toggles. |
+| [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
 | [Share Delivery Status](#share-delivery-status) | Planned | ✓ Shared only means recorded, not received. |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
@@ -1080,25 +1080,36 @@ Let the user add an event to Google Calendar and other calendar apps.
 
 ## Notification On/Off
 
-**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-17. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations). Distinct from [Notification Permission Explainer](#notification-permission-explainer) (that's the OS ask).
+**Status:** Implemented (2026-08-17). Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations). Distinct from [Notification Permission Explainer](#notification-permission-explainer) (that's the OS ask).
 
 ### Problem
 
 There is no way to turn off share notifications. App users always get both a push and an SMS for every share. Hide mutes one person (and their events). Denying the OS prompt only stops push. Twilio STOP only stops SMS. None of those is "push but not text" or "don't ping me."
 
-### Proposed Solution
+### Solution (as shipped 2026-08-17)
 
-Two separate toggles: one for push, one for SMS. Each can be on or off independently. Events still land on the calendar either way.
+Two independent per-account preferences on the `users` row — `notify_push` and `notify_sms`, both `NOT NULL DEFAULT true` (existing accounts keep today's behavior). The control lives in the People footer: a **Notifications** row opens a modal (same pattern as "Your name") with a switch per channel and the line "Events still land on your calendar either way." Flips are optimistic, persist via `users_update_own` RLS, and revert with a short alert on failure.
+
+Enforcement is server-side in `send-notification`: the recipient's prefs are read at send time — push is queued only when `notify_push` is on, the app-user SMS only when `notify_sms` is on. The hidden-sharer check still skips both ahead of the pref checks. Non-app recipients have no `users` row and are unaffected (Twilio STOP remains their opt-out). Token registration and the notification explainer are untouched — the Expo token stays registered so re-enabling push is instant.
+
+Two layout notes from the ship: the switches live in a modal rather than inline in the footer because the People screen's chrome is all pinned — three extra footer rows collapsed the list viewport to zero on short viewports (the documented pre-existing crunch from [People List Scrolling](#people-list-scrolling)). The same pass capped the circles block (~3 rows, internal scroll) and gave the people list a `minHeight` so the screen can't collapse regardless of circle count.
+
+### Technical Notes
+
+- Migration `20260817000001`: `users.notify_push` / `users.notify_sms` booleans, default true. No new RLS (`users_update_own` already covers the write); NOT NULL so prefs are never ambiguous.
+- `send-notification`: recipient fetch now selects `expo_push_token, notify_push, notify_sms`; each channel is gated on its pref (`!== false`, so a missing row keeps today's behavior).
+- `app/(app)/people.tsx`: footer **Notifications** row → pageSheet modal with two theme-tinted `Switch` rows; loads prefs with the footer read (last-good on failure), writes with `withWriteTimeout`, switches disabled mid-flight.
+- Tests: `supabase/tests/notification_prefs_test.sql` (defaults, independent flips, NOT NULL); Jest in `__tests__/app/app/people.test.tsx` (render, write, revert-on-failure, read-failure keeps defaults); e2e in `e2e/people.spec.ts` (flips persist across reload on all three form factors). Live-verified against the deployed function 2026-08-17: B with SMS off → `{"sent":0,"sms":0}`; back on → `{"sent":0,"sms":1}`. Manual: E-111.
 
 ### Acceptance Criteria
 
-- [ ] Push can be turned off without affecting SMS, and vice versa
-- [ ] Both off means neither is sent; both on is today's behavior
-- [ ] The event still appears on their calendar in every combination
+- [x] Push can be turned off without affecting SMS, and vice versa
+- [x] Both off means neither is sent; both on is today's behavior
+- [x] The event still appears on their calendar in every combination
 
 ### Open Questions
 
-- Where the control lives (the People footer is where the other account actions are).
+- None (placement resolved: People footer → Notifications modal).
 
 ---
 
