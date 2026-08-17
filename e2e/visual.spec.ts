@@ -4,14 +4,16 @@ import { expectCalendar } from './helpers';
 // Pixel-diff baselines: the cheap "nothing moved that wasn't asked to" gate.
 // Runs in the normal e2e suite on every staging push, before any agent-review
 // money is spent. Baselines live in e2e/visual.spec.ts-snapshots/ (per
-// project); regenerate them after INTENTIONAL design changes with:
-//   npx playwright test e2e/visual.spec.ts --update-snapshots
-// and review the diffs in the PR like any other change.
-// CI is the authority, not the local machine: WebKit text rendering depends
-// on the installed fonts, and cloud-VM renders differ from CI's runners, so
-// a baseline that passes locally can still fail CI. If a baseline fails only
-// in CI, commit that run's actual render as the baseline — from the
-// playwright-report artifact, the *-actual.png attachment (NOT *-diff.png).
+// project). After an INTENTIONAL design change, regenerate them with the
+// "Regenerate visual baselines" workflow (Actions tab → pick the screen) —
+// it re-takes the pictures on CI's own runners, verifies, commits, and
+// re-runs the staging pipeline. Never commit a locally regenerated
+// mobile-safari baseline: WebKit text rendering depends on the installed
+// fonts, and cloud-VM renders differ from CI's runners, so a baseline that
+// passes locally can still fail CI (the 2026-08-17 red streak). Fallback if
+// the workflow is unavailable: commit the failed run's actual render as the
+// baseline — from the playwright-report artifact, the *-actual.png
+// attachment (NOT *-diff.png).
 //
 // Stability rules that keep these deterministic:
 // - The calendar clock is frozen to 2026-06-15 (a month no test ever creates

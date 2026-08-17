@@ -1,0 +1,167 @@
+# Regenerate visual baselines — the "referee takes the photo" workflow.
+#
+# Why this exists: pixel-diff baselines (e2e/visual.spec.ts) must be re-taken
+# after every INTENTIONAL design change, but a baseline re-taken on a cloud
+# dev VM can fail CI — WebKit draws text with the machine's fonts, and VM
+# fonts (Noto) differ from the ubuntu-latest runners' (Liberation). That
+# turned staging red for six pushes on 2026-08-17. This workflow re-takes the
+# pictures on the same runner type that judges them, scoped to one screen so
+# every other baseline stays untouched and keeps guarding.
+#
+# Use: Actions → Regenerate visual baselines → Run workflow → pick the screen
+# you changed (and a form factor, or "all"). The workflow verifies the new
+# baselines pass before committing, pushes them to the branch it was run on,
+# and — on staging — re-triggers the staging pipeline so the new tip gets its
+# green check and the preview redeploys.
+name: Regenerate visual baselines
+on:
+  workflow_dispatch:
+    inputs:
+      screen:
+        description: Which screen's baselines to regenerate
+        type: choice
+        required: true
+        options:
+          - sign-in
+          - onboarding
+          - calendar
+          - add-event
+          - event-detail
+          - all
+      project:
+        description: Which form factor (all = every project)
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - desktop-chrome
+          - mobile-safari
+          - mobile-chrome
+
+permissions:
+  contents: write # push the regenerated baselines
+  actions: write # re-dispatch the staging pipeline after the push
+
+concurrency:
+  group: regen-baselines-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Unlike full-suite's e2e job (which skips without secrets), a regen
+      # that can't build the bundle is useless — fail loudly instead.
+      - name: Check for Supabase secrets
+        env:
+          SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY repo secrets not set — cannot build the bundle to regenerate against."
+            exit 1
+          fi
+
+      # EXPO_PUBLIC_* values are inlined into the bundle at export time.
+      - name: Build web bundle
+        run: npm run build:web
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Map screen input to test filter
+        id: filter
+        run: |
+          case "${{ inputs.screen }}" in
+            sign-in)      TITLE='sign-in screen matches baseline' ;;
+            onboarding)   TITLE='onboarding page matches baseline' ;;
+            calendar)     TITLE='calendar shell matches baseline' ;;
+            add-event)    TITLE='add-event form matches baseline' ;;
+            event-detail) TITLE='event detail matches baseline' ;;
+            all)          TITLE='' ;;
+            *) echo "::error::Unknown screen input"; exit 1 ;;
+          esac
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate baselines (scoped)
+        env:
+          TITLE: ${{ steps.filter.outputs.title }}
+          PROJECT: ${{ inputs.project }}
+        run: |
+          ARGS=(e2e/visual.spec.ts --update-snapshots)
+          [ -n "$TITLE" ] && ARGS+=(-g "$TITLE")
+          [ "$PROJECT" != "all" ] && ARGS+=(--project "$PROJECT")
+          npx playwright test "${ARGS[@]}"
+
+      - name: Guard — only baseline snapshots may change
+        run: |
+          OFFENDING=$(git status --porcelain | cut -c4- | grep -v '^e2e/visual\.spec\.ts-snapshots/' || true)
+          if [ -n "$OFFENDING" ]; then
+            echo "::error::Regeneration touched files outside e2e/visual.spec.ts-snapshots/:"
+            echo "$OFFENDING"
+            exit 1
+          fi
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Baselines already match CI's render — nothing to commit."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git status --porcelain
+          fi
+
+      # Prove the new baselines pass in this environment before blessing them.
+      - name: Verify regenerated baselines pass
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          TITLE: ${{ steps.filter.outputs.title }}
+          PROJECT: ${{ inputs.project }}
+        run: |
+          ARGS=(e2e/visual.spec.ts)
+          [ -n "$TITLE" ] && ARGS+=(-g "$TITLE")
+          [ "$PROJECT" != "all" ] && ARGS+=(--project "$PROJECT")
+          npx playwright test "${ARGS[@]}"
+
+      - name: Commit and push new baselines
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/visual.spec.ts-snapshots/
+          git commit -m "Regenerate ${{ inputs.screen }} visual baselines (${{ inputs.project }})"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      # Pushes made with GITHUB_TOKEN do not fire push-event workflows
+      # (GitHub-documented), so re-dispatch the staging pipeline explicitly —
+      # otherwise the new tip would have no green check (the ship-it Phase 0
+      # gate) and the preview would not redeploy. Staging's deploy job runs
+      # on whatever ref the workflow is dispatched on, so only do this when
+      # the regen ran on staging itself.
+      - name: Re-run the staging pipeline on the new tip
+        if: steps.changes.outputs.changed == 'true' && github.ref_name == 'staging'
+        run: gh workflow run staging.yml --ref staging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -71,8 +71,14 @@ can't:
    snapshots committed in `e2e/visual.spec.ts-snapshots/`) that catch
    unintended pixel movement on key screens for free on every push, before any
    agent-review money is spent. Regenerate after INTENTIONAL design changes
-   with `npx playwright test e2e/visual.spec.ts --update-snapshots` and review
-   the diffs like any other change.
+   with the **Regenerate visual baselines** workflow (Actions →
+   workflow_dispatch, pick the screen): it re-takes the pictures on CI's own
+   runners, verifies, commits, and re-runs the staging pipeline. Never commit
+   a locally regenerated mobile-safari baseline — WebKit text rendering
+   depends on the installed fonts, and cloud-VM renders differ from CI's
+   runners (the 2026-08-17 red streak). Fallback if the workflow is
+   unavailable: commit the failed run's `*-actual.png` from the
+   playwright-report artifact (NOT `*-diff.png`).
 4. **Agentic UX review** — the phased ship-time click-through; see below.
 
 ## The e2e suite
