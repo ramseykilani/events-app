@@ -24,7 +24,7 @@ const PRIVACY_POLICY_URL = 'https://shared-events.pages.dev/privacy.html';
 const ORIENTATION_LINES = [
   'Found something you want to go to? Add it here and share it with the right people — instead of texting them one by one.',
   'When your people share something, it shows up on your calendar too.',
-  "Your phone number is your account. We'll text a code to sign in, and it's how a friend shares an event with you.",
+  "Your phone number is your account. We'll text a code to sign in, and it's how you send events to your people.",
 ];
 
 export default function SignInScreen() {

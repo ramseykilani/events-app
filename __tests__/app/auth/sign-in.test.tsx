@@ -44,7 +44,7 @@ describe('app/(auth)/sign-in', () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        "Your phone number is your account. We'll text a code to sign in, and it's how a friend shares an event with you."
+        "Your phone number is your account. We'll text a code to sign in, and it's how you send events to your people."
       )
     ).toBeTruthy();
     expect(screen.queryByText('Enter your phone number to continue')).toBeNull();
