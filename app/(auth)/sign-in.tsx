@@ -164,6 +164,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     alignItems: 'center',
+    // The block is compact (title + one line + form); centering splits the
+    // whitespace instead of piling everything against the status bar.
+    justifyContent: 'center',
   },
   content: {
     paddingHorizontal: 24,
