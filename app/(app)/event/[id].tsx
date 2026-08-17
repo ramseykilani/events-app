@@ -436,7 +436,8 @@ export default function EventDetailScreen() {
                 </Text>
               ))}
               <Text style={[styles.sharedWithNote, { color: theme.textTertiary }]}>
-                Sharing delivers everyone their own copy — it can't be unsent.
+                Sharing is like sending a text — once you send it, you can't
+                take it back.
               </Text>
             </View>
           ) : null}

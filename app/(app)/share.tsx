@@ -379,9 +379,10 @@ export default function ShareScreen() {
           </Text>
         </TouchableOpacity>
       ) : null}
-      {!loadError && people.length > 0 && alreadySharedIds.size > 0 ? (
+      {!loadError && people.length > 0 ? (
         <Text style={[styles.forwardingNote, { color: theme.textTertiary }]}>
-          Sharing delivers people their own copy — it can't be unsent.
+          Sharing is like sending a text — once you send it, you can't take it
+          back.
         </Text>
       ) : null}
       {userId && Platform.OS !== 'web' ? (

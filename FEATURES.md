@@ -27,7 +27,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
-| [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Planned | First share never says you can't take it back. |
+| [Notification On/Off](#notification-onoff) | Planned | Separate push and SMS toggles. |
+| [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
 | [Share Delivery Status](#share-delivery-status) | Planned | ✓ Shared only means recorded, not received. |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
 | [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
@@ -974,28 +975,32 @@ Copy decision (2026-08-17): the spec’s draft ended “— never anything else�
 
 ## Explain Before Share (No Unshare)
 
-**Status:** Planned — copy / first-share education, not a blocker. Recorded 2026-08-16 from internal testing. No-unshare is already how sharing works ([Forwarding Shares](#forwarding-shares)).
+**Status:** Implemented (2026-08-17) — copy / first-share education. Recorded 2026-08-16 from internal testing. No-unshare is already how sharing works ([Forwarding Shares](#forwarding-shares)).
 
 ### Problem
 
-Sharing is like sending a text: once you’ve shared it, they know about the event, and you can’t take it back. The product enforces that (`✓ Shared`, additive-only, no unshare) but does not say so **before** the first send.
+Sharing is like sending a text: once you’ve shared it, they know about the event, and you can’t take it back. The product enforces that (`✓ Shared`, additive-only, no unshare) but did not say so **before** the first send — the one-liner appeared only after someone was already marked ✓ Shared, and used the storage model (“their own copy”) instead of the metaphor.
 
-Today a one-liner appears only after someone is already marked ✓ Shared: “Sharing delivers people their own copy — it can't be unsent” (`app/(app)/share.tsx`). First Share is silent. The walkthrough never mentions it. Remove-event copy only explains the other direction (“this only affects you”).
+### Solution (as shipped 2026-08-17)
 
-### Proposed Solution
+One sentence, shown in both places that already carried the old line:
 
-Before they send — especially the first time — explain that you can’t unshare because it’s like a text. Once you’ve shared it with them, they now know about the event. User-facing copy should use that metaphor, not the storage model (“their own copy”).
+> Sharing is like sending a text — once you send it, you can't take it back.
+
+- **Share screen** (`app/(app)/share.tsx`): the line now renders whenever people are listed — before the first send, not only after a share exists. (With an empty people list the screen is the add-people path; the line appears as soon as people exist, which is always before the first possible send.)
+- **Event detail** (`app/(app)/event/[id].tsx`): the same sentence replaces the storage-language note in the “Shared with” section, so later opens of an already-shared event keep the completed, non-unsendable state obvious.
+
+Decisions on the original open questions: **always-visible line** (a first-send confirm would stack a third interruption on the display-name gate + contacts explainer; first-share-only would need “has ever shared” state for a purely educational line) and **share screen only** (the walkthrough is skippable and auto-shows at most once, so it can’t guarantee “before the first send”; the share screen is the mandatory step after every event creation). The remove-event confirm (“This only affects you…”) covers the other direction and is unchanged.
 
 ### Acceptance Criteria
 
-- [ ] Before the first Share send, the user is told they can’t take it back
-- [ ] The explanation uses the text metaphor, not implementation language
-- [ ] Later opens of an already-shared event still make the completed, non-unsendable state obvious
+- [x] Before the first Share send, the user is told they can’t take it back
+- [x] The explanation uses the text metaphor, not implementation language
+- [x] Later opens of an already-shared event still make the completed, non-unsendable state obvious
 
 ### Open Questions
 
-- Always-visible line vs first-share-only vs a confirm on the first send. First share can already stack the display-name gate and the contacts explainer.
-- Whether this belongs on the share screen only, not in the walkthrough (the walkthrough auto-shows only when the calendar is empty).
+- None
 
 ---
 
@@ -1070,6 +1075,30 @@ Let the user add an event to Google Calendar and other calendar apps.
 ### Open Questions
 
 - Which calendars in the first slice, and whether this is an export the user triggers vs a sync.
+
+---
+
+## Notification On/Off
+
+**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-17. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations). Distinct from [Notification Permission Explainer](#notification-permission-explainer) (that's the OS ask).
+
+### Problem
+
+There is no way to turn off share notifications. App users always get both a push and an SMS for every share. Hide mutes one person (and their events). Denying the OS prompt only stops push. Twilio STOP only stops SMS. None of those is "push but not text" or "don't ping me."
+
+### Proposed Solution
+
+Two separate toggles: one for push, one for SMS. Each can be on or off independently. Events still land on the calendar either way.
+
+### Acceptance Criteria
+
+- [ ] Push can be turned off without affecting SMS, and vice versa
+- [ ] Both off means neither is sent; both on is today's behavior
+- [ ] The event still appears on their calendar in every combination
+
+### Open Questions
+
+- Where the control lives (the People footer is where the other account actions are).
 
 ---
 

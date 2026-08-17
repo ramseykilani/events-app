@@ -160,6 +160,28 @@ describe('app/(app)/event/[id]', () => {
     expect(router.back).toHaveBeenCalled();
   });
 
+  it('shows the no-unshare note in the Shared with section when shares exist', async () => {
+    mockSharesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [{ person_id: 'p1' }], error: null }))
+    );
+    mockPeopleIn.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: [{ id: 'p1', contact_name: 'Alice', phone_number: '+14165550001' }],
+          error: null,
+        })
+      )
+    );
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Shared with');
+    expect(screen.getByText('Alice')).toBeTruthy();
+    expect(
+      screen.getByText(/Sharing is like sending a text/)
+    ).toBeTruthy();
+  });
+
   it('shows a short alert instead of navigating back when hide fails', async () => {
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
     mockUeSingle.mockResolvedValue({ data: null, error: null });
