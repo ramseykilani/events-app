@@ -63,8 +63,8 @@ requires one).
 
 1. Device A: share an event (with a URL set) to your own real second number,
    or a friend's non-app number.
-2. The SMS reads: who added you, event title, date/time, the event URL — and
-   **no app/web links**, with a Reply STOP footer.
+2. The SMS reads: who wants to go with you, the event title, date/time, the
+   event URL — and **no app/web links**, with a Reply STOP footer.
 3. Eyeball check: it does not read like spam.
 
 ## N-007: Edit and remove
@@ -91,8 +91,10 @@ requires one).
 - Notification SMS leads with the sharer's display name. A raw phone number
   appears only for accounts that last shared before display names shipped
   (2026-08-12) — the share gate prevents any new nameless share.
-- Adding new people to an already-shared event re-notifies everyone already
-  on it, including a self-share (KI-003). Testers will see a second push/SMS
-  with the same "added you to" copy. Accepted for this release.
 - The web app is not a supported user surface; anything web-specific goes
   through `manual-tests/cloud_manual_regression.md` instead.
+- **KI-005** — with the Samsung / 3-button navigation bar on, the system bar
+  covers a strip at the bottom of the screen (People Delete account; the
+  bottom of an event on Events). Do not re-flag unless it is materially
+  worse than that (e.g. covering a whole control that was previously only
+  clipped). Gesture nav is the expected tester setup.

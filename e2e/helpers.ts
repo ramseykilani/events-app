@@ -97,9 +97,10 @@ export async function addPersonManually(
   await expect(page.getByPlaceholder('Name', { exact: true })).toBeHidden();
 }
 
-// Sharing requires a saved display name ("X added you to ..." attribution).
-// The gate appears on the share screen only while the account has no name —
-// once any run saves one it sticks server-side, so this is a no-op afterwards.
+// Sharing requires a saved display name (the "X wants to go to ... with
+// you" attribution). The gate appears on the share screen only while the
+// account has no name — once any run saves one it sticks server-side, so
+// this is a no-op afterwards.
 export async function fillNameGateIfShown(page: Page): Promise<void> {
   const nameInput = page.getByLabel('Your name');
   try {

@@ -55,63 +55,39 @@ never added: a blocker must be fixed, not accepted.
   seed can differ from the server row (the seeded detail briefly shows the
   typed description, then the fetch swaps in the row's).
 - Repro: user A creates "Lunch" (url null, date D, time T, description
-  " theirs"); user B creates "Lunch" (same url/date/time, description
+  "theirs"); user B creates "Lunch" (same url/date/time, description
   "mine") — B dedupes onto A's row and B's calendar shows "theirs".
 - Fix (separate task, not yet scheduled): include description/image_url in
   the dedup key, or have the RPC return the full row so the client seeds and
   navigates from the actual database row rather than the form values.
 
-### KI-003 — Additive share re-notifies people already on the event (including yourself)
+### KI-005 — Android 3-button navigation bar covers the bottom of the screen
 
 - Severity: minor
-- Status: fixed 2026-08-16 — pending release-review re-check. The share
-  screen now passes the newly shared person ids to `send-notification`,
-  which scopes its `event_shares` query to them; verified live against the
-  deployed function (additive share notified only the new recipient).
-- Found: 2026-08-15, owner device smoke of preview `eab4bcd7` (promoted
-  `8f3b660`). Owner ruling: accepted for this release; do not halt testers.
-- Expected: sharing an event with additional people notifies **only those new
-  recipients**. People already marked ✓ Shared — including a self-share
-  (your own number in My People) — are not pinged again.
-- Actual: `share.tsx` correctly sends only new person ids to `share_event`,
-  then fire-and-forgets `send-notification` with `{ userEventId }`. The edge
-  function loads **every** `event_shares` row for that `user_event` and
-  sends push + SMS to each, with no "already notified" filter and no skip
-  when `recipient user_id === sharer user_id`. So adding new people to an
-  event you previously shared (including with yourself) re-delivers the
-  original "X added you to …" notification to existing recipients.
-- Repro: add your own number as a person. Share an event with yourself →
-  you get a notification (correct — you were a new recipient). Later open
-  Share, add someone new, confirm. You get the same "X added you to …"
-  notification again (incorrect). Nothing about the event changed; only
-  new people were added. Those new people should be the only ones notified.
-- Fix (separate task, not this release): pass the newly-shared person ids
-  into `send-notification` (or have the RPC return them) and only notify
-  those; skip the sharer. Optionally persist a notified-at on `event_shares`
-  so retries cannot double-send either.
-
-### KI-004 — Edit Event URL field cannot be changed
-
-- Severity: minor
-- Status: fixed 2026-08-16 — pending release-review re-check. The field is
-  editable again (it shipped read-only in the initial commit; the save path
-  always supported URL edits). Regression coverage: the e2e edit spec and
-  manual M-007 now exercise every edit-form field.
-- Found: 2026-08-16, friend testing (owner classified as a bug).
-- Expected: the URL on Edit Event can be changed, the same as title, date,
-  time, and description. Edits already fork a new snapshot
-  (`find_or_create_event`); a URL change is a valid edit.
-- Actual: Edit Event shows a "URL (optional)" field but it does not accept
-  input. `app/(app)/edit-event.tsx` sets `editable={false}` on that
-  `TextInput`. Add Event's URL field is editable. A tester could not fix or
-  replace the listing URL after save.
-- Repro: create an event with a URL (or without). Open Edit. Tap the URL
-  field and try to type or paste. Nothing changes. Save cannot persist a
-  different URL because the field never updates.
-- Fix (separate task): make the URL field editable. Related planned work
-  ([Richer Link Autofill](../FEATURES.md#richer-link-autofill)) asks whether
-  a URL change on edit should refetch OG — that is a later question; this
-  bug is that the URL cannot be changed at all.
+- Status: open
+- Found: 2026-08-15 owner device smoke on Samsung with 3-button navigation
+  (not gesture nav), `manual-tests/manual_test_report_2026-08-15-device.md`
+  N-009 (People / Delete account). Still present 2026-08-17 on the Events
+  calendar.
+- Expected: in-app content sits fully on screen, clear of the system
+  navigation bar.
+- Actual: with the Samsung / 3-button navigation bar on, the bar covers a
+  strip along the bottom of the app.
+- Where it shows up (native Android, 3-button nav):
+  - People (`app/(app)/people.tsx`) — first report: the bar covered the
+    Delete account button in the account footer.
+  - Events / calendar (`components/Calendar.tsx`, title "Events") — the bar
+    covers the bottom of an event in the selected-day list.
+  - Likely the bottom of the window in general, not those two screens only.
+    Other screens have not been exhaustively re-checked on a 3-button-nav
+    device.
+- Repro: Android device, 3-button (Samsung) navigation bar enabled. Open
+  People and look at the footer, or open Events with at least one event on
+  the selected day. Not reported under gesture navigation. Web has no
+  3-button nav (do not flag there).
+- Owner ruling 2026-08-15: not a tester blocker (testers expected to use
+  gesture nav). Recorded here so release review and device smoke do not
+  re-flag the same overlap.
 
 ## Known limitations (by design — do not flag)
 

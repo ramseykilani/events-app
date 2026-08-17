@@ -35,7 +35,7 @@ Every piece of data in Events is subjective. There is no centralized source of t
 |--------|------|-------|
 | id | uuid (PK) | Supabase auth user ID |
 | phone_number | text (unique) | E.164 format, e.g. +14165551234 |
-| display_name | text (nullable) | Self-chosen attribution name ("X added you to ..."). Captured by a hard gate on the first share — never at sign-up, and users who never share are never asked. Editable from the People screen footer; never removable. CHECK constraint: non-empty after trim, ≤50 chars, no newlines (the value is interpolated unescaped into SMS bodies, and RLS lets users write their own row via raw REST) |
+| display_name | text (nullable) | Self-chosen attribution name ("X wants to go to ... with you"). Captured by a hard gate on the first share — never at sign-up, and users who never share are never asked. Editable from the People screen footer; never removable. CHECK constraint: non-empty after trim, ≤50 chars, no newlines (the value is interpolated unescaped into SMS bodies, and RLS lets users write their own row via raw REST) |
 | expo_push_token | text (nullable) | Expo push token, upserted on authenticated app launch |
 | created_at | timestamptz | |
 
@@ -308,11 +308,9 @@ The `send-notification` Edge Function sends a push notification and/or SMS to ea
 7. `DeviceNotRegistered` errors from Expo Push API clear the stale token
 8. SMS failures are logged via `console.error` and never propagate — missing Twilio credentials silently disable SMS
 
-**Push notification body:** `{ title: "[Name] added you to [Event Title]", body: "[date] · [time]", data: { eventId } }`
+**Push notification body:** `{ title: "[Name] wants to go to [Event Title] with you", body: "[date], [time]", data: { eventId } }`
 
-**SMS body (app user):** `"[DisplayName] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]"` — the event URL line is omitted for linkless events.
-
-**SMS body (non-app user):** `"[SharerName] added you to [EventTitle] on [DateStr][· TimeStr]\n[EventURL]\n\nReply STOP to unsubscribe."` — SharerName is the sharer's display name (phone number as fallback); the event URL line is omitted for linkless events.
+**SMS body (app user and non-app user — identical):** `"[Name] wants to go to [EventTitle] with you\n[DateStr], [TimeStr]\n[DescriptionExcerpt]\n[EventURL]\n\nReply STOP to unsubscribe."` — the title is quoted when present and falls back to `wants to go to an event with you` when null; the description excerpt (word-boundary truncated at 90 chars) and the event URL line are each omitted when absent. Name is the recipient's `contact_name` → `display_name` → phone for app users, and `display_name` → phone for non-app users. Titles and descriptions are normalized to GSM-7-safe punctuation so one stray character can't force UCS-2 segment pricing.
 
 SMS deliberately carries no app or web links (decision 2026-08-09, see `docs/distribution-strategy.md`): the only URL in a message is the event's own original URL. This keeps first impressions off the web build and link-free SMS reads less like spam to carrier filters. Store links may return as the non-app CTA once the app is listed.
 

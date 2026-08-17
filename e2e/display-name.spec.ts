@@ -7,8 +7,9 @@ import {
 } from './helpers';
 
 // Display names: the share screen gates the Share action on a saved name
-// (the SMS recipients get is attributed "X added you to ..."), and the People
-// footer offers the edit path. The gate only appears while the account has
+// (the SMS recipients get is attributed "X wants to go to ... with you"),
+// and the People footer offers the edit path. The gate only appears while
+// the account has
 // no name — once any run saves one it sticks server-side, so the gated half
 // of this test is exercised on the first run and skipped (by design) after.
 test('share is gated on a display name, which the People footer edits', async ({

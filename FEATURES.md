@@ -22,8 +22,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
 | [Richer Link Autofill](#richer-link-autofill) | Planned | Upgrade. Paste already stores the URL; OG title/image already work on open pages. |
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. |
-| [Branded OTP SMS](#branded-otp-sms) | Planned | The verification text doesn't say it's from Events. Config, not code. |
-| [Share SMS Content & Formatting](#share-sms-content--formatting) | Planned | Nicer share text; consider including the event description. Server-side only. |
+| [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
+| [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Planned | Upgrade. Push already works; the OS prompt currently fires cold on launch. |
@@ -47,7 +47,7 @@ How people get onto a first share today:
 
 **Web testing is unblocked** — local `npx expo start --web`, the staging preview, and the full automated suite (Jest, SQL, Playwright). That is how agents and CI test; it is not how users get the app.
 
-**Native distribution is the remaining gate for real use**, not a missing feature. Owner device smoke of preview `eab4bcd7` (promoted `8f3b660`, 2026-08-15) passed; the earlier N-005 push/tap path is green. Accepted on that build: KI-003 (additive share re-notifies existing recipients). N-007 recipient-side still needs a second account. Next: production AAB → Play internal track, then ~3 friends (see `STATUS.md`). Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
+**Native distribution is the remaining gate for real use**, not a missing feature. Owner device smoke of preview `eab4bcd7` (promoted `8f3b660`, 2026-08-15) passed; the earlier N-005 push/tap path is green. KI-003 (additive share re-notify) and KI-004 (edit URL read-only) are fixed on staging as of the 2026-08-16 release review — they still exist on the 2026-08-15 native binaries until the post-promotion rebuild. N-007 recipient-side still needs a second account. Next: production AAB → Play internal track, then ~3 friends (see `STATUS.md`). Native-only paths (contacts picker, datetimepicker, push, notification tap) still have no automated coverage — run `manual-tests/native_device_smoke.md` on each new binary.
 
 ---
 
@@ -76,11 +76,9 @@ When a user shares an event with someone, the recipient receives a push notifica
 - In `app/_layout.tsx`: set notification tap handler to navigate to `/(app)/event/[eventId]`
 - In `app/(app)/share.tsx`: call edge function fire-and-forget after share creation
 - Handle `DeviceNotRegistered` errors from Expo Push API by clearing the stale token
-- **Gap (KI-003):** the function is invoked with only `{ userEventId }` and
-  iterates every `event_shares` row for that copy. Additive shares therefore
-  re-notify people already on the event (including a self-share). The client
-  already filters to new person ids for `share_event`; the notify path does
-  not. Fix is a later task — accepted on the 2026-08-15 tester build.
+- Additive shares pass the newly shared person ids into `send-notification`,
+  which scopes its `event_shares` query to those ids (KI-003, verified
+  2026-08-16 release review).
 
 ### Acceptance Criteria
 
@@ -89,7 +87,7 @@ When a user shares an event with someone, the recipient receives a push notifica
 - [x] Tapping the notification opens the event detail screen
 - [x] No notification is sent if the sharer is hidden by the recipient
 - [x] No notification is sent if the recipient has no push token
-- [ ] Only newly shared recipients are notified on an additive share (KI-003)
+- [x] Only newly shared recipients are notified on an additive share (KI-003)
 
 ### Open Questions
 
@@ -414,7 +412,8 @@ Until layer 2 ships for a host, soften the onboarding line so it matches today: 
 
 - `og-metadata` (`supabase/functions/og-metadata/index.ts`) stays JWT-gated, 5s / 1MB capped, fail-open. Extend the JSON body to `{ title, description, image_url, event_date, event_time }` — all nullable.
 - Client: `fetchOgMetadata` in [app/(app)/add-event.tsx](app/(app)/add-event.tsx) already writes title/description/image. Also set the date/time fields when the response has them; never overwrite a date the user already changed.
-- Edit Event does not fetch OG today. URL change on edit is currently impossible ([KI-004](manual-tests/known_issues.md)); that bug is separate from this upgrade.
+- Edit Event does not fetch OG today. URL is editable on Edit (KI-004 fixed
+  2026-08-16); refetching OG on a URL change is this upgrade, not the bugfix.
 - Ticketmaster: API key as a function secret; parse `/event/{id}` only for the automatic path. Do not add a scraping/bypass dependency.
 - Timezones: prefer the listing's local date/time (Discovery's `localDate` / `localTime`, JSON-LD `startDate` without forcing UTC). Same "land on the day the user meant" rule as the web date inputs.
 - Dedup is unchanged: `find_or_create_event` still keys on `(url, title, event_date, event_time)`. Better autofill makes collisions more likely and more correct.
@@ -432,7 +431,8 @@ Until layer 2 ships for a host, soften the onboarding line so it matches today: 
 ### Open Questions
 
 - Ticketmaster only, or Eventbrite in the same slice?
-- After [KI-004](manual-tests/known_issues.md) (edit URL is locked today), should a URL change on Edit Event refetch OG (architecture says yes; the screen does not today)?
+- After a URL change on Edit Event, should OG refetch (architecture says yes;
+  the screen does not today)? KI-004 (URL field was read-only) is fixed.
 - Venue/location: we have no field. Leave it in description, or add a field later?
 
 ---
@@ -815,7 +815,7 @@ Remaining design work. An agent that starts coding from this list is doing it wr
 
 ## Branded OTP SMS
 
-**Status:** Planned — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`).
+**Status:** Implemented (2026-08-17) — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`). Shipped as `sms_template = "Events: {{ .Code }} is your sign-in code. Never share it."` via Management API auth-config PATCH (53 chars with a 6-digit code, single GSM-7 segment, names the app, code prominent). No app code changes; no EAS rebuild.
 
 ### Problem
 
@@ -827,30 +827,45 @@ Edit the phone-auth SMS template in the Supabase dashboard (Authentication → S
 
 ### Acceptance Criteria
 
-- [ ] A real sign-in SMS names Events and contains the code
-- [ ] Test-OTP accounts (`+15555550100` / `+15555550103`) still verify — they bypass the template, but confirm after the change anyway
+- [x] A real sign-in SMS names Events and contains the code — owner confirmed on a real sign-in 2026-08-17
+- [x] Test-OTP accounts (`+15555550100` / `+15555550103`) still verify — confirmed programmatically after the PATCH (they bypass the template)
 
 ---
 
 ## Share SMS Content & Formatting
 
-**Status:** Planned — server-side only (edge function; no app rebuild). Found in the 2026-08-15 owner device smoke.
+**Status:** Implemented (2026-08-17) — server-side only (edge function; no app rebuild). Found in the 2026-08-15 owner device smoke.
 
 ### Problem
 
-The share notification SMS reads plainly and omits the event description. Current template (`supabase/functions/send-notification/index.ts`): `{name} added you to {title} on {date}{time}` + the event URL when present, plus "Reply STOP to unsubscribe" on the non-app-user variant only.
+The share notification SMS read plainly and omitted the event description. Template at the time (`supabase/functions/send-notification/index.ts`): `{name} added you to {title} on {date}{time}` + the event URL when present, plus "Reply STOP to unsubscribe" on the non-app-user variant only.
 
-### Proposed Solution
+### Solution (as shipped 2026-08-17)
 
-Rewrite the template for readability and consider including the event description (truncated to a line or so). Decide at the same time whether app-user SMS should also carry the STOP footer (today only non-app recipients get it; Twilio still intercepts STOP account-wide either way).
+Both variants (app user and non-app user) are now one identical message:
 
-Standing constraints from `docs/distribution-strategy.md` (2026-08-09): the SMS carries the event's own URL but **no app/web links** — it is a pure notification, not an acquisition channel — and it must not read like spam to carrier filters.
+```
+[Name] wants to go to "[Title]" with you
+[Date], [Time]
+[Description excerpt]
+[Event URL]
+
+Reply STOP to unsubscribe.
+```
+
+- **Framing:** "wants to go with you" replaces "added you to" (owner decision 2026-08-16: a share means "I want to go with you," not "this exists" — it echoes the walkthrough's "Found something you want to go to?"). No-title events fall back to `wants to go to an event with you`. Push titles take the same verb; push bodies use the comma separator.
+- **STOP footer on every message** (previously non-app only): A2P best practice is opt-out instructions on every message, and Twilio intercepts STOP account-wide either way.
+- **Description excerpt** when present: word-boundary truncated at 90 chars; titles at 80.
+- **GSM-7 normalization** on title/description (curly quotes → straight, em/en dashes → `-`, `…` → `...`, `·` → `,`, newlines collapsed) so one non-GSM-7 character can't force UCS-2 encoding (70-char segments) and multiply per-message cost.
+- Verified by a real share to the owner's number 2026-08-17 (`send-notification` returned `{"sent":1,"sms":1}`); owner approved the exact wording on the received text.
+
+Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the SMS carries the event's own URL but **no app/web links** — it is a pure notification, not an acquisition channel — and it must not read like spam to carrier filters.
 
 ### Acceptance Criteria
 
-- [ ] New template includes a short description excerpt when the event has one
-- [ ] Owner approves the exact wording on a real text before it ships
-- [ ] Any `send-notification` tests/SQL covering message shape are updated in the same change
+- [x] New template includes a short description excerpt when the event has one
+- [x] Owner approves the exact wording on a real text before it ships — approved 2026-08-17
+- [x] Any `send-notification` tests/SQL covering message shape are updated in the same change — vacuous: no automated test asserts on message shape; the docs (`events-technical-architecture.md`, `distribution-strategy.md`) and manual-test expectations (E-107, N-006) were updated in the same commit instead
 
 ---
 
@@ -895,7 +910,7 @@ Offer the manual form from more than the denial recovery: a quiet entry on the n
 
 **Status:** Implemented (2026-08-15). Was the owner's main pre-tester item; the footer overlap was explicitly *not* a tester blocker (testers are expected to use gesture nav) but shipped in the same one-screen pass.
 
-**As shipped:** the People screen gets real `minHeight: 44` targets on every bare-text action (header Back/Add, circle Edit/Delete, person Remove, hidden Unhide, modal Cancel/Save, retry banner) via a shared `textAction` style — rows were already ≥44 tall, so only the screen header grew — and the account footer now pads `4 + insets.bottom` so 3-button nav / the home indicator can't cover Delete account. The audit pass over the same bare-text pattern elsewhere used zero-pixel-shift fixes so no `visual.spec.ts` baseline moved: calendar People button grew to 44 inside the 48px header row, event-detail Back/Retry and the add/edit-event Cancel/Save pairs got `hitSlop`, share-screen header actions got real `minHeight: 44` (unbaselined), and share-sheet chips grew to 44 with `Manage` on hitSlop. Caveat for the next agent: react-native-web only honors `hitSlop` for move/up boundary checks — the *initial* tap on web is still DOM-hit-tested, so hitSlop'd targets stay glyph-sized in the browser (a dev surface); on native they get the full expanded target. Verified by DOM measurement at 390×844 (every People/share action ≥44px, footer fully on screen) plus a full green e2e run with unchanged baselines.
+**As shipped:** the People screen gets real `minHeight: 44` targets on every bare-text action (header Back/Add, circle Edit/Delete, person Remove, hidden Unhide, modal Cancel/Save, retry banner) via a shared `textAction` style — rows were already ≥44 tall, so only the screen header grew — and the account footer now pads `4 + insets.bottom`. The 3-button nav overlap is **not** closed: it still covers the bottom of the screen on Samsung 3-button nav (People Delete account originally; Events calendar event list as of 2026-08-17). That is [KI-005](manual-tests/known_issues.md), not a People-only leftover. The audit pass over the same bare-text pattern elsewhere used zero-pixel-shift fixes so no `visual.spec.ts` baseline moved: calendar People button grew to 44 inside the 48px header row, event-detail Back/Retry and the add/edit-event Cancel/Save pairs got `hitSlop`, share-screen header actions got real `minHeight: 44` (unbaselined), and share-sheet chips grew to 44 with `Manage` on hitSlop. Caveat for the next agent: react-native-web only honors `hitSlop` for move/up boundary checks — the *initial* tap on web is still DOM-hit-tested, so hitSlop'd targets stay glyph-sized in the browser (a dev surface); on native they get the full expanded target. Verified by DOM measurement at 390×844 (every People/share action ≥44px, footer fully on screen) plus a full green e2e run with unchanged baselines.
 
 ### Problem
 
@@ -911,7 +926,7 @@ One pass over the screen: real padding/min-height (≥44pt) on row and header te
 ### Acceptance Criteria
 
 - [x] Every People-screen action has a ≥44pt effective touch target
-- [x] The footer actions clear the 3-button nav bar and the iOS home indicator
+- [ ] The footer actions clear the 3-button nav bar and the iOS home indicator — still open as [KI-005](manual-tests/known_issues.md) (People and Events; likely other screens)
 - [x] Visual-diff baselines regenerated and reviewed if any snapshotted screen shifted — vacuous: no snapshotted screen shifted (the suite passed without regenerating)
 
 ---
@@ -981,7 +996,7 @@ Before they send — especially the first time — explain that you can’t unsh
 
 ## Share Delivery Status
 
-**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Related: [Share Sent Confirmation](#share-sent-confirmation) (that you sent it) and KI-003 (additive shares re-notify people already on the event).
+**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Related: [Share Sent Confirmation](#share-sent-confirmation) (that you sent it). Additive-share re-notify (KI-003) is fixed.
 
 ### Problem
 

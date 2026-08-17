@@ -40,9 +40,10 @@ export default function ShareScreen() {
   );
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  // Shares are attributed by display name ("X added you to ..."), so sending
-  // one requires a saved name. null = gate the Share action; undefined = the
-  // fetch hasn't resolved or failed (a fetch failure must never block sharing).
+  // Shares are attributed by display name (the "X wants to go to ... with
+  // you" SMS/push attribution), so sending one requires a saved name.
+  // null = gate the Share action; undefined = the fetch hasn't resolved or
+  // failed (a fetch failure must never block sharing).
   const [displayName, setDisplayName] = useState<string | null | undefined>(undefined);
   const [nameDraft, setNameDraft] = useState('');
   const [savingName, setSavingName] = useState(false);

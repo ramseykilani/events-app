@@ -34,6 +34,31 @@ function formatTime(time: string): string {
   });
 }
 
+// GSM-7 holds 160 chars per segment; one non-GSM-7 char forces UCS-2 (70
+// chars/segment) and multiplies per-message cost. Normalize the punctuation
+// that commonly leaks into OG titles/descriptions. (Emoji or CJK still send
+// fine — they just price as UCS-2.)
+function gsm7Safe(text: string): string {
+  return text
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014\u2015]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/\u00B7/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Word-boundary truncation so a 300-char OG title or a long description
+// can't blow the message into many segments.
+function excerpt(text: string, max: number): string {
+  const clean = gsm7Safe(text);
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${cut.slice(0, lastSpace > 0 ? lastSpace : max).trimEnd()}...`;
+}
+
 // Twilio accepts either MessagingServiceSid (sender pool, built-in STOP
 // opt-out handling) or a bare From number — never both.
 async function sendSms(
@@ -131,7 +156,7 @@ serve(async (req) => {
     // Load the user_event to get the sharer and event
     const { data: userEvent, error: ueErr } = await db
       .from('user_events')
-      .select('user_id, event_id, events(title, event_date, event_time, url)')
+      .select('user_id, event_id, events(title, event_date, event_time, url, description)')
       .eq('id', userEventId)
       .single();
 
@@ -154,6 +179,7 @@ serve(async (req) => {
       event_date: string;
       event_time: string | null;
       url: string | null;
+      description: string | null;
     } | null;
 
     if (!event) return jsonResponse({ error: 'event not found' }, 404);
@@ -196,12 +222,32 @@ serve(async (req) => {
     const messages: PushMessage[] = [];
     const smsSends: Promise<void>[] = [];
 
-    const eventTitle = event.title ?? 'an event';
+    const eventTitle = event.title ? excerpt(event.title, 80) : null;
     const dateStr = formatDate(event.event_date);
-    const timeStr = event.event_time ? ` · ${formatTime(event.event_time)}` : '';
+    const timeStr = event.event_time ? `, ${formatTime(event.event_time)}` : '';
+    const dateLine = `${dateStr}${timeStr}`;
+    const descriptionLine = event.description ? excerpt(event.description, 90) : null;
     const eventId = userEvent.event_id;
-    // Recipients should be able to act without opening the app.
-    const eventUrlLine = event.url ? `${event.url}\n` : '';
+
+    // One message for both variants: the share framing (a share means "I
+    // want to go with you", not "this exists"), event details, the event's
+    // own URL when one exists, and the STOP footer — A2P best practice is
+    // opt-out instructions on every message, and Twilio intercepts STOP
+    // account-wide either way. No app/web links: the web app is a dev
+    // surface, not somewhere we want first impressions, and link-free SMS
+    // reads less like spam to carrier filters.
+    function buildSmsBody(sharerName: string): string {
+      const lines = [
+        eventTitle
+          ? `${sharerName} wants to go to "${eventTitle}" with you`
+          : `${sharerName} wants to go to an event with you`,
+        dateLine,
+      ];
+      if (descriptionLine) lines.push(descriptionLine);
+      if (event.url) lines.push(event.url);
+      lines.push('', 'Reply STOP to unsubscribe.');
+      return lines.join('\n');
+    }
 
     for (const share of shares) {
       const person = share.my_people as {
@@ -216,19 +262,12 @@ serve(async (req) => {
       if (!person.user_id) {
         if (!twilioConfigured || !person.phone_number) continue;
 
-        // The SMS is the whole message: event details plus the original event
-        // URL when one exists. No app/web CTA — the web app is a dev surface,
-        // not somewhere we want first impressions, and link-free SMS reads
-        // less like spam to carrier filters.
-        const smsBody =
-          `${sharerDisplayName ?? sharerPhone} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
-          eventUrlLine +
-          `\nReply STOP to unsubscribe.`;
-
+        // The SMS is the whole message for non-app recipients — there is no
+        // other surface.
         smsSends.push(
           sendSms(
             person.phone_number,
-            smsBody,
+            buildSmsBody(sharerDisplayName ?? sharerPhone),
             twilioAccountSid!,
             twilioAuthToken!,
             twilioSender,
@@ -288,25 +327,22 @@ serve(async (req) => {
       if (recipientUser?.expo_push_token) {
         messages.push({
           to: recipientUser.expo_push_token,
-          title: `${displayName} added you to ${eventTitle}`,
-          body: `${dateStr}${timeStr}`,
+          title: eventTitle
+            ? `${displayName} wants to go to ${eventTitle} with you`
+            : `${displayName} wants to go to an event with you`,
+          body: dateLine,
           data: { eventId },
         });
       }
 
-      // Queue SMS with the event details (original event URL when present).
-      // No app link: push is the tappable path for app users — SMS is a pure
-      // notification. Skipped gracefully if Twilio is not configured.
+      // Queue the same SMS. Push is the tappable path for app users — the
+      // SMS is a pure notification. Skipped gracefully if Twilio is not
+      // configured.
       if (twilioConfigured && person.phone_number) {
-        const smsBody = (
-          `${displayName} added you to ${eventTitle} on ${dateStr}${timeStr}\n` +
-          eventUrlLine
-        ).trimEnd();
-
         smsSends.push(
           sendSms(
             person.phone_number,
-            smsBody,
+            buildSmsBody(displayName),
             twilioAccountSid!,
             twilioAuthToken!,
             twilioSender,
