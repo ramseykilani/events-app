@@ -9,6 +9,7 @@ import {
   Linking,
   Platform,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { parsePhoneNumber } from 'libphonenumber-js';
@@ -33,6 +34,7 @@ export default function SignInScreen() {
   const submittingRef = useRef(false);
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
 
   const normalizePhone = (input: string): string | null => {
     try {
@@ -82,6 +84,10 @@ export default function SignInScreen() {
     }
   };
 
+  // Phone-width column on phones, a centered card-width column on wide
+  // screens — a full-width form across a desktop window reads as broken.
+  const columnWidth = Math.min(windowWidth - 48, 440);
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -90,66 +96,68 @@ export default function SignInScreen() {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
-          styles.content,
+          styles.scrollContent,
           {
             paddingTop: insets.top + 24,
             paddingBottom: Math.max(insets.bottom, 24),
           },
         ]}
       >
-        <Text
-          style={[
-            styles.title,
-            {
-              color: theme.textPrimary,
-              fontFamily: theme.titleFontFamily,
-              fontWeight: theme.titleFontWeight,
-            },
-          ]}
-          accessibilityRole="header"
-        >
-          Events
-        </Text>
-        <View style={styles.orientation}>
-          {ORIENTATION_LINES.map((line) => (
-            <Text key={line} style={[styles.body, { color: theme.textSecondary }]}>
-              {line}
+        <View style={[styles.content, { width: columnWidth }]}>
+          <Text
+            style={[
+              styles.title,
+              {
+                color: theme.textPrimary,
+                fontFamily: theme.titleFontFamily,
+                fontWeight: theme.titleFontWeight,
+              },
+            ]}
+            accessibilityRole="header"
+          >
+            Events
+          </Text>
+          <View style={styles.orientation}>
+            {ORIENTATION_LINES.map((line) => (
+              <Text key={line} style={[styles.body, { color: theme.textSecondary }]}>
+                {line}
+              </Text>
+            ))}
+          </View>
+          <TextInput
+            style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
+            placeholder="+1 (555) 123-4567"
+            placeholderTextColor={theme.textTertiary}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            editable={!loading}
+            accessibilityLabel="Phone number"
+          />
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.primaryButtonBg }, loading && styles.buttonDisabled]}
+            onPress={handleSignIn}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: loading }}
+          >
+            <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
+              {loading ? 'Sending...' : 'Send code'}
             </Text>
-          ))}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+            activeOpacity={0.6}
+            accessibilityRole="link"
+            accessibilityLabel="Privacy policy"
+            style={styles.privacyLink}
+          >
+            <Text style={[styles.privacyText, { color: theme.textTertiary }]}>
+              Privacy policy
+            </Text>
+          </TouchableOpacity>
         </View>
-        <TextInput
-          style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
-          placeholder="+1 (555) 123-4567"
-          placeholderTextColor={theme.textTertiary}
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          autoComplete="tel"
-          editable={!loading}
-          accessibilityLabel="Phone number"
-        />
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.primaryButtonBg }, loading && styles.buttonDisabled]}
-          onPress={handleSignIn}
-          disabled={loading}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: loading }}
-        >
-          <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
-            {loading ? 'Sending...' : 'Send code'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
-          activeOpacity={0.6}
-          accessibilityRole="link"
-          accessibilityLabel="Privacy policy"
-          style={styles.privacyLink}
-        >
-          <Text style={[styles.privacyText, { color: theme.textTertiary }]}>
-            Privacy policy
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -158,6 +166,10 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
   },
   content: {
     paddingHorizontal: 24,
@@ -169,7 +181,6 @@ const styles = StyleSheet.create({
   orientation: {
     gap: 16,
     marginBottom: 28,
-    maxWidth: 420,
   },
   body: {
     fontSize: 16,
