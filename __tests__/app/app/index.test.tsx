@@ -52,6 +52,16 @@ jest.mock('../../../components/Calendar', () => {
   };
 });
 
+const mockGate = jest.fn();
+jest.mock('../../../components/NotificationPermissionGate', () => ({
+  NotificationPermissionGate: (props: { userId: string; checkKey: number }) => {
+    mockGate(props);
+    return null;
+  },
+}));
+
+const gateCheckKeys = () => mockGate.mock.calls.map((c) => c[0].checkKey as number);
+
 const sampleRow = {
   id: 'ce-1',
   event_id: 'e-1',
@@ -109,6 +119,9 @@ describe('app/(app)/index', () => {
     expect(AsyncStorage.setItem).toHaveBeenCalledWith('onboarding_complete', 'true');
     // Month fetch + wide-range check
     expect(mockRpc).toHaveBeenCalledTimes(2);
+    // The notification gate must not trigger while the walkthrough takes over.
+    expect(mockGate).toHaveBeenCalled();
+    expect(gateCheckKeys().every((k) => k === 0)).toBe(true);
   });
 
   it('does not show the walkthrough when events exist outside the current month', async () => {
@@ -139,6 +152,8 @@ describe('app/(app)/index', () => {
 
     await waitFor(() => expect(mockRpc).toHaveBeenCalledTimes(1));
     expect(router.push).not.toHaveBeenCalledWith('/(app)/onboarding');
+    // Walkthrough already done — the notification gate gets its check.
+    await waitFor(() => expect(gateCheckKeys()).toContain(1));
   });
 
   it('does not show the walkthrough while the current month has events', async () => {
@@ -153,6 +168,8 @@ describe('app/(app)/index', () => {
     await waitFor(() => expect(screen.getByText('Spring Concert')).toBeTruthy());
     expect(router.push).not.toHaveBeenCalledWith('/(app)/onboarding');
     expect(mockRpc).toHaveBeenCalledTimes(1);
+    // Events on screen, no walkthrough — the notification gate gets its check.
+    await waitFor(() => expect(gateCheckKeys()).toContain(1));
   });
 
   it('shows an error banner on RPC failure and retries on tap', async () => {

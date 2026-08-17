@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, LogBox, Platform, StatusBar, View } from 'react-native';
+import { ActivityIndicator, LogBox, StatusBar, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
 import { SessionContextProvider, useSession } from './_context/SessionContext';
 import { ThemeContextProvider, useThemePreference } from './_context/ThemeContext';
 import { supabase } from '../lib/supabase';
+import { getExpoPushToken } from '../lib/pushNotifications';
 
 LogBox.ignoreLogs(['unable to keep activate awake']);
 
@@ -19,35 +19,6 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
   }),
 });
-
-async function registerForPushNotifications(): Promise<string | null> {
-  // Web users get SMS, not browser push — never trigger the browser's
-  // notification permission prompt (observed firing on web sign-in).
-  if (Platform.OS === 'web') return null;
-
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-    });
-  }
-
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') return null;
-
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  const token = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined
-  );
-  return token.data;
-}
 
 function RootLayoutNav() {
   const { session, isLoading } = useSession();
@@ -69,11 +40,13 @@ function RootLayoutNav() {
     }
   }, [session, isLoading, segments]);
 
-  // Register for push notifications when the user is authenticated
+  // Register for push notifications when the user is authenticated. Never
+  // prompts: the notification explainer owns the OS ask — here we only pick
+  // up the token when permission is already granted.
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    registerForPushNotifications()
+    getExpoPushToken()
       .then((token) => {
         if (!token) return;
         supabase

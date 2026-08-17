@@ -86,6 +86,23 @@ requires one).
 2. Header/footer content clears the notch/Dynamic Island and home indicator in
    both themes.
 
+## N-010: Notification permission explainer
+
+Needs a fresh install (or OS Settings → Notifications reset) per variant —
+the ask is one-shot and persisted (`notification_explainer_answered`).
+
+1. Fresh install → sign in. The in-app explainer ("Events notifies you when
+   someone shares an event with you.") appears before any OS prompt. On a
+   brand-new account the walkthrough auto-shows first and the explainer
+   appears after it's dismissed — never stacked on top of it.
+2. Not now → no OS prompt fires. Kill and relaunch → the explainer does not
+   reappear.
+3. (Fresh install again) Continue → the OS prompt fires → Allow → the N-005
+   push path still works end-to-end (share to this device, push arrives, tap
+   opens the event).
+4. (Fresh install again) Continue → Don't Allow → no recovery screen and no
+   re-ask on relaunch; a share to this device still arrives by SMS.
+
 ## Known acceptable rough edges (don't report)
 
 - Notification SMS leads with the sharer's display name. A raw phone number

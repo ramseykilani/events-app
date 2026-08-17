@@ -294,7 +294,7 @@ Under forwarding semantics every user_events row is someone's personal copy, so 
 
 The `send-notification` Edge Function sends a push notification and/or SMS to each recipient when an event is shared with them.
 
-**Registration (push):** On authenticated app launch, the app requests notification permissions, obtains the Expo push token, and upserts it to `users.expo_push_token`.
+**Registration (push):** On authenticated app launch, the app upserts the Expo push token to `users.expo_push_token` when notification permission is already granted — launch never asks. The OS prompt fires only from the notification explainer's Continue (`components/NotificationPermissionGate.tsx`, shown once on the first native launch after the calendar settles, never stacked on the walkthrough); Not now is persisted (`notification_explainer_answered` in AsyncStorage) and never re-asks, and a denied OS prompt gets no recovery screen (SMS still reaches them). Web never requests notification permission.
 
 **Sending flow:**
 1. `share.tsx` calls the Edge Function fire-and-forget after event_shares are created, passing `userEventId`

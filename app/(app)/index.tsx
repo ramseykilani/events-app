@@ -4,6 +4,7 @@ import { useFocusEffect, router } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar } from '../../components/Calendar';
+import { NotificationPermissionGate } from '../../components/NotificationPermissionGate';
 import { useSession } from '../_context/SessionContext';
 import { supabase } from '../../lib/supabase';
 import { withRetries } from '../../lib/timeoutSignal';
@@ -17,6 +18,7 @@ export default function CalendarScreen() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [notifCheckKey, setNotifCheckKey] = useState(0);
   const lastRangeRef = useRef<{ start: string; end: string } | null>(null);
   const fetchSeq = useRef(0);
   const onboardCheckedRef = useRef(false);
@@ -24,10 +26,11 @@ export default function CalendarScreen() {
   // The walkthrough is shown automatically at most once, and only to users
   // with no events at all — someone who was shared an event should land
   // directly on their calendar. It can always be reopened via the ? button.
-  const maybeShowOnboarding = useCallback(async () => {
-    if (!session?.user?.id) return;
+  // Returns true when the walkthrough took over the screen.
+  const maybeShowOnboarding = useCallback(async (): Promise<boolean> => {
+    if (!session?.user?.id) return false;
     const flag = await AsyncStorage.getItem(ONBOARDING_KEY);
-    if (flag === 'true') return;
+    if (flag === 'true') return false;
 
     let rowCount = 0;
     try {
@@ -47,12 +50,13 @@ export default function CalendarScreen() {
       // Best-effort check: a failed read must not crash the calendar or turn
       // into an unhandled rejection.
       console.error('onboarding check failed:', err);
-      return;
+      return false;
     }
-    if (rowCount > 0) return;
+    if (rowCount > 0) return false;
 
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
     router.push('/(app)/onboarding');
+    return true;
   }, [session?.user?.id]);
 
   const doFetch = useCallback(
@@ -95,7 +99,13 @@ export default function CalendarScreen() {
 
         if (!onboardCheckedRef.current) {
           onboardCheckedRef.current = true;
-          if (mapped.length === 0) maybeShowOnboarding();
+          const walkthroughShown =
+            mapped.length === 0 ? await maybeShowOnboarding() : false;
+          // The notification explainer must never stack on the walkthrough —
+          // the gate is only triggered once the calendar stays on screen.
+          if (!walkthroughShown) setNotifCheckKey((k) => k + 1);
+        } else {
+          setNotifCheckKey((k) => k + 1);
         }
       } catch (err) {
         if (seq !== fetchSeq.current) return;
@@ -148,6 +158,12 @@ export default function CalendarScreen() {
         refreshing={refreshing}
         onRefresh={handleRefresh}
       />
+      {session?.user?.id ? (
+        <NotificationPermissionGate
+          userId={session.user.id}
+          checkKey={notifCheckKey}
+        />
+      ) : null}
     </View>
   );
 }

@@ -26,7 +26,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
-| [Notification Permission Explainer](#notification-permission-explainer) | Planned | Upgrade. Push already works; the OS prompt currently fires cold on launch. |
+| [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Planned | First share never says you can't take it back. |
 | [Share Delivery Status](#share-delivery-status) | Planned | ✓ Shared only means recorded, not received. |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
@@ -933,37 +933,42 @@ One pass over the screen: real padding/min-height (≥44pt) on row and header te
 
 ## Notification Permission Explainer
 
-**Status:** Planned — upgrade, not a blocker. Push registration, delivery, and tap-to-event already work (N-005). Recorded 2026-08-16 from internal testing. Same “explain, then ask” idea as [Contacts Permission Explainer](#contacts-permission-explainer).
-
-### What this is not
-
-Not a new notification type, not an onboarding page, and not a change to when we *send* pushes. Person-triggered shares still notify; the app still never manufactures its own urgency. Web still never requests browser notification permission. Recipients who decline still get SMS.
+**Status:** Implemented (2026-08-17) — upgrade, was never a blocker. Push registration, delivery, and tap-to-event already worked (N-005). Same “explain, then ask” idea as [Contacts Permission Explainer](#contacts-permission-explainer). Jest/e2e-covered; native device acceptance is N-010 on the next binary.
 
 ### Problem
 
-On native, the first authenticated launch fires the OS notification prompt with no in-app reason (`registerForPushNotifications` in `app/_layout.tsx`). Contacts used to do the same; we replaced that with an explainer because the OS dialog does not carry our why. Notifications are worse: iOS has no usage-description equivalent, so the system copy is only “Allow Notifications.” A cold ask also burns iOS’s one-shot if the user taps Don’t Allow before they know what the ping is for.
+On native, the first authenticated launch fired the OS notification prompt with no in-app reason (`registerForPushNotifications` in `app/_layout.tsx`). Contacts used to do the same; we replaced that with an explainer because the OS dialog does not carry our why. Notifications are worse: iOS has no usage-description equivalent, so the system copy is only “Allow Notifications.” A cold ask also burns iOS’s one-shot if the user taps Don’t Allow before they know what the ping is for.
 
-### Proposed Solution
+### Solution (as shipped)
 
-Explain why we need notification access **before** asking the OS. Continue is the only moment the system prompt fires. Not now must not call the OS (so iOS hasn’t used its one ask) and must not nag on every subsequent launch — this ask is app-initiated, unlike Share/People which the user just tapped.
+A real explainer, then the system prompt — shown once, on the first authenticated launch, after the calendar settles.
 
-Do not fold this into the walkthrough or ask at sign-up. Do not stack on the empty-calendar walkthrough. Already granted → register the token with no extra UI. Web unchanged.
+1. **Explainer:** “Events notifies you when someone shares an event with you.” Continue fires the OS prompt. Not now dismisses without calling the OS (so iOS hasn’t used up its one ask) and is persisted (`notification_explainer_answered` in AsyncStorage) — the ask never reappears.
+2. **OS prompt:** Allow → the Expo push token registers as before. Don’t Allow → nothing; no recovery screen — SMS still reaches them.
+3. **Sequencing:** the explainer never stacks on the empty-calendar walkthrough. The calendar triggers the check only when the walkthrough isn’t taking over, so a brand-new user sees the walkthrough first and the explainer back on the calendar.
 
-Draft copy direction (not final): “Events notifies you when someone shares an event with you — never anything else.”
+Already granted → the token registers on launch with no extra UI. Denied with no OS re-ask → nothing. Web unchanged (no browser prompt, no explainer).
+
+Copy decision (2026-08-17): the spec’s draft ended “— never anything else”; the owner cut the tail as defensive and future-falsifiable. The statement names the only trigger without promising it forever.
+
+### Technical Notes
+
+- [`lib/pushNotifications.ts`](lib/pushNotifications.ts): `getNotificationPermission()` (`{ status, canAskAgain }`), `requestNotificationPermission()` (the explainer’s Continue is the only caller), `getExpoPushToken()` (never requests; web → null).
+- Flow owner: [`components/NotificationPermissionGate.tsx`](components/NotificationPermissionGate.tsx), rendered by the calendar screen with a `checkKey` bumped after fetches that don’t yield to the walkthrough. UI: [`components/NotificationExplainer.tsx`](components/NotificationExplainer.tsx), cloned from the contacts explainer.
+- [`app/_layout.tsx`](app/_layout.tsx) no longer calls `requestPermissionsAsync` — the launch effect only picks up the token when permission is already granted.
+- Jest: [`__tests__/components/NotificationPermissionGate.test.tsx`](__tests__/components/NotificationPermissionGate.test.tsx) + sequencing assertions in [`__tests__/app/app/index.test.tsx`](__tests__/app/app/index.test.tsx). Web no-op pin: [`e2e/notification-explainer.spec.ts`](e2e/notification-explainer.spec.ts). Native acceptance: N-010.
 
 ### Acceptance Criteria
 
-- [ ] Native first ask shows an in-app explanation before the OS prompt, never the OS prompt cold
-- [ ] Not now does not burn the iOS one-shot and does not reappear on every launch
-- [ ] Already granted still registers the push token with no extra UI
-- [ ] Web behavior unchanged (no browser permission prompt)
-- [ ] Copy states the only trigger: someone shared an event with you
+- [x] Native first ask shows an in-app explanation before the OS prompt, never the OS prompt cold (device confirmation: N-010)
+- [x] Not now does not burn the iOS one-shot and does not reappear on every launch — persisted forever, no re-ask
+- [x] Already granted still registers the push token with no extra UI
+- [x] Web behavior unchanged (no browser permission prompt)
+- [x] Copy states the only trigger: someone shared an event with you
 
 ### Open Questions
 
-- Exact copy.
-- Not now: persist forever, or one later re-ask in a contextual moment?
-- Recovery after OS deny: skip for v1 (SMS covers it), or a later “Notifications are off” path?
+- None (decided 2026-08-17: Not now persists forever with no later re-ask; no post-deny recovery screen — SMS covers it)
 
 ---
 
