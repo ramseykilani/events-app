@@ -9,7 +9,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  Switch,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +19,7 @@ import { formatPhoneDisplay } from '../../lib/format';
 import { useSession } from '../_context/SessionContext';
 import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
 import { ManualAddPersonModal } from '../../components/ManualAddPersonModal';
+import { ThemedSwitch } from '../../components/ThemedSwitch';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 import { isAbortError, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
@@ -685,23 +685,19 @@ export default function PeopleScreen() {
           <View style={styles.manualForm}>
             <View style={styles.prefRow}>
               <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Push notifications</Text>
-              <Switch
+              <ThemedSwitch
                 value={notifyPush}
                 onValueChange={(value) => handleTogglePref('notify_push', value)}
                 disabled={prefSaving}
-                trackColor={{ false: theme.surfaceSecondary, true: theme.primaryButtonBg }}
-                thumbColor={theme.surface}
                 accessibilityLabel="Push notifications"
               />
             </View>
             <View style={styles.prefRow}>
               <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Text messages (SMS)</Text>
-              <Switch
+              <ThemedSwitch
                 value={notifySms}
                 onValueChange={(value) => handleTogglePref('notify_sms', value)}
                 disabled={prefSaving}
-                trackColor={{ false: theme.surfaceSecondary, true: theme.primaryButtonBg }}
-                thumbColor={theme.surface}
                 accessibilityLabel="Text messages (SMS)"
               />
             </View>

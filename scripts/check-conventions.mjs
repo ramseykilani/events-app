@@ -25,6 +25,10 @@
 //      lib/** — showError dumps stack traces, which is right for unexpected
 //      auth/boot failures and wrong for user-triggered action failures (those
 //      get a short showAlert). Intentional exceptions need conventions-ok.
+//   7. No importing Switch from react-native outside components/ThemedSwitch.tsx —
+//      react-native-web's on-state thumb ignores thumbColor and falls back to a
+//      Material teal default outside the role-token palettes; ThemedSwitch owns
+//      the token wiring.
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -39,6 +43,7 @@ const ALERT_ALLOWED_FILES = new Set(['lib/dialogs.ts', 'lib/showError.ts']);
 const TIMEOUT_MODULE_RE = /(^|\/)timeoutSignal$/;
 const BANNED_TIMEOUT_NAMES = new Set(['withTimeout', 'timeoutSignal']);
 const SHOWERROR_MODULE_RE = /(^|\/)showError$/;
+const THEMED_SWITCH_FILE = 'components/ThemedSwitch.tsx';
 const SHOWERROR_ALLOWED = (relPath) =>
   relPath.startsWith('app/(auth)/') ||
   relPath === 'app/_context/SessionContext.tsx' ||
@@ -169,6 +174,31 @@ function checkShowErrorCalls(path, source, text) {
   visit(source);
 }
 
+function checkRawSwitchImport(path, source) {
+  const relPath = rel(path);
+  if (relPath === THEMED_SWITCH_FILE) return;
+  const visit = (node) => {
+    if (
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      node.moduleSpecifier.text === 'react-native'
+    ) {
+      const named = node.importClause?.namedBindings;
+      if (named && ts.isNamedImports(named)) {
+        for (const el of named.elements) {
+          if ((el.propertyName ?? el.name).text === 'Switch') {
+            violations.push(
+              `${relPath}:${lineOf(source, el.getStart())} — raw Switch leaks react-native-web's off-palette teal on-thumb; use ThemedSwitch from components/ThemedSwitch.tsx`
+            );
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
 function checkRegexRules(path, text, source) {
   const lines = text.split('\n');
   const relPath = rel(path);
@@ -223,6 +253,7 @@ for (const dir of SCAN_DIRS) {
     checkRegexRules(path, text, source);
     checkTimeoutImports(path, source);
     checkShowErrorCalls(path, source, text);
+    checkRawSwitchImport(path, source);
   }
 }
 

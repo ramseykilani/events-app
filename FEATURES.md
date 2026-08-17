@@ -1098,7 +1098,8 @@ Two layout notes from the ship: the switches live in a modal rather than inline 
 
 - Migration `20260817000001`: `users.notify_push` / `users.notify_sms` booleans, default true. No new RLS (`users_update_own` already covers the write); NOT NULL so prefs are never ambiguous.
 - `send-notification`: recipient fetch now selects `expo_push_token, notify_push, notify_sms`; each channel is gated on its pref (`!== false`, so a missing row keeps today's behavior).
-- `app/(app)/people.tsx`: footer **Notifications** row → pageSheet modal with two theme-tinted `Switch` rows; loads prefs with the footer read (last-good on failure), writes with `withWriteTimeout`, switches disabled mid-flight.
+- `app/(app)/people.tsx`: footer **Notifications** row → pageSheet modal with two `ThemedSwitch` rows; loads prefs with the footer read (last-good on failure), writes with `withWriteTimeout`, switches disabled mid-flight.
+- `components/ThemedSwitch.tsx` (new, conventions-enforced): react-native-web's on-state thumb ignores `thumbColor` and falls back to a Material teal default outside the palettes — the wrapper wires track/thumb (and web's `activeThumbColor`) from role tokens.
 - Tests: `supabase/tests/notification_prefs_test.sql` (defaults, independent flips, NOT NULL); Jest in `__tests__/app/app/people.test.tsx` (render, write, revert-on-failure, read-failure keeps defaults); e2e in `e2e/people.spec.ts` (flips persist across reload on all three form factors). Live-verified against the deployed function 2026-08-17: B with SMS off → `{"sent":0,"sms":0}`; back on → `{"sent":0,"sms":1}`. Manual: E-111.
 
 ### Acceptance Criteria
