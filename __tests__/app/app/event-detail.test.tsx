@@ -160,7 +160,7 @@ describe('app/(app)/event/[id]', () => {
     expect(router.back).toHaveBeenCalled();
   });
 
-  it('shows the no-unshare note in the Shared with section when shares exist', async () => {
+  it('shows the Shared with list when shares exist', async () => {
     mockSharesEq.mockImplementation(() =>
       abortablePromise(Promise.resolve({ data: [{ person_id: 'p1' }], error: null }))
     );
@@ -177,9 +177,6 @@ describe('app/(app)/event/[id]', () => {
 
     await screen.findByText('Shared with');
     expect(screen.getByText('Alice')).toBeTruthy();
-    expect(
-      screen.getByText(/Sharing is like sending a text/)
-    ).toBeTruthy();
   });
 
   it('shows a short alert instead of navigating back when hide fails', async () => {

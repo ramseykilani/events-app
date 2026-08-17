@@ -54,11 +54,6 @@ test('sharing delivers B their own copy that survives A removing theirs', async 
 
     // --- A removes their own copy; B's copy must survive (E-108).
     await openEventFromCalendar(page, title);
-    // The detail of an already-shared event states the completed,
-    // non-unsendable state in the Shared with section.
-    await expect(
-      page.getByText(/Sharing is like sending a text/).filter({ visible: true })
-    ).toBeVisible();
     await removeOpenEvent(page);
     await expect(page.getByText(title, { exact: true })).not.toBeVisible();
 

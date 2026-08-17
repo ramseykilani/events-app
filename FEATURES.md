@@ -983,20 +983,21 @@ Sharing is like sending a text: once you’ve shared it, they know about the eve
 
 ### Solution (as shipped 2026-08-17)
 
-One sentence, shown in both places that already carried the old line:
+One sentence on the share screen (`app/(app)/share.tsx`):
 
 > Sharing is like sending a text — once you send it, you can't take it back.
 
-- **Share screen** (`app/(app)/share.tsx`): the line now renders whenever people are listed — before the first send, not only after a share exists. (With an empty people list the screen is the add-people path; the line appears as soon as people exist, which is always before the first possible send.)
-- **Event detail** (`app/(app)/event/[id].tsx`): the same sentence replaces the storage-language note in the “Shared with” section, so later opens of an already-shared event keep the completed, non-unsendable state obvious.
+The line renders whenever people are listed — before the first send, not only after a share exists. (With an empty people list the screen is the add-people path; the line appears as soon as people exist, which is always before the first possible send.)
 
 Decisions on the original open questions: **always-visible line** (a first-send confirm would stack a third interruption on the display-name gate + contacts explainer; first-share-only would need “has ever shared” state for a purely educational line) and **share screen only** (the walkthrough is skippable and auto-shows at most once, so it can’t guarantee “before the first send”; the share screen is the mandatory step after every event creation). The remove-event confirm (“This only affects you…”) covers the other direction and is unchanged.
+
+**Event-detail note considered and removed (owner decision, 2026-08-17).** The “Shared with” section on the event detail briefly carried the same sentence. The moment someone thinks about *un*sharing lives on the share screen — the only share action on the detail screen routes there, where ✓ Shared rows are non-interactive and the line is always shown — and the remove-event confirm covers the adjacent take-it-back path. The detail screen’s “Shared with” list is a plain record with no controls; a note there answered an unasked question. Do not re-add it without revisiting this paragraph.
 
 ### Acceptance Criteria
 
 - [x] Before the first Share send, the user is told they can’t take it back
 - [x] The explanation uses the text metaphor, not implementation language
-- [x] Later opens of an already-shared event still make the completed, non-unsendable state obvious
+- [x] Later opens of an already-shared event still make the completed, non-unsendable state obvious — via the share sheet (✓ Shared rows + the line) and the remove-event confirm; the event-detail note was deliberately dropped (see above)
 
 ### Open Questions
 
