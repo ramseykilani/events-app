@@ -60,17 +60,22 @@ export const test = base.extend({
 });
 
 // A second context inside a test (signed-out flows, a second account). Gets
-// the project baseURL and the Web-Locks shim. The empty storageState matters:
-// the test runner applies project `use` options — including the signed-in
-// storageState — to manual browser.newContext() calls, so without this the
-// "signed-out" context would boot straight into account A's calendar.
+// the project baseURL and the Web-Locks shim. The default empty storageState
+// matters: the test runner applies project `use` options — including the
+// signed-in storageState — to manual browser.newContext() calls, so without
+// this the "signed-out" context would boot straight into account A's
+// calendar. Pass AUTH_FILE_B to boot into account B's stored session instead
+// of signing in through the UI — per-test signIn() calls each fire a real
+// Twilio SMS at the fictional 555 number (rejected 21211), which poisons the
+// account's messaging-health metrics.
 export async function newExtraContext(
   browser: Browser,
-  testInfo: TestInfo
+  testInfo: TestInfo,
+  storageState?: string
 ): Promise<BrowserContext> {
   const context = await browser.newContext({
     baseURL: testInfo.project.use.baseURL,
-    storageState: { cookies: [], origins: [] },
+    storageState: storageState ?? { cookies: [], origins: [] },
   });
   await context.addInitScript(disableNavigatorLocks);
   await context.addInitScript(instrumentNotificationRequests);

@@ -1,4 +1,5 @@
 import { expect, newExtraContext, test } from './fixtures';
+import { AUTH_FILE_B } from './constants';
 import {
   ACCOUNT_B,
   PERSON_B_NAME,
@@ -7,7 +8,6 @@ import {
   expectCalendar,
   openEventFromCalendar,
   removeOpenEvent,
-  signIn,
   uniqueTitle,
 } from './helpers';
 
@@ -37,12 +37,14 @@ test('sharing delivers B their own copy that survives A removing theirs', async 
   // --- Account A: create an event for today and share it with B.
   await createEventAndShareToB(page, title);
 
-  // --- Account B (separate signed-out browser context): sign in, event is
-  // on today.
-  const contextB = await newExtraContext(browser, testInfo);
+  // --- Account B (separate context booting from B's stored session, created
+  // once per run by the setup project — no per-test sign-in): event is on
+  // today.
+  const contextB = await newExtraContext(browser, testInfo, AUTH_FILE_B);
   const pageB = await contextB.newPage();
   try {
-    await signIn(pageB, ACCOUNT_B);
+    await pageB.goto('/');
+    await expectCalendar(pageB);
     // Generous timeout: B's first fetch includes session bootstrap plus the
     // calendar query on a freshly created context, and this step is where a
     // slow runner shows up first.

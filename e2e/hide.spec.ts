@@ -1,4 +1,5 @@
 import { expect, newExtraContext, test } from './fixtures';
+import { AUTH_FILE_B } from './constants';
 import {
   ACCOUNT_A,
   ACCOUNT_B,
@@ -8,7 +9,6 @@ import {
   expectCalendar,
   openEventFromCalendar,
   removeOpenEvent,
-  signIn,
   uniqueTitle,
 } from './helpers';
 
@@ -37,12 +37,15 @@ test('hiding the sharer suppresses their events until unhidden', async ({
   await page.getByRole('button', { name: 'Back' }).click();
   await createEventAndShareToB(page, title);
 
-  // --- B: make sure A is a known person, then hide A from the event detail.
-  const contextB = await newExtraContext(browser, testInfo);
+  // --- B (separate context booting from B's stored session from the setup
+  // project): make sure A is a known person, then hide A from the event
+  // detail.
+  const contextB = await newExtraContext(browser, testInfo, AUTH_FILE_B);
   const pageB = await contextB.newPage();
   let hidA = false;
   try {
-    await signIn(pageB, ACCOUNT_B);
+    await pageB.goto('/');
+    await expectCalendar(pageB);
     await pageB.getByRole('button', { name: 'People' }).click();
     await addPersonManually(pageB, PERSON_A_NAME, ACCOUNT_A.phone);
     await pageB.getByRole('button', { name: 'Back' }).click();
