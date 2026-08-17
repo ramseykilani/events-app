@@ -234,7 +234,8 @@ For each executed scenario:
 
 **Expected**
 - SMS body opens with `[Name] wants to go to "[title]" with you`, then the date/time line, then the event URL itself — the recipient can act without installing the app.
-- No app/web links anywhere in the message; it ends with `Reply STOP to unsubscribe.`
+- No app/web links anywhere in the message. Before the STOP footer, the non-app recipient sees the signup invite: `Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.` (internal-testing phase). The message ends with `Reply STOP to unsubscribe.`
+- SMS to *app* users (the E-111 path) carries no invite line.
 
 ---
 

@@ -119,7 +119,7 @@ npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # already set; pg
 
 Function-only deploys (no DB access) work without linking — pass the ref directly: `npx supabase functions deploy send-notification --project-ref ijmwtjyuvdnvhblwwtpt`. Note `supabase link` can fail on newer CLI versions with a `LegacyLinkApiKeysNetworkError ... inserted_at SchemaError` (Management API response drift); function deploys/secrets don't need link.
 
-Notification SMS carries no app/web links (decision 2026-08-09 — see `docs/distribution-strategy.md`): `send-notification` reads only the Twilio secrets, and `WEB_APP_URL` is currently set but unused by it (it returns as the store-link base at launch). The placeholder `IOS_APP_STORE_URL` secret was removed 2026-08-09. Build the static bundle with `npm run build:web` (→ `dist/`).
+Notification SMS carries no app/web links (decision 2026-08-09 — see `docs/distribution-strategy.md`); the one exception is the internal-testing signup invite on the non-app variant (email CTA, added 2026-08-17, replaced by store links at launch). `send-notification` reads only the Twilio secrets, and `WEB_APP_URL` is currently set but unused by it (it returns as the store-link base at launch). The placeholder `IOS_APP_STORE_URL` secret was removed 2026-08-09. Build the static bundle with `npm run build:web` (→ `dist/`).
 
 ### Deploying the web app (Cloudflare Pages)
 

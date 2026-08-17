@@ -108,10 +108,10 @@ Push notifications only reach users who have installed the app. Non-app users (c
 
 When an event is shared, the `send-notification` Edge Function also sends an SMS via Twilio to every recipient:
 
-- **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, and the sharer's phone number as display identity. No app or web links — the SMS is the whole message.
+- **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, and the sharer's phone number as display identity. No app or web links — the SMS is the whole message. During internal testing it also carries a signup invite (`Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.`, added 2026-08-17) so an interested recipient can ask the owner for beta access.
 - **App users:** the same link-free SMS in addition to their push notification (push is the tappable path into the event). A missing push token does not suppress the SMS.
 
-This means the only person who needs the app is the one sending events. Friends are informed by text; nothing in the message pulls them into the app or website. (Revised 2026-08-09: SMS previously carried web/store/deep links; removed deliberately — see `docs/distribution-strategy.md`.)
+This means the only person who needs the app is the one sending events. Friends are informed by text; the only acquisition element in the message is the internal-testing signup invite (an email CTA, no links). (Revised 2026-08-09: SMS previously carried web/store/deep links; removed deliberately — see `docs/distribution-strategy.md`. Revised 2026-08-17: non-app SMS gained the signup-invite line for the internal-testing phase.)
 
 ### Technical Notes
 
@@ -127,7 +127,7 @@ This means the only person who needs the app is the one sending events. Friends 
 
 ### Acceptance Criteria
 
-- [x] Non-app users receive an SMS with event title, date/time, sharer phone, and the event URL when one exists — no app/web links
+- [x] Non-app users receive an SMS with event title, date/time, sharer phone, and the event URL when one exists — no app/web links; during internal testing the message includes the signup-invite line
 - [x] App users receive both a push notification and a plain-text SMS when shared an event
 - [x] SMS is skipped silently when Twilio secrets are not configured
 - [x] SMS is skipped when the recipient has no phone number in `my_people`

@@ -11,6 +11,15 @@ const CORS_HEADERS = {
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
+// Internal-testing CTA (2026-08-17): while beta access is owner-gated
+// (TestFlight / Play internal tracks), the SMS to recipients without an
+// account invites them to email the owner to get signed up — an interested
+// stranger has no other way in. App users already have the app, so their SMS
+// stays a pure notification. At launch this line is replaced by store links
+// (docs/distribution-strategy.md).
+const SIGNUP_INVITE_LINE =
+  'Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.';
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -235,8 +244,10 @@ serve(async (req) => {
     // opt-out instructions on every message, and Twilio intercepts STOP
     // account-wide either way. No app/web links: the web app is a dev
     // surface, not somewhere we want first impressions, and link-free SMS
-    // reads less like spam to carrier filters.
-    function buildSmsBody(sharerName: string): string {
+    // reads less like spam to carrier filters. The non-app variant also
+    // carries SIGNUP_INVITE_LINE — the one acquisition element, kept
+    // link-free.
+    function buildSmsBody(sharerName: string, signupInvite: boolean): string {
       const lines = [
         eventTitle
           ? `${sharerName} wants to go to "${eventTitle}" with you`
@@ -245,6 +256,7 @@ serve(async (req) => {
       ];
       if (descriptionLine) lines.push(descriptionLine);
       if (event.url) lines.push(event.url);
+      if (signupInvite) lines.push('', SIGNUP_INVITE_LINE);
       lines.push('', 'Reply STOP to unsubscribe.');
       return lines.join('\n');
     }
@@ -263,11 +275,11 @@ serve(async (req) => {
         if (!twilioConfigured || !person.phone_number) continue;
 
         // The SMS is the whole message for non-app recipients — there is no
-        // other surface.
+        // other surface. This variant carries the signup invite.
         smsSends.push(
           sendSms(
             person.phone_number,
-            buildSmsBody(sharerDisplayName ?? sharerPhone),
+            buildSmsBody(sharerDisplayName ?? sharerPhone, true),
             twilioAccountSid!,
             twilioAuthToken!,
             twilioSender,
@@ -339,12 +351,13 @@ serve(async (req) => {
 
       // Queue the same SMS unless the recipient turned text messages off.
       // Push is the tappable path for app users — the SMS is a pure
-      // notification. Skipped gracefully if Twilio is not configured.
+      // notification (no signup invite; they already have the app).
+      // Skipped gracefully if Twilio is not configured.
       if (twilioConfigured && person.phone_number && recipientUser?.notify_sms !== false) {
         smsSends.push(
           sendSms(
             person.phone_number,
-            buildSmsBody(displayName),
+            buildSmsBody(displayName, false),
             twilioAccountSid!,
             twilioAuthToken!,
             twilioSender,

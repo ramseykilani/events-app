@@ -20,10 +20,10 @@ Considered and rejected as fixes (details in FEATURES.md → Web Support): Conta
 
 Notification SMS carries **no app or web links at all** — only the event details and the event's own original URL when one exists (that's event content, not app promo):
 
-- Non-app recipients: `"{sharer} wants to go to {title} with you\n{date}, {time}\n{event URL}\n\nReply STOP to unsubscribe."` — a pure notification. They are deliberately *not* pulled into the web app.
-- App users: push notification (tappable, deep-links to the event) plus the same link-free SMS as backup.
+- Non-app recipients: `"{sharer} wants to go to {title} with you\n{date}, {time}\n{event URL}\n\n{signup invite}\n\nReply STOP to unsubscribe."` — a pure notification plus, during internal testing, one signup-invite line. They are deliberately *not* pulled into the web app.
+- App users: push notification (tappable, deep-links to the event) plus the same link-free SMS as backup (no invite line — they already have the app).
 
-Rationale: the message's job is to notify, not to acquire. Links from unfamiliar senders also read as spam to carrier filters. When the app is listed on the stores, store links may return as the non-app CTA — that's a one-function change in `send-notification` and should happen as part of launch, not before.
+Rationale: the message's job is to notify, not to acquire. Links from unfamiliar senders also read as spam to carrier filters. The single exception is the internal-testing signup invite (added 2026-08-17): while beta access is owner-gated, the non-app SMS ends with `Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.` — an email CTA, not a link, so an interested recipient has a way in without the SMS becoming an acquisition channel. When the app is listed on the stores, store links replace the invite as the non-app CTA — that's a one-function change in `send-notification` and should happen as part of launch, not before.
 
 Consequence to remember: with no links, there is nothing for universal links / App Links to upgrade, so AASA/assetlinks work is off the table until launch.
 
