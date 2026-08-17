@@ -52,6 +52,11 @@ test('sharing delivers B their own copy that survives A removing theirs', async 
 
     // --- A removes their own copy; B's copy must survive (E-108).
     await openEventFromCalendar(page, title);
+    // The detail of an already-shared event states the completed,
+    // non-unsendable state in the Shared with section.
+    await expect(
+      page.getByText(/Sharing is like sending a text/).filter({ visible: true })
+    ).toBeVisible();
     await removeOpenEvent(page);
     await expect(page.getByText(title, { exact: true })).not.toBeVisible();
 
@@ -68,4 +73,38 @@ test('sharing delivers B their own copy that survives A removing theirs', async 
   } finally {
     await contextB.close();
   }
+});
+
+// The no-unshare explanation must be on the share screen before the first
+// send — not only after someone is already ✓ Shared.
+test('share screen explains no-unshare before the first send', async ({
+  page,
+}, testInfo) => {
+  const title = uniqueTitle('E2E no-unshare note', testInfo.project.name);
+
+  // The note renders once people exist (the empty list routes to add-people),
+  // so make sure account B is in My People first (idempotent upsert).
+  await page.goto('/');
+  await expectCalendar(page);
+  await page.getByRole('button', { name: 'People' }).click();
+  await addPersonManually(page, PERSON_B_NAME, ACCOUNT_B.phone);
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  // Create an event; the share screen follows automatically.
+  await expectCalendar(page);
+  await page.getByRole('button', { name: 'Add event' }).click();
+  await page.getByPlaceholder('Event title').fill(title);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Share with')).toBeVisible();
+
+  // Nobody selected, nobody shared yet — the explanation is already there.
+  await expect(
+    page.getByText(/Sharing is like sending a text/).filter({ visible: true })
+  ).toBeVisible();
+
+  // Back out and clean up the unshared event.
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expectCalendar(page);
+  await openEventFromCalendar(page, title);
+  await removeOpenEvent(page);
 });

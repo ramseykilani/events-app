@@ -309,6 +309,47 @@ describe('app/(app)/share', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 
+  describe('no-unshare note', () => {
+    it('shows the note before any share when people exist', async () => {
+      const screen = render(<ShareScreen />);
+
+      // Default mocks: people exist, nobody shared yet — the explanation
+      // must already be on screen before the first send.
+      expect(
+        await screen.findByText(/Sharing is like sending a text/)
+      ).toBeTruthy();
+    });
+
+    it('keeps the note when people are already shared', async () => {
+      mockEventSharesEq.mockImplementation(() =>
+        abortablePromise(
+          Promise.resolve({ data: [{ person_id: 'p1' }], error: null })
+        )
+      );
+
+      const screen = render(<ShareScreen />);
+      await waitFor(() =>
+        expect(mockEventSharesEq).toHaveBeenCalledWith('user_event_id', 'ue1')
+      );
+
+      expect(
+        screen.getByText(/Sharing is like sending a text/)
+      ).toBeTruthy();
+    });
+
+    it('omits the note when the people list is empty', async () => {
+      mockMyPeopleOrder.mockImplementation(() =>
+        abortablePromise(Promise.resolve({ data: [], error: null }))
+      );
+
+      const screen = render(<ShareScreen />);
+      // The contacts flow auto-starting proves the empty load completed.
+      await waitFor(() => expect(mockContactsFlow).toHaveBeenCalled());
+
+      expect(screen.queryByText(/Sharing is like sending a text/)).toBeNull();
+    });
+  });
+
   describe('display name gate', () => {
     it('blocks Share until a name is saved, then shares', async () => {
       mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
