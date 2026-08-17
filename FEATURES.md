@@ -27,7 +27,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Planned | Upgrade. Push already works; the OS prompt currently fires cold on launch. |
-| [Notification On/Off](#notification-onoff) | Planned | Turn share notifications off (push and SMS). |
+| [Notification On/Off](#notification-onoff) | Planned | Separate push and SMS toggles. |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Planned | First share never says you can't take it back. |
 | [Share Delivery Status](#share-delivery-status) | Planned | ✓ Shared only means recorded, not received. |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
@@ -1075,17 +1075,17 @@ Let the user add an event to Google Calendar and other calendar apps.
 
 ### Problem
 
-There is no way to turn off share notifications. App users always get both a push and an SMS for every share. Hide mutes one person (and their events). Denying the OS prompt only stops push. Twilio STOP only stops SMS. None of those is "don't ping me."
+There is no way to turn off share notifications. App users always get both a push and an SMS for every share. Hide mutes one person (and their events). Denying the OS prompt only stops push. Twilio STOP only stops SMS. None of those is "push but not text" or "don't ping me."
 
 ### Proposed Solution
 
-Let the user turn notifications on and off. Off covers both push and SMS. Events still land on the calendar; they just aren't pinged. On restores today's behavior.
+Two separate toggles: one for push, one for SMS. Each can be on or off independently. Events still land on the calendar either way.
 
 ### Acceptance Criteria
 
-- [ ] An app user can turn share notifications off, and then neither push nor SMS is sent on the next share
-- [ ] They can turn them back on
-- [ ] The event still appears on their calendar either way
+- [ ] Push can be turned off without affecting SMS, and vice versa
+- [ ] Both off means neither is sent; both on is today's behavior
+- [ ] The event still appears on their calendar in every combination
 
 ### Open Questions
 
