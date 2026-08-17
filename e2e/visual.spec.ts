@@ -7,6 +7,10 @@ import { expectCalendar } from './helpers';
 // project); regenerate them after INTENTIONAL design changes with:
 //   npx playwright test e2e/visual.spec.ts --update-snapshots
 // and review the diffs in the PR like any other change.
+// CI is the authority, not the local machine: WebKit text rendering depends
+// on the installed fonts, so a baseline from a stale VM image can pass locally
+// yet fail CI. If that happens, regenerate on a current cloud VM or take the
+// actual image from CI's playwright-report artifact as the baseline.
 //
 // Stability rules that keep these deterministic:
 // - The calendar clock is frozen to 2026-06-15 (a month no test ever creates
