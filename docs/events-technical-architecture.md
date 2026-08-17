@@ -238,7 +238,7 @@ People are added from the People screen (or when tapping Share) — there is no 
 4. **Sharing screen (mandatory):** User must select at least one person before confirming. People the event was already shared with render as completed actions ("✓ Shared") and cannot be deselected — a share delivers the recipient their own copy, so it can't be unsent
 5. `share_event` records the new shares and delivers copies; notifications are sent to the newly shared people only
 
-There is no unshare. The share sheet is additive: it shows existing shares as done and only offers people who don't have the event yet. The share screen says so up front — whenever people are listed, a quiet line reads "Sharing is like sending a text — once you send it, you can't take it back."; the same line sits under the event detail's "Shared with" section.
+There is no unshare. The share sheet is additive: it shows existing shares as done and only offers people who don't have the event yet. The share screen says so up front — whenever people are listed, a quiet line reads "Sharing is like sending a text — once you send it, you can't take it back."
 
 ### 5. Edit an Event (Fork, Not Mutate)
 

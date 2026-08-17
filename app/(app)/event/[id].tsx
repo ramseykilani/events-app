@@ -435,10 +435,6 @@ export default function EventDetailScreen() {
                   {p.contact_name ?? formatPhoneDisplay(p.phone_number)}
                 </Text>
               ))}
-              <Text style={[styles.sharedWithNote, { color: theme.textTertiary }]}>
-                Sharing is like sending a text — once you send it, you can't
-                take it back.
-              </Text>
             </View>
           ) : null}
           <View style={styles.actions}>
@@ -570,11 +566,6 @@ const styles = StyleSheet.create({
   sharedWithItem: {
     fontSize: 16,
     marginBottom: 4,
-  },
-  sharedWithNote: {
-    fontSize: 12,
-    marginTop: 12,
-    fontStyle: 'italic',
   },
   revokedContainer: {
     flex: 1,
