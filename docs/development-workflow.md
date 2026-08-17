@@ -238,7 +238,8 @@ builds (agent-run); current enrollment/secrets/build/tester state lives in
   the owner's machine (`F:\Code\Events\events-keys`). Secrets:
   `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`,
   `EXPO_ASC_API_KEY_P8_BASE64`. This key submits IPAs to App Store Connect.
-  It is **not** an APNs push key — Expo still has `pushKey: null` (STATUS.md).
+  It is **not** an APNs push key. The APNs key (`8T775QY87V`) was uploaded to
+  Expo 2026-08-17 (STATUS.md).
   ASC listing name is **Shared Events** (`Events` was taken); bundle ID
   `com.rkilani.events`; home-screen name stays `Events`.
 - Play service account — **done 2026-08-15.** GCP project `rkilani-events`,
