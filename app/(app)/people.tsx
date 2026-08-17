@@ -8,6 +8,7 @@ import {
   FlatList,
   Modal,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import { formatPhoneDisplay } from '../../lib/format';
 import { useSession } from '../_context/SessionContext';
 import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
 import { ManualAddPersonModal } from '../../components/ManualAddPersonModal';
+import { ThemedSwitch } from '../../components/ThemedSwitch';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 import { isAbortError, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
@@ -39,6 +41,10 @@ export default function PeopleScreen() {
   const [hiddenPeople, setHiddenPeople] = useState<(HiddenPerson & { contact_name: string | null; phone_number: string })[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [notifyPush, setNotifyPush] = useState(true);
+  const [notifySms, setNotifySms] = useState(true);
+  const [prefSaving, setPrefSaving] = useState(false);
+  const [showNotifPrefs, setShowNotifPrefs] = useState(false);
   const [showNameEdit, setShowNameEdit] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
@@ -88,7 +94,7 @@ export default function PeopleScreen() {
             .abortSignal(signal),
           supabase
             .from('users')
-            .select('display_name')
+            .select('display_name, notify_push, notify_sms')
             .eq('id', userId)
             .abortSignal(signal)
             .single(),
@@ -124,11 +130,13 @@ export default function PeopleScreen() {
             };
           }),
           members: membersData,
-          // The name read only feeds the footer — its failure must not fail
-          // the load. undefined = read failed, keep the previous value.
+          // The name/prefs read only feeds the footer — its failure must not
+          // fail the load. undefined = read failed, keep the previous value.
           displayName: userRes.error
             ? undefined
             : (userRes.data?.display_name ?? null),
+          notifyPush: userRes.error ? undefined : (userRes.data?.notify_push ?? true),
+          notifySms: userRes.error ? undefined : (userRes.data?.notify_sms ?? true),
         };
       });
 
@@ -139,6 +147,8 @@ export default function PeopleScreen() {
       setHiddenPeople(staged.hidden);
       setCircleMembers(staged.members);
       if (staged.displayName !== undefined) setDisplayName(staged.displayName);
+      if (staged.notifyPush !== undefined) setNotifyPush(staged.notifyPush);
+      if (staged.notifySms !== undefined) setNotifySms(staged.notifySms);
       setLoadError(false);
       return staged.people;
     } catch (err) {
@@ -360,6 +370,31 @@ export default function PeopleScreen() {
     });
   };
 
+  // Notification prefs are set-to-value writes of the caller's own row, so a
+  // retry is safe; the switch is disabled mid-flight instead of runMutation's
+  // drop-if-busy, which would strand the optimistic flip.
+  const handleTogglePref = async (key: 'notify_push' | 'notify_sms', value: boolean) => {
+    if (!userId || prefSaving) return;
+    const setState = key === 'notify_push' ? setNotifyPush : setNotifySms;
+    setState(value);
+    setPrefSaving(true);
+    try {
+      await withWriteTimeout(async (signal) => {
+        const { error } = await supabase
+          .from('users')
+          .update({ [key]: value })
+          .eq('id', userId)
+          .abortSignal(signal);
+        if (error) throw error;
+      });
+    } catch (err) {
+      setState(!value);
+      showMutationError('Could not update notification setting', err);
+    } finally {
+      setPrefSaving(false);
+    }
+  };
+
   const handleSignOut = () => {
     const phone = session?.user?.phone;
     showConfirm(
@@ -478,24 +513,29 @@ export default function PeopleScreen() {
         <>
           <View style={[styles.circlesSection, { borderBottomColor: theme.borderLight }]}>
             <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Circles</Text>
-            {circles.map((circle) => (
-              <View key={circle.id} style={styles.circleRow}>
-                <View style={styles.circleInfo}>
-                  <Text style={[styles.circleName, { color: theme.textPrimary }]}>{circle.name}</Text>
-                  <Text style={[styles.circleMeta, { color: theme.textSecondary }]}>
-                    {getCircleMemberIds(circle.id).length} members
-                  </Text>
+            {/* Capped + scrollable so a long circle list can't starve the
+                people list below — the screen's chrome is otherwise all
+                pinned, and enough circles used to collapse it to zero. */}
+            <ScrollView style={styles.circleList}>
+              {circles.map((circle) => (
+                <View key={circle.id} style={styles.circleRow}>
+                  <View style={styles.circleInfo}>
+                    <Text style={[styles.circleName, { color: theme.textPrimary }]}>{circle.name}</Text>
+                    <Text style={[styles.circleMeta, { color: theme.textSecondary }]}>
+                      {getCircleMemberIds(circle.id).length} members
+                    </Text>
+                  </View>
+                  <View style={styles.circleActions}>
+                    <TouchableOpacity style={styles.textAction} onPress={() => handleEditCircleMembers(circle)} activeOpacity={0.6} accessibilityRole="button">
+                      <Text style={[styles.manage, { color: theme.linkText }]}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.textAction} onPress={() => handleRemoveCircle(circle)} activeOpacity={0.6} accessibilityRole="button">
+                      <Text style={[styles.remove, { color: theme.destructiveLink }]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.circleActions}>
-                  <TouchableOpacity style={styles.textAction} onPress={() => handleEditCircleMembers(circle)} activeOpacity={0.6} accessibilityRole="button">
-                    <Text style={[styles.manage, { color: theme.linkText }]}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.textAction} onPress={() => handleRemoveCircle(circle)} activeOpacity={0.6} accessibilityRole="button">
-                    <Text style={[styles.remove, { color: theme.destructiveLink }]}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+              ))}
+            </ScrollView>
             <View style={styles.addCircleRow}>
               <TextInput
                 style={[styles.circleInput, { borderColor: theme.border, color: theme.textPrimary }]}
@@ -563,6 +603,14 @@ export default function PeopleScreen() {
         ]}
       >
         <TouchableOpacity
+          onPress={() => setShowNotifPrefs(true)}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          style={styles.footerButton}
+        >
+          <Text style={[styles.footerAction, { color: theme.textSecondary }]}>Notifications</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={() => {
             setNameDraft(displayName ?? '');
             setShowNameEdit(true);
@@ -615,6 +663,50 @@ export default function PeopleScreen() {
           }}
         />
       ) : null}
+      <Modal visible={showNotifPrefs} animationType="slide" presentationStyle="pageSheet">
+        <View
+          style={[
+            styles.modalContainer,
+            { backgroundColor: theme.background, paddingTop: insets.top + 12 },
+          ]}
+        >
+          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+            <TouchableOpacity
+              style={styles.textAction}
+              onPress={() => setShowNotifPrefs(false)}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.back, { color: theme.textSecondary }]}>Close</Text>
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Notifications</Text>
+            <View style={styles.textAction} />
+          </View>
+          <View style={styles.manualForm}>
+            <View style={styles.prefRow}>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Push notifications</Text>
+              <ThemedSwitch
+                value={notifyPush}
+                onValueChange={(value) => handleTogglePref('notify_push', value)}
+                disabled={prefSaving}
+                accessibilityLabel="Push notifications"
+              />
+            </View>
+            <View style={styles.prefRow}>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Text messages (SMS)</Text>
+              <ThemedSwitch
+                value={notifySms}
+                onValueChange={(value) => handleTogglePref('notify_sms', value)}
+                disabled={prefSaving}
+                accessibilityLabel="Text messages (SMS)"
+              />
+            </View>
+            <Text style={[styles.manualHint, { color: theme.textTertiary }]}>
+              Events still land on your calendar either way.
+            </Text>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={showNameEdit} animationType="slide" presentationStyle="pageSheet">
         <View
           style={[
@@ -770,8 +862,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
+  circleList: {
+    // ~3 circle rows; the section scrolls internally past that.
+    maxHeight: 150,
+  },
   peopleSection: {
     flex: 1,
+    // Never let the pinned chrome shrink the list to nothing — a collapsed
+    // viewport spills rows under the footer (they stay visible and eat taps).
+    minHeight: 140,
     paddingHorizontal: 20,
   },
   sectionTitle: {
@@ -826,6 +925,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     alignItems: 'center',
     paddingTop: 4,
+  },
+  prefRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    minHeight: 44,
+  },
+  prefLabel: {
+    fontSize: 16,
   },
   // 44pt minimum touch target for bare-text buttons (header actions, row
   // Remove/Edit/Delete/Unhide). Rows are already ≥44 tall, so this grows the

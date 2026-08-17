@@ -6,6 +6,11 @@ export interface User {
   // from the People screen footer; never removable.
   display_name: string | null;
   expo_push_token: string | null;
+  // Recipient-side share-notification preferences (People footer toggles).
+  // Both default true; send-notification reads them at send time. Events
+  // land on the calendar regardless — these only gate the pings.
+  notify_push: boolean;
+  notify_sms: boolean;
   created_at: string;
 }
 
