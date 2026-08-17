@@ -22,8 +22,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
 | [Richer Link Autofill](#richer-link-autofill) | Planned | Upgrade. Paste already stores the URL; OG title/image already work on open pages. |
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. |
-| [Branded OTP SMS](#branded-otp-sms) | Planned | The verification text doesn't say it's from Events. Config, not code. |
-| [Share SMS Content & Formatting](#share-sms-content--formatting) | Planned | Nicer share text; consider including the event description. Server-side only. |
+| [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
+| [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Planned | Upgrade. Push already works; the OS prompt currently fires cold on launch. |
@@ -815,7 +815,7 @@ Remaining design work. An agent that starts coding from this list is doing it wr
 
 ## Branded OTP SMS
 
-**Status:** Planned — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`).
+**Status:** Implemented (2026-08-17) — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`). Shipped as `sms_template = "Events: {{ .Code }} is your sign-in code. Never share it."` via Management API auth-config PATCH (53 chars with a 6-digit code, single GSM-7 segment, names the app, code prominent). No app code changes; no EAS rebuild.
 
 ### Problem
 
@@ -827,30 +827,45 @@ Edit the phone-auth SMS template in the Supabase dashboard (Authentication → S
 
 ### Acceptance Criteria
 
-- [ ] A real sign-in SMS names Events and contains the code
-- [ ] Test-OTP accounts (`+15555550100` / `+15555550103`) still verify — they bypass the template, but confirm after the change anyway
+- [ ] A real sign-in SMS names Events and contains the code — template confirmed live via the Management API 2026-08-17; owner eyeballs the real text on their next sign-in
+- [x] Test-OTP accounts (`+15555550100` / `+15555550103`) still verify — confirmed programmatically after the PATCH (they bypass the template)
 
 ---
 
 ## Share SMS Content & Formatting
 
-**Status:** Planned — server-side only (edge function; no app rebuild). Found in the 2026-08-15 owner device smoke.
+**Status:** Implemented (2026-08-17) — server-side only (edge function; no app rebuild). Found in the 2026-08-15 owner device smoke.
 
 ### Problem
 
-The share notification SMS reads plainly and omits the event description. Current template (`supabase/functions/send-notification/index.ts`): `{name} added you to {title} on {date}{time}` + the event URL when present, plus "Reply STOP to unsubscribe" on the non-app-user variant only.
+The share notification SMS read plainly and omitted the event description. Template at the time (`supabase/functions/send-notification/index.ts`): `{name} added you to {title} on {date}{time}` + the event URL when present, plus "Reply STOP to unsubscribe" on the non-app-user variant only.
 
-### Proposed Solution
+### Solution (as shipped 2026-08-17)
 
-Rewrite the template for readability and consider including the event description (truncated to a line or so). Decide at the same time whether app-user SMS should also carry the STOP footer (today only non-app recipients get it; Twilio still intercepts STOP account-wide either way).
+Both variants (app user and non-app user) are now one identical message:
 
-Standing constraints from `docs/distribution-strategy.md` (2026-08-09): the SMS carries the event's own URL but **no app/web links** — it is a pure notification, not an acquisition channel — and it must not read like spam to carrier filters.
+```
+[Name] wants to go to "[Title]" with you
+[Date], [Time]
+[Description excerpt]
+[Event URL]
+
+Reply STOP to unsubscribe.
+```
+
+- **Framing:** "wants to go with you" replaces "added you to" (owner decision 2026-08-16: a share means "I want to go with you," not "this exists" — it echoes the walkthrough's "Found something you want to go to?"). No-title events fall back to `wants to go to an event with you`. Push titles take the same verb; push bodies use the comma separator.
+- **STOP footer on every message** (previously non-app only): A2P best practice is opt-out instructions on every message, and Twilio intercepts STOP account-wide either way.
+- **Description excerpt** when present: word-boundary truncated at 90 chars; titles at 80.
+- **GSM-7 normalization** on title/description (curly quotes → straight, em/en dashes → `-`, `…` → `...`, `·` → `,`, newlines collapsed) so one non-GSM-7 character can't force UCS-2 encoding (70-char segments) and multiply per-message cost.
+- Verified by a real share to the owner's number 2026-08-17 (`send-notification` returned `{"sent":1,"sms":1}`); owner approved the exact wording on the received text.
+
+Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the SMS carries the event's own URL but **no app/web links** — it is a pure notification, not an acquisition channel — and it must not read like spam to carrier filters.
 
 ### Acceptance Criteria
 
-- [ ] New template includes a short description excerpt when the event has one
-- [ ] Owner approves the exact wording on a real text before it ships
-- [ ] Any `send-notification` tests/SQL covering message shape are updated in the same change
+- [x] New template includes a short description excerpt when the event has one
+- [x] Owner approves the exact wording on a real text before it ships — approved 2026-08-17
+- [x] Any `send-notification` tests/SQL covering message shape are updated in the same change — vacuous: no automated test asserts on message shape; the docs (`events-technical-architecture.md`, `distribution-strategy.md`) and manual-test expectations (E-107, N-006) were updated in the same commit instead
 
 ---
 
