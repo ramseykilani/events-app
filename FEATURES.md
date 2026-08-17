@@ -827,7 +827,7 @@ Edit the phone-auth SMS template in the Supabase dashboard (Authentication → S
 
 ### Acceptance Criteria
 
-- [ ] A real sign-in SMS names Events and contains the code — template confirmed live via the Management API 2026-08-17; owner eyeballs the real text on their next sign-in
+- [x] A real sign-in SMS names Events and contains the code — owner confirmed on a real sign-in 2026-08-17
 - [x] Test-OTP accounts (`+15555550100` / `+15555550103`) still verify — confirmed programmatically after the PATCH (they bypass the template)
 
 ---
