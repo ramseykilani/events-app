@@ -27,7 +27,7 @@ test('sign-in screen matches baseline', async ({ browser }, testInfo) => {
       page.getByRole('button', { name: 'Send code' })
     ).toBeVisible();
     await expect(
-      page.getByText("Your phone number is your account", { exact: false })
+      page.getByText("Found something you want to go to", { exact: false })
     ).toBeVisible();
     await expect(page).toHaveScreenshot('sign-in.png', SHOT);
   } finally {

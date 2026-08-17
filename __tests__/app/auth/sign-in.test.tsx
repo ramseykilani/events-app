@@ -29,7 +29,7 @@ describe('app/(auth)/sign-in', () => {
     jest.restoreAllMocks();
   });
 
-  it('shows orientation copy for what the app is and why the phone number', () => {
+  it('shows the orientation line and a Log in label over the phone field', () => {
     const screen = render(<SignInScreen />);
 
     expect(
@@ -37,17 +37,11 @@ describe('app/(auth)/sign-in', () => {
         'Found something you want to go to? Add it here and share it with the right people — instead of texting them one by one.'
       )
     ).toBeTruthy();
-    expect(
-      screen.getByText(
-        'When your people share something, it shows up on your calendar too.'
-      )
-    ).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Your phone number is your account. We'll text a code to sign in, and it's how you send events to your people."
-      )
-    ).toBeTruthy();
+    expect(screen.getByText('Log in')).toBeTruthy();
     expect(screen.queryByText('Enter your phone number to continue')).toBeNull();
+    expect(
+      screen.queryByText(/Your phone number is your account/)
+    ).toBeNull();
   });
 
   it('shows validation alert for invalid phone numbers', () => {

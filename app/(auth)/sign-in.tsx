@@ -22,11 +22,8 @@ import { useTheme } from '../../hooks/useTheme';
 
 const PRIVACY_POLICY_URL = 'https://shared-events.pages.dev/privacy.html';
 
-const ORIENTATION_LINES = [
-  'Found something you want to go to? Add it here and share it with the right people — instead of texting them one by one.',
-  'When your people share something, it shows up on your calendar too.',
-  "Your phone number is your account. We'll text a code to sign in, and it's how you send events to your people.",
-];
+const ORIENTATION_LINE =
+  'Found something you want to go to? Add it here and share it with the right people — instead of texting them one by one.';
 
 export default function SignInScreen() {
   const [phone, setPhone] = useState('');
@@ -117,13 +114,10 @@ export default function SignInScreen() {
           >
             Events
           </Text>
-          <View style={styles.orientation}>
-            {ORIENTATION_LINES.map((line) => (
-              <Text key={line} style={[styles.body, { color: theme.textSecondary }]}>
-                {line}
-              </Text>
-            ))}
-          </View>
+          <Text style={[styles.body, { color: theme.textSecondary }]}>
+            {ORIENTATION_LINE}
+          </Text>
+          <Text style={[styles.label, { color: theme.textSecondary }]}>Log in</Text>
           <TextInput
             style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
             placeholder="+1 (555) 123-4567"
@@ -178,13 +172,15 @@ const styles = StyleSheet.create({
     fontSize: 32,
     marginBottom: 16,
   },
-  orientation: {
-    gap: 16,
-    marginBottom: 28,
-  },
   body: {
     fontSize: 16,
     lineHeight: 24,
+    marginBottom: 28,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
