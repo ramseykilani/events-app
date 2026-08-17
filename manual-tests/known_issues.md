@@ -61,6 +61,34 @@ never added: a blocker must be fixed, not accepted.
   the dedup key, or have the RPC return the full row so the client seeds and
   navigates from the actual database row rather than the form values.
 
+### KI-005 — Android 3-button navigation bar covers the bottom of the screen
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-15 owner device smoke on Samsung with 3-button navigation
+  (not gesture nav), `manual-tests/manual_test_report_2026-08-15-device.md`
+  N-009 (People / Delete account). Still present 2026-08-17 on the Events
+  calendar.
+- Expected: in-app content sits fully on screen, clear of the system
+  navigation bar.
+- Actual: with the Samsung / 3-button navigation bar on, the bar covers a
+  strip along the bottom of the app.
+- Where it shows up (native Android, 3-button nav):
+  - People (`app/(app)/people.tsx`) — first report: the bar covered the
+    Delete account button in the account footer.
+  - Events / calendar (`components/Calendar.tsx`, title "Events") — the bar
+    covers the bottom of an event in the selected-day list.
+  - Likely the bottom of the window in general, not those two screens only.
+    Other screens have not been exhaustively re-checked on a 3-button-nav
+    device.
+- Repro: Android device, 3-button (Samsung) navigation bar enabled. Open
+  People and look at the footer, or open Events with at least one event on
+  the selected day. Not reported under gesture navigation. Web has no
+  3-button nav (do not flag there).
+- Owner ruling 2026-08-15: not a tester blocker (testers expected to use
+  gesture nav). Recorded here so release review and device smoke do not
+  re-flag the same overlap.
+
 ## Known limitations (by design — do not flag)
 
 - **The native date/time picker never opens on web.**

@@ -93,3 +93,8 @@ requires one).
   (2026-08-12) — the share gate prevents any new nameless share.
 - The web app is not a supported user surface; anything web-specific goes
   through `manual-tests/cloud_manual_regression.md` instead.
+- **KI-005** — with the Samsung / 3-button navigation bar on, the system bar
+  covers a strip at the bottom of the screen (People Delete account; the
+  bottom of an event on Events). Do not re-flag unless it is materially
+  worse than that (e.g. covering a whole control that was previously only
+  clipped). Gesture nav is the expected tester setup.

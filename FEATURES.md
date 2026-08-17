@@ -910,7 +910,7 @@ Offer the manual form from more than the denial recovery: a quiet entry on the n
 
 **Status:** Implemented (2026-08-15). Was the owner's main pre-tester item; the footer overlap was explicitly *not* a tester blocker (testers are expected to use gesture nav) but shipped in the same one-screen pass.
 
-**As shipped:** the People screen gets real `minHeight: 44` targets on every bare-text action (header Back/Add, circle Edit/Delete, person Remove, hidden Unhide, modal Cancel/Save, retry banner) via a shared `textAction` style — rows were already ≥44 tall, so only the screen header grew — and the account footer now pads `4 + insets.bottom` so 3-button nav / the home indicator can't cover Delete account. The audit pass over the same bare-text pattern elsewhere used zero-pixel-shift fixes so no `visual.spec.ts` baseline moved: calendar People button grew to 44 inside the 48px header row, event-detail Back/Retry and the add/edit-event Cancel/Save pairs got `hitSlop`, share-screen header actions got real `minHeight: 44` (unbaselined), and share-sheet chips grew to 44 with `Manage` on hitSlop. Caveat for the next agent: react-native-web only honors `hitSlop` for move/up boundary checks — the *initial* tap on web is still DOM-hit-tested, so hitSlop'd targets stay glyph-sized in the browser (a dev surface); on native they get the full expanded target. Verified by DOM measurement at 390×844 (every People/share action ≥44px, footer fully on screen) plus a full green e2e run with unchanged baselines.
+**As shipped:** the People screen gets real `minHeight: 44` targets on every bare-text action (header Back/Add, circle Edit/Delete, person Remove, hidden Unhide, modal Cancel/Save, retry banner) via a shared `textAction` style — rows were already ≥44 tall, so only the screen header grew — and the account footer now pads `4 + insets.bottom`. The 3-button nav overlap is **not** closed: it still covers the bottom of the screen on Samsung 3-button nav (People Delete account originally; Events calendar event list as of 2026-08-17). That is [KI-005](manual-tests/known_issues.md), not a People-only leftover. The audit pass over the same bare-text pattern elsewhere used zero-pixel-shift fixes so no `visual.spec.ts` baseline moved: calendar People button grew to 44 inside the 48px header row, event-detail Back/Retry and the add/edit-event Cancel/Save pairs got `hitSlop`, share-screen header actions got real `minHeight: 44` (unbaselined), and share-sheet chips grew to 44 with `Manage` on hitSlop. Caveat for the next agent: react-native-web only honors `hitSlop` for move/up boundary checks — the *initial* tap on web is still DOM-hit-tested, so hitSlop'd targets stay glyph-sized in the browser (a dev surface); on native they get the full expanded target. Verified by DOM measurement at 390×844 (every People/share action ≥44px, footer fully on screen) plus a full green e2e run with unchanged baselines.
 
 ### Problem
 
@@ -926,7 +926,7 @@ One pass over the screen: real padding/min-height (≥44pt) on row and header te
 ### Acceptance Criteria
 
 - [x] Every People-screen action has a ≥44pt effective touch target
-- [x] The footer actions clear the 3-button nav bar and the iOS home indicator
+- [ ] The footer actions clear the 3-button nav bar and the iOS home indicator — still open as [KI-005](manual-tests/known_issues.md) (People and Events; likely other screens)
 - [x] Visual-diff baselines regenerated and reviewed if any snapshotted screen shifted — vacuous: no snapshotted screen shifted (the suite passed without regenerating)
 
 ---
