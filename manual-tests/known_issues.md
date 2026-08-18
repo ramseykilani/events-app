@@ -185,6 +185,30 @@ never added: a blocker must be fixed, not accepted.
   an on-flip reopens the explainer (Continue → OS ask; Not now leaves it
   off). SMS stays independent.
 
+### KI-011 — Each person row on the People screen is too tall
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-18, owner report (not a tester blocker). Owner notes this
+  was not true previously — treat as a regression, but do not investigate
+  the origin in the logging pass; leave git-history / layout for a later
+  agent.
+- Expected: person rows on My People (`app/(app)/people.tsx`) are dense —
+  one compact line per person (name + actions), not a large vertical slot.
+- Actual: each person line is too tall. The list shows fewer people per
+  screen than it used to.
+- Repro: open People with more than a couple of people. Compare row height
+  to an older build / memory of the earlier denser list. Native is the
+  product; web can show the same layout.
+- Related (do not conflate): [People List Scrolling](../FEATURES.md#people-list-scrolling)
+  is the split-scroll feel (circles pinned, people in an inner pane).
+  [Touch Targets & Footer Safe Area](../FEATURES.md#touch-targets--footer-safe-area-people-screen)
+  (2026-08-15) grew text-action hit areas to 44pt and claimed person rows
+  were already ≥44. Either of those, or a later `minHeight` on the list,
+  may have inflated row height — unconfirmed.
+- Fix (separate task): find when the person-row height grew and restore a
+  denser row without dropping the 44pt Remove target.
+
 ## Known limitations (by design — do not flag)
 
 - **The native date/time picker never opens on web.**

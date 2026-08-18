@@ -29,7 +29,7 @@ Play "Finish setting up your app" (privacy policy URL, data-safety form, content
 ## Code state
 
 - `production`: `78b9e5a` — 2026-08-17 ship (reviewed `d22d619`). Live: https://shared-events.pages.dev. Includes the notification explainer (native), per-account push/SMS toggles, sign-in orientation, share no-unshare note, ThemedSwitch, SMS copy / privacy / terms.
-- `staging`: same commit plus STATUS / known-issue notes. Owner smoked preview APK `a7ce79c8` on 2026-08-18: **pass** (KI-006–KI-010 logged, not blockers). Tester production binaries for this tip are building (versionCode / iOS build **4**).
+- `staging`: same commit plus STATUS / known-issue notes. Owner smoked preview APK `a7ce79c8` on 2026-08-18: **pass** (KI-006–KI-010 logged, not blockers). Same day, owner also logged **KI-011** (People person rows too tall — density regression, not a tester blocker; not investigated). Tester production binaries for this tip are building (versionCode / iOS build **4**).
 
 ## Latest native builds
 
