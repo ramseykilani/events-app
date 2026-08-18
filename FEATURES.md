@@ -37,7 +37,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
-| [Open Event from SMS Link](#open-event-from-sms-link) | Considering | A link in the share text that opens the app to that event |
+| [Open Event from SMS Link](#open-event-from-sms-link) | Considering | App-user SMS only: a link that opens the app to that event |
 
 ## Using and testing
 
@@ -1182,16 +1182,18 @@ When you send a share, confirm that it has been sent.
 
 A link in the share notification SMS that opens the native app and lands on that specific event — the same destination as tapping the push.
 
-Today, app users get a tappable push that already does this ([Notifications](#notifications)). The SMS is backup and carries no app or web links (`docs/distribution-strategy.md`, 2026-08-09). Non-app users get the event's own listing URL when one exists, plus the internal-testing signup invite — not a path into the app.
+**App users only.** The link goes in the SMS to people who already have the app (the same recipients who get the push). It is a backup tap target for that ping, not a way to pull anyone into the app. Non-app SMS stays as it is today: event details, the listing URL when one exists, and the internal-testing signup invite — no app or web link.
+
+Today, app users get a tappable push that already does this ([Notifications](#notifications)). Their SMS is backup and carries no app or web links (`docs/distribution-strategy.md`, 2026-08-09).
 
 ### Why it might be wanted
 
-If the push is missed, muted, or never granted, the SMS is the only ping. A tappable link in that text would open the app to the event instead of leaving the recipient to find it on the calendar.
+If the push is missed, muted, or never granted, the SMS is the only ping for someone who already has the app. A tappable link in that text would open the event instead of leaving them to find it on the calendar.
 
 ### Why it's questionable
 
-This was tried and then removed. SMS used to append a custom-scheme deep link (`events-app://event/[id]`), later a `WEB_APP_URL/event/[id]` https link aimed at universal links / App Links. Those were stripped on 2026-08-09 because the SMS is a notification, not an acquisition channel, and links from unfamiliar senders read as spam to carrier filters. Universal links were explicitly parked until launch, when store links may return as the non-app CTA. App users already have the push path.
+This was tried and then removed. SMS used to append a custom-scheme deep link (`events-app://event/[id]`), later a `WEB_APP_URL/event/[id]` https link aimed at universal links / App Links — including for people who did not have the app. Those were stripped on 2026-08-09 because the SMS is a notification, not an acquisition channel, and links from unfamiliar senders read as spam to carrier filters. Restricting the link to existing app users keeps the no-acquisition rule; it does not remove the carrier-filter concern, and app users already have the push path. Universal links were explicitly parked until launch, when store links may return as the non-app CTA.
 
 ### Decision
 
-Undecided — maybe never. Revisit if testers who have the app still want a tappable path from the text, or at launch when store links re-enter the non-app SMS.
+Undecided — maybe never. Revisit if testers who have the app still want a tappable path from the text.
