@@ -121,6 +121,6 @@ the ask is one-shot and persisted (`notification_explainer_answered`).
 - **KI-007** — delete account then sign in again with the same number
   re-delivers friends' previously shared events (pending-share path).
   Self-created copies stay gone.
-- **KI-008 / KI-009 / KI-010** — Notifications modal: switches feel small,
-  Android Back does not dismiss it (Close does), Push can be on without OS
-  permission.
+- **KI-008 / KI-009 / KI-010 / KI-011** — Notifications modal: switches feel
+  small, Android Back does not dismiss it (Close does), Push can be on
+  without OS permission. People person rows are too tall (density).
