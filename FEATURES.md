@@ -816,7 +816,7 @@ Remaining design work. An agent that starts coding from this list is doing it wr
 
 ## Branded OTP SMS
 
-**Status:** Implemented (2026-08-17) — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`). Shipped as `sms_template = "Events: {{ .Code }} is your sign-in code. Never share it."` via Management API auth-config PATCH (53 chars with a 6-digit code, single GSM-7 segment, names the app, code prominent). No app code changes; no EAS rebuild.
+**Status:** Implemented (2026-08-17) — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`). Shipped via Management API auth-config PATCH. Current template (updated 2026-08-18, dropped the "Never share it" suffix): `sms_template = "Events: {{ .Code }} is your sign-in code."` (36 chars with a 6-digit code, single GSM-7 segment, names the app, code prominent). No app code changes; no EAS rebuild.
 
 ### Problem
 

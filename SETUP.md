@@ -64,6 +64,7 @@ The `EXPO_PUBLIC_` prefix makes these available to the app at build time. Do not
 2. Find **Phone** in the provider list and enable it.
 3. For development, you can use the built-in Supabase test OTP. Under **Authentication > Settings**, scroll to "Test Users" or "Test OTP" and add a phone number / OTP pair (e.g. `+15555550100` / `123456`). This lets you sign in without a real SMS provider.
 4. For production, connect a real SMS provider (Twilio, MessageBird, or Vonage) under the Phone provider settings. Enter your provider credentials (Account SID, Auth Token, and Messaging Service SID for Twilio).
+5. Set the phone-auth SMS template (Authentication → Sign In / Up → SMS template, or Management API `sms_template`) to `Events: {{ .Code }} is your sign-in code.` so the verification text names the app. Keep it to one GSM-7 segment.
 
 ---
 
