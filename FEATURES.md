@@ -27,8 +27,9 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
-| [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. |
+| [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
+| [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
 | [Share Delivery Status](#share-delivery-status) | Planned | ✓ Shared only means recorded, not received. |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
 | [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
@@ -573,12 +574,13 @@ There is no way to delete an account. Phone-number identity makes the data unamb
 - [x] "Delete account" exists at the People screen footer, destructive-styled, behind one confirm dialog
 - [x] Deleting removes the account's own data (calendar, people, circles, sign-in) and lands on the sign-in screen
 - [x] Events the deleted user shared remain on recipients' calendars
-- [x] Re-signing up with the same phone number starts a clean account and receives any pending shares
+- [x] Re-signing up with the same phone number starts a clean account and receives any pending shares — **owner 2026-08-18: this last clause is the surprise.** Friends' previously shared events come back ([KI-007](manual-tests/known_issues.md)); self-created copies do not. Not a tester blocker.
 - [x] SQL tests cover the forwarding-preservation case
 
 ### Open Questions
 
-- None (immediate deletion, no grace period — the confirm dialog is the grace period)
+- Immediate deletion, no grace period — the confirm dialog is the grace period.
+- Should a returning phone get pending-share delivery (today) or a truly empty calendar (owner expectation on 2026-08-18 smoke)? See [KI-007](manual-tests/known_issues.md).
 
 ---
 
@@ -1101,7 +1103,7 @@ There is no way to turn off share notifications. App users always get both a pus
 
 Two independent per-account preferences on the `users` row — `notify_push` and `notify_sms`, both `NOT NULL DEFAULT true` (existing accounts keep today's behavior). The control lives in the People footer: a **Notifications** row opens a modal (same pattern as "Your name") with a switch per channel and the line "Events still land on your calendar either way." Flips are optimistic, persist via `users_update_own` RLS, and revert with a short alert on failure.
 
-Enforcement is server-side in `send-notification`: the recipient's prefs are read at send time — push is queued only when `notify_push` is on, the app-user SMS only when `notify_sms` is on. The hidden-sharer check still skips both ahead of the pref checks. Non-app recipients have no `users` row and are unaffected (Twilio STOP remains their opt-out). Token registration and the notification explainer are untouched — the Expo token stays registered so re-enabling push is instant.
+Enforcement is server-side in `send-notification`: the recipient's prefs are read at send time — push is queued only when `notify_push` is on, the app-user SMS only when `notify_sms` is on. The hidden-sharer check still skips both ahead of the pref checks. Non-app recipients have no `users` row and are unaffected (Twilio STOP remains their opt-out). Token registration and the notification explainer are untouched — the Expo token stays registered so re-enabling push is instant. Owner smoke 2026-08-18: the switches are too small ([KI-008](manual-tests/known_issues.md)), Android Back does not dismiss the modal ([KI-009](manual-tests/known_issues.md)), and Push can be on without OS permission ([KI-010](manual-tests/known_issues.md) — intended follow-up: no permission → Push off; turning it on re-runs the explainer then the OS ask).
 
 Two layout notes from the ship: the switches live in a modal rather than inline in the footer because the People screen's chrome is all pinned — three extra footer rows collapsed the list viewport to zero on short viewports (the documented pre-existing crunch from [People List Scrolling](#people-list-scrolling)). The same pass capped the circles block (~3 rows, internal scroll) and gave the people list a `minHeight` so the screen can't collapse regardless of circle count.
 
@@ -1121,7 +1123,31 @@ Two layout notes from the ship: the switches live in a modal rather than inline 
 
 ### Open Questions
 
-- None (placement resolved: People footer → Notifications modal).
+- Placement resolved: People footer → Notifications modal.
+- Permission-gated Push (KI-010): if the OS has not granted notifications, should the switch be forced off and an on-flip reopen the explainer? Owner 2026-08-18: yes. SMS stays independent.
+
+---
+
+## Button Size & Clickability
+
+**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-18 from owner device smoke of preview `a7ce79c8`. Related: [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass), [KI-008](manual-tests/known_issues.md) (Notifications switches).
+
+### Problem
+
+Something about the buttons does not feel good on a real phone. The 2026-08-15 pass made People/share/calendar text actions ≥44pt, but controls still feel small or fussy to hit — the Notifications switches are the concrete example (KI-008). This is a feel pass over size and clickability, not a one-control patch.
+
+### Proposed Solution
+
+Revisit button size and clickability across the app on a native device: switches, text actions, primary Save/Share, and modal chrome. Aim for controls that are easy to hit without looking like a tablet layout.
+
+### Acceptance Criteria
+
+- [ ] Native smoke no longer calls out controls as annoying to tap
+- [ ] Notifications switches specifically meet the 44pt target (KI-008)
+
+### Open Questions
+
+- Whether this stays a dedicated pass or lands with KI-008 / KI-009 as a Notifications-modal-only fix.
 
 ---
 

@@ -29,13 +29,13 @@ Play "Finish setting up your app" (privacy policy URL, data-safety form, content
 ## Code state
 
 - `production`: `78b9e5a` — 2026-08-17 ship (reviewed `d22d619`). Live: https://shared-events.pages.dev. Includes the notification explainer (native), per-account push/SMS toggles, sign-in orientation, share no-unshare note, ThemedSwitch, SMS copy / privacy / terms.
-- `staging`: same commit plus this STATUS note. Owner smoke APK for this tip is built and **awaiting pass/fail**. Tester binaries (0.1.0 / build 3) are still the previous ship — do not submit new Play/TestFlight builds until the owner smokes this preview.
+- `staging`: same commit plus STATUS / known-issue notes. Owner smoked preview APK `a7ce79c8` on 2026-08-18: **pass** (KI-006–KI-010 logged, not blockers). Tester production binaries for this tip are building (versionCode / iOS build **4**).
 
 ## Latest native builds
 
 | Profile | Platform | Date | Link | State |
 |---------|----------|------|------|-------|
-| preview (internal APK) | Android | 2026-08-17 | https://expo.dev/accounts/rkilani/projects/events-app/builds/a7ce79c8-84f5-4763-973c-c5a2b669fbe3 | Built from promoted `78b9e5a`. **Awaiting owner smoke.** APK https://expo.dev/artifacts/eas/Z1n6Od5Obeh0yuBJX_Qi-B1sK7UUg61OEy42MFkCyvg.apk. Sideload only — testers keep the previous production AAB/IPA until this passes. |
+| preview (internal APK) | Android | 2026-08-17 | https://expo.dev/accounts/rkilani/projects/events-app/builds/a7ce79c8-84f5-4763-973c-c5a2b669fbe3 | Owner smoke **passed** 2026-08-18 on promoted `78b9e5a`. Findings KI-006–KI-010 (not blockers). APK https://expo.dev/artifacts/eas/Z1n6Od5Obeh0yuBJX_Qi-B1sK7UUg61OEy42MFkCyvg.apk. Sideload only — testers get the production AAB/IPA. |
 | preview (superseded) | Android | 2026-08-16 | https://expo.dev/accounts/rkilani/projects/events-app/builds/0c242921-5afb-4e1e-89e0-b5998d0811c1 | Owner smoke **passed** 2026-08-17 on promoted `0baab0e` (KI-003 + KI-004). APK https://expo.dev/artifacts/eas/lU0gemdHBwVKkCZhLpgCS8iVI8l6ZjNnOMGaR73g4bM.apk. Do not use for this release. |
 | production (Play internal) | Android | 2026-08-17 | https://expo.dev/accounts/rkilani/projects/events-app/builds/9010f493-7484-4f38-839b-638bbc16e4a4 | **On the internal track** (release status `completed`). 0.1.0 / versionCode **3**. Submit https://expo.dev/accounts/rkilani/projects/events-app/submissions/8035cdc7-f41a-49d5-b0fc-2aeb9676b1a5 succeeded. Play Console → Testing → Internal testing → copy the opt-in link (Play does not email testers). |
 | production (TestFlight) | iOS | 2026-08-17 | https://expo.dev/accounts/rkilani/projects/events-app/builds/6e56a6b3-b830-4689-a4f6-b851d0b5f8e0 | **Ready for internal testing.** 0.1.0 / build **3** (`internal: in beta testing`). Submit https://expo.dev/accounts/rkilani/projects/events-app/submissions/043391df-f24f-4b60-ade0-7cb1e2a6d51c succeeded (added to internal group **Team (Expo)**). https://appstoreconnect.apple.com/apps/6801756936/testflight/ios. **No Beta App Review.** |
