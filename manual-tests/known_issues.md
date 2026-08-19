@@ -89,6 +89,126 @@ never added: a blocker must be fixed, not accepted.
   gesture nav). Recorded here so release review and device smoke do not
   re-flag the same overlap.
 
+### KI-006 — Android hangs on a spinner after installing an updated APK until force-quit
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-18 owner smoke of preview APK `a7ce79c8` (promoted `78b9e5a`),
+  Android. Owner ruling: not a tester blocker. May be specific to sideloading
+  a new APK over a previous install.
+- Expected: after an update, the first open reaches the calendar (or sign-in)
+  without extra steps.
+- Actual: the first open after installing the new APK shows a continuous
+  spinner. Force-quitting from Android recents (swipe away) and opening
+  again loads normally.
+- Repro: install a newer APK over an existing Events install → open the app
+  → spinner until swipe-away → reopen. Not observed on a subsequent cold
+  start of the same binary. Web is unaffected (do not flag there).
+- Fix (separate task): confirm whether this is Expo splash / session restore
+  racing a fresh native binary, then either wait out the first session
+  restore or recover without requiring a force-quit.
+
+### KI-007 — Delete account + re-signup puts friends' shared events back on the calendar
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-18 owner smoke of preview APK `a7ce79c8`. Owner deleted the
+  account to reset for testing, signed back in with the same phone, and
+  friends' previously shared events were on the calendar again. Events
+  added by agents during testing were gone. Owner ruling: not a tester
+  blocker; delete feels incomplete.
+- Expected: after delete + re-signup, the calendar is empty of the old
+  account's copies (a clean slate).
+- Actual: `delete_my_account()` does delete the caller's `user_events`.
+  Other people's `my_people` rows for this phone revert to pending
+  (`user_id` SET NULL). Re-signup resolves those rows and
+  `deliver_pending_shares` copies every still-recorded incoming share onto
+  the new account — so friends' events return, and self-created / agent-
+  created copies (no remaining incoming share) do not. Confirm copy says
+  it deletes your calendar and does not mention this.
+- Repro: have a friend share an event to you → Delete account → sign in
+  again with the same number → the friend's event is back.
+- Fix (separate task): either also drop incoming `event_shares` (and the
+  friends' `my_people` row, or a tombstone) so a returning phone is not
+  treated as a first-time invite, or keep the re-delivery and tell the
+  user in the confirm dialog. Acceptance in FEATURES.md currently lists
+  "receives any pending shares" as intended — this finding is that the
+  owner does not want a deleted account to come back with the old
+  incoming calendar.
+
+### KI-008 — Notifications modal switches are too small to tap comfortably
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-18 owner smoke of preview APK `a7ce79c8`. Owner ruling:
+  not a tester blocker.
+- Expected: Push and SMS switches are easy to hit (≥44pt).
+- Actual: the `ThemedSwitch` controls in the People → Notifications modal
+  (`app/(app)/people.tsx`) feel too small on a phone. Broader button
+  size/clickability is also a Planned feature in `FEATURES.md`.
+- Repro: People footer → Notifications → tap either switch. Native
+  Android; not a web-review item.
+
+### KI-009 — Android system Back does not close the Notifications modal
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-18 owner smoke of preview APK `a7ce79c8`. Owner ruling:
+  not a tester blocker.
+- Expected: the system Back button dismisses the Notifications sheet, same
+  as Close.
+- Actual: Back does nothing; only the in-sheet Close control dismisses it.
+  The Notifications (and Your name) modals omit `onRequestClose`, which
+  other sheets (`NotificationExplainer`, `ManualAddPersonModal`, contacts
+  explainers) already wire.
+- Repro: People → Notifications → Android Back. Close still works.
+- Fix (separate task): `onRequestClose={() => setShowNotifPrefs(false)}`
+  on that Modal (and the name-edit Modal for the same pattern).
+
+### KI-010 — Push toggle ignores OS notification permission
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-18 owner smoke of preview APK `a7ce79c8`. Owner ruling:
+  not a tester blocker.
+- Expected: without OS notification permission, Push notifications is off.
+  Turning it on shows the notification explainer, then the OS prompt.
+- Actual: `users.notify_push` is independent of OS permission. You can
+  flip Push on after Not now / Don't Allow; `send-notification` will still
+  skip push when there is no token, so the toggle is a preference that
+  does not match what the OS will deliver. The explainer is one-shot
+  (`notification_explainer_answered`) and is not re-entered from this
+  switch.
+- Repro: deny (or Not now) the OS prompt → People → Notifications → Push
+  still shows on (default true) and can be flipped.
+- Fix (separate task): when permission is not granted, render Push as off;
+  an on-flip reopens the explainer (Continue → OS ask; Not now leaves it
+  off). SMS stays independent.
+
+### KI-011 — Each person row on the People screen is too tall
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-18, owner report (not a tester blocker). Owner notes this
+  was not true previously — treat as a regression, but do not investigate
+  the origin in the logging pass; leave git-history / layout for a later
+  agent.
+- Expected: person rows on My People (`app/(app)/people.tsx`) are dense —
+  one compact line per person (name + actions), not a large vertical slot.
+- Actual: each person line is too tall. The list shows fewer people per
+  screen than it used to.
+- Repro: open People with more than a couple of people. Compare row height
+  to an older build / memory of the earlier denser list. Native is the
+  product; web can show the same layout.
+- Related (do not conflate): [People List Scrolling](../FEATURES.md#people-list-scrolling)
+  is the split-scroll feel (circles pinned, people in an inner pane).
+  [Touch Targets & Footer Safe Area](../FEATURES.md#touch-targets--footer-safe-area-people-screen)
+  (2026-08-15) grew text-action hit areas to 44pt and claimed person rows
+  were already ≥44. Either of those, or a later `minHeight` on the list,
+  may have inflated row height — unconfirmed.
+- Fix (separate task): find when the person-row height grew and restore a
+  denser row without dropping the 44pt Remove target.
+
 ## Known limitations (by design — do not flag)
 
 - **The native date/time picker never opens on web.**

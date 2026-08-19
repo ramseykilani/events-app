@@ -21,14 +21,15 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
 | [Richer Link Autofill](#richer-link-autofill) | Planned | Upgrade. Paste already stores the URL; OG title/image already work on open pages. |
-| [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. |
+| [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. Related: [KI-011](manual-tests/known_issues.md) (person rows too tall). |
 | [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
-| [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. |
+| [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
+| [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
 | [Share Delivery Status](#share-delivery-status) | Planned | ✓ Shared only means recorded, not received. |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
 | [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
@@ -36,6 +37,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
+| [Open Event from SMS Link](#open-event-from-sms-link) | Considering | App-user SMS only: a link that opens the app to that event |
 
 ## Using and testing
 
@@ -476,7 +478,7 @@ Do not change add/remove/hide semantics, the 50-person cap, or the empty state (
 ### Open Questions
 
 - Should the "New circle name" input scroll away with Circles, or stay pinned under the header?
-- Is the odd feel only the split scroll, or also row spacing / section weight? Owner flagged scrolling and "how the people list feels" — start with one document scroll; don't restyle rows unless that pass still feels off.
+- Is the odd feel only the split scroll, or also row spacing / section weight? Owner flagged scrolling and "how the people list feels" — start with one document scroll; don't restyle rows unless that pass still feels off. Owner 2026-08-18 separately confirmed person rows are too tall ([KI-011](manual-tests/known_issues.md)); that is a density regression to fix on its own, not as part of the scroll rewrite.
 
 ---
 
@@ -573,12 +575,13 @@ There is no way to delete an account. Phone-number identity makes the data unamb
 - [x] "Delete account" exists at the People screen footer, destructive-styled, behind one confirm dialog
 - [x] Deleting removes the account's own data (calendar, people, circles, sign-in) and lands on the sign-in screen
 - [x] Events the deleted user shared remain on recipients' calendars
-- [x] Re-signing up with the same phone number starts a clean account and receives any pending shares
+- [x] Re-signing up with the same phone number starts a clean account and receives any pending shares — **owner 2026-08-18: this last clause is the surprise.** Friends' previously shared events come back ([KI-007](manual-tests/known_issues.md)); self-created copies do not. Not a tester blocker.
 - [x] SQL tests cover the forwarding-preservation case
 
 ### Open Questions
 
-- None (immediate deletion, no grace period — the confirm dialog is the grace period)
+- Immediate deletion, no grace period — the confirm dialog is the grace period.
+- Should a returning phone get pending-share delivery (today) or a truly empty calendar (owner expectation on 2026-08-18 smoke)? See [KI-007](manual-tests/known_issues.md).
 
 ---
 
@@ -816,7 +819,7 @@ Remaining design work. An agent that starts coding from this list is doing it wr
 
 ## Branded OTP SMS
 
-**Status:** Implemented (2026-08-17) — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`). Shipped as `sms_template = "Events: {{ .Code }} is your sign-in code. Never share it."` via Management API auth-config PATCH (53 chars with a 6-digit code, single GSM-7 segment, names the app, code prominent). No app code changes; no EAS rebuild.
+**Status:** Implemented (2026-08-17) — config, not code. Found in the 2026-08-15 owner device smoke (`manual-tests/manual_test_report_2026-08-15-device.md`). Shipped via Management API auth-config PATCH. Current template (updated 2026-08-18, dropped the "Never share it" suffix): `sms_template = "Events: {{ .Code }} is your sign-in code."` (36 chars with a 6-digit code, single GSM-7 segment, names the app, code prominent). No app code changes; no EAS rebuild.
 
 ### Problem
 
@@ -911,7 +914,7 @@ Offer the manual form from more than the denial recovery: a quiet entry on the n
 
 **Status:** Implemented (2026-08-15). Was the owner's main pre-tester item; the footer overlap was explicitly *not* a tester blocker (testers are expected to use gesture nav) but shipped in the same one-screen pass.
 
-**As shipped:** the People screen gets real `minHeight: 44` targets on every bare-text action (header Back/Add, circle Edit/Delete, person Remove, hidden Unhide, modal Cancel/Save, retry banner) via a shared `textAction` style — rows were already ≥44 tall, so only the screen header grew — and the account footer now pads `4 + insets.bottom`. The 3-button nav overlap is **not** closed: it still covers the bottom of the screen on Samsung 3-button nav (People Delete account originally; Events calendar event list as of 2026-08-17). That is [KI-005](manual-tests/known_issues.md), not a People-only leftover. The audit pass over the same bare-text pattern elsewhere used zero-pixel-shift fixes so no `visual.spec.ts` baseline moved: calendar People button grew to 44 inside the 48px header row, event-detail Back/Retry and the add/edit-event Cancel/Save pairs got `hitSlop`, share-screen header actions got real `minHeight: 44` (unbaselined), and share-sheet chips grew to 44 with `Manage` on hitSlop. Caveat for the next agent: react-native-web only honors `hitSlop` for move/up boundary checks — the *initial* tap on web is still DOM-hit-tested, so hitSlop'd targets stay glyph-sized in the browser (a dev surface); on native they get the full expanded target. Verified by DOM measurement at 390×844 (every People/share action ≥44px, footer fully on screen) plus a full green e2e run with unchanged baselines.
+**As shipped:** the People screen gets real `minHeight: 44` targets on every bare-text action (header Back/Add, circle Edit/Delete, person Remove, hidden Unhide, modal Cancel/Save, retry banner) via a shared `textAction` style — rows were already ≥44 tall, so only the screen header grew — and the account footer now pads `4 + insets.bottom`. Owner 2026-08-18: person rows now feel too tall ([KI-011](manual-tests/known_issues.md)); a later agent should check whether this pass (or a later list `minHeight`) inflated them. Do not chase in an unrelated task. The 3-button nav overlap is **not** closed: it still covers the bottom of the screen on Samsung 3-button nav (People Delete account originally; Events calendar event list as of 2026-08-17). That is [KI-005](manual-tests/known_issues.md), not a People-only leftover. The audit pass over the same bare-text pattern elsewhere used zero-pixel-shift fixes so no `visual.spec.ts` baseline moved: calendar People button grew to 44 inside the 48px header row, event-detail Back/Retry and the add/edit-event Cancel/Save pairs got `hitSlop`, share-screen header actions got real `minHeight: 44` (unbaselined), and share-sheet chips grew to 44 with `Manage` on hitSlop. Caveat for the next agent: react-native-web only honors `hitSlop` for move/up boundary checks — the *initial* tap on web is still DOM-hit-tested, so hitSlop'd targets stay glyph-sized in the browser (a dev surface); on native they get the full expanded target. Verified by DOM measurement at 390×844 (every People/share action ≥44px, footer fully on screen) plus a full green e2e run with unchanged baselines.
 
 ### Problem
 
@@ -1101,7 +1104,7 @@ There is no way to turn off share notifications. App users always get both a pus
 
 Two independent per-account preferences on the `users` row — `notify_push` and `notify_sms`, both `NOT NULL DEFAULT true` (existing accounts keep today's behavior). The control lives in the People footer: a **Notifications** row opens a modal (same pattern as "Your name") with a switch per channel and the line "Events still land on your calendar either way." Flips are optimistic, persist via `users_update_own` RLS, and revert with a short alert on failure.
 
-Enforcement is server-side in `send-notification`: the recipient's prefs are read at send time — push is queued only when `notify_push` is on, the app-user SMS only when `notify_sms` is on. The hidden-sharer check still skips both ahead of the pref checks. Non-app recipients have no `users` row and are unaffected (Twilio STOP remains their opt-out). Token registration and the notification explainer are untouched — the Expo token stays registered so re-enabling push is instant.
+Enforcement is server-side in `send-notification`: the recipient's prefs are read at send time — push is queued only when `notify_push` is on, the app-user SMS only when `notify_sms` is on. The hidden-sharer check still skips both ahead of the pref checks. Non-app recipients have no `users` row and are unaffected (Twilio STOP remains their opt-out). Token registration and the notification explainer are untouched — the Expo token stays registered so re-enabling push is instant. Owner smoke 2026-08-18: the switches are too small ([KI-008](manual-tests/known_issues.md)), Android Back does not dismiss the modal ([KI-009](manual-tests/known_issues.md)), and Push can be on without OS permission ([KI-010](manual-tests/known_issues.md) — intended follow-up: no permission → Push off; turning it on re-runs the explainer then the OS ask).
 
 Two layout notes from the ship: the switches live in a modal rather than inline in the footer because the People screen's chrome is all pinned — three extra footer rows collapsed the list viewport to zero on short viewports (the documented pre-existing crunch from [People List Scrolling](#people-list-scrolling)). The same pass capped the circles block (~3 rows, internal scroll) and gave the people list a `minHeight` so the screen can't collapse regardless of circle count.
 
@@ -1121,7 +1124,31 @@ Two layout notes from the ship: the switches live in a modal rather than inline 
 
 ### Open Questions
 
-- None (placement resolved: People footer → Notifications modal).
+- Placement resolved: People footer → Notifications modal.
+- Permission-gated Push (KI-010): if the OS has not granted notifications, should the switch be forced off and an on-flip reopen the explainer? Owner 2026-08-18: yes. SMS stays independent.
+
+---
+
+## Button Size & Clickability
+
+**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-18 from owner device smoke of preview `a7ce79c8`. Related: [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass), [KI-008](manual-tests/known_issues.md) (Notifications switches).
+
+### Problem
+
+Something about the buttons does not feel good on a real phone. The 2026-08-15 pass made People/share/calendar text actions ≥44pt, but controls still feel small or fussy to hit — the Notifications switches are the concrete example (KI-008). This is a feel pass over size and clickability, not a one-control patch.
+
+### Proposed Solution
+
+Revisit button size and clickability across the app on a native device: switches, text actions, primary Save/Share, and modal chrome. Aim for controls that are easy to hit without looking like a tablet layout.
+
+### Acceptance Criteria
+
+- [ ] Native smoke no longer calls out controls as annoying to tap
+- [ ] Notifications switches specifically meet the 44pt target (KI-008)
+
+### Open Questions
+
+- Whether this stays a dedicated pass or lands with KI-008 / KI-009 as a Notifications-modal-only fix.
 
 ---
 
@@ -1144,3 +1171,29 @@ When you send a share, confirm that it has been sent.
 ### Open Questions
 
 - How this sits next to per-person received status — a one-shot “sent” vs the lasting ✓ / received rows.
+
+---
+
+## Open Event from SMS Link
+
+**Status:** Considering (2026-08-18) — recorded so the idea isn't lost. Not a spec and not a commitment. Do not implement from this section.
+
+### What this would be
+
+A link in the share notification SMS that opens the native app and lands on that specific event — the same destination as tapping the push.
+
+**App users only.** The link goes in the SMS to people who already have the app (the same recipients who get the push). It is a backup tap target for that ping, not a way to pull anyone into the app. Non-app SMS stays as it is today: event details, the listing URL when one exists, and the internal-testing signup invite — no app or web link.
+
+Today, app users get a tappable push that already does this ([Notifications](#notifications)). Their SMS is backup and carries no app or web links (`docs/distribution-strategy.md`, 2026-08-09).
+
+### Why it might be wanted
+
+If the push is missed, muted, or never granted, the SMS is the only ping for someone who already has the app. A tappable link in that text would open the event instead of leaving them to find it on the calendar.
+
+### Why it's questionable
+
+This was tried and then removed. SMS used to append a custom-scheme deep link (`events-app://event/[id]`), later a `WEB_APP_URL/event/[id]` https link aimed at universal links / App Links — including for people who did not have the app. Those were stripped on 2026-08-09 because the SMS is a notification, not an acquisition channel, and links from unfamiliar senders read as spam to carrier filters. Restricting the link to existing app users keeps the no-acquisition rule; it does not remove the carrier-filter concern, and app users already have the push path. Universal links were explicitly parked until launch, when store links may return as the non-app CTA.
+
+### Decision
+
+Undecided — maybe never. Revisit if testers who have the app still want a tappable path from the text.

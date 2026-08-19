@@ -115,3 +115,12 @@ the ask is one-shot and persisted (`notification_explainer_answered`).
   bottom of an event on Events). Do not re-flag unless it is materially
   worse than that (e.g. covering a whole control that was previously only
   clipped). Gesture nav is the expected tester setup.
+- **KI-006** — first open after installing an updated APK can hang on a
+  spinner until you swipe the app away and reopen. Subsequent opens of the
+  same binary are fine.
+- **KI-007** — delete account then sign in again with the same number
+  re-delivers friends' previously shared events (pending-share path).
+  Self-created copies stay gone.
+- **KI-008 / KI-009 / KI-010 / KI-011** — Notifications modal: switches feel
+  small, Android Back does not dismiss it (Close does), Push can be on
+  without OS permission. People person rows are too tall (density).
