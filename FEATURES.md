@@ -644,7 +644,7 @@ A web-first beta is attractive: nobody has to install anything, and notification
 - ~~Remove the placeholder `IOS_APP_STORE_URL` secret~~ — done 2026-08-09 (the whole store-URL concept left with the SMS links)
 - **Considered and rejected (2026-08-09), recorded so they aren't resurrected blindly:**
   - *Contact Picker API* (browser contact picking on Chrome/Android): web-only, and the web build is no longer a user surface
-  - *Universal links / App Links + AASA/assetlinks hosting*: there are no links in SMS left to make universal; push already deep-links app users
+  - *Universal links / App Links + AASA/assetlinks hosting*: there are no links in SMS left to make universal; push already deep-links app users. If this is ever resurrected (e.g. an app link in the share SMS), update the A2P campaign description to mention the app link **before** shipping — registered content must match what we actually send, and our own domain in cold texts is the top carrier spam-filter trigger, now risking campaign suspension rather than per-message blocks (noted 2026-08-19, after the 10DLC registration)
   - *PWA install prompts*: installing the PWA unlocks no contacts capability on any platform, so it can't honestly be pitched as fixing the add-people problem
   - *Shareable event invite links*: duplicates the group-chat behavior the app replaces with extra steps; not a contacts bootstrap worth building
   - *Bulk paste of contact lists*: target users don't maintain such lists
