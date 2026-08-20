@@ -27,6 +27,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
+| [Notification Explainer Clarity](#notification-explainer-clarity) | Planned | Pre-ask screen doesn't make the OS prompt or Continue obvious. |
 | [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
 | [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
@@ -972,7 +973,7 @@ Copy decision (2026-08-17): the spec’s draft ended “— never anything else�
 
 ### Open Questions
 
-- None (decided 2026-08-17: Not now persists forever with no later re-ask; no post-deny recovery screen — SMS covers it)
+- None on the original spec (decided 2026-08-17: Not now persists forever with no later re-ask; no post-deny recovery screen — SMS covers it). Follow-up: the explainer itself is unclear — [Notification Explainer Clarity](#notification-explainer-clarity).
 
 ---
 
@@ -1171,6 +1172,31 @@ When you send a share, confirm that it has been sent.
 ### Open Questions
 
 - How this sits next to per-person received status — a one-shot “sent” vs the lasting ✓ / received rows.
+
+---
+
+## Notification Explainer Clarity
+
+**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-20 from owner feedback. **Not designed; do not implement from this section.** Related: [Notification Permission Explainer](#notification-permission-explainer) (the shipped pre-ask).
+
+### Problem
+
+The way we tell people we are about to ask for notification permission is a little weird. When that screen appears, it is unclear what is about to happen, and unclear what tapping Continue means.
+
+Today the explainer (`components/NotificationExplainer.tsx`) is one sentence — “Events notifies you when someone shares an event with you.” — and a Continue / Not now pair. Continue fires the OS prompt. The screen never says a system dialog is next, or that Continue is the ask.
+
+### Proposed Solution
+
+Not designed. The need is: when the explainer appears, it should be obvious that a system permission prompt is about to happen, and obvious what Continue does. Copy, layout, and button labels are all open.
+
+### Acceptance Criteria
+
+- [ ] On the notification permission explainer, it is clear that a system permission prompt is about to appear
+- [ ] It is clear what Continue does
+
+### Open Questions
+
+- Copy, button labels, and whether the screen itself changes — none of that is decided.
 
 ---
 
