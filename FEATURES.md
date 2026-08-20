@@ -30,7 +30,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
 | [Notification Explainer Clarity](#notification-explainer-clarity) | Planned | Pre-ask screen doesn't make the OS prompt or Continue obvious. |
 | [Circles UX](#circles-ux) | Planned | Current circles are hard to use, poorly explained, and not intuitive. Not designed — do not implement from this section. |
-| [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). |
+| [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). Broader Android Back: [KI-012](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
 | [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
 | [Share Delivery Status](#share-delivery-status) | Planned | ✓ Shared only means recorded, not received. |
@@ -883,7 +883,7 @@ Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the
 
 ### Problem
 
-On Android, swiping between screens shows a brief white bar on the right edge of the display and the motion reads as janky.
+On Android, swiping between screens shows a brief white bar on the right edge of the display and the motion reads as janky. Distinct from [KI-012](manual-tests/known_issues.md) (system Back / gesture-nav back sometimes does not navigate) — this item is the flash during a swipe that *does* change screens.
 
 ### Proposed Solution
 
@@ -1108,7 +1108,7 @@ There is no way to turn off share notifications. App users always get both a pus
 
 Two independent per-account preferences on the `users` row — `notify_push` and `notify_sms`, both `NOT NULL DEFAULT true` (existing accounts keep today's behavior). The control lives in the People footer: a **Notifications** row opens a modal (same pattern as "Your name") with a switch per channel and the line "Events still land on your calendar either way." Flips are optimistic, persist via `users_update_own` RLS, and revert with a short alert on failure.
 
-Enforcement is server-side in `send-notification`: the recipient's prefs are read at send time — push is queued only when `notify_push` is on, the app-user SMS only when `notify_sms` is on. The hidden-sharer check still skips both ahead of the pref checks. Non-app recipients have no `users` row and are unaffected (Twilio STOP remains their opt-out). Token registration and the notification explainer are untouched — the Expo token stays registered so re-enabling push is instant. Owner smoke 2026-08-18: the switches are too small ([KI-008](manual-tests/known_issues.md)), Android Back does not dismiss the modal ([KI-009](manual-tests/known_issues.md)), and Push can be on without OS permission ([KI-010](manual-tests/known_issues.md) — intended follow-up: no permission → Push off; turning it on re-runs the explainer then the OS ask).
+Enforcement is server-side in `send-notification`: the recipient's prefs are read at send time — push is queued only when `notify_push` is on, the app-user SMS only when `notify_sms` is on. The hidden-sharer check still skips both ahead of the pref checks. Non-app recipients have no `users` row and are unaffected (Twilio STOP remains their opt-out). Token registration and the notification explainer are untouched — the Expo token stays registered so re-enabling push is instant. Owner smoke 2026-08-18: the switches are too small ([KI-008](manual-tests/known_issues.md)), Android Back does not dismiss the modal ([KI-009](manual-tests/known_issues.md)), and Push can be on without OS permission ([KI-010](manual-tests/known_issues.md) — intended follow-up: no permission → Push off; turning it on re-runs the explainer then the OS ask). Owner 2026-08-20: system Back on the Samsung 3-button navbar sometimes does not go back at all — [KI-012](manual-tests/known_issues.md) (KI-009 is one sheet in that class; not designed this pass).
 
 Two layout notes from the ship: the switches live in a modal rather than inline in the footer because the People screen's chrome is all pinned — three extra footer rows collapsed the list viewport to zero on short viewports (the documented pre-existing crunch from [People List Scrolling](#people-list-scrolling)). The same pass capped the circles block (~3 rows, internal scroll) and gave the people list a `minHeight` so the screen can't collapse regardless of circle count.
 
@@ -1205,7 +1205,7 @@ Not designed. The need is: when the explainer appears, it should be obvious that
 
 ## Circles UX
 
-**Status:** Planned — recorded 2026-08-20 from owner feedback. **Not designed; do not implement from this section.** Circles already ship as an optional share shortcut; this is a later pass on that implementation. Related: [People List Scrolling](#people-list-scrolling) (list feel on My People — not a circles rewrite).
+**Status:** Planned — recorded 2026-08-20 from owner feedback. **Not designed; do not implement from this section.** Circles already ship as an optional share shortcut; this is a later pass on that implementation. Related: [People List Scrolling](#people-list-scrolling) (list feel on My People — not a circles rewrite). The circle-editor sheet is one of the Modals that swallow Android system Back ([KI-012](manual-tests/known_issues.md)); that is a platform Back gap, not a circles-UX spec.
 
 ### Problem
 

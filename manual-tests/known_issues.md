@@ -162,6 +162,9 @@ never added: a blocker must be fixed, not accepted.
   other sheets (`NotificationExplainer`, `ManualAddPersonModal`, contacts
   explainers) already wire.
 - Repro: People → Notifications → Android Back. Close still works.
+- Same pattern, not previously listed here: the circle-editor Modal in
+  `people.tsx` and `components/PeoplePicker.tsx` also omit `onRequestClose`.
+  The broader system-Back / gesture-Back picture is [KI-012](#ki-012--android-system-back-3-button-and-gesture-sometimes-does-not-navigate).
 - Fix (separate task): `onRequestClose={() => setShowNotifPrefs(false)}`
   on that Modal (and the name-edit Modal for the same pattern).
 
@@ -208,6 +211,100 @@ never added: a blocker must be fixed, not accepted.
   may have inflated row height — unconfirmed.
 - Fix (separate task): find when the person-row height grew and restore a
   denser row without dropping the 44pt Remove target.
+
+### KI-012 — Android system Back (3-button and gesture) sometimes does not navigate
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-20 owner report on Samsung 3-button navigation. Investigation
+  only — no implementation or design this pass. Not a tester blocker (same
+  ruling family as [KI-009](#ki-009--android-system-back-does-not-close-the-notifications-modal)).
+- Expected: the system Back control (Samsung 3-button navbar Back, and the
+  equivalent Android gesture-nav back swipe) leaves the current screen or
+  sheet the same way the in-app Back/Close/Cancel control does.
+- Actual: Back sometimes does nothing. This is not [KI-005](#ki-005--android-3-button-navigation-bar-covers-the-bottom-of-the-screen)
+  (the bar overlapping in-app content) and not [Screen Transition Polish](../FEATURES.md#screen-transition-polish-android)
+  (a white flash during stack swipes). Those are separate. There is no
+  FEATURES.md item for system Back; [KI-009](#ki-009--android-system-back-does-not-close-the-notifications-modal)
+  is the one already-logged instance (Notifications sheet).
+
+#### What the code is doing
+
+The app never registers a `BackHandler`. In-app header Back/Cancel labels
+(`router.back()` on People, event detail, add/edit, share) are unrelated
+top-of-screen controls. System Back is left to React Native and
+`react-native-screens`.
+
+Android 3-button Back and Android gesture-nav back are the same event
+(`OnBackPressedDispatcher` / `KEYCODE_BACK`). If Back no-ops on 3-button
+nav, gesture-nav back hits the same handlers. iOS edge-swipe pop is a
+different mechanism (native-stack gesture) and is not the Samsung navbar.
+
+`app.config.js` sets `android.predictiveBackGestureEnabled: false` (Expo's
+default). That writes `android:enableOnBackInvokedCallback="false"` and
+turns off the Android 13+ predictive-back *animation*. It does not disable
+the back action.
+
+#### Confirmed: RN Modal swallows Back unless JS handles `onRequestClose`
+
+React Native's Android `Modal` (`ReactModalHostView.kt`) always consumes
+Back and fires `onRequestClose` into JS. It does not close itself. If the
+JS `Modal` has no `onRequestClose`, the sheet stays up and the screen
+under it does not pop — Back looks dead. This is required Android Modal
+behavior, not a Samsung quirk.
+
+Inventory of every `Modal` in the app:
+
+| Sheet | File | `onRequestClose` |
+|---|---|---|
+| Notifications | `app/(app)/people.tsx` | missing (KI-009) |
+| Your name | `app/(app)/people.tsx` | missing (noted in KI-009) |
+| Circle editor | `app/(app)/people.tsx` | missing |
+| Add people (contacts picker) | `components/PeoplePicker.tsx` | missing |
+| Notification explainer | `components/NotificationExplainer.tsx` | present (`onNotNow`) |
+| Contacts explainer | `components/ContactsExplainer.tsx` | present (`onNotNow`) |
+| Contacts denied recovery | `components/ContactsDeniedRecovery.tsx` | present |
+| Manual add person | `components/ManualAddPersonModal.tsx` | present |
+
+Any time one of the four missing-handler sheets is open, 3-button Back and
+gesture-nav back will no-op. Close/Cancel/the in-app control still works.
+This is the best explanation of "sometimes."
+
+#### Unconfirmed on device: stack screens and the calendar root
+
+Pushed screens (People, event detail, add/edit, share, onboarding) live on
+the `(app)` Expo Router native `Stack` (`headerShown: false`). Nothing in
+app code intercepts Back there; `react-native-screens` should pop. Not
+reproduced on a phone this pass (cloud agents have no Android). If Back
+fails on those screens with no Modal open, it is a different layer than
+the table above.
+
+The calendar (`app/(app)/index.tsx`) is the `(app)` stack root. After
+sign-in, `app/_layout.tsx` `replace`s into `(app)`, so Back on the
+calendar has no in-app screen to pop to. If the root Stack still pops
+`(app)` onto `(auth)` while a session exists, `RootLayoutNav` immediately
+`replace`s back to `(app)` — Back appears to do nothing. Depending on the
+OS, Back at root may instead background the app. Either way it will not
+"go back" inside Events.
+
+Other first-press consumers that are not a failed navigation: the
+keyboard dismissing, the Android date/time picker dialog, and a native
+`Alert` confirm.
+
+- Repro (confirmed in code, previously seen on device as KI-009): Samsung
+  Android, 3-button nav. Open People → Notifications (or Your name, a
+  circle editor, or the contacts picker) → press the navbar Back button.
+  The sheet stays. Close/Cancel dismisses it. Repeat with gesture nav to
+  confirm the same handlers (not done this pass).
+- Repro (unconfirmed): same Back on a pushed screen with no Modal up
+  (event detail, People, add-event), or on the calendar itself.
+- Web: no 3-button / gesture nav. Browser back/forward is a different
+  stack (covered by the release-review edge/platform track). Do not flag
+  there.
+- Fix: not designed this pass. A later task should treat the missing
+  `onRequestClose` sheets as the known, bounded class (KI-009 plus the
+  two extra rows in the table) and only chase stack-root / native-stack
+  behavior if Back still fails with every Modal closed.
 
 ## Known limitations (by design — do not flag)
 
