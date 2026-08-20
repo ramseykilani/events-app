@@ -124,8 +124,10 @@ the ask is one-shot and persisted (`notification_explainer_answered`).
 - **KI-008 / KI-009 / KI-010 / KI-011** — Notifications modal: switches feel
   small, Android Back does not dismiss it (Close does), Push can be on
   without OS permission. People person rows are too tall (density).
-- **KI-012** — Samsung 3-button (and likely gesture-nav) system Back
+- **KI-012** — Samsung 3-button (and Android gesture-nav) system Back
   sometimes does nothing. Confirmed class: RN Modals that omit
   `onRequestClose` (Notifications / Your name / circle editor / contacts
-  picker). Do not re-flag those. Flag only if Back fails on a pushed
-  screen with no Modal/picker/keyboard/alert up.
+  picker). iOS: the same four sheets also will not swipe-down dismiss;
+  left-edge swipe on pushed screens is a different path and should pop.
+  Do not re-flag the four sheets. Flag only if Back / edge-swipe fails on
+  a pushed screen with no Modal/picker/keyboard/alert up.

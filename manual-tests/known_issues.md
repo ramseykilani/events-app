@@ -237,8 +237,9 @@ top-of-screen controls. System Back is left to React Native and
 
 Android 3-button Back and Android gesture-nav back are the same event
 (`OnBackPressedDispatcher` / `KEYCODE_BACK`). If Back no-ops on 3-button
-nav, gesture-nav back hits the same handlers. iOS edge-swipe pop is a
-different mechanism (native-stack gesture) and is not the Samsung navbar.
+nav, gesture-nav back hits the same handlers. iOS has no Back key; its
+gestures are a separate follow-up (sheet swipe-down vs stack edge-swipe)
+in the iOS section below.
 
 `app.config.js` sets `android.predictiveBackGestureEnabled: false` (Expo's
 default). That writes `android:enableOnBackInvokedCallback="false"` and
@@ -305,6 +306,52 @@ keyboard dismissing, the Android date/time picker dialog, and a native
   `onRequestClose` sheets as the known, bounded class (KI-009 plus the
   two extra rows in the table) and only chase stack-root / native-stack
   behavior if Back still fails with every Modal closed.
+
+#### iOS gestures (follow-up 2026-08-20 — code only, no device)
+
+iOS has no 3-button navbar and no Back key. The two gestures people mean
+by "go back" are not one Android-style event:
+
+1. **Left-edge swipe to pop a pushed screen** — not the same issue as
+   Android Back. `react-native-screens` 4.16 defaults `gestureEnabled` to
+   true (`_gestureEnabled = YES` in `RNSScreen.mm`). The app never sets
+   `gestureEnabled: false`. `headerShown: false` does not turn this off:
+   `RNSScreenStack` is the pop-gesture delegate and only requires a stack
+   depth ≥ 2, `gestureEnabled`, and a non-modal screen. `fullScreenSwipeEnabled`
+   is off, so this is the standard ~20pt left-edge swipe, not a swipe from
+   anywhere. Unconfirmed on a TestFlight device this pass.
+
+   Same as Android, the calendar is the `(app)` stack root: there is no
+   in-app screen to pop to. Onboarding is a horizontal paging `ScrollView`
+   (`app/(app)/onboarding.tsx`); screens gives the *edge* pan priority over
+   that pager, so a swipe that does not start at the left edge pages
+   instead of leaving. That is paging, not a dead back handler.
+
+2. **Swipe-down to dismiss a `pageSheet` Modal** — the same class as
+   Android Back on those sheets. Every Modal in the inventory uses
+   `presentationStyle="pageSheet"` and none set `allowSwipeDismissal`
+   (defaults `false` → `modalInPresentation = YES`). iOS will not
+   interactively dismiss the sheet. A drag that UIKit treats as an
+   attempted dismiss calls `presentationControllerDidAttemptToDismiss`;
+   Paper RN (this app, `newArchEnabled: false`, `RCTModalHostView.m`)
+   then fires `onRequestClose` only if JS provided it.
+
+   - The four sheets missing `onRequestClose` (Notifications, Your name,
+     circle editor, contacts picker): swipe-down rubber-bands and the
+     sheet stays. Same "gesture does nothing" as Android Back.
+   - The four sheets that already wire `onRequestClose`: a swipe-down
+     *attempt* should close via JS (Not now / Close) even without
+     `allowSwipeDismissal`. Not verified on a phone this pass.
+
+The iOS home-indicator swipe-up is the app switcher, not back. Do not
+flag that.
+
+- Repro (iOS, confirmed in code, not run on device this pass): Notifications
+  / Your name / a circle editor / the contacts picker → swipe down on the
+  sheet. It should stay. Close/Cancel still works.
+- Repro (iOS, unconfirmed): left-edge swipe on event detail / People /
+  add-event with no Modal up — code says this should pop. Left-edge swipe
+  on the calendar should not navigate inside Events.
 
 ## Known limitations (by design — do not flag)
 
