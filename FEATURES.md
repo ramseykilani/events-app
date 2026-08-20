@@ -13,6 +13,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Hide](#hide) | Implemented | |
 | [Forwarding Shares](#forwarding-shares) | Implemented | |
 | [Sign Out](#sign-out) | Implemented | |
+| [Sign Out Pop-up](#sign-out-pop-up) | Planned | Sign-out confirm is lacking, especially on native. |
 | [Web Support](#web-support) | Implemented | Dev/staging/CI surface only |
 | [Display Names](#display-names) | Implemented | |
 | [Contacts Permission Explainer](#contacts-permission-explainer) | Implemented | First Share already adds people |
@@ -260,6 +261,7 @@ A deliberately low-prominence sign-out action — this should not be easy to tap
 ### Open Questions
 
 - Exact placement (People screen footer vs. a calendar header menu that could later hold more settings)
+- Follow-up: the confirm itself is lacking — [Sign Out Pop-up](#sign-out-pop-up).
 
 ---
 
@@ -1222,6 +1224,30 @@ Not designed. Do not invent a new circles model, copy, or layout from this secti
 ### Open Questions
 
 - How circles should work, how they should be explained, and how they should feel — none of that is decided.
+
+---
+
+## Sign Out Pop-up
+
+**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-20 from owner feedback. **Not designed; do not implement from this section.** Related: [Sign Out](#sign-out) (the shipped action).
+
+### Problem
+
+The sign-out pop-up is lacking, especially on native.
+
+Today, Sign out on the People footer calls `showConfirm` (`lib/dialogs.ts`): title “Sign out”, message “Sign out of [formatted phone]?”, Cancel / Sign Out. On native that is `Alert.alert`; on web it is `window.confirm`. The original Sign Out spec required a confirm, and that gate exists — the pop-up itself is the thin part, and it reads worse on the device than in the browser.
+
+### Proposed Solution
+
+Not designed. The need is: the sign-out pop-up should not feel lacking, especially on native. Copy, layout, buttons, and the surface itself are all open.
+
+### Acceptance Criteria
+
+- [ ] The sign-out pop-up does not feel lacking, especially on native
+
+### Open Questions
+
+- Copy, button labels, and the surface itself — none of that is decided.
 
 ---
 
