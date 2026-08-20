@@ -40,7 +40,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
-| [Open Event from SMS Link](#open-event-from-sms-link) | Considering | App-user SMS only: a link that opens the app to that event |
+| [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 
 ## Using and testing
 
@@ -116,12 +116,12 @@ When an event is shared, the `send-notification` Edge Function also sends an SMS
 - **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, and the sharer's phone number as display identity. No app or web links — the SMS is the whole message. During internal testing it also carries a signup invite (`Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.`, added 2026-08-17) so an interested recipient can ask the owner for beta access.
 - **App users:** the same link-free SMS in addition to their push notification (push is the tappable path into the event). A missing push token does not suppress the SMS.
 
-This means the only person who needs the app is the one sending events. Friends are informed by text; the only acquisition element in the message is the internal-testing signup invite (an email CTA, no links). (Revised 2026-08-09: SMS previously carried web/store/deep links; removed deliberately — see `docs/distribution-strategy.md`. Revised 2026-08-17: non-app SMS gained the signup-invite line for the internal-testing phase.)
+This means the only person who needs the app is the one sending events. Friends are informed by text; the only acquisition element in the message is the internal-testing signup invite (an email CTA, no links). (Revised 2026-08-09: SMS previously carried web/store/deep links; removed deliberately — see `docs/distribution-strategy.md`. Revised 2026-08-17: non-app SMS gained the signup-invite line for the internal-testing phase. At launch the two URLs return together as [SMS Links at Launch](#sms-links-at-launch): store link for non-users, event deep link for app users.)
 
 ### Technical Notes
 
 - No SDK dependency: Twilio REST API called directly via `fetch` with Basic auth in `supabase/functions/send-notification/index.ts`
-- New Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender — `TWILIO_MESSAGING_SERVICE_SID` (preferred; built-in STOP opt-out handling) or `TWILIO_PHONE_NUMBER`. No other secrets gate SMS (`IOS_APP_STORE_URL` placeholder was removed 2026-08-09; `WEB_APP_URL` is no longer read by this function)
+- New Supabase secrets: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender — `TWILIO_MESSAGING_SERVICE_SID` (preferred; built-in STOP opt-out handling) or `TWILIO_PHONE_NUMBER`. No other secrets gate SMS (`IOS_APP_STORE_URL` placeholder was removed 2026-08-09; `WEB_APP_URL` is no longer read by this function). Launch restores store-URL secrets and the event-link base together — [SMS Links at Launch](#sms-links-at-launch)
 - Graceful degradation: if any Twilio secret is missing, SMS is silently skipped — push notifications are unaffected
 - SMS failures use `.catch(console.error)` and never propagate to the caller
 - SMS sends are collected as `Promise<void>[]` and flushed with `Promise.all` after the Expo push batch — concurrent, non-blocking
@@ -141,7 +141,7 @@ This means the only person who needs the app is the one sending events. Friends 
 
 ### Open Questions
 
-- None
+- Launch SMS URLs (store + event deep link) live in [SMS Links at Launch](#sms-links-at-launch) — one change, both variants.
 
 ---
 
@@ -651,7 +651,7 @@ A web-first beta is attractive: nobody has to install anything, and notification
 - ~~Remove the placeholder `IOS_APP_STORE_URL` secret~~ — done 2026-08-09 (the whole store-URL concept left with the SMS links)
 - **Considered and rejected (2026-08-09), recorded so they aren't resurrected blindly:**
   - *Contact Picker API* (browser contact picking on Chrome/Android): web-only, and the web build is no longer a user surface
-  - *Universal links / App Links + AASA/assetlinks hosting*: there are no links in SMS left to make universal; push already deep-links app users. If this is ever resurrected (e.g. an app link in the share SMS), update the A2P campaign description to mention the app link **before** shipping — registered content must match what we actually send, and our own domain in cold texts is the top carrier spam-filter trigger, now risking campaign suspension rather than per-message blocks (noted 2026-08-19, after the 10DLC registration)
+  - *Universal links / App Links + AASA/assetlinks hosting as a web-beta SMS path*: rejected as an acquisition channel into the web build (2026-08-09). The launch-time version is [SMS Links at Launch](#sms-links-at-launch) — event deep link for app users only, store link for non-users, never the web app. A2P campaign description must mention both link types **before** that ships — registered content must match what we actually send, and our own domain in cold texts is the top carrier spam-filter trigger, now risking campaign suspension rather than per-message blocks (noted 2026-08-19, after the 10DLC registration)
   - *PWA install prompts*: installing the PWA unlocks no contacts capability on any platform, so it can't honestly be pitched as fixing the add-people problem
   - *Shareable event invite links*: duplicates the group-chat behavior the app replaces with extra steps; not a contacts bootstrap worth building
   - *Bulk paste of contact lists*: target users don't maintain such lists
@@ -867,7 +867,7 @@ Reply STOP to unsubscribe.
 - **GSM-7 normalization** on title/description (curly quotes → straight, em/en dashes → `-`, `…` → `...`, `·` → `,`, newlines collapsed) so one non-GSM-7 character can't force UCS-2 encoding (70-char segments) and multiply per-message cost.
 - Verified by a real share to the owner's number 2026-08-17 (`send-notification` returned `{"sent":1,"sms":1}`); owner approved the exact wording on the received text.
 
-Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the SMS carries the event's own URL but **no app/web links** — it is a pure notification, not an acquisition channel — and it must not read like spam to carrier filters.
+Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the SMS carries the event's own URL but **no app/web links** — it is a pure notification, not an acquisition channel — and it must not read like spam to carrier filters. That no-app-link rule stands through internal testing; the launch pair is [SMS Links at Launch](#sms-links-at-launch).
 
 ### Acceptance Criteria
 
@@ -1251,26 +1251,69 @@ Not designed. The need is: the sign-out pop-up should not feel lacking, especial
 
 ---
 
-## Open Event from SMS Link
+## SMS Links at Launch
 
-**Status:** Considering (2026-08-18) — recorded so the idea isn't lost. Not a spec and not a commitment. Do not implement from this section.
+**Status:** Planned — launch-time. Store links were already the launch CTA in `docs/distribution-strategy.md` (2026-08-09). The app-user event deep link was recorded as Considering on 2026-08-18. Owner confirmed 2026-08-20 that the two are one change: store link for non-users, event deep link for app users. Testers asked for the deep link. **Do not implement before the app is listed. Ship both in the same `send-notification` change — never one variant without the other.** Related: [SMS Invitations](#sms-invitations), [Notifications](#notifications), [Share SMS Content & Formatting](#share-sms-content--formatting).
 
-### What this would be
+Previously titled "Open Event from SMS Link."
 
-A link in the share notification SMS that opens the native app and lands on that specific event — the same destination as tapping the push.
+### Problem
 
-**App users only.** The link goes in the SMS to people who already have the app (the same recipients who get the push). It is a backup tap target for that ping, not a way to pull anyone into the app. Non-app SMS stays as it is today: event details, the listing URL when one exists, and the internal-testing signup invite — no app or web link.
+Share SMS is link-free today (2026-08-09): event details, the event's own listing URL when one exists, STOP, and — for people without an account — an email signup invite. That is correct for internal testing.
 
-Today, app users get a tappable push that already does this ([Notifications](#notifications)). Their SMS is backup and carries no app or web links (`docs/distribution-strategy.md`, 2026-08-09).
+Two gaps show up the moment the app is listed:
 
-### Why it might be wanted
+1. **Non-app recipients** have no store path. The email invite is a beta hatch, not how people get the app.
+2. **App users** whose push is missed, muted, or never granted have only a plain-text SMS. Testers asked for a tap that opens that event — the same destination as the push.
 
-If the push is missed, muted, or never granted, the SMS is the only ping for someone who already has the app. A tappable link in that text would open the event instead of leaving them to find it on the calendar.
+These are not two features. Both are the first app/store URLs in a cold share text since the links were stripped. They share A2P-campaign and carrier-filter risk, and the deep link's "app isn't on this phone" fallback *is* a store CTA — so shipping one without the other leaves a hole.
 
-### Why it's questionable
+### The split (load-bearing)
 
-This was tried and then removed. SMS used to append a custom-scheme deep link (`events-app://event/[id]`), later a `WEB_APP_URL/event/[id]` https link aimed at universal links / App Links — including for people who did not have the app. Those were stripped on 2026-08-09 because the SMS is a notification, not an acquisition channel, and links from unfamiliar senders read as spam to carrier filters. Restricting the link to existing app users keeps the no-acquisition rule; it does not remove the carrier-filter concern, and app users already have the push path. Universal links were explicitly parked until launch, when store links may return as the non-app CTA.
+Who gets which extra URL:
 
-### Decision
+| Recipient | Extra SMS line | Must not be |
+|-----------|----------------|-------------|
+| Non-app (`my_people.user_id IS NULL`) | Store link(s) — App Store / Play — replacing the email signup invite | An event deep link, or any URL into the web build |
+| App user (`my_people.user_id IS NOT NULL`) | One https event deep link that opens the native app on that event (same as tapping the push) | A store link, a custom-scheme `events-app://` URL, or a web-app session |
 
-Undecided — maybe never. Revisit if testers who have the app still want a tappable path from the text.
+The event's own original listing URL stays in both variants when present — that is event content, not app promo.
+
+Do not send the event deep link to non-app users (it would open the web product, which is the 2026-08-09 rejection). Do not send store links to people who already have the app.
+
+### Why they ship together
+
+- **Same function, same day.** Both are lines in `buildSmsBody` in `send-notification`. A store-only or deep-link-only ship is an incomplete launch SMS.
+- **A2P first.** Registered campaign content must match what we send. Our own domain (or store URLs) in cold texts is the top carrier spam-filter trigger and now risks campaign suspension, not just per-message blocks (noted 2026-08-19 after 10DLC). Update the A2P campaign description to mention **both** the store CTA and the app event link before the first live send.
+- **Deep-link fallback is a store problem.** An "app user" on a new phone, or who deleted the app, will not open the native app. A universal https link that falls through to `shared-events.pages.dev` dumps them on the demoted web surface. The non-app store CTA is the honest fallback — which is why the two URLs are one design, even though any given message carries only one of them.
+- **Infrastructure.** Universal links / App Links (AASA + assetlinks on the link domain) are what make the app-user URL open the app. Until listings exist there is nowhere honest for the non-app CTA to go, and nothing for AASA to upgrade.
+
+### History (do not repeat)
+
+SMS used to append a custom-scheme deep link (`events-app://event/[id]`), then a `WEB_APP_URL/event/[id]` https link aimed at everyone, including people without the app. Stripped 2026-08-09: the SMS is a notification, not an acquisition channel, and links from unfamiliar senders read as spam. The custom scheme also never linkifies in SMS clients. This pair keeps the no-web-acquisition rule (non-users get stores, not the web app) and puts the event link only on people who already have an account.
+
+### Proposed Solution
+
+At launch, in the same `send-notification` change:
+
+1. Non-app variant: replace `SIGNUP_INVITE_LINE` with store-link copy. Restore `IOS_APP_STORE_URL` / `ANDROID_PLAY_STORE_URL` (or equivalent) as function secrets. Do not use `WEB_APP_URL` as the non-app CTA.
+2. App-user variant: append one https event link (`WEB_APP_URL/event/[id]` or a dedicated link domain) once Apple AASA and Android assetlinks are hosted on that domain and the native app has associated domains / intent filters. Push remains the primary tap; this is the SMS backup.
+3. Hosting AASA/assetlinks is in scope for this change. The link must open `/(app)/event/[eventId]` when the app is installed. If it is not, do not strand the person on the full web app — prefer store buttons or OS store handling.
+4. Copy, exact URL layout (both store URLs vs one chooser), and the no-app fallback page are decided at implementation with the owner — not invented from this section.
+
+### Acceptance Criteria
+
+- [ ] Non-app share SMS replaces the email signup invite with store link(s); still has event details, listing URL when present, and STOP
+- [ ] App-user share SMS includes a tappable https link that opens the native app on that event when the app is installed
+- [ ] Non-app SMS never contains the event deep link; app-user SMS never contains the store CTA
+- [ ] Custom-scheme `events-app://` URLs are not used
+- [ ] A2P campaign description mentions both link types before the first live send
+- [ ] Both variants ship in the same release; neither ships during internal testing
+- [ ] Owner approves the exact wording on a real text before it ships (same bar as [Share SMS Content & Formatting](#share-sms-content--formatting))
+
+### Open Questions
+
+- Store CTA copy, and whether the SMS carries both store URLs, one smart URL, or a tiny store-chooser page (we cannot know the recipient's OS from a phone number).
+- Link domain: `shared-events.pages.dev` vs a custom domain (AASA on `pages.dev` is often painful).
+- What a universal-link miss shows instead of the full web app.
+- Whether `WEB_APP_URL` stays the event-link base or a dedicated link domain is introduced.

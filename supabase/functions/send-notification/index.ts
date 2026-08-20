@@ -16,7 +16,8 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 // account invites them to email the owner to get signed up — an interested
 // stranger has no other way in. App users already have the app, so their SMS
 // stays a pure notification. At launch this line is replaced by store links
-// (docs/distribution-strategy.md).
+// for non-users, and app-user SMS gains an event deep link — same change,
+// never one without the other (FEATURES.md → SMS Links at Launch).
 const SIGNUP_INVITE_LINE =
   'Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.';
 
@@ -246,7 +247,9 @@ serve(async (req) => {
     // surface, not somewhere we want first impressions, and link-free SMS
     // reads less like spam to carrier filters. The non-app variant also
     // carries SIGNUP_INVITE_LINE — the one acquisition element, kept
-    // link-free.
+    // link-free. Launch pair (store link for non-users, event deep link
+    // for app users) is FEATURES.md → SMS Links at Launch; not before
+    // listings, never one variant without the other.
     function buildSmsBody(sharerName: string, signupInvite: boolean): string {
       const lines = [
         eventTitle
