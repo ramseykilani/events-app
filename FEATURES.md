@@ -28,6 +28,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
 | [Notification Explainer Clarity](#notification-explainer-clarity) | Planned | Pre-ask screen doesn't make the OS prompt or Continue obvious. |
+| [Circles UX](#circles-ux) | Planned | Current circles are hard to use, poorly explained, and not intuitive. Not designed — do not implement from this section. |
 | [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
 | [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
@@ -443,11 +444,11 @@ Until layer 2 ships for a host, soften the onboarding line so it matches today: 
 
 ## People List Scrolling
 
-**Status:** Planned — polish, not a blocker. Adding people, circles, hide/unhide, and the account footer all work today.
+**Status:** Planned — polish, not a blocker. Adding people, circles, hide/unhide, and the account footer all work today. Related: [Circles UX](#circles-ux) (the circles product/UX pass — not this scroll rewrite).
 
 ### What this is not
 
-This is not a missing People-screen capability and not a tester blocker. Do not treat it as a rewrite of My People, circles, or hide. The owner asked to record that the list *feel* is off so a later pass can fix the scroll, not invent new people features.
+This is not a missing People-screen capability and not a tester blocker. Do not treat it as a rewrite of My People, circles, or hide. The owner asked to record that the list *feel* is off so a later pass can fix the scroll, not invent new people features. A later pass on circles themselves lives under [Circles UX](#circles-ux).
 
 ### Problem
 
@@ -1197,6 +1198,30 @@ Not designed. The need is: when the explainer appears, it should be obvious that
 ### Open Questions
 
 - Copy, button labels, and whether the screen itself changes — none of that is decided.
+
+---
+
+## Circles UX
+
+**Status:** Planned — recorded 2026-08-20 from owner feedback. **Not designed; do not implement from this section.** Circles already ship as an optional share shortcut; this is a later pass on that implementation. Related: [People List Scrolling](#people-list-scrolling) (list feel on My People — not a circles rewrite).
+
+### Problem
+
+The current circles implementation is lacking. Circles are hard to use, not explained well, and not intuitive.
+
+They exist today as saved selections: create/edit/delete on My People, chip shortcuts on the share sheet that resolve to individual people. Sharing stays person-to-person; circles are a UI convenience, not a visibility model (`docs/events-product.md`).
+
+### Proposed Solution
+
+Not designed. Do not invent a new circles model, copy, or layout from this section.
+
+### Acceptance Criteria
+
+- [ ] Do not implement from this section. A later pass, with the owner, decides what better looks like.
+
+### Open Questions
+
+- How circles should work, how they should be explained, and how they should feel — none of that is decided.
 
 ---
 
