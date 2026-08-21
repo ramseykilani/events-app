@@ -178,7 +178,11 @@ BEGIN
       image_url = p_image_url, event_date = p_event_date, event_time = p_event_time,
       updated_at = now()
   FROM descendants d
-  WHERE e.id = d.id;
+  -- AND NOT e.frozen is load-bearing, not redundant with the CTE: the CTE is
+  -- evaluated once at the statement snapshot, but this outer predicate is
+  -- what EvalPlanQual re-evaluates on the new row version after a lock wait
+  -- (see Concurrency below).
+  WHERE e.id = d.id AND NOT e.frozen;
 
   RETURN p_id;
 END;
@@ -188,7 +192,7 @@ Properties:
 
 - **One server call, one transaction.** The whole follow tree updates or nothing does; there is no partial-propagation state. SECURITY DEFINER is required because the cascade writes other people's rows; ownership of the source row is verified explicitly.
 - **Cycles cannot form in practice** — `from_event_id` is written once at copy creation and never updated, and sharing always mints a new row — so the follow graph is a forest. The UNION visited-set is belt-and-braces (also covers a backfill bug).
-- **Concurrency:** the cascade's row locks serialize against a recipient's own concurrent `save_event`; Postgres re-evaluates `NOT frozen` after lock waits (EvalPlanQual), so a recipient who saves first is never overwritten by a late cascade.
+- **Concurrency:** the recursive CTE is evaluated once against the statement's snapshot, so its `NOT frozen` filter cannot see a concurrent commit. The guard that matters at lock-wait time is the outer UPDATE's `AND NOT e.frozen`: when the cascade waits on a row lock and the follower's own `save_event` commits first (setting `frozen = true` plus their values), EvalPlanQual re-evaluates the outer predicate against the new row version, the row no longer qualifies, and the late cascade skips it — the follower's edit survives. Without that clause EPQ re-checks only `e.id = d.id`, which still matches, and the cascade would silently overwrite the follower's fresh edit on a row now marked frozen. Accepted residual: a frozen intermediary's *subtree* can still receive one late cascade in the same race (CTE membership is fixed at snapshot), which is semantically defensible and vanishingly rare at this scale — the direct-overwrite case is the one that must be correct, and it is.
 - **Silent:** no notifications fire on edit (owner decision 1). There is no ping path to scope.
 - The client keeps the no-op detection it has today (unchanged form values never call `save_event`), so follow is preserved without relying on the server rule; the server rule is defense in depth.
 
@@ -430,15 +434,15 @@ WHERE e.id = c.recipient_new_id;
 
 ## Cutover
 
-One coordinated session, in this order. There is exactly one Supabase project (`ijmwtjyuvdnvhblwwtpt`) serving both the staging preview and production, so the schema cutover is global the moment step 5 runs; production web and old native builds are down from step 5 until step 10 (accepted — owner decision 5).
+One coordinated session, in this order. Precondition: the implementation is complete as a local commit on top of `staging` — client, migration, tests, docs together — with the fast checks green locally (`npx tsc --noEmit && npm run test:conventions && npm test -- --runInBand && npm run test:sql`). There is exactly one Supabase project (`ijmwtjyuvdnvhblwwtpt`) serving both the staging preview and production, so the schema cutover is global the moment step 5 runs; production web and old native builds are down from step 5 until step 10 (accepted — owner decision 5).
 
 1. **Tag the restore point:** `git tag forwarding-model-final <last pre-cutover commit>` and push the tag (rollback element 1).
 2. **Snapshot:** `pg_dump` the live database immediately before migrating; verify the file restores (it is also the rehearsal input — element 4/5).
 3. **Rehearse** on the restored copy: apply the migration, run the verification queries, execute the revert procedure, verify the round-trip (rollback elements 5–6). If anything fails, stop — the live project is untouched.
-4. **Native builds:** `eas build --platform android --profile production --non-interactive --wait` + `eas submit`, and the iOS equivalents with the ASC key setup from AGENTS.md, from the staging tip carrying the new client. Submitting before the migration lets store processing overlap the outage so auto-update (Play on its idle/wifi schedule; TestFlight faster) delivers the fixed binary. Builds are metered — one per platform, no speculative rebuilds.
+4. **Native builds:** build and submit from the **local implementation commit** — `eas build` uploads the local project and does not need the commit pushed anywhere. The commit must be final: the exact SHA built here is pushed unchanged at step 7, so the binaries match the shipped code. `eas build --platform android --profile production --non-interactive --wait` + `eas submit`, and the iOS equivalents with the ASC key setup from AGENTS.md. Submitting before the migration lets store processing overlap the outage so auto-update (Play on its idle/wifi schedule; TestFlight faster) delivers the fixed binary. Builds are metered — one per platform, no speculative rebuilds; if the post-migration blocker policy forces a client fix, the fix-forward path produces a new commit and a second pair of builds (accepted). (Alternative considered and rejected: push to `staging` before the migration and let the full suite run red against the old schema until the migration lands — a deliberately red run erodes the "red means fix forward" signal, and the staging preview keeps serving the old, now-broken client during the window.)
 5. **Apply the migration:** `npx supabase db push` against the linked project. The migration also unschedules the `cleanup-events-weekly` cron job (defensive `DO` block calling `cron.unschedule` when the job exists; runbook fallback: SQL editor).
 6. **Deploy the edge function:** `npx supabase functions deploy send-notification --project-ref ijmwtjyuvdnvhblwwtpt`; delete `cleanup-events` (`npx supabase functions delete cleanup-events`).
-7. **Push the client to `staging`.** The full suite runs in CI (e2e now passes against the new schema) and the staging preview redeploys when green.
+7. **Push the client to `staging`** — the same SHA built in step 4, unchanged. The full suite runs in CI (e2e now passes against the new schema) and the staging preview redeploys when green.
 8. **Go/no-go verification queries** against the live DB (below).
 9. **Manual regression subset** on the staging preview: E-104 (share lands), E-108 (forwarding), E-105 (hide), an edit-propagation pass, and a pending-signup delivery pass (third test-OTP account per the AGENTS.md runbook).
 10. **Release review** per `scripts/release-review-orchestrator.md`, with the post-migration blocker policy below in force. On SHIP: `git push origin origin/staging:production` — production web is restored by the deploy. Native testers receive the step-4 binaries via auto-update; no messaging (owner decision 6).
