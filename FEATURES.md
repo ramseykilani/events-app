@@ -700,7 +700,14 @@ The question "does this rewrite actually make sense?" is deliberately left **una
 
 Work starts only after the owner confirms why we are doing this. An agent that skips that conversation is doing it wrong, however good the write-up below looks.
 
-**Answered (2026-08-21):** the owner confirmed both halves of the why — the storage rewrite (engineering) and edits-propagate-to-followers (product) are both wanted, and wanted now. The design pass is unblocked; implementation still waits on that pass producing a real spec (schema, backfill SQL, cutover order, tests). The owner also required that the current behavior be documented well enough to re-implement if the rewrite goes wrong — see the "Old-model archive + rollback" cutover bullet below.
+**Answered (2026-08-21):** the owner confirmed both halves of the why — the storage rewrite (engineering) and edits-propagate-to-followers (product) are both wanted, and wanted now. The design pass is unblocked; implementation still waits on that pass producing a real spec (schema, backfill SQL, cutover order, tests). The owner also required that the current behavior be documented well enough to re-implement if the rewrite goes wrong — see the "Extensive rollback plan" cutover bullet below.
+
+### Owner decisions (2026-08-21)
+
+- **No edit-triggered notifications in v1.** Edits cascade silently — no push, no SMS, at no depth of the follow tree. Rationale: the person editing doesn't realize hitting Save would notify anyone; the app is mostly a one-time send (usually with a link attached) after which people reach out to confirm details person-to-person; date/time aren't essential enough to interrupt anyone over. Adding date/time pings later is deliberately left open as a separate future decision — not designed here.
+- **Following ends on any save.** The simple rule: edit anything — even a typo fix — and your copy stops following. No field-level following.
+- **Two senders = two entries.** Receiving the same listing from two different people puts two rows on your calendar, each following its own sender. No cross-sender dedup on receive.
+- **Extensive rollback plan is part of the implementation.** Not a follow-up: the spec must include the archive + restore point + data rollback path required below, and implementation does not start without it.
 
 ### Why this is on the roadmap — the B-1 postmortem (2026-08-13)
 
@@ -754,15 +761,15 @@ Incoming and outgoing are opposite arrows. `from_event_id` is where it came from
 
 **Share (including today’s re-share):** copy **your** current row onto their calendar with `from_event_id = your row`, and write a send-log line. Sarah sends to Bob; Bob has his own row, From Sarah. Bob taps Share, picks Carol; Carol gets a copy of **Bob’s** row, From Bob. If they don’t have an account, only the send-log line exists until they sign up — then we copy from your row as it is *now*.
 
-**Follow until local edit:** Save updates your row and sets `frozen`. Then update every row that still points at you and isn’t frozen. Those updates walk the same way to *their* followers. Sarah hits Save → Bob still following Sarah → Bob’s row updates → Carol still following Bob → Carol’s row updates. Bob hits Save → he stops following Sarah, and Carol (still following him) gets *his* version. Carol hits Save → she stops following Bob.
+**Follow until local edit:** Save updates your row and sets `frozen` — any save ends following, even a typo fix (owner decision, 2026-08-21). Then update every row that still points at you and isn’t frozen. Those updates walk the same way to *their* followers. Sarah hits Save → Bob still following Sarah → Bob’s row updates → Carol still following Bob → Carol’s row updates. Bob hits Save → he stops following Sarah, and Carol (still following him) gets *his* version. Carol hits Save → she stops following Bob.
 
 That cascade is the rule applied twice, not a hosted object. Sarah never “messages” Carol. Carol is still looking at the concert Bob sent her. The time field changing is the listing getting corrected.
 
 **Remove / delete account:** delete your row. Followers already have the fields on their own rows, so they keep the event; `from_event_id` goes dangling and they no longer receive updates. Same personal-remove rule as today. This is why share must **copy** at send time, not grant access to your row — access is the old pointer model forwarding was written to kill.
 
-**Notifications:** data can cascade; pings should not. Date/time change: notify the people **you** told. Further followers see it the next time they open the app. Title-only fixes stay silent.
+**Notifications (owner decision, 2026-08-21):** edits propagate **silently** — no push, no SMS, at no depth of the follow tree. The person editing may not realize a save would notify anyone, and the app is a one-time send after which people confirm details person-to-person. Followers simply see the corrected listing the next time they open the app. Adding date/time pings later stays open as a separate future decision.
 
-**Dedup:** per-user “already have this listing” is enough. Drop the global unique index on `(url, title, date, time)`. Two people adding “Lunch” at the same slot are two heads-ups, not one shared blob (KI-002 goes away).
+**Dedup:** drop the global unique index on `(url, title, date, time)`. Two people adding “Lunch” at the same slot are two heads-ups, not one shared blob (KI-002 goes away). Receiving the same listing from two different people creates **two rows**, each following its own sender (owner decision, 2026-08-21) — no cross-sender dedup on receive. Whether a per-user “already have this listing” check still applies on the *create* path is a design-pass detail.
 
 ### Follow propagation is ONE server call, not a client loop
 
@@ -772,7 +779,7 @@ Design answer to "how does the follow cascade avoid N database calls" (2026-08-1
 2. propagates with a set-based recursive UPDATE (`WITH RECURSIVE` over `from_event_id`, restricted to non-`frozen` rows, carrying a visited-id set — which also answers the cycles open question by construction: a row is never updated twice, so A↔B loops terminate);
 3. commits — the whole follow tree updates or nothing does. There is no partial-propagation state.
 
-It must be SECURITY DEFINER because the cascade writes *other people's* rows — impossible under RLS from the client. The function verifies `auth.uid()` owns the source row, then runs the tree update with definer rights. Notifications deliberately do **not** cascade: after commit, only the caller's direct `sends` are pinged, and only for date/time changes; further followers are pull-only. Data walks the tree; pings go one hop.
+It must be SECURITY DEFINER because the cascade writes *other people's* rows — impossible under RLS from the client. The function verifies `auth.uid()` owns the source row, then runs the tree update with definer rights. No notifications fire on edit at all (owner decision, 2026-08-21): data walks the tree, and every follower is pull-only — there is no ping path to scope.
 
 The client write is a set-to-value update of one row, so it is naturally idempotent — silent retry + reconcile-read on timeout are safe with no idempotency key. That is what removes the B-1 failure mode by construction rather than by budget tuning.
 
@@ -783,7 +790,7 @@ Calendar, share sheet, hide, remove, SMS, display names stay. No new onboarding.
 | Situation | Today | After a future ship of this |
 |-----------|--------|------------------------------|
 | You fix the time after sending | They keep 7pm (you forked) | People still following you get 8pm; that walks the follow tree |
-| Date/time change | No extra ping | Ping people you told; further followers are pull-only |
+| You edit after sending | No ping | Still no ping — followers silently see the new version next time they open the app |
 | You edit, then they open the event | “From you” can vanish | Attribution stays |
 | Re-share after you edited | Can plant a second copy | Same event; ✓ Shared for people you already sent it to |
 | Two people add “Lunch” at the same slot | One can steal the other’s description | Two independent rows |
@@ -798,28 +805,28 @@ A later design pass, then a later implementation, has to cover:
 - **Sends + follow pointers.** Each `event_shares` row becomes a `sends` line on the *sender’s* new row, and (when the recipient already has a copy) `from_event_id` / `from_person_id` on the recipient’s row. Pending contacts (no account) stay send-log-only until signup.
 - **Forks already in the wild.** If the sender already forked, recipients still pointing at the old blob are *not* following the sender’s current row. The migration must decide frozen vs dangling `from_event_id` vs “best-effort relink.” Today’s graph is already lossy after edits; the backfill will be too. That’s a design problem, not a surprise at ship time.
 - **Cutover.** One migration when this ships: rewrite `share_event`, `get_calendar_events`, pending delivery, RLS; delete `find_or_create_event`, the global unique index, the client-side edit merge, and orphan-snapshot GC. Client and backend move together. No long dual-write. Architecture docs / agent context update in the same change — they stay the source of truth for **shipped** behavior until then.
-- **Old-model archive + rollback path (owner requirement, 2026-08-21).** The current behavior works and must stay re-implementable if the rewrite goes wrong. Before the cutover migration lands: tag the last forwarding-model commit (`forwarding-model-final`) so the old behavior — `docs/events-technical-architecture.md`, agent context, migrations, `supabase/tests/forwarding_semantics.sql`, client — is one named restore point; and keep an archived plain-language description of the old model's rules (share = copy at send time, edits never propagate, remove is personal, global dedup, attribution reconstructed from the share log) *including the bugs it carried* (B-1 class, KI-002), so a future revert knows both the behavior and its price. Code rollback is a git revert; data rollback is the one-way door — the spec must say how long the old tables survive post-cutover (renamed, not dropped) and require a database snapshot immediately before the migration runs.
+- **Extensive rollback plan (owner requirement, 2026-08-21 — part of the implementation, not a follow-up).** The current behavior works and must stay re-implementable if the rewrite goes wrong. The spec's rollback section must include, at minimum: (1) a named restore point — tag the last forwarding-model commit (`forwarding-model-final`) before the cutover lands, so the old behavior (`docs/events-technical-architecture.md`, agent context, migrations, `supabase/tests/forwarding_semantics.sql`, client) is one findable point; (2) an archived plain-language description of the old model's rules (share = copy at send time, edits never propagate, remove is personal, global dedup, attribution reconstructed from the share log) *including the bugs it carried* (B-1 class, KI-002), so a future revert knows both the behavior and its price; (3) old tables renamed, not dropped, for a defined soak window after cutover; (4) a database snapshot immediately before the migration runs; (5) the backfill rehearsed against a copy of real data before the real run; (6) a written revert procedure (code revert + how data flows back) executed at least once on staging before any production cutover; (7) post-cutover verification queries (row counts, spot-check shared events on both calendars) with explicit go/no-go criteria for keeping the new model. Code rollback is a git revert; data rollback is the one-way door — this plan is what keeps the door open.
 - **Verify.** Rewrite [`supabase/tests/forwarding_semantics.sql`](supabase/tests/forwarding_semantics.sql) and the Jest/e2e paths that assume snapshot ids / `userEventId`. Manual pass: existing shared events still on both calendars, ✓ Shared intact, hide/remove/delete-account still personal. Old events keep their details; they do not get a silent rewrite of history beyond stamping follow/send as best we can.
 
 ### Acceptance Criteria
 
 - [ ] Do not implement from this section. A dedicated design pass must close the open questions and produce a real spec (schema, backfill SQL, cutover order, tests) before any migration is written.
+- [ ] The spec includes the extensive rollback plan above; implementation does not start without it.
 - [ ] When that spec exists, the implementation includes data migration as above — not a follow-up someone will remember later.
+- [ ] v1 ships no edit-triggered notifications (push or SMS) — edits propagate silently.
 
 ### Open Questions
 
+Answered by the owner (2026-08-21), no longer open: whether the rewrite makes sense (yes — see the gate above); what ends following (any save); two senders delivering the same listing (two rows, each following its own sender); edit-triggered notifications (none in v1 — silent cascade; future pings are a separate decision); rollback scope (extensive plan required as part of implementation — see the cutover bullets).
+
 Remaining design work. An agent that starts coding from this list is doing it wrong.
 
-- **Does this rewrite still make sense?** (Owner question, deliberately open since 2026-08-13 — see "Confirm the WHY with the owner first" above. Nothing below is touched until the owner answers it.)
 - Exact new schema and RLS.
 - Exact backfill SQL: how to pick `from_event_id` when several people shared the same snapshot; what to do when the sender’s pointer already moved (fork).
-- Whether `frozen` is a flag, or “I saved,” or “any local field change.”
-- Cycles (A and B share the same listing to each other).
-- Two people send you the same concert — one row or two; who you follow.
-- Hide + a correction walking in through someone else.
-- Pending SMS users and edits before they sign up.
-- Notification reach and copy: the draft pings only the editor's direct sends (one hop) while data walks the whole tree; the owner questioned the one-hop rule on 2026-08-21 — decide one hop vs whole follow tree, how the copy attributes the change, and whether date/time pings are in scope at all for v1 of this.
-- Rollback / expand-contract if the migration is wrong on live tester data.
+- Cycles (A and B share the same listing to each other) — termination is answered by construction (visited set, above); the design pass confirms the user-visible result reads sensibly.
+- Hide + a correction walking in through someone else (proposed default: hide filters shares *from* a person, not corrections arriving via someone you follow).
+- Pending SMS users: answered in draft (their copy is stamped from the sender’s row as it is at sign-up, so pre-sign-up edits are simply included) — design pass confirms.
+- The rollback plan's specifics: soak-window length, snapshot + revert procedure, go/no-go checks.
 - What, if anything, remains of [Creator-Linked Events](#creator-linked-events-edits-propagate) after this.
 
 ---
