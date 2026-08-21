@@ -38,7 +38,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
 | [Share Sent Confirmation](#share-sent-confirmation) | Planned | After Share, the screen just goes back. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
-| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner confirmed the why 2026-08-21; design pass may start — no implementation until its spec. Not a tester blocker. |
+| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Spec written 2026-08-21 — [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). No implementation until the owner approves the spec. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 
@@ -689,7 +689,7 @@ If we do want a time fix to reach the people you told, do **not** build this hos
 
 ## Per-User Events (Copy + Follow)
 
-**Status:** Planned (2026-08-13) — **incomplete, do not implement.** Testers should get the current forwarding/fork build. This is a later storage-and-edit rewrite. What follows is a direction from a design conversation, not a complete spec. A dedicated design pass has to finish it before anyone writes a migration. Listing it is not a commitment to the exact shape below. **The design-pass gate was answered by the owner on 2026-08-21 (next section): proceed to the design pass; implementation still waits on its spec.**
+**Status:** Planned (2026-08-13) — **do not implement from this section.** Testers should get the current forwarding/fork build. This is a later storage-and-edit rewrite. What follows is the direction from a design conversation, preserved for context. **Design pass complete 2026-08-21: the implementation spec is [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md) (schema, RLS, RPCs, backfill SQL, cutover order, rollback plan, tests). Implementation waits on the owner approving that spec — when approved, implement from the spec, not from this section.**
 
 ### Confirm the WHY with the owner first (gate, 2026-08-13)
 
