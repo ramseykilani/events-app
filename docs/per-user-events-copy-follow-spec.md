@@ -1,8 +1,6 @@
 # Per-User Events (Copy + Follow) — Implementation Spec
 
-**Status:** Spec complete 2026-08-21 — **awaiting owner approval. Do not implement until the owner approves this document.** This is the spec required by FEATURES.md → "Per-User Events (Copy + Follow)" before any migration is written.
-
-This document is the implementation contract: schema, RLS, RPCs, backfill SQL, cutover order, rollback plan, and test plan. When approved, implementation lands as one coordinated change (client + backend move together — no dual-write period).
+**Status:** Spec complete and **approved by the owner 2026-08-21**. This document is the implementation contract: schema, RLS, RPCs, backfill SQL, cutover order, rollback plan, and test plan. Implement from this document (not from the FEATURES.md section, which is preserved for context). Implementation lands as one coordinated change (client + backend move together — no dual-write period).
 
 ## Why
 
@@ -535,7 +533,7 @@ Update E-103–E-109 and M-005–M-007 wording (own row, not `user_events` copy)
 
 ## Acceptance criteria
 
-- [ ] Owner approves this spec before any migration is written.
+- [x] Owner approves this spec before any migration is written — approved 2026-08-21.
 - [ ] Implementation includes the data migration and the full rollback plan above — not as follow-ups.
 - [ ] v1 ships no edit-triggered notifications (push or SMS); edits propagate silently.
 - [ ] Any field-changing save ends following; no-op saves do not.
