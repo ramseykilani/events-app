@@ -38,7 +38,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
 | [Share Sent Confirmation](#share-sent-confirmation) | Planned | After Share, the screen just goes back. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
-| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner must confirm the why before any design pass. Not a tester blocker. |
+| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Incomplete — do not implement. Owner confirmed the why 2026-08-21; design pass may start — no implementation until its spec. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 
@@ -689,7 +689,7 @@ If we do want a time fix to reach the people you told, do **not** build this hos
 
 ## Per-User Events (Copy + Follow)
 
-**Status:** Planned (2026-08-13) — **incomplete, do not implement.** Testers should get the current forwarding/fork build. This is a later storage-and-edit rewrite. What follows is a direction from a design conversation, not a complete spec. A dedicated design pass has to finish it before anyone writes a migration. Listing it is not a commitment to the exact shape below. **And the design pass itself is gated: confirm the why with the owner first (next section).**
+**Status:** Planned (2026-08-13) — **incomplete, do not implement.** Testers should get the current forwarding/fork build. This is a later storage-and-edit rewrite. What follows is a direction from a design conversation, not a complete spec. A dedicated design pass has to finish it before anyone writes a migration. Listing it is not a commitment to the exact shape below. **The design-pass gate was answered by the owner on 2026-08-21 (next section): proceed to the design pass; implementation still waits on its spec.**
 
 ### Confirm the WHY with the owner first (gate, 2026-08-13)
 
@@ -699,6 +699,8 @@ The question "does this rewrite actually make sense?" is deliberately left **una
 - **Against:** the largest change in the project — schema replacement, backfill from a lossy fork graph, cutover, test rewrites. And it ships a product change (edits propagate to followers) inside what looks like a storage refactor. The interim B-1 fixes (below) may also make day-to-day pain low enough that the rewrite can wait — or be descoped entirely.
 
 Work starts only after the owner confirms why we are doing this. An agent that skips that conversation is doing it wrong, however good the write-up below looks.
+
+**Answered (2026-08-21):** the owner confirmed both halves of the why — the storage rewrite (engineering) and edits-propagate-to-followers (product) are both wanted, and wanted now. The design pass is unblocked; implementation still waits on that pass producing a real spec (schema, backfill SQL, cutover order, tests). The owner also required that the current behavior be documented well enough to re-implement if the rewrite goes wrong — see the "Old-model archive + rollback" cutover bullet below.
 
 ### Why this is on the roadmap — the B-1 postmortem (2026-08-13)
 
@@ -796,6 +798,7 @@ A later design pass, then a later implementation, has to cover:
 - **Sends + follow pointers.** Each `event_shares` row becomes a `sends` line on the *sender’s* new row, and (when the recipient already has a copy) `from_event_id` / `from_person_id` on the recipient’s row. Pending contacts (no account) stay send-log-only until signup.
 - **Forks already in the wild.** If the sender already forked, recipients still pointing at the old blob are *not* following the sender’s current row. The migration must decide frozen vs dangling `from_event_id` vs “best-effort relink.” Today’s graph is already lossy after edits; the backfill will be too. That’s a design problem, not a surprise at ship time.
 - **Cutover.** One migration when this ships: rewrite `share_event`, `get_calendar_events`, pending delivery, RLS; delete `find_or_create_event`, the global unique index, the client-side edit merge, and orphan-snapshot GC. Client and backend move together. No long dual-write. Architecture docs / agent context update in the same change — they stay the source of truth for **shipped** behavior until then.
+- **Old-model archive + rollback path (owner requirement, 2026-08-21).** The current behavior works and must stay re-implementable if the rewrite goes wrong. Before the cutover migration lands: tag the last forwarding-model commit (`forwarding-model-final`) so the old behavior — `docs/events-technical-architecture.md`, agent context, migrations, `supabase/tests/forwarding_semantics.sql`, client — is one named restore point; and keep an archived plain-language description of the old model's rules (share = copy at send time, edits never propagate, remove is personal, global dedup, attribution reconstructed from the share log) *including the bugs it carried* (B-1 class, KI-002), so a future revert knows both the behavior and its price. Code rollback is a git revert; data rollback is the one-way door — the spec must say how long the old tables survive post-cutover (renamed, not dropped) and require a database snapshot immediately before the migration runs.
 - **Verify.** Rewrite [`supabase/tests/forwarding_semantics.sql`](supabase/tests/forwarding_semantics.sql) and the Jest/e2e paths that assume snapshot ids / `userEventId`. Manual pass: existing shared events still on both calendars, ✓ Shared intact, hide/remove/delete-account still personal. Old events keep their details; they do not get a silent rewrite of history beyond stamping follow/send as best we can.
 
 ### Acceptance Criteria
@@ -815,7 +818,7 @@ Remaining design work. An agent that starts coding from this list is doing it wr
 - Two people send you the same concert — one row or two; who you follow.
 - Hide + a correction walking in through someone else.
 - Pending SMS users and edits before they sign up.
-- Notification copy, and whether date/time pings are in scope at all for v1 of this.
+- Notification reach and copy: the draft pings only the editor's direct sends (one hop) while data walks the whole tree; the owner questioned the one-hop rule on 2026-08-21 — decide one hop vs whole follow tree, how the copy attributes the change, and whether date/time pings are in scope at all for v1 of this.
 - Rollback / expand-contract if the migration is wrong on live tester data.
 - What, if anything, remains of [Creator-Linked Events](#creator-linked-events-edits-propagate) after this.
 
