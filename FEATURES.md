@@ -41,6 +41,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Spec approved 2026-08-21 — [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Implement from the spec. Not a tester blocker. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
+| [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
 ## Using and testing
 
@@ -1327,3 +1328,33 @@ At launch, in the same `send-notification` change:
 - Link domain: `shared-events.pages.dev` vs a custom domain (AASA on `pages.dev` is often painful).
 - What a universal-link miss shows instead of the full web app.
 - Whether `WEB_APP_URL` stays the event-link base or a dedicated link domain is introduced.
+
+---
+
+## AT Protocol Backend
+
+**Status:** Considering (2026-08-24) — idea stage only, recorded at the owner's request so the idea isn't lost. **Nothing has been designed**: no spec, no schema, no lexicon draft, no migration plan, no prototype. This is not roadmap and not a commitment. Do not implement from this section — if it is ever picked up, step one is a design conversation with the owner, not code.
+
+### What this would be
+
+Move the backend off Supabase onto the [AT Protocol](https://atproto.com/) (the open protocol under Bluesky). The social graph stops being a private database we operate and becomes the open protocol's graph; Events becomes one app among potentially many reading and writing event records on that network. The owner's framing: an open-protocol answer to the Meta model, with Events as one of the first apps on it.
+
+### Why it might be wanted
+
+- The data model is already close to the protocol's shape: every piece of data is subjective, per-user copies, no central source of truth. The protocol's per-user repos ("your data lives in your repo, signed by your key") are the same idea with credible exit built in.
+- The events niche on the protocol is vacant: Smoke Signal, the events app that defined the `community.lexicon.calendar.event` lexicon, sunset in July 2026.
+- An open graph means other apps could interoperate with event records (and Events with theirs) without anyone operating a Meta-style closed graph.
+
+### Why it's questionable (investigation notes, 2026-08-24)
+
+Facts, not design conclusions:
+
+- **The app's core is private person-to-person sharing, and the protocol is public-by-default.** The non-public extension ("Atproto Spaces") entered open alpha on 2026-08-20 — explicitly not production-ready (breaking changes and data loss expected; stable launch targeted later in 2026). Any port is blocked on this maturing.
+- **Phone-number identity, contact matching, pending shares to non-users, and SMS have no protocol equivalent.** They would remain centralized services we operate regardless, so the backend never fully moves.
+- **Operational step-up.** Today: one Supabase project plus edge functions. A protocol backend means running an AppView (indexer + API), a push gateway, and the sidecar services above — while still pre-launch.
+- **Philosophy tension.** `docs/events-philosophy.md` says "a tool, not a platform." Being a founding app of a network is a platform ambition; adopting this direction would be a deliberate change of identity, not a drift.
+- Checked against [Per-User Events (Copy + Follow)](#per-user-events-copy--follow): that migration is neutral-to-positive for this direction (per-user owned rows are closer to the protocol's per-user-repo shape than the shared snapshot table), so this idea is not a reason to block or alter it.
+
+### Decision
+
+Undecided — maybe never. Natural revisit trigger: Atproto Spaces reaching a stable release. Until then, Supabase remains the backend and nothing in this section is actionable.
