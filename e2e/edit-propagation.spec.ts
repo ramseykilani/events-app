@@ -26,11 +26,22 @@ test('edits cascade to followers until the follower edits locally', async ({
   test.setTimeout(240_000);
   const title = uniqueTitle('E2E cascade', testInfo.project.name);
   const bTitle = `${title} (B's edition)`;
-  const timeStr = (t: string) =>
-    new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], {
+  // The detail's meta line is ONE text node ("Mon, Aug 24 · 6:30 PM"), so
+  // match the whole line (an exact match on the time alone can never hit).
+  // The event is created for today, so the date half is always today.
+  const metaLine = (t: string) => {
+    const now = new Date();
+    const date = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    const time = new Date(`1970-01-01T${t}:00`).toLocaleTimeString([], {
       hour: 'numeric',
       minute: '2-digit',
     });
+    return `${date} · ${time}`;
+  };
 
   // --- A: make sure B is in My People, then create + share the event.
   await page.goto('/');
@@ -46,7 +57,7 @@ test('edits cascade to followers until the follower edits locally', async ({
   await page.getByLabel('Time (optional)').fill('18:30');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(
-    visibleText(page, timeStr('18:30'))
+    visibleText(page, metaLine('18:30'))
   ).toBeVisible({ timeout: 15000 });
 
   const contextB = await newExtraContext(browser, testInfo, AUTH_FILE_B);
@@ -59,7 +70,7 @@ test('edits cascade to followers until the follower edits locally', async ({
       timeout: 30000,
     });
     await openEventFromCalendar(pageB, title);
-    await expect(visibleText(pageB, timeStr('18:30'))).toBeVisible({
+    await expect(visibleText(pageB, metaLine('18:30'))).toBeVisible({
       timeout: 15000,
     });
 
@@ -73,20 +84,20 @@ test('edits cascade to followers until the follower edits locally', async ({
     await page.getByRole('button', { name: 'Edit' }).filter({ visible: true }).click();
     await page.getByLabel('Time (optional)').fill('19:45');
     await page.getByRole('button', { name: 'Save' }).click();
-    await expect(visibleText(page, timeStr('19:45'))).toBeVisible({
+    await expect(visibleText(page, metaLine('19:45'))).toBeVisible({
       timeout: 15000,
     });
 
     // --- B keeps their own version: A's second edit does not reach B.
-    // (The reload also resets B's nav stack to the calendar, so the cleanup
-    // removal below pops straight back to it.)
-    await pageB.reload();
+    // (goto('/') re-boots B on the calendar — a fresh fetch — and resets the
+    // nav stack, so the cleanup removal below pops straight back to it.)
+    await pageB.goto('/');
     await expectCalendar(pageB);
     await openEventFromCalendar(pageB, bTitle);
-    await expect(visibleText(pageB, timeStr('18:30'))).toBeVisible({
+    await expect(visibleText(pageB, metaLine('18:30'))).toBeVisible({
       timeout: 15000,
     });
-    await expect(visibleText(pageB, timeStr('19:45'))).toBeHidden();
+    await expect(visibleText(pageB, metaLine('19:45'))).toBeHidden();
 
     // --- And B's edit never travels upstream: A's row keeps A's title.
     await expect(visibleText(page, title)).toBeVisible();
