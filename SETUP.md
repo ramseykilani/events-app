@@ -94,6 +94,7 @@ The app's database schema, security policies, triggers, and functions are define
 | `20260217000001_fix_delete_cascade.sql` | Adds RLS policies so the event creator can cascade-delete related `user_events` and `event_shares` rows |
 | `20260218000000_resolve_my_people_user_id_on_insert.sql` | Adds a BEFORE INSERT trigger on `my_people` to resolve `user_id` immediately when a contact is added for an existing user, and updates `ensure_user_exists` to correct placeholder phone numbers |
 | `20260218000001_fix_user_phone_and_rebackfill.sql` | Syncs `users.phone_number` from `auth.users.phone`, re-resolves `my_people.user_id` with flexible phone matching (handles `+` prefix differences), and updates all phone-matching triggers and functions |
+| `20260824000001_copy_follow_model.sql` | Copy + Follow cutover: renames `events`/`user_events`/`event_shares` to `legacy_*` (kept for a 30-day soak, client-revoked), creates the per-user `events` + `sends` tables with owner-only RLS, installs `save_event` / `share_event` / `get_calendar_events` / `deliver_pending_shares`, backfills rows + sends + follow links, drops `find_or_create_event` / `cleanup_old_events`, and unschedules the `cleanup-events-weekly` cron job |
 
 If any migration fails, check the error message — it usually means a previous migration wasn't run, or was run out of order.
 
@@ -140,12 +141,12 @@ Your project ref is the `abcdefghijk` part of your Supabase URL (`https://abcdef
 
 #### Deploy the functions
 
-The two cleanup functions are called server-side (from cron), not from the app. Deploy them with `--no-verify-jwt` so they can be invoked with a secret key:
+The cleanup function is called server-side (from cron), not from the app. Deploy it with `--no-verify-jwt` so it can be invoked with a secret key:
 
 ```bash
 supabase functions deploy og-metadata
+supabase functions deploy send-notification
 supabase functions deploy cleanup-people --no-verify-jwt
-supabase functions deploy cleanup-events --no-verify-jwt
 ```
 
 #### What each function does
@@ -153,12 +154,14 @@ supabase functions deploy cleanup-events --no-verify-jwt
 | Function | Purpose | When it runs |
 |----------|---------|-------------|
 | `og-metadata` | Fetches Open Graph metadata (title, description, image) from a pasted URL for link previews | Called by the app when a user pastes a URL in the "Add event" screen |
+| `send-notification` | Sends the share push notification and/or SMS to each recipient | Called by the app (fire-and-forget) after a share |
 | `cleanup-people` | Removes people from `my_people` who haven't been shared with in 6 months | Scheduled via cron (see below) |
-| `cleanup-events` | Deletes event shares, user_events, and events older than 6 months | Scheduled via cron (see below) |
 
-#### Schedule the cleanup cron jobs
+(There is no `cleanup-events`: in the Copy + Follow model every events row has exactly one owner, so there are no orphan snapshots to reclaim — the function, its SQL helper, and its cron job were removed in the 2026-08-24 cutover.)
 
-The two cleanup functions should run on a schedule. In the Supabase Dashboard:
+#### Schedule the cleanup cron job
+
+The cleanup function should run on a schedule. In the Supabase Dashboard:
 
 1. Go to **Database > Extensions** and enable the `pg_cron` and `pg_net` extensions if they aren't already.
 2. Go to **Project Settings > API Keys** and create a **secret key** if you don't have one.
@@ -171,18 +174,6 @@ SELECT cron.schedule(
   '0 3 * * 0',
   $$SELECT net.http_post(
     url := 'https://abcdefghijk.supabase.co/functions/v1/cleanup-people',
-    headers := jsonb_build_object(
-      'apikey', 'sb_secret_...'
-    )
-  );$$
-);
-
--- Run events cleanup weekly (Sunday at 4am UTC)
-SELECT cron.schedule(
-  'cleanup-events-weekly',
-  '0 4 * * 0',
-  $$SELECT net.http_post(
-    url := 'https://abcdefghijk.supabase.co/functions/v1/cleanup-events',
     headers := jsonb_build_object(
       'apikey', 'sb_secret_...'
     )

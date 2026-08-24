@@ -8,13 +8,14 @@ import {
 } from './helpers';
 
 // Event detail actions (M-007, with M-006's disabled-state check): Share opens
-// the share sheet (which refuses to share with zero selection), Edit forks the
-// event and the detail shows the new snapshot, Remove deletes only the
-// caller's copy. Dates must render formatted, never raw YYYY-MM-DD. The edit
-// step exercises EVERY field — KI-004 shipped a read-only URL input while
-// every test layer only ever edited the title; fill() fails on a read-only
-// input, so this is the guard.
-test('event detail: share sheet, edit fork, formatted date, remove', async ({
+// the share sheet (which refuses to share with zero selection), Edit saves the
+// caller's own row in place (Copy + Follow: one save_event call, no fork) and
+// the detail shows the new values, Remove deletes only the caller's row.
+// Dates must render formatted, never raw YYYY-MM-DD. The edit step exercises
+// EVERY field — KI-004 shipped a read-only URL input while every test layer
+// only ever edited the title; fill() fails on a read-only input, so this is
+// the guard.
+test('event detail: share sheet, edit in place, formatted date, remove', async ({
   page,
 }, testInfo) => {
   const title = uniqueTitle('E2E detail', testInfo.project.name);
@@ -48,10 +49,10 @@ test('event detail: share sheet, edit fork, formatted date, remove', async ({
     page.getByRole('button', { name: 'Remove Event' })
   ).toBeVisible();
 
-  // Edit creates a fork; the detail shows the new snapshot. Every field is
-  // edited, not just the title. The date moves to a different day in the
-  // same month (the calendar lists events per selected day, so the date
-  // edit is proven by where the event lands afterwards).
+  // Edit updates the caller's row in place; the detail shows the new values.
+  // Every field is edited, not just the title. The date moves to a different
+  // day in the same month (the calendar lists events per selected day, so
+  // the date edit is proven by where the event lands afterwards).
   const editedUrl = 'https://example.com/e2e-edited';
   const editedDescription = `${title} details updated`;
   const now = new Date();
@@ -78,7 +79,7 @@ test('event detail: share sheet, edit fork, formatted date, remove', async ({
   await page.getByLabel('Time (optional)').fill('18:30');
   await page.getByRole('button', { name: 'Save' }).click();
 
-  // The fork's detail shows every edited value. The URL renders as a
+  // The saved row's detail shows every edited value. The URL renders as a
   // fixed-label link, so the button's appearance proves the URL persisted.
   await expect(visibleText(page, editedTitle)).toBeVisible({
     timeout: 15000,

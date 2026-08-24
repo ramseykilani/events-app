@@ -8,7 +8,6 @@ describe('components/EventCard', () => {
     const onPress = jest.fn();
     const event: CalendarEvent = {
       id: 'ce-1',
-      event_id: 'e-1',
       title: null,
       description: null,
       image_url: null,
@@ -30,7 +29,6 @@ describe('components/EventCard', () => {
   it('renders sharer information when present', () => {
     const event: CalendarEvent = {
       id: 'ce-2',
-      event_id: 'e-2',
       title: 'Board Game Night',
       description: null,
       image_url: null,
@@ -51,7 +49,6 @@ describe('components/EventCard', () => {
   it('renders the event date in a friendly format', () => {
     const event: CalendarEvent = {
       id: 'ce-3',
-      event_id: 'e-3',
       title: 'Picnic',
       description: null,
       image_url: null,

@@ -20,7 +20,6 @@ import { isAbortError, withFetchTimeout, withRetries, withWriteTimeout } from '.
 
 type ShareParams = {
   eventId?: string | string[];
-  userEventId?: string | string[];
 };
 
 export default function ShareScreen() {
@@ -98,19 +97,19 @@ export default function ShareScreen() {
           membersData = data ?? [];
         }
 
-        // Load existing shares so already-shared people render as completed
+        // Load existing sends so already-shared people render as completed
         // actions. Sharing is forwarding: once shared it cannot be unsent, so
-        // existing shares are shown as done and only new people can be picked.
-        const ueId = firstParamValue(params.userEventId);
+        // existing sends are shown as done and only new people can be picked.
+        const eventId = firstParamValue(params.eventId);
         const sharedNow = new Set<string>();
-        if (ueId) {
-          const { data: shares, error: sharesErr } = await supabase
-            .from('event_shares')
+        if (eventId) {
+          const { data: sends, error: sendsErr } = await supabase
+            .from('sends')
             .select('person_id')
-            .eq('user_event_id', ueId)
+            .eq('event_id', eventId)
             .abortSignal(signal);
-          if (sharesErr) throw sharesErr;
-          for (const s of shares ?? []) sharedNow.add(s.person_id);
+          if (sendsErr) throw sendsErr;
+          for (const s of sends ?? []) sharedNow.add(s.person_id);
         }
 
         return {
@@ -143,7 +142,7 @@ export default function ShareScreen() {
     } finally {
       setPeopleLoaded(true);
     }
-  }, [userId, params.userEventId]);
+  }, [userId, params.eventId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -202,67 +201,23 @@ export default function ShareScreen() {
 
     setLoading(true);
     try {
-      let userEventId = firstParamValue(params.userEventId);
       let shared = false;
       // Captured inside the write so the notification below names exactly
-      // the new recipients — notifying every event_shares row re-pings
-      // people who were already on the event (KI-003).
+      // the new recipients — notifying every sends row re-pings people who
+      // were already on the event (KI-003).
       let notifiedPersonIds: string[] = [];
 
       await withWriteTimeout(async (signal) => {
-        if (!userEventId) {
-          const { data: existing } = await supabase
-            .from('user_events')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('event_id', eventId)
-            .abortSignal(signal)
-            .single();
-
-          if (existing) {
-            userEventId = existing.id;
-          } else {
-            const { data: inserted, error: insertErr } = await supabase
-              .from('user_events')
-              .insert({
-                user_id: userId,
-                event_id: eventId,
-              })
-              .select('id')
-              .abortSignal(signal)
-              .single();
-
-            if (insertErr && insertErr.code !== '23505') throw insertErr;
-            userEventId = inserted?.id;
-
-            if (!userEventId) {
-              const { data: afterConflict, error: fetchErr } = await supabase
-                .from('user_events')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('event_id', eventId)
-                .abortSignal(signal)
-                .single();
-              if (fetchErr) throw fetchErr;
-              userEventId = afterConflict?.id;
-            }
-          }
-        }
-
-        if (!userEventId) {
-          throw new Error('Could not find event ownership for sharing');
-        }
-
         const toShare = Array.from(selectedPersonIds).filter(
           (pid) => !alreadySharedIds.has(pid)
         );
 
         if (toShare.length > 0) {
-          // Delivers each recipient their own copy of the event and records the
-          // shares server-side (also bumps last_shared_at).
+          // Delivers each recipient their own copy of the caller's row and
+          // records the sends server-side (also bumps last_shared_at).
           const { error: shareErr } = await supabase
             .rpc('share_event', {
-              p_user_event_id: userEventId,
+              p_event_id: eventId,
               p_person_ids: toShare,
             })
             .abortSignal(signal);
@@ -275,10 +230,10 @@ export default function ShareScreen() {
 
       // Fire-and-forget, outside the write budget: notify the people just
       // shared with — and only them.
-      if (shared && userEventId) {
+      if (shared) {
         supabase.functions
           .invoke('send-notification', {
-            body: { userEventId, personIds: notifiedPersonIds },
+            body: { eventId, personIds: notifiedPersonIds },
           })
           .catch((err) => console.error('send-notification error:', err));
       }

@@ -10,21 +10,15 @@ import {
 import { FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from '../../../lib/timeoutSignal';
 import EventDetailScreen from '../../../app/(app)/event/[id]';
 
-const mockEventsSingle = jest.fn();
+const mockEventsMaybeSingle = jest.fn();
 const mockEventsEq = jest.fn();
 const mockEventsSelect = jest.fn();
+const mockEventsDeleteEqOwner = jest.fn();
+const mockEventsDeleteEqId = jest.fn();
 const mockEventsDelete = jest.fn();
 
-const mockUeSingle = jest.fn();
-const mockUeEqEvent = jest.fn();
-const mockUeEqUser = jest.fn();
-const mockUeSelect = jest.fn();
-const mockUeDeleteEqUser = jest.fn();
-const mockUeDeleteEqId = jest.fn();
-const mockUeDelete = jest.fn();
-
-const mockSharesEq = jest.fn();
-const mockSharesSelect = jest.fn();
+const mockSendsEq = jest.fn();
+const mockSendsSelect = jest.fn();
 
 const mockPeopleIn = jest.fn();
 const mockPeopleSingle = jest.fn();
@@ -60,14 +54,18 @@ jest.mock('../../../lib/supabase', () => ({
 
 const eventRow = {
   id: 'e1',
-  created_by_user_id: 'u1',
+  owner_id: 'u1',
   url: null,
   title: 'Board Game Night',
   description: null,
   image_url: null,
   event_date: '2026-05-10',
   event_time: null,
+  from_event_id: null,
+  from_user_id: null,
+  frozen: false,
   created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-01T00:00:00.000Z',
 };
 
 describe('app/(app)/event/[id]', () => {
@@ -82,24 +80,20 @@ describe('app/(app)/event/[id]', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1' });
 
-    mockEventsSingle.mockResolvedValue({ data: eventRow, error: null });
-    mockEventsEq.mockReturnValue(abortable({ single: mockEventsSingle }));
+    mockEventsMaybeSingle.mockResolvedValue({ data: eventRow, error: null });
+    mockEventsEq.mockReturnValue(abortable({ maybeSingle: mockEventsMaybeSingle }));
     mockEventsSelect.mockReturnValue({ eq: mockEventsEq });
 
-    mockUeSingle.mockResolvedValue({ data: { id: 'ue1' }, error: null });
-    mockUeEqEvent.mockReturnValue(abortable({ single: mockUeSingle }));
-    mockUeEqUser.mockReturnValue({ eq: mockUeEqEvent });
-    mockUeSelect.mockReturnValue({ eq: mockUeEqUser });
-    mockUeDeleteEqUser.mockImplementation(() =>
+    mockEventsDeleteEqOwner.mockImplementation(() =>
       abortablePromise(Promise.resolve({ error: null }))
     );
-    mockUeDeleteEqId.mockReturnValue({ eq: mockUeDeleteEqUser });
-    mockUeDelete.mockReturnValue({ eq: mockUeDeleteEqId });
+    mockEventsDeleteEqId.mockReturnValue({ eq: mockEventsDeleteEqOwner });
+    mockEventsDelete.mockReturnValue({ eq: mockEventsDeleteEqId });
 
-    mockSharesEq.mockImplementation(() =>
+    mockSendsEq.mockImplementation(() =>
       abortablePromise(Promise.resolve({ data: [], error: null }))
     );
-    mockSharesSelect.mockReturnValue({ eq: mockSharesEq });
+    mockSendsSelect.mockReturnValue({ eq: mockSendsEq });
 
     mockPeopleIn.mockImplementation(() =>
       abortablePromise(Promise.resolve({ data: [], error: null }))
@@ -126,8 +120,7 @@ describe('app/(app)/event/[id]', () => {
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'events') return { select: mockEventsSelect, delete: mockEventsDelete };
-      if (table === 'user_events') return { select: mockUeSelect, delete: mockUeDelete };
-      if (table === 'event_shares') return { select: mockSharesSelect };
+      if (table === 'sends') return { select: mockSendsSelect };
       if (table === 'my_people') return { select: mockPeopleSelect };
       if (table === 'hidden_people') {
         return { select: mockHiddenSelect, insert: mockHiddenInsert, delete: mockHiddenDelete };
@@ -140,7 +133,7 @@ describe('app/(app)/event/[id]', () => {
     jest.restoreAllMocks();
   });
 
-  it('removes only the own user_events row — never the events row', async () => {
+  it('removes only the caller\'s own events row', async () => {
     const screen = render(<EventDetailScreen />);
     const removeButton = await screen.findByText('Remove Event');
 
@@ -153,15 +146,14 @@ describe('app/(app)/event/[id]', () => {
     destructive?.onPress?.();
 
     await waitFor(() => {
-      expect(mockUeDeleteEqId).toHaveBeenCalledWith('id', 'ue1');
-      expect(mockUeDeleteEqUser).toHaveBeenCalledWith('user_id', 'u1');
+      expect(mockEventsDeleteEqId).toHaveBeenCalledWith('id', 'e1');
+      expect(mockEventsDeleteEqOwner).toHaveBeenCalledWith('owner_id', 'u1');
     });
-    expect(mockEventsDelete).not.toHaveBeenCalled();
     expect(router.back).toHaveBeenCalled();
   });
 
-  it('shows the Shared with list when shares exist', async () => {
-    mockSharesEq.mockImplementation(() =>
+  it('shows the Shared with list when sends exist', async () => {
+    mockSendsEq.mockImplementation(() =>
       abortablePromise(Promise.resolve({ data: [{ person_id: 'p1' }], error: null }))
     );
     mockPeopleIn.mockImplementation(() =>
@@ -177,11 +169,43 @@ describe('app/(app)/event/[id]', () => {
 
     await screen.findByText('Shared with');
     expect(screen.getByText('Alice')).toBeTruthy();
+    expect(mockSendsEq).toHaveBeenCalledWith('event_id', 'e1');
+  });
+
+  it('resolves the caller\'s own copy via the from_event_id fallback (notification tap with the sender\'s row id)', async () => {
+    // The param id is the SENDER's row id: the caller's own-row lookup
+    // misses, and the fallback finds their copy by from_event_id.
+    const copyRow = { ...eventRow, id: 'e-copy', from_event_id: 'e1', from_user_id: 'u-sender' };
+    mockEventsMaybeSingle
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: copyRow, error: null });
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Board Game Night');
+    expect(mockEventsEq).toHaveBeenCalledWith('id', 'e1');
+    expect(mockEventsEq).toHaveBeenCalledWith('from_event_id', 'e1');
+
+    // Actions operate on the resolved copy, not the param id.
+    fireEvent.press(screen.getByText('Share'));
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/(app)/share',
+      params: { eventId: 'e-copy' },
+    });
+  });
+
+  it('shows the access-removed state when neither the row nor a followed copy resolves', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Access removed');
+    fireEvent.press(screen.getByText('Back'));
+    expect(router.back).toHaveBeenCalled();
   });
 
   it('shows a short alert instead of navigating back when hide fails', async () => {
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
-    mockUeSingle.mockResolvedValue({ data: null, error: null });
     mockHiddenInsert.mockImplementation(() =>
       abortablePromise(Promise.resolve({ error: { message: 'insert failed' } }))
     );
@@ -200,10 +224,8 @@ describe('app/(app)/event/[id]', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 
-  it('navigates back after a successful hide — also when the viewer owns a copy (forwarding)', async () => {
+  it('navigates back after a successful hide', async () => {
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
-    // userEventId stays set (default mock): recipients own their copy, and
-    // the hide action must still be available on shared events.
 
     const screen = render(<EventDetailScreen />);
     const hideButton = await screen.findByText('Hide Alice');
@@ -219,21 +241,8 @@ describe('app/(app)/event/[id]', () => {
     expect(router.back).toHaveBeenCalled();
   });
 
-  it('shows access-removed state with a back button when the event is not visible', async () => {
-    mockEventsSingle.mockResolvedValue({
-      data: null,
-      error: { code: 'PGRST116', message: 'row not found' },
-    });
-
-    const screen = render(<EventDetailScreen />);
-
-    await screen.findByText('Access removed');
-    fireEvent.press(screen.getByText('Back'));
-    expect(router.back).toHaveBeenCalled();
-  });
-
   it('shows retry instead of spinning forever when the events fetch throws', async () => {
-    mockEventsSingle.mockRejectedValue(
+    mockEventsMaybeSingle.mockRejectedValue(
       new TypeError('NetworkError when attempting to fetch resource.')
     );
 
@@ -255,7 +264,7 @@ describe('app/(app)/event/[id]', () => {
 
   it('retries a failed load and then shows the event', async () => {
     const err = new TypeError('NetworkError when attempting to fetch resource.');
-    mockEventsSingle
+    mockEventsMaybeSingle
       .mockRejectedValueOnce(err)
       .mockRejectedValueOnce(err)
       .mockRejectedValueOnce(err);
@@ -270,7 +279,7 @@ describe('app/(app)/event/[id]', () => {
   });
 
   it('auto-retries a thrown fetch and then shows the event', async () => {
-    mockEventsSingle.mockRejectedValueOnce(
+    mockEventsMaybeSingle.mockRejectedValueOnce(
       new TypeError('NetworkError when attempting to fetch resource.')
     );
 
@@ -282,7 +291,6 @@ describe('app/(app)/event/[id]', () => {
   it('shows Share/Edit/Remove immediately from a calendar preview without waiting on fetch', async () => {
     rememberEventPreview({
       event_id: 'e1',
-      userEventId: 'ue1',
       title: 'Board Game Night',
       description: null,
       image_url: null,
@@ -290,9 +298,8 @@ describe('app/(app)/event/[id]', () => {
       event_date: '2026-05-10',
       event_time: null,
     });
-    useLocalSearchParamsMock.mockReturnValue({ id: 'e1', userEventId: 'ue1' });
     let resolveEvents!: (value: { data: typeof eventRow; error: null }) => void;
-    mockEventsSingle.mockReturnValue(
+    mockEventsMaybeSingle.mockReturnValue(
       new Promise((resolve) => {
         resolveEvents = resolve;
       })
@@ -305,12 +312,12 @@ describe('app/(app)/event/[id]', () => {
     expect(screen.getByText('Remove Event')).toBeTruthy();
 
     resolveEvents({ data: eventRow, error: null });
-    await waitFor(() => expect(mockEventsSingle).toHaveBeenCalled());
+    await waitFor(() => expect(mockEventsMaybeSingle).toHaveBeenCalled());
   });
 
   it('gives up a hung fetch after a few short attempts and shows Retry', async () => {
     jest.useFakeTimers();
-    mockEventsSingle.mockReturnValue(new Promise(() => {}));
+    mockEventsMaybeSingle.mockReturnValue(new Promise(() => {}));
 
     const screen = render(<EventDetailScreen />);
     expect(screen.getByText('Back')).toBeTruthy();
@@ -326,7 +333,7 @@ describe('app/(app)/event/[id]', () => {
 
   it('keeps Back available while the detail is still loading', async () => {
     let resolveEvents!: (value: { data: typeof eventRow; error: null }) => void;
-    mockEventsSingle.mockReturnValue(
+    mockEventsMaybeSingle.mockReturnValue(
       new Promise((resolve) => {
         resolveEvents = resolve;
       })

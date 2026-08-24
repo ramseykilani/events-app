@@ -38,8 +38,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
 | [Share Sent Confirmation](#share-sent-confirmation) | Planned | After Share, the screen just goes back. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
-| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Planned | Later rewrite. Spec approved 2026-08-21 — [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Implement from the spec. Not a tester blocker. |
-| [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Considering | Maybe never — recorded so the idea isn't lost |
+| [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Implemented | Storage rewrite + silent edit propagation. Spec: [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Shipped 2026-08-24. |
+| [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
@@ -682,15 +682,13 @@ Today, sharing is forwarding (see [Forwarding Shares](#forwarding-shares)): ever
 
 ### Decision
 
-Undecided — maybe never. Revisit only if real users turn out to be confused by edits not reaching the people they shared with.
-
-If we do want a time fix to reach the people you told, do **not** build this hosted-event version (one shared mutable row, creator owns it, everyone is a subscriber). The direction is [Per-User Events (Copy + Follow)](#per-user-events-copy--follow): everyone already has their own row; copies follow the sender until someone edits locally. That keeps remove personal and answers “whose version wins” (the person who hit Save). This Considering entry stays as the thing we are *not* building unless we change our minds about hosting.
+Superseded 2026-08-24 — [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) shipped and delivers the wanted half (a time fix reaches the people you told) without the hosted-event model: everyone has their own row, copies follow the sender until someone edits locally, remove stays personal, and "whose version wins" is the person who hit Save. Hosted events stay unbuilt; this entry stays as the thing we are *not* building unless we change our minds about hosting.
 
 ---
 
 ## Per-User Events (Copy + Follow)
 
-**Status:** Planned (2026-08-13) — **do not implement from this section.** Testers should get the current forwarding/fork build. This is a later storage-and-edit rewrite. What follows is the direction from a design conversation, preserved for context. **Design pass complete and spec approved by the owner 2026-08-21: implement from [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md) (schema, RLS, RPCs, backfill SQL, cutover order, rollback plan, tests), not from this section.**
+**Status:** Implemented 2026-08-24 per [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md) (owner-approved 2026-08-21). What follows is the original direction from the design conversation, preserved for context — the spec and `docs/events-technical-architecture.md` are the source of truth for the shipped behavior, and `docs/archive/forwarding-model.md` describes the model it replaced (rollback reference).
 
 ### Confirm the WHY with the owner first (gate, 2026-08-13)
 

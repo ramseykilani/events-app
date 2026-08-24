@@ -38,11 +38,9 @@ function firstParam(value?: string | string[]): string | undefined {
 export default function EventDetailScreen() {
   const params = useLocalSearchParams<{
     id?: string | string[];
-    userEventId?: string | string[];
     sharedByPersonId?: string | string[];
   }>();
   const id = firstParam(params.id);
-  const paramUserEventId = firstParam(params.userEventId);
   const sharedByPersonId = firstParam(params.sharedByPersonId);
   const preview = id ? readEventPreview(id) : undefined;
   const seeded = preview ? eventFromPreview(preview) : null;
@@ -50,9 +48,6 @@ export default function EventDetailScreen() {
   const { session } = useSession();
   const theme = useTheme();
   const [event, setEvent] = useState<Event | null>(seeded);
-  const [userEventId, setUserEventId] = useState<string | null>(
-    paramUserEventId ?? preview?.userEventId ?? null
-  );
   const [sharedWith, setSharedWith] = useState<SharedWithPerson[]>([]);
   const [loading, setLoading] = useState(!seeded);
   const [accessRevoked, setAccessRevoked] = useState(false);
@@ -80,52 +75,50 @@ export default function EventDetailScreen() {
 
     try {
       const result = await withRetries(async (signal) => {
-        const eventQuery = supabase
+        // Resolution chain (Copy + Follow ids are owner-scoped):
+        // 1. the caller's own row with this id (calendar taps and
+        //    post-cutover notification taps land here — RLS returns a row
+        //    only when the caller owns it);
+        // 2. the caller's copy of a followed sender's row (taps carrying the
+        //    sender's row id — future deep links, sender-perspective
+        //    payloads);
+        // 3. nothing → the access-revoked UI.
+        const { data: own, error: ownErr } = await supabase
           .from('events')
           .select('*')
           .eq('id', id)
           .abortSignal(signal)
-          .single();
+          .maybeSingle();
+        if (ownErr) throw ownErr;
 
-        const ueQuery = paramUserEventId
-          ? Promise.resolve({ data: { id: paramUserEventId }, error: null })
-          : supabase
-              .from('user_events')
-              .select('id')
-              .eq('user_id', session.user.id)
-              .eq('event_id', id)
-              .abortSignal(signal)
-              .single();
-
-        const [{ data, error }, { data: ue }] = await Promise.all([
-          eventQuery,
-          ueQuery,
-        ]);
-
-        if (error) {
-          if (error.code === 'PGRST116') {
-            return { kind: 'revoked' as const };
-          }
-          throw error;
+        let row = own as Event | null;
+        if (!row) {
+          const { data: copy, error: copyErr } = await supabase
+            .from('events')
+            .select('*')
+            .eq('from_event_id', id)
+            .abortSignal(signal)
+            .maybeSingle();
+          if (copyErr) throw copyErr;
+          row = copy as Event | null;
         }
 
-        const ueId = ue?.id ?? paramUserEventId ?? null;
+        if (!row) return { kind: 'revoked' as const };
+
         let nextShared: SharedWithPerson[] = [];
-        if (ueId) {
-          const { data: shares } = await supabase
-            .from('event_shares')
-            .select('person_id')
-            .eq('user_event_id', ueId)
+        const { data: sends } = await supabase
+          .from('sends')
+          .select('person_id')
+          .eq('event_id', row.id)
+          .abortSignal(signal);
+        const personIds = (sends ?? []).map((s) => s.person_id);
+        if (personIds.length > 0) {
+          const { data: people } = await supabase
+            .from('my_people')
+            .select('id, contact_name, phone_number')
+            .in('id', personIds)
             .abortSignal(signal);
-          const personIds = (shares ?? []).map((s) => s.person_id);
-          if (personIds.length > 0) {
-            const { data: people } = await supabase
-              .from('my_people')
-              .select('id, contact_name, phone_number')
-              .in('id', personIds)
-              .abortSignal(signal);
-            nextShared = (people ?? []) as SharedWithPerson[];
-          }
+          nextShared = (people ?? []) as SharedWithPerson[];
         }
 
         let nextSharer = null as string | null;
@@ -152,8 +145,7 @@ export default function EventDetailScreen() {
 
         return {
           kind: 'ok' as const,
-          event: data as Event,
-          userEventId: ueId,
+          event: row,
           sharedWith: nextShared,
           sharerName: nextSharer,
           isHidden: nextHidden,
@@ -172,13 +164,12 @@ export default function EventDetailScreen() {
 
       hasContentRef.current = true;
       setEvent(result.event);
-      setUserEventId(result.userEventId);
       setSharedWith(result.sharedWith);
       if (result.sharerName !== null) setSharerName(result.sharerName);
       setIsHidden(result.isHidden);
       setAccessRevoked(false);
       setLoadError(false);
-      rememberEventPreview(previewFromEvent(result.event, result.userEventId));
+      rememberEventPreview(previewFromEvent(result.event));
     } catch (err) {
       if (seq !== loadSeq.current) return;
       console.error('Failed to load event:', err);
@@ -188,7 +179,7 @@ export default function EventDetailScreen() {
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
-  }, [id, session?.user?.id, sharedByPersonId, paramUserEventId]);
+  }, [id, session?.user?.id, sharedByPersonId]);
 
   // useFocusEffect (not useEffect) so returning from Edit shows the new
   // snapshot without remounting.
@@ -199,26 +190,25 @@ export default function EventDetailScreen() {
   );
 
   const handleShare = () => {
+    if (!event) return;
     router.push({
       pathname: '/(app)/share',
-      params: {
-        eventId: id,
-        ...(userEventId ? { userEventId } : {}),
-      },
+      params: { eventId: event.id },
     });
   };
 
   const handleEdit = () => {
-    if (!id || !userEventId || !event) return;
-    rememberEventPreview(previewFromEvent(event, userEventId));
+    if (!event) return;
+    rememberEventPreview(previewFromEvent(event));
     router.push({
       pathname: '/(app)/edit-event',
-      params: { eventId: id, userEventId },
+      params: { eventId: event.id },
     });
   };
 
   const handleDelete = () => {
-    if (!userEventId) return;
+    if (!event) return;
+    const rowId = event.id;
     showConfirm(
       'Remove Event',
       'Remove this event from your calendar? This only affects you — everyone you shared it with keeps their own copy.',
@@ -232,10 +222,10 @@ export default function EventDetailScreen() {
           try {
             await withWriteTimeout(async (signal) => {
               const { error } = await supabase
-                .from('user_events')
+                .from('events')
                 .delete()
-                .eq('id', userEventId)
-                .eq('user_id', session?.user?.id ?? '')
+                .eq('id', rowId)
+                .eq('owner_id', session?.user?.id ?? '')
                 .abortSignal(signal);
 
               if (error) throw error;
@@ -427,7 +417,7 @@ export default function EventDetailScreen() {
               <Text style={[styles.linkText, { color: theme.linkText }]}>Open link</Text>
             </TouchableOpacity>
           ) : null}
-          {userEventId && sharedWith.length > 0 ? (
+          {sharedWith.length > 0 ? (
             <View style={[styles.sharedWithSection, { backgroundColor: theme.surface }]}>
               <Text style={[styles.sharedWithTitle, { color: theme.textSecondary }]}>Shared with</Text>
               {sharedWith.map((p) => (
@@ -441,26 +431,22 @@ export default function EventDetailScreen() {
             <TouchableOpacity style={[styles.shareButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleShare} activeOpacity={0.7} accessibilityRole="button">
               <Text style={[styles.shareButtonText, { color: theme.primaryButtonText }]}>Share</Text>
             </TouchableOpacity>
-            {userEventId && (
-              <TouchableOpacity
-                style={[styles.editButton, { backgroundColor: theme.surfaceSecondary }]}
-                onPress={handleEdit}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.editButtonText, { color: theme.textPrimary }]}>Edit</Text>
-              </TouchableOpacity>
-            )}
-            {userEventId && (
-              <TouchableOpacity
-                style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
-                onPress={handleDelete}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={[styles.editButton, { backgroundColor: theme.surfaceSecondary }]}
+              onPress={handleEdit}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.editButtonText, { color: theme.textPrimary }]}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
+              onPress={handleDelete}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
+            </TouchableOpacity>
             {sharedByPersonId && (
               <TouchableOpacity
                 style={[styles.hideButton, { backgroundColor: theme.surfaceSecondary }]}

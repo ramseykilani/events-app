@@ -36,31 +36,6 @@ never added: a blocker must be fixed, not accepted.
   react-native-screens/react-native-web transition raster quirk. Cosmetic,
   web-only. Do not chase unless it becomes reproducible.
 
-### KI-002 — An edit can silently drop the typed description/image when the dedup key collides
-
-- Severity: minor
-- Status: open
-- Found: 2026-08-13, while diagnosing the B-1 blocker in
-  `manual-tests/manual_test_report_2026-08-13-release.md`
-- Expected: editing an event's description or image always ends up on the
-  snapshot you own.
-- Actual: `find_or_create_event` dedupes on `(url, title, event_date,
-  event_time)` only — `description` and `image_url` are not part of the key
-  (`supabase/migrations/20240216000008_find_or_create_event.sql`). If an
-  edit's four key fields match an existing snapshot (e.g. two people
-  independently added the same listing, or the edited values happen to match
-  an older snapshot), the caller is attached to that existing row, and a
-  differing typed description/image_url is silently dropped in favor of the
-  existing row's values. This is also the only path where a preview-cache
-  seed can differ from the server row (the seeded detail briefly shows the
-  typed description, then the fetch swaps in the row's).
-- Repro: user A creates "Lunch" (url null, date D, time T, description
-  "theirs"); user B creates "Lunch" (same url/date/time, description
-  "mine") — B dedupes onto A's row and B's calendar shows "theirs".
-- Fix (separate task, not yet scheduled): include description/image_url in
-  the dedup key, or have the RPC return the full row so the client seeds and
-  navigates from the actual database row rather than the form values.
-
 ### KI-005 — Android 3-button navigation bar covers the bottom of the screen
 
 - Severity: minor
@@ -416,6 +391,20 @@ resolving the refresh, and `SessionContext`'s callback awaited
   token long expired) — the same fix should cover it. Confirm both on
   the next device smoke; remove the entries only after on-device
   verification.
+
+## Deleted bug classes (do not re-flag, do not reintroduce)
+
+- **KI-002 (global dedup drops description/image) — deleted 2026-08-24 by the
+  Copy + Follow cutover** (`docs/per-user-events-copy-follow-spec.md`). The
+  global `(url, title, date, time)` dedup index and `find_or_create_event`
+  are gone; two people adding the same listing are two independent rows, and
+  an edit writes exactly the fields the user typed.
+- **The B-1 class (multi-call client-side save) — deleted 2026-08-24 by the
+  same cutover.** The five-call fork (`find_or_create_event` → re-point
+  `user_events` → 23505 merge → delete old row) is gone; create and edit are
+  one idempotent `save_event` call each. The interim B-1 layers (split
+  read/write budgets, friendly write failures, reconcile-read on timeout,
+  latency e2e, conventions rules) all survive — keep them.
 
 ## Known limitations (by design — do not flag)
 

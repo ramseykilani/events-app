@@ -231,8 +231,7 @@ export function Calendar({
               router.push({
                 pathname: '/(app)/event/[id]',
                 params: {
-                  id: event.event_id,
-                  userEventId: event.id,
+                  id: event.id,
                   ...(event.sharer_person_id
                     ? { sharedByPersonId: event.sharer_person_id }
                     : {}),

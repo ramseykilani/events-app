@@ -115,7 +115,7 @@ Prerequisites: `SUPABASE_ACCESS_TOKEN` in the environment (Cursor Secrets inject
 ```bash
 npx supabase link --project-ref ijmwtjyuvdnvhblwwtpt
 npx supabase db push                 # applies all pending migrations in order
-npx supabase functions deploy send-notification cleanup-people cleanup-events og-metadata
+npx supabase functions deploy send-notification cleanup-people og-metadata
 npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # already set; pg_cron jobs send it as x-cron-secret
 ```
 
@@ -189,7 +189,7 @@ eas submit --platform ios --profile production --non-interactive --latest --grou
 - Supabase migrations in `supabase/migrations/` must be applied in filename order against the Supabase project before the app functions end-to-end.
 - Edge Functions in `supabase/functions/` are Deno/TypeScript (excluded from the main `tsconfig.json`).
 - Edge functions that browsers call must allow the headers supabase-js always sends: `Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type` — otherwise the CORS preflight fails with `net::ERR_FAILED` and calls silently never reach the function.
-- `cleanup-people`/`cleanup-events` are invoked weekly by pg_cron jobs that must send the `CRON_SECRET` edge-function secret as the `x-cron-secret` header. Check with `SELECT jobid, jobname, command FROM cron.job;` if they start 401ing.
+- `cleanup-people` is invoked weekly by a pg_cron job that must send the `CRON_SECRET` edge-function secret as the `x-cron-secret` header. Check with `SELECT jobid, jobname, command FROM cron.job;` if it starts 401ing. (`cleanup-events` and its cron job were removed in the 2026-08-24 Copy + Follow cutover — every events row has exactly one owner, so there are no orphan snapshots to reclaim.)
 - Phone auth requires a real SMS provider (Twilio) configured in the Supabase project. Fake/test phone numbers like `+15555550100` are rejected by Twilio with `sms_send_failed`. To test sign-in without real SMS, configure a "Test OTP" phone/code pair in the Supabase Dashboard under **Authentication > Settings**.
 - When the `.env` file changes, the Expo dev server must be restarted to pick up new values (Metro does not hot-reload env vars).
 - Sign-in surfaces SMS send failures to the user via a short `showAlert` (expected auth mistakes like `sms_send_failed`, rate limits, and expired OTP use `getAuthUserMessage` in `lib/authErrors.ts`). Unexpected failures still use `showError` (detailed alert with code/details). Check that dialog when auth testing fails.

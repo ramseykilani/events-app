@@ -147,14 +147,17 @@ serve(async (req) => {
   const db = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    const { userEventId, personIds } = await req.json();
-    if (!userEventId || typeof userEventId !== 'string') {
-      return jsonResponse({ error: 'userEventId is required' }, 400);
+    // Copy + Follow: eventId is the SENDER'S own events row id. Each
+    // recipient's push carries that recipient's own row id (resolved below),
+    // or tapping the notification lands on "Event not found".
+    const { eventId, personIds } = await req.json();
+    if (!eventId || typeof eventId !== 'string') {
+      return jsonResponse({ error: 'eventId is required' }, 400);
     }
     // Optional scoping: the share screen passes the person ids it just
     // shared to, so an additive share notifies only the new recipients
-    // instead of every event_shares row (KI-003). Absent = all rows, the
-    // pre-fix behavior, kept for legacy callers.
+    // instead of every sends row (KI-003). Absent = all rows, the pre-fix
+    // behavior, kept for legacy callers.
     if (
       personIds !== undefined &&
       (!Array.isArray(personIds) ||
@@ -163,18 +166,18 @@ serve(async (req) => {
       return jsonResponse({ error: 'personIds must be an array of strings' }, 400);
     }
 
-    // Load the user_event to get the sharer and event
-    const { data: userEvent, error: ueErr } = await db
-      .from('user_events')
-      .select('user_id, event_id, events(title, event_date, event_time, url, description)')
-      .eq('id', userEventId)
+    // Load the sender's row and verify the caller owns it.
+    const { data: event, error: evErr } = await db
+      .from('events')
+      .select('owner_id, title, event_date, event_time, url, description')
+      .eq('id', eventId)
       .single();
 
-    if (ueErr || !userEvent) {
-      return jsonResponse({ error: 'user_event not found' }, 404);
+    if (evErr || !event) {
+      return jsonResponse({ error: 'event not found' }, 404);
     }
 
-    if (userEvent.user_id !== caller.id) {
+    if (event.owner_id !== caller.id) {
       return jsonResponse({ error: 'Forbidden' }, 403);
     }
 
@@ -183,16 +186,7 @@ serve(async (req) => {
       return jsonResponse({ sent: 0, sms: 0 });
     }
 
-    const sharerUserId = userEvent.user_id;
-    const event = userEvent.events as {
-      title: string | null;
-      event_date: string;
-      event_time: string | null;
-      url: string | null;
-      description: string | null;
-    } | null;
-
-    if (!event) return jsonResponse({ error: 'event not found' }, 404);
+    const sharerUserId = event.owner_id;
 
     // Fetch the sharer's phone number and display name once. The name is the
     // preferred attribution everywhere; the phone is the fallback for
@@ -206,19 +200,19 @@ serve(async (req) => {
     const sharerPhone = sharerUser?.phone_number ?? 'Someone';
     const sharerDisplayName = (sharerUser?.display_name as string | null) ?? null;
 
-    // Load the shares to notify for this user_event, including each
-    // recipient's phone number — scoped to the just-shared person ids when
-    // the client passes them.
-    let sharesQuery = db
-      .from('event_shares')
+    // Load the sends to notify for this event, including each recipient's
+    // phone number — scoped to the just-shared person ids when the client
+    // passes them.
+    let sendsQuery = db
+      .from('sends')
       .select('person_id, my_people(user_id, owner_id, phone_number)')
-      .eq('user_event_id', userEventId);
+      .eq('event_id', eventId);
     if (personIds) {
-      sharesQuery = sharesQuery.in('person_id', personIds);
+      sendsQuery = sendsQuery.in('person_id', personIds);
     }
-    const { data: shares, error: sharesErr } = await sharesQuery;
+    const { data: sends, error: sendsErr } = await sendsQuery;
 
-    if (sharesErr || !shares?.length) {
+    if (sendsErr || !sends?.length) {
       return jsonResponse({ sent: 0, sms: 0 });
     }
 
@@ -237,7 +231,6 @@ serve(async (req) => {
     const timeStr = event.event_time ? `, ${formatTime(event.event_time)}` : '';
     const dateLine = `${dateStr}${timeStr}`;
     const descriptionLine = event.description ? excerpt(event.description, 90) : null;
-    const eventId = userEvent.event_id;
 
     // One message for both variants: the share framing (a share means "I
     // want to go with you", not "this exists"), event details, the event's
@@ -264,8 +257,8 @@ serve(async (req) => {
       return lines.join('\n');
     }
 
-    for (const share of shares) {
-      const person = share.my_people as {
+    for (const send of sends) {
+      const person = send.my_people as {
         user_id: string | null;
         owner_id: string;
         phone_number: string | null;
@@ -341,14 +334,26 @@ serve(async (req) => {
         .eq('id', recipientUserId)
         .single();
 
-      if (recipientUser?.expo_push_token && recipientUser.notify_push !== false) {
+      // The push payload must carry the RECIPIENT'S own row id — row ids are
+      // owner-scoped, so the sender's id would land on "Event not found".
+      // share_event delivered the copy just before this call; if it is
+      // missing (the recipient removed it in the race), skip the push and
+      // still send the SMS.
+      const { data: recipientCopy } = await db
+        .from('events')
+        .select('id')
+        .eq('from_event_id', eventId)
+        .eq('owner_id', recipientUserId)
+        .maybeSingle();
+
+      if (recipientCopy && recipientUser?.expo_push_token && recipientUser.notify_push !== false) {
         messages.push({
           to: recipientUser.expo_push_token,
           title: eventTitle
             ? `${displayName} wants to go to ${eventTitle} with you`
             : `${displayName} wants to go to an event with you`,
           body: dateLine,
-          data: { eventId },
+          data: { eventId: recipientCopy.id },
         });
       }
 

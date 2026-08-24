@@ -185,17 +185,17 @@ For each executed scenario:
 
 **Expected**
 - The event disappears from the user's calendar and the user is navigated away from the detail page.
-- The underlying `events` row is untouched: anyone who re-shared the event still sees it (verify with the second test account if the event was shared onward).
+- Only the caller's own row is deleted: anyone it was shared with keeps their own row (verify with the second test account if the event was shared onward). Followers' rows keep their field values and simply stop following (their `from_event_id` clears).
 
 ---
 
 ### E-104 Multi-user share lands on recipient's calendar immediately
 **Steps**
-1. Signed in as `+15555550100` (account A), add `+15555550101` to My People, create an event, and share it with them.
-2. Sign out, then sign in as `+15555550101` (account B) — an account that has never opened the app.
+1. Signed in as `+15555550100` (account A), add `+15555550103` to My People, create an event, and share it with them.
+2. Sign out, then sign in as `+15555550103` (account B).
 
 **Expected**
-- Account B lands directly on the calendar (no forced setup) and the shared event is visible on the correct date.
+- Account B lands directly on the calendar (no forced setup) and the shared event is visible on the correct date — B's own row, delivered at share time.
 - No walkthrough gate blocks the view (walkthrough only auto-shows when the calendar is completely empty).
 
 ---
@@ -239,18 +239,18 @@ For each executed scenario:
 
 ---
 
-### E-108 Sharing delivers the recipient their own copy (forwarding)
+### E-108 Sharing delivers the recipient their own row (forwarding)
 **Steps**
-1. As account A, create an event and share it with B (test OTP `+15555550101`).
+1. As account A, create an event and share it with B (test OTP `+15555550103`).
 2. As account B, sign in and check the calendar — the event is there.
-3. In the Supabase dashboard, confirm B has their own `user_events` row for the same `event_id`.
+3. In the Supabase dashboard, confirm B has their own `events` row whose `from_event_id` is A's row id and `from_user_id` is A's account.
 4. As account A, open the event, tap **Remove Event**, and confirm.
 5. As account B, refresh the calendar.
 
 **Expected**
-- The event stays on B's calendar after A removes it — B owns a copy, A's removal is purely personal.
+- The event stays on B's calendar after A removes it — B owns their row, A's removal is purely personal.
 - B's calendar entry survives A re-sharing chains too: if B re-shares to a third account and B then removes the event, the third account keeps it.
-- On A's side the event disappears; in the dashboard A's `event_shares` rows are gone but B's `user_events` row remains.
+- On A's side the event disappears; in the dashboard A's `events` row and its `sends` rows are gone, while B's `events` row remains with `from_event_id` SET NULL (B keeps the field values; `from_user_id` still points at A while A's account exists).
 
 ---
 
@@ -281,6 +281,37 @@ For each executed scenario:
 - Each channel is gated independently; both off means neither is sent.
 - The event appears on B's calendar in every combination — the toggles only gate the pings.
 - Toggling persists across reload/sign-in (stored on the `users` row), and a failed save reverts the switch with a short alert.
+
+---
+
+### E-112 Edits cascade to followers until a follower edits (Copy + Follow)
+**Steps**
+1. As account A, create an event and share it with B (`+15555550103`).
+2. As A, edit the event's time and save.
+3. As B, refocus/reload the calendar and open the event — B's row shows A's new time (no push/SMS fired by the edit).
+4. As B, edit the event's title and save.
+5. As A, edit the event again (another time change) and save.
+6. As B, reload and reopen the event.
+
+**Expected**
+- Step 3: B's row silently carries A's correction (following).
+- Step 4: B's save freezes B's row (any field-changing save ends following).
+- Step 6: B's row still shows B's title and the step-2 time — A's second edit did not reach B.
+- A's row is never affected by B's edit (cascades only walk downstream).
+
+---
+
+### E-113 Pending delivery stamps the sender's current values at sign-up
+**Steps**
+1. Temporarily add a third test OTP via the Management API (per AGENTS.md), e.g. `+15555550105`.
+2. As account A, add that number to My People, create an event, and share it with them (no account exists yet).
+3. As A, edit the event (change the title/time) and save.
+4. Sign up as the new number (test OTP) and land on the calendar.
+5. Remove the temporary test OTP via the Management API when done.
+
+**Expected**
+- The new account's calendar shows the event immediately, with the sender's CURRENT (post-edit) values — the pending copy is stamped from the sender's row as it is at sign-up.
+- The row follows the sender (`from_event_id` = the sender's row): a later edit by A reaches it until the new account edits their own copy.
 
 ---
 

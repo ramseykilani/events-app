@@ -44,9 +44,9 @@ type IntendedEventFields = {
   eventTime: string | null;
 };
 
-// Dedup (find_or_create_event) keys on url+title+date+time only and ignores
-// description/image_url (KI-002), so a subset compare can false-confirm —
-// check every field. Server time may carry fractional seconds.
+// Every field participates in the compare: a subset match can false-confirm
+// (KI-002's lesson), and save_event's server-side no-op rule compares all six
+// the same way. Server time may carry fractional seconds.
 function eventMatchesIntended(e: Event, intended: IntendedEventFields): boolean {
   return (
     (e.title ?? '') === (intended.title ?? '') &&
@@ -71,9 +71,8 @@ function fieldsFromEvent(e: Event) {
 }
 
 export default function EditEventScreen() {
-  const params = useLocalSearchParams<{ eventId?: string | string[]; userEventId?: string | string[] }>();
+  const params = useLocalSearchParams<{ eventId?: string | string[] }>();
   const eventId = firstParam(params.eventId);
-  const userEventId = firstParam(params.userEventId);
   const preview = eventId ? readEventPreview(eventId) : undefined;
   const seeded = preview ? eventFromPreview(preview) : null;
   const seededFields = seeded ? fieldsFromEvent(seeded) : null;
@@ -91,11 +90,11 @@ export default function EditEventScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  // A seeded form never refetches: events are immutable, so the preview
-  // (written from the calendar/detail fetch moments ago) already holds
-  // everything the fetch could return — and skipping it means no late
-  // response can overwrite what the user has typed. `seeded` is rebuilt on
-  // every render, so capture it once in a ref.
+  // A seeded form never refetches on mount: the preview (written from the
+  // calendar/detail fetch moments ago) already holds everything the fetch
+  // could return — and skipping it means no late response can overwrite what
+  // the user has typed. `seeded` is rebuilt on every render, so capture it
+  // once in a ref.
   const hadSeedOnMount = useRef(!!seeded);
   const saveInFlightRef = useRef(false);
 
@@ -108,7 +107,7 @@ export default function EditEventScreen() {
     setImageUrl(fields.imageUrl);
     setEventDate(fields.eventDate);
     setEventTime(fields.eventTime);
-    rememberEventPreview(previewFromEvent(e, userEventId));
+    rememberEventPreview(previewFromEvent(e));
   };
 
   const load = useCallback(async () => {
@@ -136,68 +135,34 @@ export default function EditEventScreen() {
       console.error('Failed to load event:', err);
       setLoadError(true);
     }
-  }, [eventId, userEventId]);
+  }, [eventId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // A timed-out write may still have committed server-side, and it must never
-  // be retried (KI-002). Reconcile by reading instead: confirmation comes
-  // from the user_events pointer, never from the RPC result. Returns the
-  // owned copy when the server already holds the intended snapshot, else
-  // null. Retried like any read — an abort can land while the server is
-  // still committing; a false negative just means the user sees the alert.
+  // A timed-out write may still have committed server-side. save_event is
+  // idempotent (set-to-value on the caller's own row), so reconcile by
+  // reading: confirmation comes from the row itself. Returns the row when the
+  // server already holds the intended values, else null. Retried like any
+  // read — an abort can land while the server is still committing; a false
+  // negative just means the user sees the alert.
   const reconcileTimedOutSave = async (
-    candidateEventId: string | undefined,
     intended: IntendedEventFields
-  ): Promise<{ event: Event; eventId: string; userEventId: string } | null> => {
-    if (!session?.user?.id || !userEventId) return null;
+  ): Promise<Event | null> => {
+    if (!session?.user?.id || !eventId) return null;
     try {
       return await withRetries(async (signal) => {
-        const { data: ue, error: ueErr } = await supabase
-          .from('user_events')
-          .select('id, event_id, events(*)')
-          .eq('id', userEventId)
-          .eq('user_id', session.user.id)
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', eventId)
           .abortSignal(signal)
           .single();
 
-        if (!ueErr && ue) {
-          const row = ue as unknown as {
-            id: string;
-            event_id: string;
-            events: Event | null;
-          };
-          if (row.events && eventMatchesIntended(row.events, intended)) {
-            return { event: row.events, eventId: row.event_id, userEventId: row.id };
-          }
-          // The row still points at another snapshot: the save is
-          // incomplete (or a partial merge) — never navigate.
-          throw new Error('save not committed');
-        }
-
-        // Row gone: the 23505 merge path deletes the original row on
-        // success, so check ownership of the candidate snapshot.
-        if (ueErr?.code === 'PGRST116' && candidateEventId) {
-          const { data: owned, error: ownedErr } = await supabase
-            .from('user_events')
-            .select('id, event_id, events(*)')
-            .eq('user_id', session.user.id)
-            .eq('event_id', candidateEventId)
-            .abortSignal(signal)
-            .maybeSingle();
-          if (!ownedErr && owned) {
-            const row = owned as unknown as {
-              id: string;
-              event_id: string;
-              events: Event | null;
-            };
-            if (row.events && eventMatchesIntended(row.events, intended)) {
-              return { event: row.events, eventId: row.event_id, userEventId: row.id };
-            }
-          }
-        }
+        if (error) throw error;
+        const row = data as Event;
+        if (eventMatchesIntended(row, intended)) return row;
         throw new Error('save not committed');
       });
     } catch {
@@ -211,7 +176,7 @@ export default function EditEventScreen() {
       return;
     }
 
-    if (!session?.user?.id || !userEventId || !event) return;
+    if (!session?.user?.id || !eventId || !event) return;
 
     if (!isPlausibleEventDate(eventDate)) {
       // Same web year-typo guard as add-event (2026 -> 1906 is one slip away).
@@ -242,130 +207,54 @@ export default function EditEventScreen() {
       eventDate: localDate,
       eventTime: timeStr,
     };
-    // A no-op Save has nothing to reconcile — the server matches by
-    // definition, so a timeout there goes straight to the alert.
-    const isNoOpSave = eventMatchesIntended(event, intended);
 
-    // Set inside the write callback when the RPC returns in time; the
-    // reconcile-read uses it to recognize a completed 23505 merge.
-    let savedEventId: string | undefined;
+    // A save that changes nothing never calls save_event: follow is preserved
+    // without relying on the server's no-op rule (which is defense in depth).
+    if (eventMatchesIntended(event, intended)) {
+      saveInFlightRef.current = false;
+      router.replace(`/(app)/event/${eventId}`);
+      return;
+    }
 
     setLoading(true);
     try {
       await withWriteTimeout(async (signal) => {
-        const { data: newEventId, error: eventErr } = await supabase
-          .rpc('find_or_create_event', {
+        const { data: savedId, error: saveErr } = await supabase
+          .rpc('save_event', {
+            p_id: eventId,
             p_url: intended.url,
             p_title: intended.title,
             p_description: intended.description,
             p_image_url: intended.imageUrl,
-            p_event_date: localDate,
-            p_event_time: timeStr,
+            p_event_date: intended.eventDate,
+            p_event_time: intended.eventTime,
           })
           .abortSignal(signal);
 
-        if (eventErr) throw eventErr;
-        if (!newEventId) throw new Error('Failed to create event');
-        // Capture the candidate immediately: if the abort lands during the
-        // follow-up calls, the reconcile-read uses this to recognize a
-        // completed merge.
-        savedEventId = newEventId as string;
-
-        const { error: ueErr } = await supabase
-          .from('user_events')
-          .update({ event_id: newEventId })
-          .eq('id', userEventId)
-          .eq('user_id', session.user.id)
-          .abortSignal(signal);
-
-        if (ueErr) {
-          // If update fails because the user already owns the target snapshot,
-          // merge into that existing user_events row instead of duplicating it:
-          // carry over shares that aren't already there, then drop the old row
-          // (its remaining duplicate shares cascade away).
-          if (ueErr.code === '23505') {
-            const { data: existingUe, error: findErr } = await supabase
-              .from('user_events')
-              .select('id')
-              .eq('user_id', session.user.id)
-              .eq('event_id', newEventId)
-              .abortSignal(signal)
-              .single();
-            if (findErr || !existingUe) {
-              throw findErr ?? new Error('Failed to find the existing event copy');
-            }
-
-            const [{ data: targetShares }, { data: sourceShares }] = await Promise.all([
-              supabase
-                .from('event_shares')
-                .select('person_id')
-                .eq('user_event_id', existingUe.id)
-                .abortSignal(signal),
-              supabase
-                .from('event_shares')
-                .select('person_id')
-                .eq('user_event_id', userEventId)
-                .abortSignal(signal),
-            ]);
-
-            const alreadyShared = new Set((targetShares ?? []).map((s) => s.person_id));
-            const toMove = (sourceShares ?? [])
-              .map((s) => s.person_id)
-              .filter((pid) => !alreadyShared.has(pid));
-
-            if (toMove.length > 0) {
-              const { error: moveErr } = await supabase
-                .from('event_shares')
-                .insert(
-                  toMove.map((person_id) => ({
-                    user_event_id: existingUe.id,
-                    person_id,
-                  }))
-                )
-                .abortSignal(signal);
-              if (moveErr) throw moveErr;
-            }
-
-            const { error: delErr } = await supabase
-              .from('user_events')
-              .delete()
-              .eq('id', userEventId)
-              .abortSignal(signal);
-
-            if (delErr) throw delErr;
-          } else {
-            throw ueErr;
-          }
-        }
-
-        rememberEventPreview(
-          previewFromEvent(
-            {
-              ...(event as Event),
-              id: newEventId as string,
-              title: intended.title,
-              description: intended.description,
-              url: intended.url,
-              image_url: intended.imageUrl,
-              event_date: localDate,
-              event_time: timeStr,
-            },
-            userEventId
-          )
-        );
+        if (saveErr) throw saveErr;
+        if (savedId !== eventId) throw new Error('Failed to save event');
       });
 
-      if (!savedEventId) throw new Error('Failed to create event');
-      router.replace(`/(app)/event/${savedEventId}`);
+      rememberEventPreview(
+        previewFromEvent({
+          ...(event as Event),
+          title: intended.title,
+          description: intended.description,
+          url: intended.url,
+          image_url: intended.imageUrl,
+          event_date: intended.eventDate,
+          event_time: intended.eventTime,
+          frozen: true,
+        })
+      );
+      router.replace(`/(app)/event/${eventId}`);
     } catch (err: unknown) {
       console.error('Failed to save event:', err);
-      if (isAbortError(err) && !isNoOpSave) {
-        const confirmed = await reconcileTimedOutSave(savedEventId, intended);
+      if (isAbortError(err)) {
+        const confirmed = await reconcileTimedOutSave(intended);
         if (confirmed) {
-          rememberEventPreview(
-            previewFromEvent(confirmed.event, confirmed.userEventId)
-          );
-          router.replace(`/(app)/event/${confirmed.eventId}`);
+          rememberEventPreview(previewFromEvent(confirmed));
+          router.replace(`/(app)/event/${eventId}`);
           return;
         }
       }
@@ -395,10 +284,10 @@ export default function EditEventScreen() {
           try {
             await withWriteTimeout(async (signal) => {
               const { error } = await supabase
-                .from('user_events')
+                .from('events')
                 .delete()
-                .eq('id', userEventId)
-                .eq('user_id', session?.user?.id ?? '')
+                .eq('id', eventId ?? '')
+                .eq('owner_id', session?.user?.id ?? '')
                 .abortSignal(signal);
 
               if (error) throw error;

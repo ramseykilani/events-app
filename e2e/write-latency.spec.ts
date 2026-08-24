@@ -8,16 +8,17 @@ import {
 } from './helpers';
 
 // B-1 regression: the edit Save used to share the 2s READ budget, so a slow
-// find_or_create_event was aborted client-side, showError dumped the
-// AbortError stack into a window.alert, and the server could still commit.
-// Writes now get their own 15s budget and failures are short alerts. These
-// specs delay the network past the old budget and assert the new behavior.
+// save was aborted client-side, showError dumped the AbortError stack into a
+// window.alert, and the server could still commit. Writes now get their own
+// 15s budget and failures are short alerts — and the save itself is a single
+// idempotent save_event call (Copy + Follow). These specs delay the network
+// past the old budget and assert the new behavior.
 //
 // Route patterns are regexes so query strings / CORS preflights also match.
 // route.continue() is guarded: when the client aborts mid-delay, continuing
 // the request throws "request already handled".
 
-test('write latency: a 3s find_or_create_event still saves, with no alert', async ({
+test('write latency: a 3s save_event still saves, with no alert', async ({
   page,
 }, testInfo) => {
   const title = uniqueTitle('E2E write-latency', testInfo.project.name);
@@ -45,7 +46,7 @@ test('write latency: a 3s find_or_create_event still saves, with no alert', asyn
   page.on('dialog', onDialog);
 
   // 3s: past the old 2s read budget, well under the 15s write budget.
-  await page.route(/\/rpc\/find_or_create_event/, async (route) => {
+  await page.route(/\/rpc\/save_event/, async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 3000));
     try {
       await route.continue();
@@ -70,11 +71,12 @@ test('write latency: a 3s find_or_create_event still saves, with no alert', asyn
     expect(dialogs).toEqual([]);
   } finally {
     page.off('dialog', onDialog);
-    await page.unroute(/\/rpc\/find_or_create_event/);
+    await page.unroute(/\/rpc\/save_event/);
   }
 
-  // Cleanup: remove the caller's copy. After the edit fork, Remove pops back
-  // to the pre-edit detail (no longer owned) — Back lands on the calendar.
+  // Cleanup: remove the caller's row. Remove pops back to the pre-edit
+  // detail, whose refetch finds the row gone and shows the access-removed
+  // screen — its Back lands on the calendar.
   page.once('dialog', (dialog) => dialog.accept());
   await page
     .getByRole('button', { name: 'Remove Event' })

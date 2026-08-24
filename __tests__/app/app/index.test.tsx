@@ -64,7 +64,6 @@ const gateCheckKeys = () => mockGate.mock.calls.map((c) => c[0].checkKey as numb
 
 const sampleRow = {
   id: 'ce-1',
-  event_id: 'e-1',
   title: 'Spring Concert',
   description: null,
   image_url: null,

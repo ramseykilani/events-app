@@ -1,8 +1,9 @@
 import type { CalendarEvent, Event } from './types';
 
+// Previews are keyed by the event row id (owner-scoped in the Copy + Follow
+// model — every row the client can show belongs to the caller).
 export type EventPreview = {
   event_id: string;
-  userEventId?: string;
   title: string | null;
   description: string | null;
   image_url: string | null;
@@ -29,8 +30,7 @@ export function clearEventPreviewCache(): void {
 
 export function previewFromCalendarEvent(event: CalendarEvent): EventPreview {
   return {
-    event_id: event.event_id,
-    userEventId: event.id,
+    event_id: event.id,
     title: event.title,
     description: event.description,
     image_url: event.image_url,
@@ -42,13 +42,9 @@ export function previewFromCalendarEvent(event: CalendarEvent): EventPreview {
   };
 }
 
-export function previewFromEvent(
-  event: Event,
-  userEventId?: string | null
-): EventPreview {
+export function previewFromEvent(event: Event): EventPreview {
   return {
     event_id: event.id,
-    ...(userEventId ? { userEventId } : {}),
     title: event.title,
     description: event.description,
     image_url: event.image_url,
@@ -61,13 +57,17 @@ export function previewFromEvent(
 export function eventFromPreview(preview: EventPreview): Event {
   return {
     id: preview.event_id,
-    created_by_user_id: null,
+    owner_id: '',
     url: preview.url,
     title: preview.title,
     description: preview.description,
     image_url: preview.image_url,
     event_date: preview.event_date,
     event_time: preview.event_time,
+    from_event_id: null,
+    from_user_id: null,
+    frozen: false,
     created_at: '',
+    updated_at: '',
   };
 }

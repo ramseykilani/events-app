@@ -14,6 +14,7 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Crypto from 'expo-crypto';
 import { WebDateInput, WebTimeInput, isPlausibleEventDate } from '../../components/WebDateTimeInputs';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
@@ -36,6 +37,10 @@ export default function AddEventScreen() {
   const [loadingOg, setLoadingOg] = useState(false);
   const [loading, setLoading] = useState(false);
   const createInFlightRef = useRef(false);
+  // The new row's id is client-generated (save_event is idempotent on it), so
+  // a re-tap after a timed-out create retries the SAME row instead of
+  // risking a duplicate. Held for the life of the form.
+  const newEventIdRef = useRef<string | null>(null);
 
   const fetchOgMetadata = async () => {
     if (!url.trim()) return;
@@ -62,6 +67,8 @@ export default function AddEventScreen() {
     }
   };
 
+  // Per-user dedup: events RLS is owner-only, so this only ever matches rows
+  // already on the caller's own calendar (no cross-user aspect).
   const checkExistingEvents = async (): Promise<{ id: string; title: string | null; event_date: string }[] | null> => {
     if (!url.trim()) return null;
     try {
@@ -130,55 +137,9 @@ export default function AddEventScreen() {
         if (existing && existing.length > 0) {
           const eventId = await chooseExistingEvent(existing);
           if (eventId) {
-            let userEventId: string | null = null;
-            try {
-              await withWriteTimeout(async (signal) => {
-                const { data: inserted, error: ueErr } = await supabase
-                  .from('user_events')
-                  .insert({
-                    user_id: session.user.id,
-                    event_id: eventId,
-                  })
-                  .select('id')
-                  .abortSignal(signal)
-                  .single();
-
-                // If the user already has this event, reuse that ownership row.
-                if (ueErr && ueErr.code !== '23505') {
-                  throw ueErr;
-                }
-
-                userEventId = inserted?.id ?? null;
-                if (!userEventId) {
-                  const { data: existingUserEvent, error: fetchErr } = await supabase
-                    .from('user_events')
-                    .select('id')
-                    .eq('user_id', session.user.id)
-                    .eq('event_id', eventId)
-                    .abortSignal(signal)
-                    .single();
-
-                  if (fetchErr || !existingUserEvent?.id) {
-                    throw fetchErr ?? new Error('Failed to prepare sharing');
-                  }
-                  userEventId = existingUserEvent.id;
-                }
-              });
-            } catch (err) {
-              console.error('Failed to save event:', err);
-              showAlert(
-                'Could not save',
-                isAbortError(err)
-                  ? 'That took too long. Check your connection and try again.'
-                  : 'Something went wrong. Try again.'
-              );
-              return;
-            }
-
-            router.replace({
-              pathname: '/(app)/share',
-              params: { eventId, userEventId },
-            });
+            // The URL is already on the caller's calendar — jump to that row
+            // instead of adding a second copy.
+            router.replace({ pathname: '/(app)/event/[id]', params: { id: eventId } });
             return;
           }
         }
@@ -194,8 +155,9 @@ export default function AddEventScreen() {
         return;
       }
 
-      let createdEventId: string | undefined;
-      let createdUserEventId: string | undefined;
+      if (!newEventIdRef.current) newEventIdRef.current = Crypto.randomUUID();
+      const newId = newEventIdRef.current;
+
       await withWriteTimeout(async (signal) => {
         const timeStr = eventTime
           ? eventTime.toTimeString().slice(0, 8)
@@ -206,8 +168,9 @@ export default function AddEventScreen() {
         const day = String(eventDate.getDate()).padStart(2, '0');
         const localDate = `${year}-${month}-${day}`;
 
-        const { data: eventId, error: eventErr } = await supabase
-          .rpc('find_or_create_event', {
+        const { data: savedId, error: saveErr } = await supabase
+          .rpc('save_event', {
+            p_id: newId,
             p_url: url.trim() || null,
             p_title: title.trim() || null,
             p_description: description.trim() || null,
@@ -217,47 +180,13 @@ export default function AddEventScreen() {
           })
           .abortSignal(signal);
 
-        if (eventErr) throw eventErr;
-        if (!eventId) throw new Error('Failed to create event');
-
-        const { data: insertedUserEvent, error: ueErr } = await supabase
-          .from('user_events')
-          .insert({
-            user_id: session.user.id,
-            event_id: eventId,
-          })
-          .select('id')
-          .abortSignal(signal)
-          .single();
-
-        // Ignore duplicate user_event (user already has this event)
-        if (ueErr && ueErr.code !== '23505') throw ueErr;
-
-        let userEventId = insertedUserEvent?.id ?? null;
-        if (!userEventId) {
-          const { data: existingUserEvent, error: fetchErr } = await supabase
-            .from('user_events')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .eq('event_id', eventId)
-            .abortSignal(signal)
-            .single();
-          if (fetchErr || !existingUserEvent?.id) {
-            throw fetchErr ?? new Error('Failed to prepare sharing');
-          }
-          userEventId = existingUserEvent.id;
-        }
-
-        createdEventId = eventId as string;
-        createdUserEventId = userEventId;
+        if (saveErr) throw saveErr;
+        if (savedId !== newId) throw new Error('Failed to create event');
       });
 
-      if (!createdEventId || !createdUserEventId) {
-        throw new Error('Failed to create event');
-      }
       router.replace({
         pathname: '/(app)/share',
-        params: { eventId: createdEventId, userEventId: createdUserEventId },
+        params: { eventId: newId },
       });
     } catch (err: unknown) {
       console.error('Failed to create event:', err);

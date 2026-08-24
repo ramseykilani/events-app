@@ -83,7 +83,6 @@ export default function CalendarScreen() {
         const mapped: CalendarEvent[] = data.map(
           (row: Record<string, unknown>) => ({
             id: row.id as string,
-            event_id: row.event_id as string,
             title: row.title as string | null,
             description: row.description as string | null,
             image_url: row.image_url as string | null,

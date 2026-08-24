@@ -20,8 +20,11 @@ import { expectCalendar } from './helpers';
 //   events in), so the grid and selected day never drift with the calendar.
 // - The month grid itself is masked: dot placement depends on shared test
 //   data, and nobody needs pixel police on stub data.
-// - The event-detail shot uses a pinned event created idempotently
-//   (find_or_create_event dedups by title+date+time) and removed after.
+// - The event-detail shot uses a pinned event title and removes the event
+//   after. Rows are per-user now (no global dedup), so a failed run can
+//   leave residue behind: the detail test first removes any leftover
+//   "Baseline event" rows, or the next run's strict-mode locator would
+//   match two cards.
 
 const SHOT = { maxDiffPixelRatio: 0.02, animations: 'disabled' as const };
 
@@ -80,8 +83,28 @@ test('event detail matches baseline', async ({ page }) => {
   await page.goto('/');
   await expectCalendar(page);
 
-  // Pinned baseline event: same title+date+time every run, so the server-side
-  // dedup reuses one row instead of accumulating test data.
+  // Residue from a failed earlier run would break the strict-mode locator
+  // below (two cards with the pinned title) — remove leftovers first. Rows
+  // are per-user now, so nothing dedups them away.
+  for (let i = 0; i < 5; i++) {
+    const leftover = page
+      .getByText('Baseline event', { exact: true })
+      .filter({ visible: true })
+      .first();
+    if (!(await leftover.isVisible().catch(() => false))) break;
+    await leftover.click();
+    await expect(
+      page.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
+    ).toBeVisible({ timeout: 15000 });
+    page.once('dialog', (dialog) => dialog.accept());
+    await page
+      .getByRole('button', { name: 'Remove Event' })
+      .filter({ visible: true })
+      .click();
+    await expectCalendar(page);
+  }
+
+  // Pinned baseline event: same title+date+time every run, removed after.
   await page.getByRole('button', { name: 'Add event' }).click();
   await page.getByPlaceholder('Event title').fill('Baseline event');
   await page.getByRole('button', { name: 'Save' }).click();

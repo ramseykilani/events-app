@@ -37,37 +37,39 @@ export interface CircleMember {
   person_id: string;
 }
 
+// A row on the owner's calendar (Copy + Follow model — see
+// docs/per-user-events-copy-follow-spec.md). Ids are owner-scoped: every row
+// the client can read belongs to the caller (RLS is owner-only).
 export interface Event {
   id: string;
-  // NULL once the creator deletes their account — the snapshot belongs to
-  // whoever still owns a copy (see delete_my_account).
-  created_by_user_id: string | null;
+  owner_id: string;
   url: string | null;
   title: string | null;
   description: string | null;
   image_url: string | null;
   event_date: string;
   event_time: string | null;
+  // Where this copy came from. NULL = the owner created it (or the link was
+  // cleared when the sender removed their row / deleted their account).
+  from_event_id: string | null;
+  // The sender's account, for attribution + hide. NULL once the sender
+  // deletes their account.
+  from_user_id: string | null;
+  // The owner edited this copy; it no longer follows from_event_id.
+  frozen: boolean;
   created_at: string;
+  updated_at: string;
 }
 
-export interface UserEvent {
+export interface Send {
   id: string;
-  user_id: string;
   event_id: string;
-  created_at: string;
-}
-
-export interface EventShare {
-  id: string;
-  user_event_id: string;
   person_id: string;
   created_at: string;
 }
 
 export interface CalendarEvent {
   id: string;
-  event_id: string;
   title: string | null;
   description: string | null;
   image_url: string | null;

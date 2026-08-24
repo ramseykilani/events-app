@@ -13,10 +13,9 @@ describe('lib/eventPreviewCache', () => {
     clearEventPreviewCache();
   });
 
-  it('stores and reads a calendar preview by event_id', () => {
+  it('stores and reads a calendar preview by the row id', () => {
     const calendarEvent: CalendarEvent = {
-      id: 'ue-1',
-      event_id: 'e-1',
+      id: 'e-1',
       title: 'Picnic',
       description: 'Park',
       image_url: null,
@@ -30,24 +29,29 @@ describe('lib/eventPreviewCache', () => {
 
     rememberEventPreview(previewFromCalendarEvent(calendarEvent));
     const preview = readEventPreview('e-1');
-    expect(preview?.userEventId).toBe('ue-1');
     expect(preview?.title).toBe('Picnic');
+    expect(preview?.sharer_contact_name).toBe('Alice');
     expect(eventFromPreview(preview!).id).toBe('e-1');
   });
 
-  it('keeps a userEventId when remembering a loaded event', () => {
+  it('remembers a loaded event row', () => {
     const event: Event = {
       id: 'e-2',
-      created_by_user_id: 'u1',
+      owner_id: 'u1',
       url: null,
       title: 'Show',
       description: null,
       image_url: null,
       event_date: '2026-08-14',
       event_time: '19:00:00',
+      from_event_id: null,
+      from_user_id: null,
+      frozen: false,
       created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
     };
-    rememberEventPreview(previewFromEvent(event, 'ue-2'));
-    expect(readEventPreview('e-2')?.userEventId).toBe('ue-2');
+    rememberEventPreview(previewFromEvent(event));
+    expect(readEventPreview('e-2')?.title).toBe('Show');
+    expect(readEventPreview('e-2')?.event_time).toBe('19:00:00');
   });
 });

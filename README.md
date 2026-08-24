@@ -21,10 +21,11 @@ There's no public profile, no follower count, no algorithmic feed. You pick up t
 - **Share with people and circles** — After creating an event, pick who sees it. Select individuals, tap a circle to select a whole group, or mix and match.
 - **My People** — Import up to 50 people from your phone contacts. The app stores their phone number and resolves it to a user account automatically — both when you add the contact and when that person signs up.
 - **Circles** — Named groups of your people (e.g. "Close friends", "Work", "Basketball"). Makes sharing faster.
-- **Event detail** — View full event info, open the original link, reshare to more people, edit your copy, or delete events you created.
+- **Event detail** — View full event info, open the original link, reshare to more people, edit your copy, or remove it from your calendar.
+- **Edits reach the people you told** — Fix a time after sharing and everyone still following your copy sees the correction (silently — no pings). Editing your own copy of someone else's share ends its following.
 - **Onboarding** — A short walkthrough for new users explaining how the app works.
 - **Phone auth** — Sign in with your phone number via SMS OTP. No passwords, no email.
-- **Data retention** — Automated weekly cleanup removes events older than 6 months and people you haven't shared with in 6 months.
+- **Data retention** — Automated weekly cleanup removes people you haven't shared with in 6 months.
 
 ---
 
@@ -32,7 +33,7 @@ There's no public profile, no follower count, no algorithmic feed. You pick up t
 
 ### Data Model
 
-The database has seven tables:
+The database has seven tables (Copy + Follow model, 2026-08-24):
 
 | Table | Purpose |
 |-------|---------|
@@ -40,16 +41,16 @@ The database has seven tables:
 | `my_people` | Your curated contact list (max 50). Each row is a phone number you've imported, optionally resolved to a `users` row |
 | `circles` | Named groups of your people |
 | `circle_members` | Join table between circles and people |
-| `events` | Immutable event snapshots (URL, title, description, image, date, time). Deduplicated by URL + title + date + time |
-| `user_events` | Ownership — links a user to an event they've added to their calendar |
-| `event_shares` | Routing — links a `user_event` to a person it was shared with |
+| `events` | A row on your calendar (URL, title, description, image, date, time) plus provenance (`from_event_id`/`from_user_id`) and a `frozen` flag. Owner-scoped — every row belongs to exactly one user |
+| `sends` | The share record — links your events row to a person you sent it to |
+| `hidden_people` | People whose shared events you've hidden from your calendar |
 
 ### Sharing Flow
 
-1. You create an event (or the app deduplicates against an existing one).
-2. A `user_events` row is created linking you to that event.
-3. You pick people/circles on the share screen. An `event_shares` row is created for each person.
-4. When that person opens their calendar, `get_calendar_events` finds shares targeting them (via `my_people.user_id`) and returns those events.
+1. You create an event — your own `events` row, via the idempotent `save_event` RPC.
+2. You pick people/circles on the share screen. The `share_event` RPC records a `sends` row per person and delivers each recipient their own `events` row — a copy of yours, following it.
+3. When that person opens their calendar, `get_calendar_events` returns their own rows, with "From X" attribution resolved live from `from_user_id`.
+4. If you edit later, the correction cascades silently to everyone still following your row. A recipient who edits their own copy stops following — their calendar, their data.
 
 ### Phone Number Resolution
 
@@ -99,7 +100,7 @@ events-app/
 │   │   ├── index.tsx              Calendar — the main screen
 │   │   ├── onboarding.tsx         Welcome walkthrough for new users
 │   │   ├── add-event.tsx          Create a new event (URL or manual)
-│   │   ├── edit-event.tsx         Edit an event (creates a fork)
+│   │   ├── edit-event.tsx         Edit an event (updates your row; followers follow)
 │   │   ├── event/[id].tsx         Event detail view
 │   │   ├── share.tsx              Select people/circles to share with
 │   │   └── people.tsx             Manage your people list and circles
@@ -120,8 +121,8 @@ events-app/
 │   ├── migrations/                SQL migrations (schema, RLS, RPCs, triggers)
 │   └── functions/                 Edge Functions (Deno/TypeScript)
 │       ├── og-metadata/           Link preview metadata fetcher
-│       ├── cleanup-people/        6-month inactive people removal
-│       └── cleanup-events/        6-month event data retention
+│       ├── send-notification/     Share notifications (push + SMS)
+│       └── cleanup-people/        6-month inactive people removal
 ├── .env.example                   Environment variable template
 ├── app.json                       Expo configuration
 ├── package.json                   Dependencies and scripts

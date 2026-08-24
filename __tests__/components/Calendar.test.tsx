@@ -43,7 +43,6 @@ describe('components/Calendar', () => {
   const events: CalendarEvent[] = [
     {
       id: 'ce-1',
-      event_id: 'e-1',
       title: 'April 15 Event',
       description: null,
       image_url: null,
@@ -56,7 +55,6 @@ describe('components/Calendar', () => {
     },
     {
       id: 'ce-2',
-      event_id: 'e-2',
       title: 'April 20 Event',
       description: null,
       image_url: null,
@@ -115,7 +113,7 @@ describe('components/Calendar', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/add-event');
   });
 
-  it('opens event detail with the calendar row userEventId', () => {
+  it('opens event detail with the calendar row id', () => {
     const onMonthChange = jest.fn();
     const screen = render(<Calendar events={events} onMonthChange={onMonthChange} />);
 
@@ -123,8 +121,7 @@ describe('components/Calendar', () => {
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/(app)/event/[id]',
       params: {
-        id: 'e-1',
-        userEventId: 'ce-1',
+        id: 'ce-1',
         sharedByPersonId: 'mp-1',
       },
     });

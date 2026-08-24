@@ -49,3 +49,9 @@ jest.mock('react-native-safe-area-context', () => {
     useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   };
 });
+
+// expo-crypto's randomUUID is native-backed; tests just need unique strings.
+jest.mock('expo-crypto', () => ({
+  randomUUID: () =>
+    `test-${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`,
+}));
