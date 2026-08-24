@@ -42,6 +42,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
+| [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
 ## Using and testing
 
@@ -1356,3 +1357,21 @@ Facts, not design conclusions:
 ### Decision
 
 Undecided — maybe never. Natural revisit trigger: Atproto Spaces reaching a stable release. Until then, Supabase remains the backend and nothing in this section is actionable.
+
+---
+
+## Recurring Events
+
+**Status:** Considering (2026-08-24) — idea stage only, recorded at the owner's request so the idea isn't lost. **Nothing has been designed.** This is not roadmap and not a commitment. Do not implement from this section — if it is ever picked up, step one is a design conversation with the owner, not code.
+
+### What this would be
+
+Events that repeat (weekly, monthly, and so on) instead of existing only as a single date.
+
+### Why it might be wanted
+
+Some things people share aren't one-offs — a weekly dinner, a monthly meetup. Today each occurrence is a separate event created by hand.
+
+### Decision
+
+Undecided — maybe never. Nothing in this section is actionable.
