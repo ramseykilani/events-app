@@ -29,7 +29,7 @@ Play "Finish setting up your app" (privacy policy URL, data-safety form, content
 ## Code state
 
 - `production`: `78b9e5a` — 2026-08-17 ship (reviewed `d22d619`). Live: https://shared-events.pages.dev. Includes the notification explainer (native), per-account push/SMS toggles, sign-in orientation, share no-unshare note, ThemedSwitch, SMS copy / privacy / terms.
-- `staging`: same product plus STATUS / known-issue notes. Owner smoked preview APK `a7ce79c8` on 2026-08-18: **pass** (KI-006–KI-010 logged, not blockers). Same day, owner also logged **KI-011** (People person rows too tall — density regression, not a tester blocker; not investigated). 2026-08-20: **KI-012** logged (Samsung 3-button / Android gesture system Back sometimes does not navigate; iOS sheet swipe-down is the same Modal class, stack edge-swipe is not — investigation only, no fix). Tester binaries 0.1.0 / **4** are on Play internal and TestFlight.
+- `staging`: same product plus STATUS / known-issue notes. Owner smoked preview APK `a7ce79c8` on 2026-08-18: **pass** (KI-006–KI-010 logged, not blockers). Same day, owner also logged **KI-011** (People person rows too tall — density regression, not a tester blocker; not investigated). 2026-08-20: **KI-012** logged (Samsung 3-button / Android gesture system Back sometimes does not navigate; iOS sheet swipe-down is the same Modal class, stack edge-swipe is not — investigation only, no fix). 2026-08-24: **KI-013** logged (Android spinner that does not clear when opening the app after a day unused — distinct from KI-006's post-APK-update hang; logging only, no investigation). Tester binaries 0.1.0 / **4** are on Play internal and TestFlight.
 
 ## Latest native builds
 

@@ -353,6 +353,25 @@ flag that.
   add-event with no Modal up — code says this should pop. Left-edge swipe
   on the calendar should not navigate inside Events.
 
+### KI-013 — Android hangs on a spinner when opening the app after a day unused
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-24, owner report on Android. Logging only — no
+  investigation or fix this pass.
+- Expected: opening the app after leaving it unused reaches the calendar
+  (or sign-in).
+- Actual: after not opening the app for about a day, the next open shows a
+  loading spinner that does not go away.
+- Repro: Android. Leave the app unused for about a day. Open it. The
+  spinner stays. Recovery (force-quit / wait / network) was not reported
+  this pass.
+- Distinct from [KI-006](#ki-006--android-hangs-on-a-spinner-after-installing-an-updated-apk-until-force-quit):
+  that is the same symptom on the first open after sideloading a newer APK
+  over an existing install, and was not observed on a later cold start of
+  the same binary. This report is a later open of an already-installed app
+  after a day of not using it. Web is unaffected (do not flag there).
+
 ## Known limitations (by design — do not flag)
 
 - **The native date/time picker never opens on web.**
