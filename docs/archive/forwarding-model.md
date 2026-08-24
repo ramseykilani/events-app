@@ -65,3 +65,41 @@ Copy + Follow (`docs/per-user-events-copy-follow-spec.md`, owner-approved
 `frozen` flag. Edits are one `save_event` call that updates the caller's row
 and cascades to followers silently. The share log became `sends` (who you
 told), and the follow links carry attribution and hide.
+
+## Reverting (the written procedure — rollback element 6)
+
+Code rollback is a git revert; data rollback is the one-way door. If the
+cutover must be undone:
+
+1. **Code:** `git revert` the cutover commit, redeploy the web build and
+   `send-notification`, redeploy `cleanup-events` (from the
+   `forwarding-model-final` tag) and re-schedule its cron job (the data
+   script below does this when given the original command).
+2. **Data:** run `docs/archive/revert-to-forwarding-model.sql` against the
+   project with psql (never via `supabase db push`). Choice rule: soak
+   ≤ 1 day and few writes → option A (`SET drill.option = 'A'` — fast, drops
+   the new tables, loses soak-window writes); otherwise option B (default —
+   rebuilds the legacy pointer/share tables from the new model's current
+   state, lossy: a second sender's copy of the same listing collapses into
+   the first under the restored dedup index, losing that attribution; follow
+   links have no legacy home and are discarded). To also restore the
+   `cleanup-events-weekly` cron job, `SET revert.cron_command` to the command
+   captured in the pre-cutover pg_dump's `cron.job` row (it embeds the
+   CRON_SECRET — never hardcode it; rotating CRON_SECRET and substituting a
+   fresh command works too).
+3. **Functions:** re-apply, from this tag, in order:
+   `20240216000008_find_or_create_event.sql`,
+   `20260807000005_share_event_rpc.sql`,
+   `20260812000002_calendar_display_name.sql`,
+   `20260807000006_signup_deliver_pending_shares.sql`,
+   `20260807000008_cleanup_orphan_events_only.sql`.
+   (The legacy tables' RLS policies ride along with the renames — they were
+   never dropped, which is exactly why `owns_user_event` survived the
+   cutover.)
+4. **Verify:** the go/no-go queries from the spec, inverted — row counts
+   match the pre-cutover snapshot plus any reverse-backfilled writes; the
+   calendar/share/remove flows work on the reverted client.
+
+The full round-trip (restore → migrate → verify → revert → verify) was
+rehearsed against a restored copy of the production dump before the real
+cutover (cutover step 3).
