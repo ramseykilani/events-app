@@ -4,11 +4,10 @@
 export const FETCH_TIMEOUT_MS = 2000;
 export const FETCH_ATTEMPTS = 3;
 
-// Writes must not share that budget. A 2s abort of find_or_create_event
-// dumps AbortError via showError and can leave the server committed while
-// the client still shows the old title (B-1, 2026-08-13). Do not retry an
-// aborted write: the RPC is not idempotent with description/image_url
-// (KI-002). Navigation stays outside this timer.
+// Writes must not share that budget. A 2s abort of a save dumps AbortError
+// via showError and can leave the server committed while the client still
+// shows the old title (B-1, 2026-08-13). An aborted write is reconciled by
+// reading, not by blind retry. Navigation stays outside this timer.
 export const WRITE_TIMEOUT_MS = 15000;
 
 // The budget is fixed per kind on purpose: withFetchTimeout/withWriteTimeout
@@ -75,9 +74,10 @@ export function withFetchTimeout<T>(
 }
 
 /**
- * Writes: 15s, and never retried — find_or_create_event may have already
- * committed (KI-002), so an aborted write is reconciled by reading, not by
- * trying again.
+ * Writes: 15s, and never auto-retried — a write may have already committed
+ * server-side, so an aborted write is reconciled by reading (save_event is
+ * idempotent, which is what makes a same-arguments retry safe), not by
+ * blindly trying again.
  */
 export function withWriteTimeout<T>(
   fn: (signal: AbortSignal) => Promise<T>
