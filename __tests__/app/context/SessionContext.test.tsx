@@ -115,4 +115,45 @@ describe('SessionContextProvider', () => {
     screen.unmount();
     expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   });
+
+  it('does not block the auth-state callback on a hung ensure_user_exists (KI-013)', async () => {
+    mockGetSession.mockResolvedValueOnce({
+      data: {
+        session: null,
+      },
+    });
+    // auth-js awaits every onAuthStateChange callback before resolving the
+    // token refresh that getSession() is waiting on, so a callback that
+    // awaited this never-settling RPC would hold the boot spinner forever.
+    mockRpc.mockReturnValue(new Promise(() => {}));
+
+    const screen = render(
+      <SessionContextProvider>
+        <SessionProbe />
+      </SessionContextProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('loading').props.children).toBe('false'));
+
+    let callbackResult: unknown;
+    await act(async () => {
+      callbackResult = authStateCallback?.('TOKEN_REFRESHED', {
+        user: {
+          id: 'user-3',
+          phone: '+14165550003',
+          user_metadata: {},
+        },
+      });
+    });
+
+    const raced = await Promise.race([
+      Promise.resolve(callbackResult).then(() => 'settled'),
+      new Promise((resolve) => setTimeout(() => resolve('blocked'), 100)),
+    ]);
+    expect(raced).toBe('settled');
+    expect(mockRpc).toHaveBeenCalledWith('ensure_user_exists', {
+      p_phone: '+14165550003',
+    });
+    await waitFor(() => expect(screen.getByTestId('user-id').props.children).toBe('user-3'));
+  });
 });

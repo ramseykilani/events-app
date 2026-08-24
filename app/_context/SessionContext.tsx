@@ -55,10 +55,14 @@ export function SessionContextProvider({ children }: { children: React.ReactNode
         setIsLoading(false);
       });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.user) {
-        await ensureUserRow(session);
+        // Fire-and-forget, same as the getSession path above: auth-js awaits
+        // every subscriber before resolving the token refresh that
+        // getSession() is waiting on, so a hung ensure_user_exists RPC would
+        // hold the boot spinner (KI-013).
+        void ensureUserRow(session);
       }
     });
 

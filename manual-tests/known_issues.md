@@ -356,7 +356,9 @@ flag that.
 ### KI-013 — Android hangs on a spinner when opening the app after a day unused
 
 - Severity: minor
-- Status: open
+- Status: open — fix landed 2026-08-24 (see below); pending owner
+  on-device confirmation (a day-long idle repro is not possible from a
+  cloud VM).
 - Found: 2026-08-24, owner report on Android. Logging only — no
   investigation or fix this pass.
 - Expected: opening the app after leaving it unused reaches the calendar
@@ -371,6 +373,49 @@ flag that.
   over an existing install, and was not observed on a later cold start of
   the same binary. This report is a later open of an already-installed app
   after a day of not using it. Web is unaffected (do not flag there).
+
+#### Root cause (2026-08-24 investigation, verified against library sources)
+
+The spinner is the boot gate in `app/_layout.tsx` (`isLoading ||
+!themeLoaded`); `isLoading` clears only when `supabase.auth.getSession()`
+settles. After >1h idle the stored access token is always expired
+(auth-js treats it as expired 90s early via `EXPIRY_MARGIN_MS`), so
+`getSession()` awaits a refresh-token POST. That fetch had no timeout at
+any layer: auth-js's `_request` attaches no AbortSignal, RN's fetch sets
+no JS-side timeout, and RN's Android `OkHttpClientProvider` builds with
+connect/read/write timeouts of 0 ("No timeouts by default"). A
+black-holed connection — a half-open socket after long idle (stale NAT
+mapping, post-Doze radio) that never delivers bytes and never resets —
+hangs the refresh forever, and with it the boot spinner. Force-quit
+starts a fresh process with fresh sockets, which is why recovery worked.
+Honest-offline (no route at all) never hung: the fetch rejects instantly
+and the app lands on sign-in after auth-js's bounded retry window (~13s),
+with the stored session preserved. A second unbounded wait shared the
+path: auth-js awaits every `onAuthStateChange` subscriber before
+resolving the refresh, and `SessionContext`'s callback awaited
+`ensureUserRow` — a raw RPC with no timeout.
+
+#### Fix (2026-08-24)
+
+- `lib/timeoutSignal.ts`: `boundedFetch`, a fetch wrapper with a 20s
+  backstop (`NETWORK_BACKSTOP_TIMEOUT_MS`, deliberately above the 15s
+  write budget so wrapped calls still time out on their own signal
+  first; a caller-provided signal is forwarded and wins when earlier).
+- `lib/supabase.ts`: passed as `global.fetch`, which supabase-js forwards
+  to auth, postgrest, storage, and functions — every Supabase call is now
+  bounded.
+- `app/_context/SessionContext.tsx`: the `onAuthStateChange` subscriber
+  no longer awaits `ensureUserRow` (fire-and-forget, matching the
+  getSession path).
+- Result on a black-holed network: the refresh aborts at ~20s (worst
+  ~40s including auth-js's internal retry window), the stored session is
+  kept, and the app lands on sign-in instead of spinning forever; the
+  auto-refresh ticker / next launch self-heals when the network recovers.
+- [KI-006](#ki-006--android-hangs-on-a-spinner-after-installing-an-updated-apk-until-force-quit)
+  shares this exact boot path (first cold start after an APK update,
+  token long expired) — the same fix should cover it. Confirm both on
+  the next device smoke; remove the entries only after on-device
+  verification.
 
 ## Known limitations (by design — do not flag)
 

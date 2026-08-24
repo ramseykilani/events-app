@@ -100,3 +100,34 @@ export async function withRetries<T>(
   }
   throw lastError;
 }
+
+// Backstop for Supabase calls that carry no budget of their own (auth
+// refresh/OTP, fire-and-forget invokes). auth-js has no timeout support and
+// RN's OkHttp client is built with infinite timeouts, so without this a
+// black-holed connection hangs the caller forever — KI-013 was the boot
+// spinner waiting on the expired-session refresh after a day idle. Wired as
+// global.fetch in lib/supabase.ts, which supabase-js forwards to auth,
+// postgrest, storage, and functions. 20s sits above the write budget so
+// wrapped calls always time out on their own signal first.
+export const NETWORK_BACKSTOP_TIMEOUT_MS = 20000;
+
+export function boundedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NETWORK_BACKSTOP_TIMEOUT_MS);
+  const upstream = init?.signal ?? null;
+  const onUpstreamAbort = () => controller.abort();
+  if (upstream) {
+    if (upstream.aborted) {
+      controller.abort();
+    } else {
+      upstream.addEventListener('abort', onUpstreamAbort, { once: true });
+    }
+  }
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => {
+    clearTimeout(timer);
+    upstream?.removeEventListener('abort', onUpstreamAbort);
+  });
+}

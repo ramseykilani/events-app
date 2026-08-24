@@ -2,6 +2,7 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
+import { boundedFetch } from './timeoutSignal';
 
 // createClient throws on an empty URL, and a module-level throw in a release
 // binary is an instant launch crash before React mounts. A build missing the
@@ -50,6 +51,13 @@ export const supabase = createClient(clientUrl, clientKey, {
     persistSession: true,
     detectSessionInUrl: false,
     ...(Platform.OS === 'web' ? { lock: noOpLock } : {}),
+  },
+  global: {
+    // auth-js has no timeout support and RN's OkHttp client defaults to
+    // infinite timeouts, so a black-holed token refresh used to hang the boot
+    // spinner forever (KI-013). supabase-js forwards this fetch to auth,
+    // postgrest, storage, and functions — one backstop bounds them all.
+    fetch: boundedFetch,
   },
 });
 
