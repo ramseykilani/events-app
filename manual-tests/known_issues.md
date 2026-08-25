@@ -328,6 +328,29 @@ flag that.
   add-event with no Modal up — code says this should pop. Left-edge swipe
   on the calendar should not navigate inside Events.
 
+### KI-014 — Month-navigation chevrons don't paint on web (functional but invisible)
+
+- Severity: minor
+- Status: open
+- Found: 2026-08-24 release review (skeptic pass on the visual matrix,
+  `manual-tests/manual_test_report_2026-08-24-release.md`).
+- Expected: the calendar's month header shows visible ‹ › chevrons.
+- Actual: on web (react-native-web), the arrow touchables are present and
+  clickable — month navigation WORKS — but the arrow glyphs collapse to 0×0
+  and never paint (react-native-web's tintColor SVG-filter path). Native
+  renders the library's PNG arrows normally (never reported on any device
+  smoke). Web-only; the web build is the dev/staging/CI surface, never
+  promoted to users.
+- Repro: open the calendar on the web build (any theme/width) — no painted
+  chevrons flank the month title; clicking where they should be still
+  navigates. Adjacent-month day taps also switch months.
+- Note for CI: the e2e pixel baselines mask the grid header
+  (`mask: [page.getByRole('slider')]` in `e2e/visual.spec.ts`), so pixel
+  diffs can't catch this.
+- Fix (separate task): render the chevrons as vector icons
+  (`@expo/vector-icons`, tinted by `theme.textPrimary`) instead of the
+  library's tinted-PNG arrows, or pass custom `renderArrow`.
+
 ### KI-013 — Android hangs on a spinner when opening the app after a day unused
 
 - Severity: minor
