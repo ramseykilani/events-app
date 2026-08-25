@@ -193,6 +193,11 @@ export function Calendar({
           monthTextColor: theme.textPrimary,
           textDisabledColor: theme.textTertiary,
           dotColor: theme.accent,
+          // The library's Dot pushes todayDot AFTER visibleDot, so without
+          // this a marked-but-unselected today renders the library default
+          // blue (#00BBF2) instead of the accent (found in the 2026-08-24
+          // release review's visual matrix).
+          todayDotColor: theme.accent,
         }}
       />
       <ScrollView
