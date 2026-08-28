@@ -29,6 +29,11 @@
 //      react-native-web's on-state thumb ignores thumbColor and falls back to a
 //      Material teal default outside the role-token palettes; ThemedSwitch owns
 //      the token wiring.
+//   8. Every <Modal> carries onRequestClose — RN's Android Modal consumes
+//      hardware Back and only forwards it to onRequestClose, so a missing
+//      handler leaves the sheet swallowing Back (KI-009/KI-012); on iOS a
+//      pageSheet swipe-down attempt rubber-bands instead of closing. Wire it
+//      to the sheet's own Close/Cancel.
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -174,6 +179,35 @@ function checkShowErrorCalls(path, source, text) {
   visit(source);
 }
 
+function checkModalRequestClose(path, source, text) {
+  const relPath = rel(path);
+  const lines = text.split('\n');
+  const visit = (node) => {
+    if (
+      (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) &&
+      ts.isIdentifier(node.tagName) &&
+      node.tagName.text === 'Modal'
+    ) {
+      const attrs = node.attributes.properties;
+      const hasHandler = attrs.some(
+        (a) => ts.isJsxAttribute(a) && a.name.text === 'onRequestClose'
+      );
+      const hasSpread = attrs.some((a) => ts.isJsxSpreadAttribute(a));
+      if (
+        !hasHandler &&
+        !hasSpread &&
+        !hasAllowComment(lines, lineOf(source, node.getStart()))
+      ) {
+        violations.push(
+          `${relPath}:${lineOf(source, node.getStart())} — <Modal> without onRequestClose swallows Android system Back and iOS pageSheet swipe-down attempts (KI-009/KI-012); wire it to the sheet's Close/Cancel`
+        );
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
 function checkRawSwitchImport(path, source) {
   const relPath = rel(path);
   if (relPath === THEMED_SWITCH_FILE) return;
@@ -254,6 +288,7 @@ for (const dir of SCAN_DIRS) {
     checkTimeoutImports(path, source);
     checkShowErrorCalls(path, source, text);
     checkRawSwitchImport(path, source);
+    checkModalRequestClose(path, source, text);
   }
 }
 

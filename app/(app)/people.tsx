@@ -663,7 +663,7 @@ export default function PeopleScreen() {
           }}
         />
       ) : null}
-      <Modal visible={showNotifPrefs} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={showNotifPrefs} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowNotifPrefs(false)}>
         <View
           style={[
             styles.modalContainer,
@@ -707,7 +707,7 @@ export default function PeopleScreen() {
           </View>
         </View>
       </Modal>
-      <Modal visible={showNameEdit} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={showNameEdit} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowNameEdit(false)}>
         <View
           style={[
             styles.modalContainer,
@@ -762,7 +762,7 @@ export default function PeopleScreen() {
           </View>
         </View>
       </Modal>
-      <Modal visible={!!editingCircle} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={!!editingCircle} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditingCircle(null)}>
         <View
           style={[
             styles.modalContainer,

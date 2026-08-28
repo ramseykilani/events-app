@@ -1,6 +1,6 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Platform } from 'react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Modal, Platform } from 'react-native';
 import { abortable, abortablePromise } from '../../helpers/abortable';
 import PeopleScreen from '../../../app/(app)/people';
 import { showAlert, showConfirm } from '../../../lib/dialogs';
@@ -629,5 +629,133 @@ describe('app/(app)/people notification toggles', () => {
     fireEvent.press(getByText('Notifications'));
     expect(getByLabelText('Push notifications').props.value).toBe(true);
     expect(getByLabelText('Text messages (SMS)').props.value).toBe(true);
+  });
+});
+
+describe('app/(app)/people sheets dismiss via onRequestClose', () => {
+  // Android hardware Back and iOS pageSheet swipe-down attempts reach a sheet
+  // only through Modal's onRequestClose (KI-009/KI-012).
+  const originalOS = Platform.OS;
+
+  const mockCircleMembersIn = jest.fn();
+  const mockCircleMembersSelect = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
+    mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
+
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
+
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
+
+    mockCircleMembersSelect.mockReturnValue({ in: mockCircleMembersIn });
+    mockCircleMembersIn.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
+    mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'my_people') {
+        return { select: mockMyPeopleSelect, upsert: mockMyPeopleUpsert };
+      }
+      if (table === 'circles') {
+        return { select: mockCirclesSelect };
+      }
+      if (table === 'circle_members') {
+        return { select: mockCircleMembersSelect };
+      }
+      if (table === 'hidden_people') {
+        return { select: mockHiddenSelect };
+      }
+      if (table === 'users') {
+        return { select: mockUsersSelect, update: mockUsersUpdate };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+  });
+
+  afterEach(() => {
+    Platform.OS = originalOS;
+  });
+
+  const requestClose = (screen: ReturnType<typeof render>) => {
+    const open = screen
+      .UNSAFE_getAllByType(Modal)
+      .filter((modal) => modal.props.visible);
+    expect(open).toHaveLength(1);
+    expect(typeof open[0].props.onRequestClose).toBe('function');
+    act(() => open[0].props.onRequestClose());
+  };
+
+  it('Notifications sheet: Back closes it like Close', async () => {
+    const screen = render(<PeopleScreen />);
+
+    await waitFor(() => expect(screen.getByText('Notifications')).toBeTruthy());
+    fireEvent.press(screen.getByText('Notifications'));
+    expect(screen.getByLabelText('Push notifications')).toBeTruthy();
+
+    requestClose(screen);
+
+    expect(screen.queryByLabelText('Push notifications')).toBeNull();
+  });
+
+  it('Your name sheet: Back closes it like Cancel', async () => {
+    const screen = render(<PeopleScreen />);
+
+    await waitFor(() => expect(screen.getByText('Your name: Test User')).toBeTruthy());
+    fireEvent.press(screen.getByText('Your name: Test User'));
+    expect(screen.getByLabelText('Your name')).toBeTruthy();
+
+    requestClose(screen);
+
+    expect(screen.queryByLabelText('Your name')).toBeNull();
+  });
+
+  it('circle editor: Back closes it like Cancel', async () => {
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: [
+            { id: 'p1', owner_id: 'u1', phone_number: '+14165550001', contact_name: 'Alice' },
+          ],
+          error: null,
+        })
+      )
+    );
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: [{ id: 'c1', owner_id: 'u1', name: 'Family' }],
+          error: null,
+        })
+      )
+    );
+    const screen = render(<PeopleScreen />);
+
+    await waitFor(() => expect(screen.getByText('Edit')).toBeTruthy());
+    fireEvent.press(screen.getByText('Edit'));
+    expect(screen.getByText('Cancel')).toBeTruthy();
+
+    requestClose(screen);
+
+    expect(screen.queryByText('Cancel')).toBeNull();
   });
 });

@@ -121,13 +121,15 @@ the ask is one-shot and persisted (`notification_explainer_answered`).
 - **KI-007** — delete account then sign in again with the same number
   re-delivers friends' previously shared events (pending-share path).
   Self-created copies stay gone.
-- **KI-008 / KI-009 / KI-010 / KI-011** — Notifications modal: switches feel
-  small, Android Back does not dismiss it (Close does), Push can be on
-  without OS permission. People person rows are too tall (density).
-- **KI-012** — Samsung 3-button (and Android gesture-nav) system Back
-  sometimes does nothing. Confirmed class: RN Modals that omit
-  `onRequestClose` (Notifications / Your name / circle editor / contacts
-  picker). iOS: the same four sheets also will not swipe-down dismiss;
-  left-edge swipe on pushed screens is a different path and should pop.
-  Do not re-flag the four sheets. Flag only if Back / edge-swipe fails on
-  a pushed screen with no Modal/picker/keyboard/alert up.
+- **KI-008 / KI-010 / KI-011** — Notifications modal: switches feel
+  small, Push can be on without OS permission. People person rows are too
+  tall (density).
+- **KI-009 / KI-012 — fix landed 2026-08-28, verify on this smoke.**
+  System Back (3-button and gesture-nav) should now dismiss the
+  Notifications / Your name / circle editor / contacts-picker sheets,
+  same as their Close/Cancel; on iOS, a swipe-down attempt on those
+  sheets should close them. Flag any sheet where Back / swipe-down still
+  does nothing. Then, with every sheet closed, check Back on a pushed
+  screen (event detail, People, add-event) and on the calendar — iOS
+  left-edge swipe on a pushed screen should pop. Flag only if Back /
+  edge-swipe fails there with no Modal/picker/keyboard/alert up.

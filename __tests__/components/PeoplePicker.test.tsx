@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Modal } from 'react-native';
 import { PeoplePicker } from '../../components/PeoplePicker';
 import { getContactsWithPhones } from '../../lib/contacts';
 
@@ -143,5 +144,21 @@ describe('components/PeoplePicker', () => {
     expect(onSelect).toHaveBeenCalledWith([
       { phoneNumber: '+14165550002', name: 'Bob' },
     ]);
+  });
+
+  it('wires the Modal onRequestClose to onCancel (Android Back / iOS swipe-down)', async () => {
+    getContactsWithPhonesMock.mockResolvedValueOnce([]);
+
+    const onCancel = jest.fn();
+    const screen = render(
+      <PeoplePicker onSelect={jest.fn()} onCancel={onCancel} existingPhones={[]} />
+    );
+
+    await waitFor(() => expect(screen.queryByText('Loading contacts...')).toBeNull());
+
+    const modal = screen.UNSAFE_getByType(Modal);
+    expect(typeof modal.props.onRequestClose).toBe('function');
+    act(() => modal.props.onRequestClose());
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

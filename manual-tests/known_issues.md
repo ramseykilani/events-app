@@ -142,7 +142,8 @@ never added: a blocker must be fixed, not accepted.
 ### KI-009 — Android system Back does not close the Notifications modal
 
 - Severity: minor
-- Status: open
+- Status: open — fix landed 2026-08-28 (see below); pending owner
+  on-device confirmation (no Android device in a cloud VM).
 - Found: 2026-08-18 owner smoke of preview APK `a7ce79c8`. Owner ruling:
   not a tester blocker.
 - Expected: the system Back button dismisses the Notifications sheet, same
@@ -155,8 +156,13 @@ never added: a blocker must be fixed, not accepted.
 - Same pattern, not previously listed here: the circle-editor Modal in
   `people.tsx` and `components/PeoplePicker.tsx` also omit `onRequestClose`.
   The broader system-Back / gesture-Back picture is [KI-012](#ki-012--android-system-back-3-button-and-gesture-sometimes-does-not-navigate).
-- Fix (separate task): `onRequestClose={() => setShowNotifPrefs(false)}`
-  on that Modal (and the name-edit Modal for the same pattern).
+- Fix (2026-08-28): all four sheets now wire `onRequestClose` to their own
+  Close/Cancel — Notifications / Your name / circle editor in
+  `app/(app)/people.tsx`, contacts picker in `components/PeoplePicker.tsx` —
+  and `test:conventions` requires the handler on every `<Modal>` so the
+  class cannot regress. The same wiring covers the iOS pageSheet
+  swipe-down attempt. Remove this entry once a device smoke confirms Back
+  dismisses each sheet.
 
 ### KI-010 — Push toggle ignores OS notification permission
 
@@ -205,7 +211,9 @@ never added: a blocker must be fixed, not accepted.
 ### KI-012 — Android system Back (3-button and gesture) sometimes does not navigate
 
 - Severity: minor
-- Status: open
+- Status: open — the confirmed Modal class is fixed (2026-08-28, pending
+  owner on-device confirmation); the unconfirmed stack-root layer below
+  is what remains open.
 - Found: 2026-08-20 owner report on Samsung 3-button navigation. Investigation
   only — no implementation or design this pass. Not a tester blocker (same
   ruling family as [KI-009](#ki-009--android-system-back-does-not-close-the-notifications-modal)).
@@ -248,18 +256,18 @@ Inventory of every `Modal` in the app:
 
 | Sheet | File | `onRequestClose` |
 |---|---|---|
-| Notifications | `app/(app)/people.tsx` | missing (KI-009) |
-| Your name | `app/(app)/people.tsx` | missing (noted in KI-009) |
-| Circle editor | `app/(app)/people.tsx` | missing |
-| Add people (contacts picker) | `components/PeoplePicker.tsx` | missing |
+| Notifications | `app/(app)/people.tsx` | fixed 2026-08-28 (was KI-009) |
+| Your name | `app/(app)/people.tsx` | fixed 2026-08-28 |
+| Circle editor | `app/(app)/people.tsx` | fixed 2026-08-28 |
+| Add people (contacts picker) | `components/PeoplePicker.tsx` | fixed 2026-08-28 |
 | Notification explainer | `components/NotificationExplainer.tsx` | present (`onNotNow`) |
 | Contacts explainer | `components/ContactsExplainer.tsx` | present (`onNotNow`) |
 | Contacts denied recovery | `components/ContactsDeniedRecovery.tsx` | present |
 | Manual add person | `components/ManualAddPersonModal.tsx` | present |
 
-Any time one of the four missing-handler sheets is open, 3-button Back and
-gesture-nav back will no-op. Close/Cancel/the in-app control still works.
-This is the best explanation of "sometimes."
+While one of the four previously missing-handler sheets was open, 3-button
+Back and gesture-nav back no-oped. Close/Cancel/the in-app control still
+worked. This was the best explanation of "sometimes."
 
 #### Unconfirmed on device: stack screens and the calendar root
 
@@ -292,10 +300,14 @@ keyboard dismissing, the Android date/time picker dialog, and a native
 - Web: no 3-button / gesture nav. Browser back/forward is a different
   stack (covered by the release-review edge/platform track). Do not flag
   there.
-- Fix: not designed this pass. A later task should treat the missing
-  `onRequestClose` sheets as the known, bounded class (KI-009 plus the
-  two extra rows in the table) and only chase stack-root / native-stack
-  behavior if Back still fails with every Modal closed.
+- Fix (2026-08-28): the bounded class is done — all four sheets wire
+  `onRequestClose` to their own Close/Cancel, and `test:conventions`
+  requires the handler on every `<Modal>` so the class cannot regress.
+  What remains is the unconfirmed layer: on the next device smoke, check
+  Back on a pushed screen (event detail, People, add-event) and on the
+  calendar with every Modal closed; only if it still fails there, chase
+  the stack-root / native-stack behavior above. Remove this entry once
+  that check passes.
 
 #### iOS gestures (follow-up 2026-08-20 — code only, no device)
 

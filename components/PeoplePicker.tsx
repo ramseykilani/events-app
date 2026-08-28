@@ -100,7 +100,7 @@ export function PeoplePicker({
   };
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet">
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
       <View
         style={[
           styles.container,
