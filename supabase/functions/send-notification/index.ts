@@ -78,6 +78,15 @@ function isReservedTestPhone(phone: string | null | undefined): boolean {
   return /^1?555\d{7}$/.test(digits);
 }
 
+// Result of a Twilio Messages API call. 'sent' only means Twilio ACCEPTED
+// the message — the carrier can still fail it; terminal states arrive via
+// the StatusCallback webhook (twilio-status function). 'rejected' is a
+// synchronous 21xxx error from the API itself.
+type SmsResult =
+  | { status: 'sent'; sid: string | null }
+  | { status: 'rejected'; errorCode: number | null; errorMessage: string | null }
+  | { status: 'skipped' };
+
 // Twilio accepts either MessagingServiceSid (sender pool, built-in STOP
 // opt-out handling) or a bare From number — never both.
 async function sendSms(
@@ -86,8 +95,8 @@ async function sendSms(
   accountSid: string,
   authToken: string,
   sender: { messagingServiceSid?: string; fromNumber?: string },
-): Promise<void> {
-  if (isReservedTestPhone(to)) return;
+): Promise<SmsResult> {
+  if (isReservedTestPhone(to)) return { status: 'skipped' };
   const credentials = btoa(`${accountSid}:${authToken}`);
   const params = new URLSearchParams({ To: to, Body: body });
   if (sender.messagingServiceSid) {
@@ -95,9 +104,9 @@ async function sendSms(
   } else if (sender.fromNumber) {
     params.set('From', sender.fromNumber);
   } else {
-    return;
+    return { status: 'skipped' };
   }
-  await fetch(
+  const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {
       method: 'POST',
@@ -108,6 +117,25 @@ async function sendSms(
       body: params,
     },
   );
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) {
+    // Synchronous rejection (21xxx). Until the response was parsed these
+    // were invisible outside the Twilio console — the 2026-08-17 diagnosis
+    // found carrier-blocked (30034) and landline (30006) failures with zero
+    // trace in our own logs.
+    console.error('Twilio SMS rejected:', {
+      to,
+      httpStatus: res.status,
+      errorCode: payload?.code ?? null,
+      errorMessage: payload?.message ?? null,
+    });
+    return {
+      status: 'rejected',
+      errorCode: payload?.code ?? null,
+      errorMessage: payload?.message ?? null,
+    };
+  }
+  return { status: 'sent', sid: payload?.sid ?? null };
 }
 
 serve(async (req) => {
@@ -234,7 +262,7 @@ serve(async (req) => {
     }
 
     const messages: PushMessage[] = [];
-    const smsSends: Promise<void>[] = [];
+    const smsSends: Promise<SmsResult | void>[] = [];
 
     const eventTitle = event.title ? excerpt(event.title, 80) : null;
     const dateStr = formatDate(event.event_date);
