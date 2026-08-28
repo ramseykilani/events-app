@@ -15,11 +15,10 @@ import { AUTH_FILE_A, AUTH_FILE_B } from './constants';
 //
 // With E2E_ACCOUNT_PASSWORD set (the norm — scripts/create-test-accounts.mjs)
 // sign-in goes through the token endpoint and fires no SMS at all. Without
-// it, the fallback drives the OTP UI, and each sign-in fires a real Twilio
-// SMS at the fictional 555 test number, which Twilio rejects (21211) —
-// per-test sign-ins were poisoning the account's messaging-health metrics
-// (2026-08-17: ~770 rejected sends to account B in 30 days). The OTP UI
-// itself stays covered by auth.spec.ts; that is the product surface.
+// it, the fallback drives the OTP UI. Registered test numbers are in
+// sms_test_otp, so that request returns message_id "test-otp" and does not
+// call Twilio. The OTP UI itself stays covered by auth.spec.ts; that is the
+// product surface.
 setup('sign in as account A', async ({ page }) => {
   if (ACCOUNT_PASSWORD) {
     await signInWithPassword(page, ACCOUNT_A);

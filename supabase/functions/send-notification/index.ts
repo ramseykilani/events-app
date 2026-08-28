@@ -69,6 +69,15 @@ function excerpt(text: string, max: number): string {
   return `${cut.slice(0, lastSpace > 0 ? lastSpace : max).trimEnd()}...`;
 }
 
+// NANP area code 555 is reserved / fictional. Twilio rejects these with
+// 21211, which poisons messaging-health metrics. Keep in sync with
+// lib/reservedPhone.ts (this function cannot import app lib at deploy time).
+function isReservedTestPhone(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  return /^1?555\d{7}$/.test(digits);
+}
+
 // Twilio accepts either MessagingServiceSid (sender pool, built-in STOP
 // opt-out handling) or a bare From number — never both.
 async function sendSms(
@@ -78,6 +87,7 @@ async function sendSms(
   authToken: string,
   sender: { messagingServiceSid?: string; fromNumber?: string },
 ): Promise<void> {
+  if (isReservedTestPhone(to)) return;
   const credentials = btoa(`${accountSid}:${authToken}`);
   const params = new URLSearchParams({ To: to, Body: body });
   if (sender.messagingServiceSid) {
@@ -268,7 +278,13 @@ serve(async (req) => {
 
       // ── Non-app user: SMS only ──────────────────────────────────────────────
       if (!person.user_id) {
-        if (!twilioConfigured || !person.phone_number) continue;
+        if (
+          !twilioConfigured ||
+          !person.phone_number ||
+          isReservedTestPhone(person.phone_number)
+        ) {
+          continue;
+        }
 
         // The SMS is the whole message for non-app recipients — there is no
         // other surface. This variant carries the signup invite.
@@ -361,7 +377,12 @@ serve(async (req) => {
       // Push is the tappable path for app users — the SMS is a pure
       // notification (no signup invite; they already have the app).
       // Skipped gracefully if Twilio is not configured.
-      if (twilioConfigured && person.phone_number && recipientUser?.notify_sms !== false) {
+      if (
+        twilioConfigured &&
+        person.phone_number &&
+        !isReservedTestPhone(person.phone_number) &&
+        recipientUser?.notify_sms !== false
+      ) {
         smsSends.push(
           sendSms(
             person.phone_number,

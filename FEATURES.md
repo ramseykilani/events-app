@@ -637,7 +637,7 @@ A web-first beta is attractive: nobody has to install anything, and notification
 - `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are bundled into the static build at export time
 - The forwarded-copy model means a recipient who later installs the native app sees the same calendar — web and native are interchangeable frontends over the same account
 - Status as of 2026-08-07: all three Twilio function secrets are set (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID`) and a real SMS was verified end-to-end (E-107: `send-notification` returned `{"sent":0,"sms":1}`; Twilio's message log confirms delivery from the Messaging Service pool number). Non-app-user SMS remains gated on a store URL until item 4 lands — a temporary `IOS_APP_STORE_URL=https://example.com/events` placeholder secret is set; remove it when `WEB_APP_URL` exists
-- Test accounts use reserved 555 numbers: A is `+15555550100`, B is `+15555550103` (moved off the real-format `+16462655565`). Sharing to test accounts never sends real SMS
+- Test accounts use reserved 555 numbers: A is `+15555550100`, B is `+15555550103` (moved off the real-format `+16462655565`). Sharing to test accounts never sends real SMS (`send-notification` skips NANP area-code 555). Auth OTP on a number in `sms_test_otp` returns `message_id: test-otp` and does not call Twilio.
 
 ### Acceptance Criteria
 

@@ -28,10 +28,11 @@
 //     generated and printed once; store it in .env, Cursor Secrets, and the
 //     GitHub repo secrets.
 //
-// Cost: each account's first OTP request fires ONE Twilio send attempt
-// (rejected 21211 at the 555 numbers — free, one-time). Once the password is
-// set, no harness sign-in fires SMS again. Re-running is safe: test-OTP
-// config is merged, and password setting is idempotent.
+// Cost: zero Twilio sends. Users are created (or re-passworded) through the
+// Auth Admin API with phone_confirm, and sms_test_otp is registered first so
+// the OTP UI (auth.spec.ts) returns message_id "test-otp" instead of calling
+// Twilio. Re-running is safe: test-OTP config is merged, and password setting
+// is idempotent.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { randomBytes, randomInt } from 'node:crypto';
@@ -108,20 +109,73 @@ async function api(path, { method = 'GET', token, body } = {}) {
   return { status: res.status, ok: res.ok, json };
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 const CONFIG_PATH = `https://api.supabase.com/v1/projects/${projectRef}/config/auth`;
 
+const MGMT_HEADERS = {
+  authorization: `Bearer ${ACCESS_TOKEN}`,
+  'user-agent': 'Mozilla/5.0 (compatible; events-app-agent/1.0)',
+};
+
 async function getAuthConfig() {
-  const res = await fetch(CONFIG_PATH, {
-    headers: { authorization: `Bearer ${ACCESS_TOKEN}` },
-  });
+  const res = await fetch(CONFIG_PATH, { headers: MGMT_HEADERS });
   if (!res.ok) {
     throw new Error(
       `GET config/auth failed: ${res.status} ${await res.text()}`
     );
   }
   return res.json();
+}
+
+async function getServiceRole() {
+  const res = await fetch(
+    `https://api.supabase.com/v1/projects/${projectRef}/api-keys`,
+    { headers: MGMT_HEADERS }
+  );
+  if (!res.ok) {
+    throw new Error(
+      `GET api-keys failed: ${res.status} ${await res.text()}`
+    );
+  }
+  const keys = await res.json();
+  const service = keys.find((k) => k.id === 'service_role' || k.name === 'service_role');
+  if (!service?.api_key) {
+    throw new Error('no service_role key in Management API api-keys response');
+  }
+  return service.api_key;
+}
+
+function phoneDigits(phone) {
+  return phone.replace(/\D/g, '');
+}
+
+async function findUserByPhone(service, phone) {
+  const want = phoneDigits(phone);
+  let page = 1;
+  for (;;) {
+    const res = await fetch(
+      `${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=200`,
+      {
+        headers: { authorization: `Bearer ${service}`, apikey: service },
+      }
+    );
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = { raw: text };
+    }
+    if (!res.ok) {
+      throw new Error(
+        `admin list users failed: ${res.status} ${JSON.stringify(json)}`
+      );
+    }
+    const users = json.users ?? [];
+    const match = users.find((u) => phoneDigits(u.phone ?? '') === want);
+    if (match) return match;
+    if (users.length < 200) return null;
+    page += 1;
+  }
 }
 
 // Picks two random numbers from the fictional 555-01xx block that no test
@@ -183,7 +237,7 @@ async function ensureTestOtps() {
   const patch = await fetch(CONFIG_PATH, {
     method: 'PATCH',
     headers: {
-      authorization: `Bearer ${ACCESS_TOKEN}`,
+      ...MGMT_HEADERS,
       'content-type': 'application/json',
     },
     body: JSON.stringify({
@@ -203,58 +257,45 @@ async function ensureTestOtps() {
   );
 }
 
-// 2. Per account: OTP sign-in (creates the user on first use; the SMS send
-// itself is rejected by Twilio at the 555 number — expected), set the
-// password, then prove the password grant works.
-async function provision(phone) {
-  let otp = await api(`${SUPABASE_URL}/auth/v1/otp`, {
-    method: 'POST',
-    body: { phone },
-  });
-  // Two transient failures, both observed in practice:
-  // - 429: one OTP request per number per 60s — a re-run inside the window
-  //   waits it out.
-  // - 422 sms_send_failed on a brand-new number: the test-OTP config PATCH
-  //   can take a moment to reach the auth service, and until it does the
-  //   number gets a real Twilio send attempt (rejected 21211) that fails the
-  //   request. Retry while propagation catches up.
-  for (let attempt = 0; attempt < 3 && !otp.ok; attempt += 1) {
-    const retryable =
-      otp.status === 429 || otp.json?.error_code === 'sms_send_failed';
-    if (!retryable) break;
-    const wait = otp.status === 429 ? 65_000 : 30_000;
-    console.log(
-      `${phone}: OTP send ${otp.status === 429 ? 'rate-limited' : 'config still propagating'}; retrying in ${wait / 1000}s`
+// 2. Per account: create or update via the Auth Admin API (phone confirmed,
+// password set) — never call /otp, so Twilio is never contacted. Then prove
+// the password grant works.
+async function provision(phone, service) {
+  const existing = await findUserByPhone(service, phone);
+  const adminHeaders = {
+    authorization: `Bearer ${service}`,
+    apikey: service,
+    'content-type': 'application/json',
+  };
+  if (existing) {
+    const update = await fetch(
+      `${SUPABASE_URL}/auth/v1/admin/users/${existing.id}`,
+      {
+        method: 'PUT',
+        headers: adminHeaders,
+        body: JSON.stringify({ password }),
+      }
     );
-    await sleep(wait);
-    otp = await api(`${SUPABASE_URL}/auth/v1/otp`, {
+    if (!update.ok) {
+      throw new Error(
+        `${phone}: admin password update failed: ${update.status} ${await update.text()}`
+      );
+    }
+  } else {
+    const create = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
       method: 'POST',
-      body: { phone },
+      headers: adminHeaders,
+      body: JSON.stringify({
+        phone,
+        phone_confirm: true,
+        password,
+      }),
     });
-  }
-  if (!otp.ok) {
-    throw new Error(`${phone}: OTP send failed: ${JSON.stringify(otp.json)}`);
-  }
-
-  const verify = await api(`${SUPABASE_URL}/auth/v1/verify`, {
-    method: 'POST',
-    body: { type: 'sms', phone, token: TEST_OTP },
-  });
-  if (!verify.ok || !verify.json.access_token) {
-    throw new Error(
-      `${phone}: OTP verify failed: ${JSON.stringify(verify.json)}`
-    );
-  }
-
-  const update = await api(`${SUPABASE_URL}/auth/v1/user`, {
-    method: 'PUT',
-    token: verify.json.access_token,
-    body: { password },
-  });
-  if (!update.ok) {
-    throw new Error(
-      `${phone}: setting password failed: ${JSON.stringify(update.json)}`
-    );
+    if (!create.ok) {
+      throw new Error(
+        `${phone}: admin create failed: ${create.status} ${await create.text()}`
+      );
+    }
   }
 
   const grant = await api(
@@ -274,11 +315,9 @@ if (FRESH_PAIR) {
   console.log(`fresh pair: ${targets[0]} / ${targets[1]}`);
 }
 await ensureTestOtps();
+const service = await getServiceRole();
 for (const phone of targets) {
-  await provision(phone);
-  // Stay under the 1-OTP/60s/number limit without serializing the whole pool
-  // on the full cooldown — the limit is per number, so only a re-run of the
-  // SAME number hits it. No sleep needed between distinct numbers.
+  await provision(phone, service);
 }
 if (FRESH_PAIR) {
   console.log(

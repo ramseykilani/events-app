@@ -65,9 +65,9 @@ export const test = base.extend({
 // signed-in storageState — to manual browser.newContext() calls, so without
 // this the "signed-out" context would boot straight into account A's
 // calendar. Pass AUTH_FILE_B to boot into account B's stored session instead
-// of signing in through the UI — per-test signIn() calls each fire a real
-// Twilio SMS at the fictional 555 number (rejected 21211), which poisons the
-// account's messaging-health metrics.
+// of signing in through the UI — per-test OTP on an unregistered 555 used to
+// 21211 Twilio; registered test numbers no longer do (sms_test_otp + password
+// setup). Still never sign in per test: it churns shared sessions.
 export async function newExtraContext(
   browser: Browser,
   testInfo: TestInfo,

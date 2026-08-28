@@ -59,8 +59,9 @@ test('verify screen starts the resend cooldown and rejects a wrong code (M-002)'
     await page.getByLabel('Phone number').fill(ACCOUNT_B.phone);
     await page.getByRole('button', { name: 'Send code' }).click();
 
-    // The initial send starts the 60s cooldown so an accidental tap can't
-    // fire a second SMS.
+    // Send code hits sms_test_otp (message_id test-otp) and does not call
+    // Twilio. The cooldown still exists so a double-tap cannot fire a second
+    // request inside Auth's max-frequency window.
     const codeInput = page.getByLabel('Verification code');
     await expect(codeInput).toBeVisible();
     await expect(page.getByText(/Resend code in \d+s/)).toBeVisible();

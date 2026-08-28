@@ -16,8 +16,8 @@ export const ACCOUNT_B = {
 };
 // Shared password for every test account (scripts/create-test-accounts.mjs).
 // When set, the auth setup signs in via the token endpoint — no SMS fired.
-// When unset, it falls back to driving the OTP UI (one rejected Twilio send
-// per account per run).
+// When unset, it falls back to driving the OTP UI. Registered test numbers
+// use sms_test_otp (message_id test-otp) and do not call Twilio.
 export const ACCOUNT_PASSWORD = process.env.E2E_ACCOUNT_PASSWORD ?? '';
 // Display name account A uses for account B in My People. The share test is
 // idempotent: if this person already exists it is reused, not re-added.
