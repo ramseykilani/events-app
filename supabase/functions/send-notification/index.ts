@@ -95,6 +95,7 @@ async function sendSms(
   accountSid: string,
   authToken: string,
   sender: { messagingServiceSid?: string; fromNumber?: string },
+  statusCallbackUrl?: string,
 ): Promise<SmsResult> {
   if (isReservedTestPhone(to)) return { status: 'skipped' };
   const credentials = btoa(`${accountSid}:${authToken}`);
@@ -106,6 +107,10 @@ async function sendSms(
   } else {
     return { status: 'skipped' };
   }
+  // Per-message StatusCallback overrides the Messaging Service's callback
+  // URL, so delivery-status webhooks are wired entirely here — no Twilio
+  // console configuration.
+  if (statusCallbackUrl) params.set('StatusCallback', statusCallbackUrl);
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
     {
@@ -240,10 +245,11 @@ serve(async (req) => {
 
     // Load the sends to notify for this event, including each recipient's
     // phone number — scoped to the just-shared person ids when the client
-    // passes them.
+    // passes them. sends.id is needed to write each SMS's delivery outcome
+    // back onto the share record.
     let sendsQuery = db
       .from('sends')
-      .select('person_id, my_people(user_id, owner_id, phone_number)')
+      .select('id, person_id, my_people(user_id, owner_id, phone_number)')
       .eq('event_id', eventId);
     if (personIds) {
       sendsQuery = sendsQuery.in('person_id', personIds);
@@ -262,7 +268,49 @@ serve(async (req) => {
     }
 
     const messages: PushMessage[] = [];
-    const smsSends: Promise<SmsResult | void>[] = [];
+    const smsSends: Promise<void>[] = [];
+
+    // Delivery-status webhook for every SMS this function sends. The URL is
+    // deterministic, so the twilio-status function can verify Twilio's
+    // signature against it.
+    const smsStatusCallbackUrl = `${supabaseUrl}/functions/v1/twilio-status`;
+
+    // Send one SMS and persist the outcome on its sends row (Share Delivery
+    // Status): accepted → message SID + 'queued' (terminal carrier states
+    // arrive via twilio-status); synchronous rejection → 'failed' + the
+    // 21xxx code (21610 STOP included — Twilio answers STOP'd numbers
+    // synchronously). A lost status write degrades that row to the legacy
+    // "✓ Shared" label; the SMS itself is already on its way.
+    const sendAndRecord = async (
+      sendId: string,
+      to: string,
+      body: string,
+    ): Promise<void> => {
+      const result = await sendSms(
+        to,
+        body,
+        twilioAccountSid!,
+        twilioAuthToken!,
+        twilioSender,
+        smsStatusCallbackUrl,
+      );
+      if (result.status === 'skipped') return;
+      const update =
+        result.status === 'sent'
+          ? {
+              sms_sid: result.sid,
+              sms_status: 'queued',
+              sms_error_code: null,
+              sms_status_at: new Date().toISOString(),
+            }
+          : {
+              sms_status: 'failed',
+              sms_error_code: result.errorCode != null ? String(result.errorCode) : null,
+              sms_status_at: new Date().toISOString(),
+            };
+      const { error } = await db.from('sends').update(update).eq('id', sendId);
+      if (error) console.error('send-notification: status write failed', error);
+    };
 
     const eventTitle = event.title ? excerpt(event.title, 80) : null;
     const dateStr = formatDate(event.event_date);
@@ -317,12 +365,10 @@ serve(async (req) => {
         // The SMS is the whole message for non-app recipients — there is no
         // other surface. This variant carries the signup invite.
         smsSends.push(
-          sendSms(
+          sendAndRecord(
+            send.id,
             person.phone_number,
             buildSmsBody(sharerDisplayName ?? sharerPhone, true),
-            twilioAccountSid!,
-            twilioAuthToken!,
-            twilioSender,
           ).catch(console.error),
         );
         continue;
@@ -412,12 +458,10 @@ serve(async (req) => {
         recipientUser?.notify_sms !== false
       ) {
         smsSends.push(
-          sendSms(
+          sendAndRecord(
+            send.id,
             person.phone_number,
             buildSmsBody(displayName, false),
-            twilioAccountSid!,
-            twilioAuthToken!,
-            twilioSender,
           ).catch(console.error),
         );
       }
