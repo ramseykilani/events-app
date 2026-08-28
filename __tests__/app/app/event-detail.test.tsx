@@ -35,6 +35,8 @@ const mockHiddenDeleteEqOwner = jest.fn();
 const mockHiddenDelete = jest.fn();
 
 const mockFrom = jest.fn();
+const mockRpc = jest.fn();
+const mockFunctionsInvoke = jest.fn();
 
 const mockSessionState: { session: { user: { id: string } } | null } = {
   session: { user: { id: 'u1' } },
@@ -49,6 +51,8 @@ jest.mock('../../../app/_context/SessionContext', () => ({
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
+    rpc: (...args: unknown[]) => mockRpc(...args),
+    functions: { invoke: (...args: unknown[]) => mockFunctionsInvoke(...args) },
   },
 }));
 
@@ -127,6 +131,13 @@ describe('app/(app)/event/[id]', () => {
       }
       return {};
     });
+
+    // Who's Coming: default = nothing to answer (the RPC returns zero rows),
+    // so no Yes/No widget renders unless a test sets one up.
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockFunctionsInvoke.mockResolvedValue({ data: { sent: 1 }, error: null });
   });
 
   afterEach(() => {
@@ -346,5 +357,201 @@ describe('app/(app)/event/[id]', () => {
 
     resolveEvents({ data: eventRow, error: null });
     await screen.findByText('Remove Event');
+  });
+
+  // ===== Who's Coming =====
+
+  const receivedRow = {
+    ...eventRow,
+    from_event_id: 'e-sender',
+    from_user_id: 'u-sender',
+  };
+
+  const mockReplyState = (response: 'yes' | 'no' | null, changed = true) => {
+    mockRpc.mockImplementation((name: string) => {
+      if (name === 'get_my_send_response') {
+        return abortablePromise(
+          Promise.resolve({ data: [{ response, sharer_name: 'Alice' }], error: null })
+        );
+      }
+      if (name === 'respond_to_send') {
+        return abortablePromise(Promise.resolve({ data: changed, error: null }));
+      }
+      return abortablePromise(Promise.resolve({ data: null, error: null }));
+    });
+  };
+
+  it('shows the Yes/No reply widget on a received event', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockReplyState(null);
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Alice asked — are you in?');
+    expect(screen.getByLabelText("Yes, I'm in")).toBeTruthy();
+    expect(screen.getByLabelText("No, I'm out")).toBeTruthy();
+    expect(mockRpc).toHaveBeenCalledWith('get_my_send_response', { p_event_id: 'e1' });
+  });
+
+  it('shows no reply widget on a self-created event', async () => {
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Board Game Night');
+    expect(screen.queryByText('Are you in?')).toBeNull();
+    expect(mockRpc).not.toHaveBeenCalledWith(
+      'get_my_send_response',
+      expect.anything()
+    );
+  });
+
+  it('shows no reply widget when the send is gone (received row, nothing to answer)', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    // Default mockRpc returns zero rows.
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Board Game Night');
+    expect(screen.queryByText('Alice asked — are you in?')).toBeNull();
+    expect(screen.queryByLabelText("Yes, I'm in")).toBeNull();
+  });
+
+  it('answering yes records it and pings the asker when the answer changed', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockReplyState(null, true);
+
+    const screen = render(<EventDetailScreen />);
+    const yesButton = await screen.findByLabelText("Yes, I'm in");
+
+    fireEvent.press(yesButton);
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('respond_to_send', {
+        p_event_id: 'e1',
+        p_response: 'yes',
+      });
+    });
+    await waitFor(() => {
+      expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-response-notification', {
+        body: { eventId: 'e1' },
+      });
+    });
+  });
+
+  it('does not ping the asker when the server reports the answer unchanged', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockReplyState(null, false);
+
+    const screen = render(<EventDetailScreen />);
+    const yesButton = await screen.findByLabelText("Yes, I'm in");
+
+    fireEvent.press(yesButton);
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('respond_to_send', {
+        p_event_id: 'e1',
+        p_response: 'yes',
+      });
+    });
+    expect(mockFunctionsInvoke).not.toHaveBeenCalled();
+  });
+
+  it('re-tapping the current answer is a local no-op (no RPC, no push)', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockReplyState('yes');
+
+    const screen = render(<EventDetailScreen />);
+    const yesButton = await screen.findByLabelText("Yes, I'm in");
+
+    fireEvent.press(yesButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alice asked — are you in?')).toBeTruthy();
+    });
+    expect(mockRpc).not.toHaveBeenCalledWith('respond_to_send', expect.anything());
+    expect(mockFunctionsInvoke).not.toHaveBeenCalled();
+  });
+
+  it('flipping the answer calls the RPC with the new value', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockReplyState('yes', true);
+
+    const screen = render(<EventDetailScreen />);
+    const noButton = await screen.findByLabelText("No, I'm out");
+
+    fireEvent.press(noButton);
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('respond_to_send', {
+        p_event_id: 'e1',
+        p_response: 'no',
+      });
+    });
+    expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-response-notification', {
+      body: { eventId: 'e1' },
+    });
+  });
+
+  it('shows a short alert when saving the answer fails', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockRpc.mockImplementation((name: string) => {
+      if (name === 'get_my_send_response') {
+        return abortablePromise(
+          Promise.resolve({ data: [{ response: null, sharer_name: 'Alice' }], error: null })
+        );
+      }
+      if (name === 'respond_to_send') {
+        return abortablePromise(
+          Promise.resolve({ data: null, error: { message: 'write failed' } })
+        );
+      }
+      return abortablePromise(Promise.resolve({ data: null, error: null }));
+    });
+
+    const screen = render(<EventDetailScreen />);
+    const yesButton = await screen.findByLabelText("Yes, I'm in");
+
+    fireEvent.press(yesButton);
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Could not save',
+        'Something went wrong. Try again.'
+      );
+    });
+    expect(mockFunctionsInvoke).not.toHaveBeenCalled();
+  });
+
+  it('shows per-person answers in the Shared with list', async () => {
+    mockSendsEq.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: [
+            { person_id: 'p1', response: 'yes' },
+            { person_id: 'p2', response: null },
+          ],
+          error: null,
+        })
+      )
+    );
+    mockPeopleIn.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: [
+            { id: 'p1', contact_name: 'Alice', phone_number: '+14165550001' },
+            { id: 'p2', contact_name: 'Bob', phone_number: '+14165550002' },
+          ],
+          error: null,
+        })
+      )
+    );
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Shared with');
+    expect(screen.getByText('Alice')).toBeTruthy();
+    expect(screen.getByText('Bob')).toBeTruthy();
+    // Alice answered yes; Bob hasn't said — exactly one status label renders.
+    expect(screen.getByText('Yes')).toBeTruthy();
+    expect(screen.queryByText('No')).toBeNull();
   });
 });

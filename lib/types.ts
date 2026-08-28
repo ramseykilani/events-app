@@ -75,6 +75,15 @@ export interface Send {
   sms_status: 'queued' | 'sent' | 'delivered' | 'undelivered' | 'failed' | null;
   sms_error_code: string | null;
   sms_status_at: string | null;
+  // Who's Coming: the recipient's answer to the person who sent them the
+  // event. NULL = they haven't said; yes/no only (no maybe); last write
+  // wins. Only the asker reads it (sends_select_owner); recipients write it
+  // via the respond_to_send RPC or the SMS receipt page (response_token).
+  response: 'yes' | 'no' | null;
+  responded_at: string | null;
+  // Capability for the receipt-page link in the share SMS — never selected
+  // by the client.
+  response_token: string;
 }
 
 export interface CalendarEvent {

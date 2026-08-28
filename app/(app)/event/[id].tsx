@@ -29,6 +29,16 @@ type SharedWithPerson = {
   id: string;
   contact_name: string | null;
   phone_number: string;
+  // Who's Coming: this person's answer to the share. NULL = hasn't said.
+  response: 'yes' | 'no' | null;
+};
+
+// The recipient's own answer slot on a received event (Who's Coming), from
+// the get_my_send_response RPC. NULL replyTo = nothing to answer (a
+// self-created row, or the send is gone) — no widget renders.
+type ReplyState = {
+  response: 'yes' | 'no' | null;
+  sharerName: string | null;
 };
 
 function firstParam(value?: string | string[]): string | undefined {
@@ -56,6 +66,7 @@ export default function EventDetailScreen() {
     preview?.sharer_contact_name ?? null
   );
   const [isHidden, setIsHidden] = useState(false);
+  const [replyTo, setReplyTo] = useState<ReplyState | null>(null);
   const loadSeq = useRef(0);
   const hasContentRef = useRef(!!seeded);
   const writeInFlightRef = useRef(false);
@@ -108,7 +119,7 @@ export default function EventDetailScreen() {
         let nextShared: SharedWithPerson[] = [];
         const { data: sends } = await supabase
           .from('sends')
-          .select('person_id')
+          .select('person_id, response')
           .eq('event_id', row.id)
           .abortSignal(signal);
         const personIds = (sends ?? []).map((s) => s.person_id);
@@ -118,7 +129,30 @@ export default function EventDetailScreen() {
             .select('id, contact_name, phone_number')
             .in('id', personIds)
             .abortSignal(signal);
-          nextShared = (people ?? []) as SharedWithPerson[];
+          const responseByPerson = new Map(
+            (sends ?? []).map((s) => [s.person_id, s.response] as const)
+          );
+          nextShared = ((people ?? []) as Omit<SharedWithPerson, 'response'>[]).map(
+            (p) => ({ ...p, response: responseByPerson.get(p.id) ?? null })
+          );
+        }
+
+        // Who's Coming: a received row (from_event_id set) may be answerable.
+        // The RPC returns one row when a send exists for the caller (response
+        // NULL = not answered yet) and zero rows when there is nothing to
+        // answer — self-created rows never reach the RPC.
+        let nextReply: ReplyState | null = null;
+        if (row.from_event_id) {
+          const { data: replyRows, error: replyErr } = await supabase
+            .rpc('get_my_send_response', { p_event_id: row.id })
+            .abortSignal(signal);
+          if (replyErr) throw replyErr;
+          const reply = (
+            replyRows as { response: 'yes' | 'no' | null; sharer_name: string | null }[] | null
+          )?.[0];
+          if (reply) {
+            nextReply = { response: reply.response, sharerName: reply.sharer_name };
+          }
         }
 
         let nextSharer = null as string | null;
@@ -149,6 +183,7 @@ export default function EventDetailScreen() {
           sharedWith: nextShared,
           sharerName: nextSharer,
           isHidden: nextHidden,
+          replyTo: nextReply,
         };
       });
 
@@ -167,6 +202,7 @@ export default function EventDetailScreen() {
       setSharedWith(result.sharedWith);
       if (result.sharerName !== null) setSharerName(result.sharerName);
       setIsHidden(result.isHidden);
+      setReplyTo(result.replyTo);
       setAccessRevoked(false);
       setLoadError(false);
       rememberEventPreview(previewFromEvent(result.event));
@@ -298,6 +334,43 @@ export default function EventDetailScreen() {
     void load();
   };
 
+  // Who's Coming: the recipient's yes/no reply to the person who sent them
+  // this event. Last write wins; re-tapping the current answer is a no-op
+  // (the RPC reports changed=false and the asker is never pinged for it).
+  const handleRespond = async (answer: 'yes' | 'no') => {
+    if (!event || !replyTo) return;
+    if (answer === replyTo.response) return;
+    if (writeInFlightRef.current) return;
+    writeInFlightRef.current = true;
+    try {
+      const changed = await withWriteTimeout(async (signal) => {
+        const { data, error } = await supabase
+          .rpc('respond_to_send', { p_event_id: event.id, p_response: answer })
+          .abortSignal(signal);
+        if (error) throw error;
+        return data as boolean;
+      });
+      setReplyTo({ ...replyTo, response: answer });
+      // Fire-and-forget, outside the write budget: the asker gets a push
+      // only when the answer actually changed (first answer and flips).
+      if (changed) {
+        supabase.functions
+          .invoke('send-response-notification', { body: { eventId: event.id } })
+          .catch((err) => console.error('send-response-notification error:', err));
+      }
+    } catch (err) {
+      console.error('Failed to save answer:', err);
+      showAlert(
+        'Could not save',
+        isAbortError(err)
+          ? 'That took too long. Check your connection and try again.'
+          : 'Something went wrong. Try again.'
+      );
+    } finally {
+      writeInFlightRef.current = false;
+    }
+  };
+
   const timeStr = event?.event_time
     ? new Date(`1970-01-01T${event.event_time}`).toLocaleTimeString([], {
         hour: 'numeric',
@@ -417,13 +490,62 @@ export default function EventDetailScreen() {
               <Text style={[styles.linkText, { color: theme.linkText }]}>Open link</Text>
             </TouchableOpacity>
           ) : null}
+          {replyTo ? (
+            <View style={[styles.replySection, { backgroundColor: theme.surface }]}>
+              <Text style={[styles.replyTitle, { color: theme.textSecondary }]}>
+                {replyTo.sharerName ?? sharerName
+                  ? `${replyTo.sharerName ?? sharerName} asked — are you in?`
+                  : 'Are you in?'}
+              </Text>
+              <View style={styles.replyButtons}>
+                {(['yes', 'no'] as const).map((answer) => {
+                  const selected = replyTo.response === answer;
+                  return (
+                    <TouchableOpacity
+                      key={answer}
+                      style={[
+                        styles.replyButton,
+                        {
+                          backgroundColor: selected
+                            ? theme.selectedBg
+                            : theme.surfaceSecondary,
+                        },
+                      ]}
+                      onPress={() => handleRespond(answer)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={answer === 'yes' ? "Yes, I'm in" : "No, I'm out"}
+                      accessibilityState={{ selected }}
+                    >
+                      <Text
+                        style={[
+                          styles.replyButtonText,
+                          { color: theme.textPrimary },
+                          selected && { fontWeight: '700' },
+                        ]}
+                      >
+                        {answer === 'yes' ? 'Yes' : 'No'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
           {sharedWith.length > 0 ? (
             <View style={[styles.sharedWithSection, { backgroundColor: theme.surface }]}>
               <Text style={[styles.sharedWithTitle, { color: theme.textSecondary }]}>Shared with</Text>
               {sharedWith.map((p) => (
-                <Text key={p.id} style={[styles.sharedWithItem, { color: theme.textPrimary }]}>
-                  {p.contact_name ?? formatPhoneDisplay(p.phone_number)}
-                </Text>
+                <View key={p.id} style={styles.sharedWithRow}>
+                  <Text style={[styles.sharedWithItem, { color: theme.textPrimary }]}>
+                    {p.contact_name ?? formatPhoneDisplay(p.phone_number)}
+                  </Text>
+                  {p.response ? (
+                    <Text style={[styles.sharedWithResponse, { color: theme.textSecondary }]}>
+                      {p.response === 'yes' ? 'Yes' : 'No'}
+                    </Text>
+                  ) : null}
+                </View>
               ))}
             </View>
           ) : null}
@@ -551,7 +673,45 @@ const styles = StyleSheet.create({
   },
   sharedWithItem: {
     fontSize: 16,
+  },
+  sharedWithRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
+  },
+  sharedWithResponse: {
+    fontSize: 14,
+    marginLeft: 16,
+  },
+  replySection: {
+    width: '100%',
+    marginBottom: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+  replyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  replyButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  replyButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  replyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   revokedContainer: {
     flex: 1,
