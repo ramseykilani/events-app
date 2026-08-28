@@ -1,9 +1,11 @@
 import { expect, type Dialog, type Page } from '@playwright/test';
 
-// Test OTP accounts configured on the Supabase project (see AGENTS.md →
-// "Signing in (test OTP)"). Both expire March 31, 2027. They are documented
-// in the repo, so defaults here are not secrets; override via env to point
-// the suite at a different project.
+// Test accounts configured on the Supabase project (see AGENTS.md →
+// "Signing in (test accounts)"). Test OTPs expire March 31, 2027. They are
+// documented in the repo, so defaults here are not secrets; override via env
+// to point the suite at a different project — or to claim a pool account
+// pair (C–F: +15555550110–113) so a parallel local run never races the
+// standing accounts' calendars.
 export const ACCOUNT_A = {
   phone: process.env.E2E_PHONE_A ?? '+15555550100',
   otp: process.env.E2E_OTP_A ?? '123456',
@@ -12,6 +14,11 @@ export const ACCOUNT_B = {
   phone: process.env.E2E_PHONE_B ?? '+15555550103',
   otp: process.env.E2E_OTP_B ?? '123456',
 };
+// Shared password for every test account (scripts/create-test-accounts.mjs).
+// When set, the auth setup signs in via the token endpoint — no SMS fired.
+// When unset, it falls back to driving the OTP UI (one rejected Twilio send
+// per account per run).
+export const ACCOUNT_PASSWORD = process.env.E2E_ACCOUNT_PASSWORD ?? '';
 // Display name account A uses for account B in My People. The share test is
 // idempotent: if this person already exists it is reused, not re-added.
 export const PERSON_B_NAME = 'E2E Account B';
@@ -38,6 +45,52 @@ export async function signIn(
   await codeInput.fill(account.otp);
   await page.getByTestId('verify-button').click();
 
+  await dismissOnboardingIfShown(page);
+  await expectCalendar(page);
+}
+
+// Signs in with phone + password via the token endpoint and seeds the
+// session into localStorage before app code runs — no UI, no SMS. The app
+// persists its session under sb-<project-ref>-auth-token (supabase-js
+// default storage key; AsyncStorage falls back to localStorage on web), and
+// Playwright's storageState then captures it for the browser projects. Not
+// used by auth.spec.ts: the OTP UI is the product surface and stays covered
+// there.
+export async function signInWithPassword(
+  page: Page,
+  account: { phone: string }
+): Promise<void> {
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    throw new Error(
+      'signInWithPassword needs EXPO_PUBLIC_SUPABASE_URL and ' +
+        'EXPO_PUBLIC_SUPABASE_ANON_KEY in the environment (or .env)'
+    );
+  }
+  const res = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', apikey: key },
+    body: JSON.stringify({
+      phone: account.phone,
+      password: ACCOUNT_PASSWORD,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `password sign-in failed for ${account.phone}: ${res.status} ${await res.text()}`
+    );
+  }
+  const session = await res.json();
+  // auth-js computes expires_at client-side when it persists a session; the
+  // raw token response only carries expires_in.
+  session.expires_at = Math.floor(Date.now() / 1000) + session.expires_in;
+  const storageKey = `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+  await page.context().addInitScript(
+    ([k, v]: string[]) => window.localStorage.setItem(k, v),
+    [storageKey, JSON.stringify(session)]
+  );
+  await page.goto('/');
   await dismissOnboardingIfShown(page);
   await expectCalendar(page);
 }

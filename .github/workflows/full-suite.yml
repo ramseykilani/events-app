@@ -96,6 +96,13 @@ jobs:
 
       - name: Playwright e2e (desktop + mobile web)
         if: steps.secrets.outputs.present == 'true'
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          # Optional: enables SMS-free password sign-in in the auth setup.
+          # Absent → the setup falls back to the OTP UI (one rejected Twilio
+          # send attempt per account per run).
+          E2E_ACCOUNT_PASSWORD: ${{ secrets.E2E_ACCOUNT_PASSWORD }}
         run: npm run test:e2e
 
       - name: Upload built bundle (reused by the staging preview deploy)

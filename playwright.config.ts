@@ -1,5 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync, readFileSync } from 'node:fs';
 import { AUTH_FILE_A } from './e2e/constants';
+
+// Playwright runs in plain Node and does not read .env — load it (without
+// overriding real env vars) so local runs pick up EXPO_PUBLIC_* and
+// E2E_ACCOUNT_PASSWORD without shell exports.
+if (existsSync('.env')) {
+  for (const line of readFileSync('.env', 'utf8').split('\n')) {
+    const m = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
+    if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2];
+  }
+}
 
 // E2E coverage for the web build. Runs the same specs on desktop Chrome and
 // on mobile emulation (Mobile Safari/WebKit + Mobile Chrome) so mobile-web
