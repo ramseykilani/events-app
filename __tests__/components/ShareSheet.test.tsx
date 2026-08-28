@@ -178,6 +178,67 @@ describe('components/ShareSheet', () => {
     expect(Array.from(selected)).toEqual(['p2']);
   });
 
+  it('renders per-person delivery status for shared rows', () => {
+    const appUser: MyPerson = {
+      id: 'p3',
+      owner_id: 'u1',
+      phone_number: '+14165550003',
+      user_id: 'u3',
+      contact_name: 'Carol',
+      added_at: '2026-01-03T00:00:00.000Z',
+      last_shared_at: null,
+    };
+
+    const screen = render(
+      <ShareSheet
+        people={[...people, appUser]}
+        circles={[]}
+        circleMembers={[]}
+        selectedPersonIds={new Set()}
+        sharedPersonIds={new Set(['p1', 'p2', 'p3'])}
+        sharedStatuses={
+          new Map([
+            // p1 (no account): the text reached their phone.
+            ['p1', { sms_status: 'delivered' as const, sms_error_code: null }],
+            // p2 (no account): they replied STOP — the text never made it.
+            ['p2', { sms_status: 'failed' as const, sms_error_code: '21610' }],
+            // p3 (app user): the event is on their calendar regardless of SMS.
+            ['p3', { sms_status: null, sms_error_code: null }],
+          ])
+        }
+        onSelectionChange={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText('✓ Delivered')).toBeTruthy();
+    expect(screen.getByText('Not delivered')).toBeTruthy();
+    expect(screen.getByText('They unsubscribed from texts')).toBeTruthy();
+    expect(screen.getByText('✓ On their calendar')).toBeTruthy();
+    expect(screen.queryByText('✓ Shared')).toBeNull();
+
+    // Status rows stay non-interactive.
+    const onSelectionChange = jest.fn();
+    screen.rerender(
+      <ShareSheet
+        people={[...people, appUser]}
+        circles={[]}
+        circleMembers={[]}
+        selectedPersonIds={new Set()}
+        sharedPersonIds={new Set(['p1', 'p2', 'p3'])}
+        sharedStatuses={
+          new Map([
+            ['p1', { sms_status: 'delivered' as const, sms_error_code: null }],
+            ['p2', { sms_status: 'failed' as const, sms_error_code: '21610' }],
+            ['p3', { sms_status: null, sms_error_code: null }],
+          ])
+        }
+        onSelectionChange={onSelectionChange}
+      />
+    );
+    fireEvent.press(screen.getByText('Bob'));
+    expect(onSelectionChange).not.toHaveBeenCalled();
+  });
+
   it('disables a circle chip when every member was already shared', () => {
     const onSelectionChange = jest.fn();
 

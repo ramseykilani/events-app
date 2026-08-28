@@ -1,7 +1,8 @@
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { router } from 'expo-router';
-import type { MyPerson, Circle } from '../lib/types';
+import type { MyPerson, Circle, Send } from '../lib/types';
 import { formatPhoneDisplay } from '../lib/format';
+import { shareDeliveryStatus } from '../lib/deliveryStatus';
 import { useTheme } from '../hooks/useTheme';
 
 type Props = {
@@ -13,6 +14,9 @@ type Props = {
   // (it delivered them their own copy), so these rows render as done and are
   // not interactive.
   sharedPersonIds?: Set<string>;
+  // Per-person delivery status for shared rows (Share Delivery Status),
+  // keyed by person_id. Absent entry = legacy "✓ Shared".
+  sharedStatuses?: Map<string, Pick<Send, 'sms_status' | 'sms_error_code'>>;
   onSelectionChange: (ids: Set<string>) => void;
   onAddPeople?: () => void;
 };
@@ -23,6 +27,7 @@ export function ShareSheet({
   circleMembers,
   selectedPersonIds,
   sharedPersonIds,
+  sharedStatuses,
   onSelectionChange,
   onAddPeople,
 }: Props) {
@@ -142,6 +147,9 @@ export function ShareSheet({
             renderItem={({ item }) => {
               const isShared = shared.has(item.id);
               const selected = selectedPersonIds.has(item.id);
+              const status = isShared
+                ? shareDeliveryStatus(item, sharedStatuses?.get(item.id))
+                : null;
               return (
                 <TouchableOpacity
                   disabled={isShared}
@@ -155,17 +163,34 @@ export function ShareSheet({
                   accessibilityRole="button"
                   accessibilityState={{ selected, disabled: isShared }}
                 >
-                  <Text
-                    style={[
-                      styles.personName,
-                      { color: isShared ? theme.textTertiary : theme.textPrimary },
-                    ]}
-                  >
-                    {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
-                  </Text>
-                  {isShared ? (
-                    <Text style={[styles.sharedLabel, { color: theme.textTertiary }]}>
-                      ✓ Shared
+                  <View style={styles.personText}>
+                    <Text
+                      style={[
+                        styles.personName,
+                        { color: isShared ? theme.textTertiary : theme.textPrimary },
+                      ]}
+                    >
+                      {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
+                    </Text>
+                    {status?.subLabel ? (
+                      <Text style={[styles.sharedSubLabel, { color: theme.destructiveText }]}>
+                        {status.subLabel}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {isShared && status ? (
+                    <Text
+                      style={[
+                        styles.sharedLabel,
+                        {
+                          color:
+                            status.tone === 'destructive'
+                              ? theme.destructiveText
+                              : theme.textTertiary,
+                        },
+                      ]}
+                    >
+                      {status.label}
                     </Text>
                   ) : (
                     selected && <Text style={[styles.checkmark, { color: theme.textPrimary }]}>✓</Text>
@@ -250,6 +275,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
+    gap: 12,
+  },
+  personText: {
+    flex: 1,
+    flexShrink: 1,
   },
   personName: {
     fontSize: 16,
@@ -261,5 +291,9 @@ const styles = StyleSheet.create({
   sharedLabel: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  sharedSubLabel: {
+    fontSize: 13,
+    marginTop: 2,
   },
 });

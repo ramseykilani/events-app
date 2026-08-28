@@ -66,6 +66,15 @@ export interface Send {
   event_id: string;
   person_id: string;
   created_at: string;
+  // Share Delivery Status: what happened to the notification text. Written
+  // by send-notification (at send time) and the twilio-status webhook
+  // (carrier states). NULL sms_status = no SMS was attempted (app user with
+  // texts off, Twilio unconfigured, reserved test number) or a pre-feature
+  // row — rendered as the legacy "✓ Shared".
+  sms_sid: string | null;
+  sms_status: 'queued' | 'sent' | 'delivered' | 'undelivered' | 'failed' | null;
+  sms_error_code: string | null;
+  sms_status_at: string | null;
 }
 
 export interface CalendarEvent {

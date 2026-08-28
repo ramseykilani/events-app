@@ -14,7 +14,7 @@ import { showAlert } from '../../lib/dialogs';
 import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
 import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
-import type { MyPerson, Circle, CircleMember } from '../../lib/types';
+import type { MyPerson, Circle, CircleMember, Send } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 import { isAbortError, withFetchTimeout, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
 
@@ -37,6 +37,11 @@ export default function ShareScreen() {
   const [alreadySharedIds, setAlreadySharedIds] = useState<Set<string>>(
     new Set()
   );
+  // Per-person delivery status for already-shared rows (Share Delivery
+  // Status), keyed by person_id. Absent entry = legacy "✓ Shared".
+  const [sharedStatuses, setSharedStatuses] = useState<
+    Map<string, Pick<Send, 'sms_status' | 'sms_error_code'>>
+  >(new Map());
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   // Shares are attributed by display name (the "X wants to go to ... with
@@ -100,16 +105,24 @@ export default function ShareScreen() {
         // Load existing sends so already-shared people render as completed
         // actions. Sharing is forwarding: once shared it cannot be unsent, so
         // existing sends are shown as done and only new people can be picked.
+        // The SMS delivery columns drive the per-person status label.
         const eventId = firstParamValue(params.eventId);
         const sharedNow = new Set<string>();
+        const statuses = new Map<string, Pick<Send, 'sms_status' | 'sms_error_code'>>();
         if (eventId) {
           const { data: sends, error: sendsErr } = await supabase
             .from('sends')
-            .select('person_id')
+            .select('person_id, sms_status, sms_error_code')
             .eq('event_id', eventId)
             .abortSignal(signal);
           if (sendsErr) throw sendsErr;
-          for (const s of sends ?? []) sharedNow.add(s.person_id);
+          for (const s of sends ?? []) {
+            sharedNow.add(s.person_id);
+            statuses.set(s.person_id, {
+              sms_status: s.sms_status,
+              sms_error_code: s.sms_error_code,
+            });
+          }
         }
 
         return {
@@ -117,6 +130,7 @@ export default function ShareScreen() {
           circles: (circlesRes.data ?? []) as Circle[],
           members: membersData,
           sharedNow,
+          statuses,
         };
       });
 
@@ -126,6 +140,7 @@ export default function ShareScreen() {
       setCircles(staged.circles);
       setCircleMembers(staged.members);
       setAlreadySharedIds(staged.sharedNow);
+      setSharedStatuses(staged.statuses);
       // Preserve in-flight selections: a user who taps while the sheet is
       // still loading must not lose their picks when the fetch lands (CI
       // caught this — the reset raced the tap and left Share disabled). Only
@@ -322,6 +337,7 @@ export default function ShareScreen() {
         circleMembers={circleMembers}
         selectedPersonIds={selectedPersonIds}
         sharedPersonIds={alreadySharedIds}
+        sharedStatuses={sharedStatuses}
         onSelectionChange={setSelectedPersonIds}
         onAddPeople={
           Platform.OS === 'web' ? undefined : () => setFlowRestartKey((k) => k + 1)
