@@ -141,12 +141,13 @@ Your project ref is the `abcdefghijk` part of your Supabase URL (`https://abcdef
 
 #### Deploy the functions
 
-The cleanup function is called server-side (from cron), not from the app. Deploy it with `--no-verify-jwt` so it can be invoked with a secret key:
+The cleanup function is called server-side (from cron), not from the app, and the twilio-status webhook is called by Twilio, which cannot present a user JWT (its request signature is the auth). Deploy both with `--no-verify-jwt`:
 
 ```bash
 supabase functions deploy og-metadata
 supabase functions deploy send-notification
 supabase functions deploy cleanup-people --no-verify-jwt
+supabase functions deploy twilio-status --no-verify-jwt
 ```
 
 #### What each function does
@@ -154,7 +155,8 @@ supabase functions deploy cleanup-people --no-verify-jwt
 | Function | Purpose | When it runs |
 |----------|---------|-------------|
 | `og-metadata` | Fetches Open Graph metadata (title, description, image) from a pasted URL for link previews | Called by the app when a user pastes a URL in the "Add event" screen |
-| `send-notification` | Sends the share push notification and/or SMS to each recipient | Called by the app (fire-and-forget) after a share |
+| `send-notification` | Sends the share push notification and/or SMS to each recipient, and records each SMS's synchronous outcome on the sends row | Called by the app (fire-and-forget) after a share |
+| `twilio-status` | Records SMS carrier states (delivered / failed / undelivered + error code) onto the sends row | Called by Twilio as the per-message StatusCallback webhook |
 | `cleanup-people` | Removes people from `my_people` who haven't been shared with in 6 months | Scheduled via cron (see below) |
 
 (There is no `cleanup-events`: in the Copy + Follow model every events row has exactly one owner, so there are no orphan snapshots to reclaim — the function, its SQL helper, and its cron job were removed in the 2026-08-24 cutover.)

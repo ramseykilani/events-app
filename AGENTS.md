@@ -123,12 +123,13 @@ A feature task = its `FEATURES.md` section (Problem / Solution / Technical Notes
 
 Migrations `20260807000001`–`20260807000008` and the hardened edge functions were deployed to project `ijmwtjyuvdnvhblwwtpt` on 2026-08-07. For future migrations/functions the same flow applies: the client and backend must move together (e.g. the client expects the `share_event` RPC, and the calendar RPC assumes recipient copies exist).
 
-Prerequisites: `SUPABASE_ACCESS_TOKEN` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). If the CLI fails at "Initialising login role..." (upstream bug supabase/cli#5091 — a stale `cli_login_postgres` role), either delete the role via `DELETE /v1/projects/{ref}/cli/login-role`, or rotate the DB password via `PATCH /v1/projects/{ref}/database/password` and export `SUPABASE_DB_PASSWORD` (setting it skips the login-role path entirely).
+Prerequisites: `SUPABASE_ACCESS_TOKEN` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). If the CLI fails at "Initialising login role..." (upstream bug supabase/cli#5091 — a stale `cli_login_postgres` role), rotate the DB password via `PATCH /v1/projects/{ref}/database/password` and export `SUPABASE_DB_PASSWORD` (setting it skips the login-role path entirely). Deleting the role via `DELETE /v1/projects/{ref}/cli/login-role` was the earlier documented fix, but on 2026-08-28 the CLI still failed after the role was gone — password rotation is the reliable path.
 
 ```bash
 npx supabase link --project-ref ijmwtjyuvdnvhblwwtpt
 npx supabase db push                 # applies all pending migrations in order
 npx supabase functions deploy send-notification cleanup-people og-metadata
+npx supabase functions deploy twilio-status --no-verify-jwt   # Twilio can't present a JWT; the request signature is the auth
 npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # already set; pg_cron jobs send it as x-cron-secret
 ```
 

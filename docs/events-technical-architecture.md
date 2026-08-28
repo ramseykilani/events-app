@@ -109,6 +109,10 @@ There is deliberately **no global dedup**: two people adding "Lunch" at the same
 | event_id | uuid (FK → events) | The sender's own row the send was made from. ON DELETE CASCADE. |
 | person_id | uuid (FK → my_people) | The individual person this event was sent to (the **sender's** contact row). ON DELETE CASCADE. |
 | created_at | timestamptz | When the send happened |
+| sms_sid | text, nullable | Twilio message SID for the notification SMS (webhook lookup key; unique where present). NULL = no SMS attempted. |
+| sms_status | text, nullable | `queued` / `sent` / `delivered` / `undelivered` / `failed` (CHECK). Written by send-notification at send time and by the twilio-status webhook at carrier time. NULL = no SMS / pre-feature row. |
+| sms_error_code | text, nullable | Twilio error code on failure (e.g. `21610` STOP, `30034` carrier block). |
+| sms_status_at | timestamptz | When the current status was recorded. |
 
 Unique constraint on (event_id, person_id).
 
@@ -297,9 +301,11 @@ The `send-notification` Edge Function sends a push notification and/or SMS to ea
    - **Non-app user** (`my_people.user_id IS NULL`): sends an SMS with event info and the event URL (when present) — no app/web links; the SMS is the whole message. During internal testing it also carries the signup-invite line (see the SMS body below)
    - **App user** (`my_people.user_id IS NOT NULL`): checks whether the sharer is in the recipient's hidden_people (lookup is by the recipient's my_people; skips both push and SMS if hidden), then queues a push notification when a token exists and the recipient's `users.notify_push` is on, and an SMS containing the event URL (when present) when `users.notify_sms` is on. Push is the tappable path into the event; the SMS is a plain notification with no links. A missing push token never suppresses the SMS. The two prefs are independent per-account toggles (People footer → Notifications); events land on the recipient's calendar regardless — they only gate the pings.
    - **Push ids are per-recipient:** row ids are owner-scoped, so the function resolves each app recipient's own copy (`events WHERE from_event_id = <sender row id> AND owner_id = <recipient>`) and puts *that* id in `data.eventId` — otherwise the tap would land on "Event not found." If the copy is missing (the recipient removed it in the race between share and notify), the push is skipped and the SMS still sends.
-6. Push messages are batch-sent to the Expo Push API; SMS messages are fired concurrently via the Twilio REST API. Recipients whose number is NANP area-code 555 (the reserved fictional range used by test accounts) are skipped and never reach Twilio.
+6. Push messages are batch-sent to the Expo Push API; SMS messages are fired concurrently via the Twilio REST API, each with a per-message `StatusCallback` pointing at the `twilio-status` function (a per-message callback overrides the Messaging Service's, so no Twilio console configuration). Recipients whose number is NANP area-code 555 (the reserved fictional range used by test accounts) are skipped and never reach Twilio.
 7. `DeviceNotRegistered` errors from Expo Push API clear the stale token
-8. SMS failures are logged via `console.error` and never propagate — missing Twilio credentials silently disable SMS
+8. Each SMS's synchronous outcome is written onto its sends row (Share Delivery Status): accepted → `sms_sid` + `sms_status='queued'`; a 21xxx rejection → `sms_status='failed'` + `sms_error_code` (and a `console.error` — the response parsing that ended the log-blindness of the 2026-08-17 diagnosis). Network errors still only log and never propagate — missing Twilio credentials silently disable SMS
+
+**Delivery status webhook (`twilio-status`):** Twilio POSTs message status callbacks here (deployed `--no-verify-jwt` — Twilio cannot present a user JWT). Auth is Twilio's request signature: `X-Twilio-Signature` = base64 HMAC-SHA1(`TWILIO_AUTH_TOKEN`, callback URL + sorted POST params), verified fail-closed. The function records `sent` and terminal states (`delivered` / `failed` / `undelivered` + `ErrorCode`, incl. `21610` STOP) onto the sends row keyed by `sms_sid`. A late non-terminal callback never downgrades a terminal state; an unknown SID answers 500 so Twilio retries (the first callback can beat the send-time SID write). The share sheet renders per-person status from these columns (`lib/deliveryStatus.ts`): app users always show "✓ On their calendar" (their copy is the delivery); SMS-only contacts show the ladder "✓ Sent" → "✓ Delivered" / "Not delivered" ("They unsubscribed from texts" for `21610`); NULL status keeps the legacy "✓ Shared".
 
 **Push notification body:** `{ title: "[Name] wants to go to [Event Title] with you", body: "[date], [time]", data: { eventId: <recipient's own row id> } }`
 
@@ -389,7 +395,8 @@ events-app/
 │   ├── functions/
 │   │   ├── cleanup-people/         # Cron: 6-month auto-removal
 │   │   ├── og-metadata/            # Link preview metadata fetch
-│   │   └── send-notification/      # Push + SMS share notifications
+│   │   ├── send-notification/      # Push + SMS share notifications
+│   │   └── twilio-status/          # SMS delivery-status webhook (Twilio-signed)
 │   └── migrations/                 # Applied in filename order
 ├── __tests__/                      # Jest + React Native Testing Library
 ├── AGENTS.md                       # Agent/Cursor-specific instructions
