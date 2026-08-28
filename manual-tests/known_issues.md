@@ -67,7 +67,10 @@ never added: a blocker must be fixed, not accepted.
 ### KI-006 — Android hangs on a spinner after installing an updated APK until force-quit
 
 - Severity: minor
-- Status: open
+- Status: open — fix landed 2026-08-24 (same boot path as KI-013); the
+  long-idle half was owner-confirmed on device 2026-08-28 (app opened
+  normally after many hours unused — KI-013 closed). This entry remains
+  until the APK-update trigger specifically is seen working on device.
 - Found: 2026-08-18 owner smoke of preview APK `a7ce79c8` (promoted `78b9e5a`),
   Android. Owner ruling: not a tester blocker. May be specific to sideloading
   a new APK over a previous install.
@@ -79,9 +82,21 @@ never added: a blocker must be fixed, not accepted.
 - Repro: install a newer APK over an existing Events install → open the app
   → spinner until swipe-away → reopen. Not observed on a subsequent cold
   start of the same binary. Web is unaffected (do not flag there).
-- Fix (separate task): confirm whether this is Expo splash / session restore
-  racing a fresh native binary, then either wait out the first session
-  restore or recover without requiring a force-quit.
+- Root cause (shares the KI-013 boot path): the first cold start of the new
+  binary holds a long-expired access token, so the boot gate in
+  `app/_layout.tsx` awaits a refresh-token POST that had no timeout on any
+  layer (auth-js attaches no AbortSignal; RN's Android OkHttp client builds
+  with infinite timeouts). A black-holed connection hung the refresh, and
+  with it the spinner, until force-quit.
+- Fix (2026-08-24): `boundedFetch` (20s `NETWORK_BACKSTOP_TIMEOUT_MS`) wired
+  as `global.fetch` in `lib/supabase.ts` bounds the refresh, and the
+  `onAuthStateChange` subscriber no longer awaits `ensureUserRow`. A
+  black-holed refresh now aborts at ~20s (worst ~40s through auth-js's
+  retry window), keeps the stored session, and lands on sign-in; the
+  auto-refresh ticker self-heals when the network recovers.
+- Verify (next APK smoke): install a newer APK over an existing install →
+  open → reaches the calendar, or worst case ~40s of spinner then sign-in —
+  no force-quit. Remove this entry once seen on device.
 
 ### KI-007 — Delete account + re-signup puts friends' shared events back on the calendar
 
@@ -350,70 +365,6 @@ flag that.
 - Fix (separate task): render the chevrons as vector icons
   (`@expo/vector-icons`, tinted by `theme.textPrimary`) instead of the
   library's tinted-PNG arrows, or pass custom `renderArrow`.
-
-### KI-013 — Android hangs on a spinner when opening the app after a day unused
-
-- Severity: minor
-- Status: open — fix landed 2026-08-24 (see below); pending owner
-  on-device confirmation (a day-long idle repro is not possible from a
-  cloud VM).
-- Found: 2026-08-24, owner report on Android. Logging only — no
-  investigation or fix this pass.
-- Expected: opening the app after leaving it unused reaches the calendar
-  (or sign-in).
-- Actual: after not opening the app for about a day, the next open shows a
-  loading spinner that does not go away.
-- Repro: Android. Leave the app unused for about a day. Open it. The
-  spinner stays. Recovery (force-quit / wait / network) was not reported
-  this pass.
-- Distinct from [KI-006](#ki-006--android-hangs-on-a-spinner-after-installing-an-updated-apk-until-force-quit):
-  that is the same symptom on the first open after sideloading a newer APK
-  over an existing install, and was not observed on a later cold start of
-  the same binary. This report is a later open of an already-installed app
-  after a day of not using it. Web is unaffected (do not flag there).
-
-#### Root cause (2026-08-24 investigation, verified against library sources)
-
-The spinner is the boot gate in `app/_layout.tsx` (`isLoading ||
-!themeLoaded`); `isLoading` clears only when `supabase.auth.getSession()`
-settles. After >1h idle the stored access token is always expired
-(auth-js treats it as expired 90s early via `EXPIRY_MARGIN_MS`), so
-`getSession()` awaits a refresh-token POST. That fetch had no timeout at
-any layer: auth-js's `_request` attaches no AbortSignal, RN's fetch sets
-no JS-side timeout, and RN's Android `OkHttpClientProvider` builds with
-connect/read/write timeouts of 0 ("No timeouts by default"). A
-black-holed connection — a half-open socket after long idle (stale NAT
-mapping, post-Doze radio) that never delivers bytes and never resets —
-hangs the refresh forever, and with it the boot spinner. Force-quit
-starts a fresh process with fresh sockets, which is why recovery worked.
-Honest-offline (no route at all) never hung: the fetch rejects instantly
-and the app lands on sign-in after auth-js's bounded retry window (~13s),
-with the stored session preserved. A second unbounded wait shared the
-path: auth-js awaits every `onAuthStateChange` subscriber before
-resolving the refresh, and `SessionContext`'s callback awaited
-`ensureUserRow` — a raw RPC with no timeout.
-
-#### Fix (2026-08-24)
-
-- `lib/timeoutSignal.ts`: `boundedFetch`, a fetch wrapper with a 20s
-  backstop (`NETWORK_BACKSTOP_TIMEOUT_MS`, deliberately above the 15s
-  write budget so wrapped calls still time out on their own signal
-  first; a caller-provided signal is forwarded and wins when earlier).
-- `lib/supabase.ts`: passed as `global.fetch`, which supabase-js forwards
-  to auth, postgrest, storage, and functions — every Supabase call is now
-  bounded.
-- `app/_context/SessionContext.tsx`: the `onAuthStateChange` subscriber
-  no longer awaits `ensureUserRow` (fire-and-forget, matching the
-  getSession path).
-- Result on a black-holed network: the refresh aborts at ~20s (worst
-  ~40s including auth-js's internal retry window), the stored session is
-  kept, and the app lands on sign-in instead of spinning forever; the
-  auto-refresh ticker / next launch self-heals when the network recovers.
-- [KI-006](#ki-006--android-hangs-on-a-spinner-after-installing-an-updated-apk-until-force-quit)
-  shares this exact boot path (first cold start after an APK update,
-  token long expired) — the same fix should cover it. Confirm both on
-  the next device smoke; remove the entries only after on-device
-  verification.
 
 ## Deleted bug classes (do not re-flag, do not reintroduce)
 
