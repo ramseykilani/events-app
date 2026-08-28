@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendExpoPush, type PushMessage } from '../_shared/expoPush.ts';
 
 // supabase-js always sends apikey and x-client-info alongside Authorization;
 // all four must be allowed or the browser preflight blocks the call.
@@ -8,8 +9,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 // Internal-testing CTA (2026-08-17): while beta access is owner-gated
 // (TestFlight / Play internal tracks), the SMS to recipients without an
@@ -246,10 +245,11 @@ serve(async (req) => {
     // Load the sends to notify for this event, including each recipient's
     // phone number — scoped to the just-shared person ids when the client
     // passes them. sends.id is needed to write each SMS's delivery outcome
-    // back onto the share record.
+    // back onto the share record; response_token builds the Who's Coming
+    // receipt link for non-app recipients.
     let sendsQuery = db
       .from('sends')
-      .select('id, person_id, my_people(user_id, owner_id, phone_number)')
+      .select('id, person_id, response_token, my_people(user_id, owner_id, phone_number)')
       .eq('event_id', eventId);
     if (personIds) {
       sendsQuery = sendsQuery.in('person_id', personIds);
@@ -258,13 +258,6 @@ serve(async (req) => {
 
     if (sendsErr || !sends?.length) {
       return jsonResponse({ sent: 0, sms: 0 });
-    }
-
-    interface PushMessage {
-      to: string;
-      title: string;
-      body: string;
-      data: { eventId: string };
     }
 
     const messages: PushMessage[] = [];
@@ -329,7 +322,24 @@ serve(async (req) => {
     // link-free. Launch pair (store link for non-users, event deep link
     // for app users) is FEATURES.md → SMS Links at Launch; not before
     // listings, never one variant without the other.
-    function buildSmsBody(sharerName: string, signupInvite: boolean): string {
+    //
+    // Who's Coming: the non-app variant can carry ONE more link — the
+    // per-send receipt page where the recipient answers yes/no (the share
+    // already is the ask; app users answer on the event, so their SMS is
+    // unchanged). Gated on RESPONSE_LINK_BASE_URL: unset = no line, which
+    // is also the strip switch if carriers or the A2P campaign hate it.
+    // The host is a receipt page, not the web app
+    // (docs/distribution-strategy.md). Wording is owner-approved on a real
+    // text before it ships (FEATURES.md → Who's Coming → Open Questions).
+    const responseLinkBase = Deno.env.get('RESPONSE_LINK_BASE_URL')?.replace(/\/$/, '') ?? null;
+    // Hoisted out of the closure: TS narrowing doesn't cross into the
+    // function body for the compound guard above.
+    const eventUrl = event.url;
+    function buildSmsBody(
+      sharerName: string,
+      signupInvite: boolean,
+      responseLink: string | null,
+    ): string {
       const lines = [
         eventTitle
           ? `${sharerName} wants to go to "${eventTitle}" with you`
@@ -337,14 +347,17 @@ serve(async (req) => {
         dateLine,
       ];
       if (descriptionLine) lines.push(descriptionLine);
-      if (event.url) lines.push(event.url);
+      if (eventUrl) lines.push(eventUrl);
+      if (responseLink) lines.push('', `Coming? ${responseLink}`);
       if (signupInvite) lines.push('', SIGNUP_INVITE_LINE);
       lines.push('', 'Reply STOP to unsubscribe.');
       return lines.join('\n');
     }
 
     for (const send of sends) {
-      const person = send.my_people as {
+      // Many-to-one embed arrives as a single object at runtime; the
+      // untyped client types embeds as arrays, hence the double cast.
+      const person = send.my_people as unknown as {
         user_id: string | null;
         owner_id: string;
         phone_number: string | null;
@@ -363,12 +376,17 @@ serve(async (req) => {
         }
 
         // The SMS is the whole message for non-app recipients — there is no
-        // other surface. This variant carries the signup invite.
+        // other surface. This variant carries the signup invite, plus the
+        // Who's Coming receipt link when RESPONSE_LINK_BASE_URL is set.
+        const responseLink =
+          responseLinkBase && send.response_token
+            ? `${responseLinkBase}/?t=${send.response_token}`
+            : null;
         smsSends.push(
           sendAndRecord(
             send.id,
             person.phone_number,
-            buildSmsBody(sharerDisplayName ?? sharerPhone, true),
+            buildSmsBody(sharerDisplayName ?? sharerPhone, true, responseLink),
           ).catch(console.error),
         );
         continue;
@@ -461,37 +479,14 @@ serve(async (req) => {
           sendAndRecord(
             send.id,
             person.phone_number,
-            buildSmsBody(displayName, false),
+            buildSmsBody(displayName, false, null),
           ).catch(console.error),
         );
       }
     }
 
     // ── Send push notifications ─────────────────────────────────────────────
-    if (messages.length > 0) {
-      const pushResponse = await fetch(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(messages),
-      });
-
-      const pushResult = await pushResponse.json();
-
-      // Clear stale tokens for any DeviceNotRegistered receipts
-      if (Array.isArray(pushResult.data)) {
-        for (let i = 0; i < pushResult.data.length; i++) {
-          if (pushResult.data[i]?.details?.error === 'DeviceNotRegistered') {
-            const token = messages[i]?.to;
-            if (token) {
-              await db
-                .from('users')
-                .update({ expo_push_token: null })
-                .eq('expo_push_token', token);
-            }
-          }
-        }
-      }
-    }
+    await sendExpoPush(db, messages);
 
     // ── Fire all SMS sends (already non-throwing via .catch) ────────────────
     await Promise.all(smsSends);
