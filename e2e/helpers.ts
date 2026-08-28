@@ -192,13 +192,20 @@ export async function createEventAndShareToB(
     // Self-verifying selection: a tap that races a list re-render can be eaten
     // (the row node gets replaced mid-click), leaving Share disabled forever.
     // Retry until the row's ✓ shows — guarded so an already-selected row isn't
-    // toggled back off by the retry.
-    const rowB = page.getByText(PERSON_B_NAME, { exact: true }).locator('..');
+    // toggled back off by the retry. Match the row by role, not text-parent:
+    // the name sits inside a nested View since Share Delivery Status wrapped
+    // it (a `.locator('..')` chain lands on that wrapper, not the row), and
+    // covered nav screens stay mounted, so filter to the visible copy. The
+    // accessible name gains the ✓ when selected — substring name matching
+    // covers both states.
+    const rowB = page
+      .getByRole('button', { name: PERSON_B_NAME })
+      .filter({ visible: true });
     await expect(async () => {
-      if (!(await rowB.getByText('✓').isVisible().catch(() => false))) {
+      if (!(await rowB.getByText('✓', { exact: true }).isVisible().catch(() => false))) {
         await rowB.click();
       }
-      await expect(rowB.getByText('✓')).toBeVisible({ timeout: 2000 });
+      await expect(rowB.getByText('✓', { exact: true })).toBeVisible({ timeout: 2000 });
     }).toPass();
     await page.getByRole('button', { name: 'Share', exact: true }).click();
     await expectCalendar(page);
