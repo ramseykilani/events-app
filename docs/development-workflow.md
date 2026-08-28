@@ -94,9 +94,15 @@ npm run test:e2e:mobile    # mobile projects only
 E2E_BASE_URL=https://staging.shared-events.pages.dev npm run test:e2e
 ```
 
-Auth uses the Supabase test-OTP accounts documented in AGENTS.md
-(`E2E_PHONE_A/B`, `E2E_OTP_A/B` env vars override them). One sign-in per run
-via a setup project; specs reuse the stored session.
+Auth uses the Supabase test accounts documented in AGENTS.md
+(`E2E_PHONE_A/B` override which accounts a run uses — parallel agents claim
+pool pairs C–F so local runs never race CI's A/B). With
+`E2E_ACCOUNT_PASSWORD` set, the setup project signs in via the token
+endpoint and fires no SMS; without it, it drives the OTP UI once per account
+per run (one rejected Twilio send each — keep that the exception). Specs
+reuse the stored session. New features ship with a new or extended spec —
+the suite grows toward covering every web action, and specs describe
+intended behavior: never weaken a test to match what was built.
 
 Test-environment quirks worth knowing (all handled in `e2e/fixtures.ts` and
 `e2e/helpers.ts`, with comments):

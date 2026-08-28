@@ -4,7 +4,7 @@ A running list of planned and in-progress features. Each section contains a full
 
 ## Status
 
-The core loop is shipped. Nothing in Planned is required to use the app or to test that loop. Listing an idea here is not a commitment to build it: Planned means "intended, when someone picks it up," and Considering means "recorded so the idea isn't lost — we may never do it."
+The core loop is shipped. Nothing in Planned is required to use the app or to test that loop. Listing an idea here is not a commitment to build it: Planned means "intended, when someone picks it up," and Considering means "recorded so the idea isn't lost — we may never do it." In progress means an agent or collaborator is actively building it — set by whoever dispatches the work so parallel agents never pick up the same feature; don't start a feature marked In progress without coordinating first.
 
 | Feature | Status | What it is |
 |---------|--------|------------|

@@ -31,16 +31,18 @@ If `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are available 
 printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_PUBLIC_SUPABASE_URL" "$EXPO_PUBLIC_SUPABASE_ANON_KEY" > .env
 ```
 
-### Signing in (test OTP)
+### Signing in (test accounts)
 
-Two test OTPs are configured on the Supabase project (both expire March 31, 2027):
+Six test accounts are configured on the Supabase project, all with test OTP `123456` (expires March 31, 2027) and all sharing one password:
 
-- Phone `+15555550100`, code `123456` (account A)
-- Phone `+15555550103`, code `123456` (account B)
+- **Standing pair:** account A `+15555550100`, account B `+15555550103` — the e2e defaults.
+- **Pool accounts C–F:** `+15555550110`–`+15555550113` — for parallel agents. An agent running e2e locally claims its own pair via `E2E_PHONE_A` / `E2E_PHONE_B` env overrides so two runs never race the same calendars, and CI never fights a local run for A/B.
 
-Use either to sign in without a real SMS provider. The second number is useful for testing multi-user scenarios (e.g. sharing events between two accounts). After sign-in the app goes straight to the calendar; the onboarding walkthrough auto-shows only when the user has no events at all, and can be reopened via the `?` button.
+**Password sign-in (preferred):** the password lives in `E2E_ACCOUNT_PASSWORD` (`.env` locally, repo/Cursor secrets in CI/cloud). The e2e setup signs in via the token endpoint, which fires **no SMS**. Without the password it falls back to driving the OTP UI — one rejected Twilio send per account per run, so keep that the exception. The OTP UI itself stays covered by `auth.spec.ts`; that is the product surface. Provisioning is idempotent — to grow the pool, rotate the password, or create a throwaway account: `node scripts/create-test-accounts.mjs [+15555550114 ...]` (needs `SUPABASE_ACCESS_TOKEN`).
 
-Note: account B was re-pointed from `+16462655565` (a real-format Manhattan number that would receive real texts) to the reserved fictional 555 range — never point test accounts at real-format numbers. `+15555550101` is **not** a configured test number — Twilio rejects it with `sms_send_failed`. For a truly fresh account (e.g. M-003 onboarding auto-show), temporarily add a third test OTP via the Management API (`PATCH /v1/projects/{ref}/config/auth` with both `sms_test_otp` and `sms_test_otp_valid_until`), then remove it when done. Sign out lives at the bottom of the People screen (behind a confirm dialog); on web you can also sign out with `localStorage.clear(); location.reload();` in the browser console.
+After sign-in the app goes straight to the calendar; the onboarding walkthrough auto-shows only when the user has no events at all, and can be reopened via the `?` button. For a truly fresh account (e.g. M-003 onboarding auto-show), provision a new number with the script (or temporarily add a test OTP via the Management API — `PATCH /v1/projects/{ref}/config/auth` with both `sms_test_otp` and `sms_test_otp_valid_until` — then remove it when done). Sign out lives at the bottom of the People screen (behind a confirm dialog); on web you can also sign out with `localStorage.clear(); location.reload();` in the browser console.
+
+Never point test accounts at real-format numbers — account B was re-pointed off `+16462655565` (a real Manhattan number that would receive real texts) into the reserved fictional 555 range. `+15555550101` is **not** a configured test number — Twilio rejects it with `sms_send_failed`. Never delete accounts A or B: delete + re-signup with the same phone re-delivers still-pending shares (KI-007).
 
 ### Linting / type checking
 
@@ -105,6 +107,16 @@ Then follow:
 
 - `manual-tests/cloud_manual_regression.md`
 - `manual-tests/manual_test_report_template.md`
+
+### Feature tasks & parallel agents
+
+A feature task = its `FEATURES.md` section (Problem / Solution / Technical Notes / Acceptance Criteria — that is the brief) + a **scope** + the **verify bar**.
+
+- **Scope:** whoever dispatches the task assigns the files/screens the agent owns ("you own `components/ShareSheet.tsx`"). One writer per scope — two agents never edit the same files at the same time. `FEATURES.md` has an **In progress** status: the dispatcher flips it when an agent starts, and agents never touch a feature marked In progress that isn't theirs.
+- **Verify bar:** the fast checks (`npx tsc --noEmit && npm run test:conventions && npm test -- --runInBand && npm run test:sql`) **plus a new or updated Playwright spec covering the feature's web actions**, run locally on desktop Chrome (`npm run build:web && npx playwright test e2e/<spec> --project=desktop-chrome`) before pushing. CI runs the full three-browser suite on push. The suite grows toward covering every web action: every screen's save/cancel/confirm/empty/validation paths — not every click permutation.
+- **Specs describe intended behavior.** Making a test match what was built — weaker assertion, skip, rewritten expectation — is never an allowed fix. A red spec means the code is wrong, or the intent changed (which is the owner's call, not the agent's).
+- **Second opinion (risky changes only):** for migrations, RLS, or share/hide/auth logic, have a second agent on `cursor-grok-4.6-high-fast` review the diff and run the tests before pushing. Scary changes only — not every commit.
+- **Sign-in discipline:** sign in once per run and reuse stored sessions; never sign in per test. Prefer password sign-in (see Signing in) — OTP sign-ins fire real Twilio send attempts.
 
 ### Deploying migrations & edge functions (runbook)
 

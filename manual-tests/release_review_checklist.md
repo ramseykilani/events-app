@@ -18,6 +18,7 @@ section (same brief format). Written from
 - [ ] Share it to account B → B sees it (sign in as B)
 - [ ] Remove the event on A → gone on A, still on B; remove on B (cleanup)
 - [ ] No browser permission prompts, no visible errors, no console errors
+- [ ] Coverage: every user-facing screen and action has a spec in `e2e/` (compare against the Track 4 screen list and the Track 2–3 flows) — a screen or action that shipped without one is a coverage blocker, noted and halting like any other
 
 ## Phase 2 — Deep tracks (halt everything on a blocker; minors never halt)
 
