@@ -141,13 +141,15 @@ Your project ref is the `abcdefghijk` part of your Supabase URL (`https://abcdef
 
 #### Deploy the functions
 
-The cleanup function is called server-side (from cron), not from the app, and the twilio-status webhook is called by Twilio, which cannot present a user JWT (its request signature is the auth). Deploy both with `--no-verify-jwt`:
+The cleanup function is called server-side (from cron), not from the app; the twilio-status webhook is called by Twilio, which cannot present a user JWT (its request signature is the auth); and the send-response receipt API is called by the Who's Coming SMS receipt page, whose visitors have no account (the per-send response_token is the auth). Deploy those three with `--no-verify-jwt`:
 
 ```bash
 supabase functions deploy og-metadata
 supabase functions deploy send-notification
+supabase functions deploy send-response-notification
 supabase functions deploy cleanup-people --no-verify-jwt
 supabase functions deploy twilio-status --no-verify-jwt
+supabase functions deploy send-response --no-verify-jwt
 ```
 
 #### What each function does

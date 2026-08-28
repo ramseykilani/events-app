@@ -128,10 +128,13 @@ Prerequisites: `SUPABASE_ACCESS_TOKEN` in the environment (Cursor Secrets inject
 ```bash
 npx supabase link --project-ref ijmwtjyuvdnvhblwwtpt
 npx supabase db push                 # applies all pending migrations in order
-npx supabase functions deploy send-notification cleanup-people og-metadata
+npx supabase functions deploy send-notification cleanup-people og-metadata send-response-notification
 npx supabase functions deploy twilio-status --no-verify-jwt   # Twilio can't present a JWT; the request signature is the auth
+npx supabase functions deploy send-response --no-verify-jwt   # Who's Coming receipt API; the per-send response_token is the auth
 npx supabase secrets set CRON_SECRET=$(openssl rand -hex 32)   # already set; pg_cron jobs send it as x-cron-secret
 ```
+
+Who's Coming (shipped 2026-08-28): the share SMS's response link is gated on the `RESPONSE_LINK_BASE_URL` function secret — set to `https://events-reply.pages.dev`, it appends `Coming? <link>` to the non-app SMS variant; unset it and the line disappears with no redeploy (the strip switch if carriers or the A2P campaign hate it). The receipt page is a one-page static site in `receipt/` on its own Cloudflare Pages project (`events-reply`, production branch `main`): deploy with `npm run deploy:receipt` (same Cloudflare secrets as the web app). The page's API is the `send-response` edge function; its URL is baked into `receipt/index.html` and never appears in texts.
 
 Function-only deploys (no DB access) work without linking — pass the ref directly: `npx supabase functions deploy send-notification --project-ref ijmwtjyuvdnvhblwwtpt`. Note `supabase link` can fail on newer CLI versions with a `LegacyLinkApiKeysNetworkError ... inserted_at SchemaError` (Management API response drift); function deploys/secrets don't need link.
 

@@ -331,6 +331,45 @@ For each executed scenario:
 
 ---
 
+### E-115 Who's Coming — in-app yes/no and the asker's list
+**Steps**
+1. As account A, create an event and share it with B.
+2. As B, open the event from the calendar — a reply block ("<name> asked — are you in?") shows above "Shared with". Tap **Yes**.
+3. As A, open (or reopen) the event — "Shared with" shows B with "Yes".
+4. As B, reopen the event and tap **No** (a flip), then tap **No** again (a no-op re-tap).
+5. As A, reload and reopen the event.
+6. As A (self-created event check): create a second event and do not share it — open it.
+
+**Expected**
+- Step 2: the widget appears only because the row was received; answering records the answer and (on native, with push granted) A gets a "B said yes"-style push. Web fires the `send-response-notification` invoke but delivers no push.
+- Step 3: the answer is visible to the asker only — B never sees A's list; if B forwards to C, C's answer lands on B's "Shared with", not A's.
+- Step 4: the flip updates the answer and pings A once; the re-tap changes nothing and pings nobody (the RPC reports unchanged).
+- Step 5: A sees "No" (pull model — the list updates on open, not live).
+- Step 6: a self-created event has no Yes/No block — there is nobody to reply to.
+- Removing the event copy does not change the answer; deleting A's event removes the send (and the answer) entirely.
+
+---
+
+### E-116 Who's Coming — SMS receipt link (non-app recipient)
+**Steps**
+1. Prereq: the `RESPONSE_LINK_BASE_URL` function secret is set (currently `https://events-reply.pages.dev`); without it the SMS carries no link and this test is limited to the API checks below.
+2. As account A, add a pending contact with a reserved 555 number (no real SMS fires), create an event, and share it to them.
+3. Read the send's `response_token` as A (dashboard SQL or REST: `sends?event_id=eq.<id>&select=response_token`), then open `https://events-reply.pages.dev/?t=<token>` in a browser.
+4. The page loads ("<A's name> asked", title, date) — confirm the answer is still empty afterwards (GET is inert; this is the prefetch-safety check).
+5. Tap **Yes**; reload the link; tap **No**.
+6. As A, reopen the event's detail.
+7. Open the page with a garbage token (`?t=<random uuid>`).
+
+**Expected**
+- Step 3/4: the page renders the question and records nothing on load.
+- Step 5: the tap confirms immediately; the same link shows and changes the answer later (last write wins).
+- Step 6: "Shared with" shows the pending contact's "No".
+- Step 7: a clear "this link doesn't work" state; the API answers 404.
+- The page has no install CTA, no other people, and no link to the web app.
+- Unsetting `RESPONSE_LINK_BASE_URL` removes the `Coming?` line from future share SMSes; the page and in-app answers keep working.
+
+---
+
 ## Pass Criteria
 
 Manual suite passes when:

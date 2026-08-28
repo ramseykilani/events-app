@@ -113,8 +113,13 @@ There is deliberately **no global dedup**: two people adding "Lunch" at the same
 | sms_status | text, nullable | `queued` / `sent` / `delivered` / `undelivered` / `failed` (CHECK). Written by send-notification at send time and by the twilio-status webhook at carrier time. NULL = no SMS / pre-feature row. |
 | sms_error_code | text, nullable | Twilio error code on failure (e.g. `21610` STOP, `30034` carrier block). |
 | sms_status_at | timestamptz | When the current status was recorded. |
+| response | text, nullable | Who's Coming: the recipient's answer to this send — `yes` / `no` (CHECK), NULL = hasn't said. Last write wins. Written only via `respond_to_send` (app) or the `send-response` receipt API (SMS link); read by the asker through `sends_select_owner`. |
+| responded_at | timestamptz | When the current answer was set; `send-response-notification` requires it to be fresh (~2 min) so replayed invokes can't re-ping the asker. |
+| response_token | uuid | Capability for the SMS receipt link (`send-response` edge function). Unique; stable across re-shares (`share_event` is ON CONFLICT DO NOTHING). Never selected by the client. (Readable by the asker under `sends_select_owner` like any sends column — accepted 2026-08-28: a token holder can only read/spoof the answer on the asker's own list, which only the asker sees; column-level exclusion was rejected as a per-new-column maintenance hazard.) |
 
 Unique constraint on (event_id, person_id).
+
+**Who's Coming (the response slot).** Every send is also the ask: the recipient's yes/no lives on the send, visible only to the asker ("Shared with"). A forward is a new ask answered to the forwarder — Carol answers Bob, not Alice. Recipients answer in the app via `respond_to_send` (their own row id in, changed-flag out) or, without the app, via the receipt page linked from the share SMS (`events-reply.pages.dev/?t=<response_token>`, backed by the `--no-verify-jwt` `send-response` function; GET is inert so link prefetch can't answer). When an answer *changes*, the asker gets a push (`send-response-notification`, or the receipt function directly) — never an SMS, never a badge, and not when the asker hid the responder. The SMS line exists only while the `RESPONSE_LINK_BASE_URL` function secret is set — unsetting it strips the link without touching the in-app path. Removing the event copy does not change the answer; the answer dies only with the asker's event (sends cascade).
 
 **Sharing is forwarding.** Sharing an event with someone delivers them their own `events` row — a copy of your row as it is at send time (via the `share_event` RPC) — like forwarding a text. A share is a completed action and cannot be unsent; removing your own row never affects anyone else's calendar.
 
@@ -317,7 +322,9 @@ SMS deliberately carries no app or web links (decision 2026-08-09, see `docs/dis
 
 **Tap handler (push):** Configured in `app/_layout.tsx` — tapping a notification navigates to `/(app)/event/[id]` with the recipient's own row id. The detail screen resolves ids it doesn't own via a fallback (`events WHERE from_event_id = :id` — the caller's copy of a followed sender's row) before showing "Event not found" / access-removed.
 
-**Required Supabase secrets:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender (`TWILIO_MESSAGING_SERVICE_SID` preferred, `TWILIO_PHONE_NUMBER` as fallback). No other secrets gate SMS.
+**Response notifications (Who's Coming):** when a recipient's answer *changes* (first answer or a flip — never a page open, never a re-tap of the same answer), the asker gets a push: `{ title: "[Name] said yes" | "[Name] said no", body: "[Event Title] · [date], [time]", data: { eventId: <asker's own row id> } }`. Two write paths, one notifier (`supabase/functions/_shared/responseNotify.ts`): the app path calls `respond_to_send` and then `send-response-notification` fire-and-forget (JWT-verified; the function re-resolves the send, requires `responded_at` within two minutes so replayed invokes can't re-ping, honors the asker's `notify_push`, and skips when the asker has hidden the responder); the SMS receipt path writes via the `send-response` function and notifies directly. Push only — never an SMS per answer, no badges, no "3 haven't responded" nags. The receipt link in the non-app share SMS (`Coming? https://events-reply.pages.dev/?t=<response_token>`) is emitted only while the `RESPONSE_LINK_BASE_URL` secret is set.
+
+**Required Supabase secrets:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, plus a sender (`TWILIO_MESSAGING_SERVICE_SID` preferred, `TWILIO_PHONE_NUMBER` as fallback). No other secrets gate SMS. `RESPONSE_LINK_BASE_URL` (set 2026-08-28) gates only the Who's Coming receipt-link line — unset it to strip that line with no redeploy.
 
 ---
 

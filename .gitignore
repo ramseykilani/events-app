@@ -37,6 +37,9 @@ yarn-error.*
 # Supabase CLI local state
 supabase/.temp/
 
+# Deno type-check byproduct (edge functions are checked ad hoc, no lockfile)
+deno.lock
+
 # Store submit credentials (agents materialize these from secrets; never commit)
 google-play-service-account.json
 

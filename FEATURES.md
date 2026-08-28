@@ -41,7 +41,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Implemented | Storage rewrite + silent edit propagation. Spec: [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Shipped 2026-08-24. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
-| [Who's Coming](#whos-coming) | Planned | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. |
+| [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
@@ -1336,7 +1336,7 @@ At launch, in the same `send-notification` change:
 
 ## Who's Coming
 
-**Status:** Planned — recorded 2026-08-27 from the product conversation. Decisions below are the outline; **implementation is not designed.** Do not invent schema, RPCs, URL layout, or copy from this section. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building).
+**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building).
 
 ### User stories
 
@@ -1404,22 +1404,32 @@ The SMS link is easy to add and easy to strip if A2P or filters hate it, without
 
 The story that waits without the link is the SMS-only recipient. The asker's story is only fully true once that line exists.
 
+### Technical Notes (implemented 2026-08-28)
+
+- Migration `20260828000002_whos_coming.sql`: `sends` gains `response text CHECK (response IN ('yes','no'))` (NULL = unanswered), `responded_at timestamptz`, and `response_token uuid NOT NULL DEFAULT gen_random_uuid()` (unique) — the receipt-link capability, stable across re-shares because `share_event` is `ON CONFLICT DO NOTHING`. Reads ride the existing `sends_select_owner` policy; no new RLS.
+- Recipient write path: `respond_to_send(p_event_id, p_response)` (SECURITY DEFINER) — `p_event_id` is the caller's **own** row; the send resolves through `from_event_id` + the sender's `my_people` row with `user_id = auth.uid()`. Writes only on change (`IS DISTINCT FROM`) and returns whether it changed — the client invokes `send-response-notification` only then, so page-opens never ping and flips always do. Self-created rows and non-recipients are rejected. `get_my_send_response(p_event_id)` returns the caller's answer + sharer attribution (contact_name → display_name → NULL), one row when answerable, zero rows otherwise.
+- App UI: the event detail screen shows a Yes/No reply block on received events (keyed off the row's own `from_event_id`, so it works on push deep links) and per-person answers on "Shared with". Selected answer uses `selectedBg`; no accent, no red (design-language §3).
+- Asker push: `send-response-notification` edge function (user JWT; verifies the caller is the send's recipient, requires `responded_at` within 2 minutes so replayed invokes can't re-ping, honors the asker's `notify_push`, skips when the asker hid the responder). Title "Bob said yes" / "Bob said no"; payload carries the **asker's** row id. Push only, never an SMS per answer. The Expo batch sender is shared in `supabase/functions/_shared/expoPush.ts`; the asker-notify logic is shared in `_shared/responseNotify.ts`.
+- SMS receipt page: the non-app share SMS gains one line — `Coming? <link>` — **only when the `RESPONSE_LINK_BASE_URL` function secret is set** (the strip switch: unset it and the line disappears with no redeploy; the in-app path is unaffected). The link is `https://events-reply.pages.dev/?t=<response_token>` — a dedicated one-page Cloudflare Pages project (`receipt/` + `npm run deploy:receipt`, Wrangler project `events-reply`), deliberately not the web app. Its API is the `send-response` edge function (deployed `--no-verify-jwt`; the token is the credential): GET returns who asked / title / date / current answer and never writes (prefetch-safe); POST writes on explicit tap and pushes the asker on change.
+- E2e: `e2e/whos-coming.spec.ts` (A↔B answer + flip + asker list, and notify-on-change-only via request counting). SQL: `supabase/tests/whos_coming_test.sql`.
+
 ### Acceptance Criteria
 
-- [ ] Every send has an empty / yes / no slot; there is no maybe and no separate "ask who's going"
-- [ ] The recipient can set and change yes/no from the event in the app
-- [ ] The asker sees those answers on "Shared with"; nobody else does (a forward is a new ask, answered to the person who forwarded)
-- [ ] A self-created event has no yes/no for the owner
-- [ ] The asker gets a push when an answer changes, not when the page is only opened; no per-answer SMS to the asker
-- [ ] Share SMS for non-app recipients includes one response link; the page confirms yes/no without opening the event or the app; prefetch does not record an answer; the same link can change the answer later
-- [ ] Events never creates or opens a group chat
-- [ ] The SMS response line can be omitted or removed without breaking in-app yes/no
+- [x] Every send has an empty / yes / no slot; there is no maybe and no separate "ask who's going"
+- [x] The recipient can set and change yes/no from the event in the app
+- [x] The asker sees those answers on "Shared with"; nobody else does (a forward is a new ask, answered to the person who forwarded)
+- [x] A self-created event has no yes/no for the owner
+- [x] The asker gets a push when an answer changes, not when the page is only opened; no per-answer SMS to the asker
+- [x] Share SMS for non-app recipients includes one response link; the page confirms yes/no without opening the event or the app; prefetch does not record an answer; the same link can change the answer later
+- [x] Events never creates or opens a group chat
+- [x] The SMS response line can be omitted or removed without breaking in-app yes/no (the `RESPONSE_LINK_BASE_URL` secret is the switch)
 
 ### Open Questions
 
-- Exact SMS wording for the response link, and the receipt-page copy (owner approves on a real text before it ships — same bar as [Share SMS Content & Formatting](#share-sms-content--formatting)).
-- Link host / short URL (must not be the web app; A2P campaign description must mention this link type before the first live send).
-- Whether the in-app slice ships before the SMS line, or they ship together and the SMS line is the part we can strip.
+- Exact SMS wording for the response link (shipped placeholder: `Coming? <link>`), and the receipt-page copy — owner approves on a real text; strip path is unsetting `RESPONSE_LINK_BASE_URL` (same bar as [Share SMS Content & Formatting](#share-sms-content--formatting)).
+- A2P campaign description must mention this link type before the first live send (owner action in the Twilio console).
+- ~~Link host / short URL~~ — decided 2026-08-28: dedicated `events-reply.pages.dev` Pages project, not the web app.
+- ~~Whether the in-app slice ships before the SMS line~~ — decided 2026-08-28: shipped together; the SMS line is config-gated.
 
 ---
 
