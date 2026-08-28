@@ -43,7 +43,7 @@ constants/           Colors.ts — role-token palettes for paper/evening + the t
 docs/                Architecture, product, philosophy, design-language, and development-workflow docs
 e2e/                 Playwright e2e suite (desktop + mobile-web); shared fixtures in fixtures.ts
 hooks/               useTheme (active theme palette from ThemeContext) and other shared hooks
-lib/                 supabase.ts, types.ts, contacts.ts, pushNotifications.ts, showError.ts, dialogs.ts, format.ts, applyWebBrowserChrome.ts, timeoutSignal.ts
+lib/                 supabase.ts, types.ts, contacts.ts, reservedPhone.ts, pushNotifications.ts, showError.ts, dialogs.ts, format.ts, applyWebBrowserChrome.ts, timeoutSignal.ts
 app/+html.tsx        Web HTML shell (default Paper theme-color / body background)
 manual-tests/        Cloud manual regression suite, report templates, known-issues ledger
 assets/              Launcher icon, adaptive foreground, splash, favicon, notification glyph (Paper E’s)
