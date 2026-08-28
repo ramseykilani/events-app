@@ -41,6 +41,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Implemented | Storage rewrite + silent edit propagation. Spec: [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Shipped 2026-08-24. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
+| [Who's Coming](#whos-coming) | Planned | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
@@ -1327,6 +1328,95 @@ At launch, in the same `send-notification` change:
 - Link domain: `shared-events.pages.dev` vs a custom domain (AASA on `pages.dev` is often painful).
 - What a universal-link miss shows instead of the full web app.
 - Whether `WEB_APP_URL` stays the event-link base or a dedicated link domain is introduced.
+
+---
+
+## Who's Coming
+
+**Status:** Planned — recorded 2026-08-27 from the product conversation. Decisions below are the outline; **implementation is not designed.** Do not invent schema, RPCs, URL layout, or copy from this section. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building).
+
+### User stories
+
+The asker's story is the epic. The calendar share stays; it is the question a response answers. The group chat is the handoff, not a feature.
+
+- **Asker:** As someone who shared a concert, I want to see who said yes and who said no, so I can make one group chat of the people who are in.
+- **Recipient with the app:** As someone who has that event on my calendar, I want to tap yes or no once, so the person who sent it to me knows whether to include me.
+- **Recipient with only the text:** As someone who got the SMS and does not have the app, I want to answer on that text, so I can say yes or no without installing anything.
+
+### Problem
+
+A share puts the event on someone's calendar and records who you told (`sends` / "Shared with"). It does not record who's coming. The SMS already asks ("Alice wants to go to X with you") but the answer still lives in DMs, mixed with people who aren't going. The annoying piece is collecting that list. The piece Events should never automate is the group chat of the people who are in — that chat is made on an existing messaging app anyway.
+
+### What we decided
+
+This is a **response**, not an RSVP. It hangs off the send: this person answered the person who asked them. It is not a guest list on "the event," not hosted, not visible to anyone but the asker.
+
+- **Yes / no only.** No maybe. Yes means add me to the group chat. No means don't. Empty means they haven't said. The asker makes the chat from the yeses.
+- **Every send has a response slot.** No separate "ask who's going." The share already is the ask.
+- **Only the asker sees the answers.** Alice sees her people's yes/no. If Bob forwards to Carol, Carol answers Bob — not Alice. Same person-to-person rule as sharing.
+- **Last write wins.** You can change your answer anytime (in the app or via the SMS page).
+- **Events does not create the chat** and does not export one. The artifact is the list.
+
+**On the event in the app**
+
+- If someone sent it to you: Yes / No on that event is your reply to that person.
+- If you sent it to people: "Shared with" shows empty / yes / no next to each name. Only you see that.
+- Same screen can be both (you answered the sender and you forwarded). Two widgets, not one status on the event.
+- You don't answer a row you created. There's nobody to reply to.
+
+**Push to the asker**
+
+- When an answer **changes**, the person who shared gets a push ("Bob said yes to Friday" / "Bob said no"). First answer notifies; a flip notifies (yes → no matters for the chat). Opening the page and leaving it does not.
+- Person-triggered, same family as the share notification, opposite direction. No badge counts, no "3 haven't responded," no nags.
+- Push only — not an SMS to the organizer per answer. Honor the existing notify-push pref.
+- The list still updates on pull (open the event). The push is "go look."
+
+**SMS: one link, tiny confirm page**
+
+Inbound "reply Y/N" is out: one Twilio thread, two events, and a `Y` doesn't know which send it belongs to. STOP already lives on that number.
+
+One capability URL per send, in the share SMS:
+
+- The link is not an invite, not the event, not the app, not the listing. It is "respond to this send."
+- The page shows who asked, title, date, and Yes / No. If you already answered, it shows that and lets you flip. Same link still works after a later invite's text arrives.
+- Tapping the link must not record the answer by itself (SMS/iMessage prefetch would submit for you). The page is inert until they choose Yes or No.
+- No other people, no comments, no install CTA on that page. The write already happened; the receipt stops there.
+- Aimed at recipients **without** the app. App users answer on the event. Don't pile this URL onto the launch store / deep-link pair ([SMS Links at Launch](#sms-links-at-launch)); different job.
+
+Own-domain links in cold texts are the top carrier-filter risk. A short host is part of making the text readable, not polish. The host is a receipt page, not the web app (`docs/distribution-strategy.md`).
+
+### What this is not
+
+- Not likes, comments, read receipts, or a public guest list (the RSVP the product doc rejected).
+- Not a hosted event, not Partiful, not "the event" as a shared object.
+- Not inferred from calendar presence (keeping the row is not a yes; removing it is not a no).
+- Not a second share verb, not unshare, not automating iMessage/WhatsApp.
+- Not shareable invite links (rejected 2026-08-09 as duplicating the group chat). This URL is already in the text they received; it only records a yes or no.
+
+### Sequencing
+
+The in-app path (Yes / No on the event, list on Shared with, push to the asker) can ship without new SMS URLs. Until the link exists, the going-list is only true for people on the app; SMS-only recipients still answer out of band. That's honest.
+
+The SMS link is easy to add and easy to strip if A2P or filters hate it, without taking down the in-app path. If it becomes a problem as we get on the store, add it later or remove it temporarily. Do not couple it to [SMS Links at Launch](#sms-links-at-launch) as one change.
+
+The story that waits without the link is the SMS-only recipient. The asker's story is only fully true once that line exists.
+
+### Acceptance Criteria
+
+- [ ] Every send has an empty / yes / no slot; there is no maybe and no separate "ask who's going"
+- [ ] The recipient can set and change yes/no from the event in the app
+- [ ] The asker sees those answers on "Shared with"; nobody else does (a forward is a new ask, answered to the person who forwarded)
+- [ ] A self-created event has no yes/no for the owner
+- [ ] The asker gets a push when an answer changes, not when the page is only opened; no per-answer SMS to the asker
+- [ ] Share SMS for non-app recipients includes one response link; the page confirms yes/no without opening the event or the app; prefetch does not record an answer; the same link can change the answer later
+- [ ] Events never creates or opens a group chat
+- [ ] The SMS response line can be omitted or removed without breaking in-app yes/no
+
+### Open Questions
+
+- Exact SMS wording for the response link, and the receipt-page copy (owner approves on a real text before it ships — same bar as [Share SMS Content & Formatting](#share-sms-content--formatting)).
+- Link host / short URL (must not be the web app; A2P campaign description must mention this link type before the first live send).
+- Whether the in-app slice ships before the SMS line, or they ship together and the SMS line is the part we can strip.
 
 ---
 
