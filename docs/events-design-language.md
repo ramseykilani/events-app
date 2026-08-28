@@ -49,7 +49,7 @@ Color is assigned **by role, never by value**. Every visual decision traces to a
 
 ### The semantic law
 
-- **Accent** = a small moment of warmth: the selected day, the dots marking days that have events, the primary action, and the quiet "From X" attribution. That is the entire job. The accent is never used for badges, unread counts, or anything that asks for attention.
+- **Accent** = a small moment of warmth: the selected day, the dots marking days that have events, the primary action, and the quiet "From X" attribution. The selected answer in the Who's Coming reply widget uses the same selected-state fill as the selected day (`calendarSelected`) — a chosen answer is a selection, and the two creams (`surfaceSecondary` vs `selectedBg`) proved too close to read as feedback (owner call, 2026-08-28). That is the entire job. The accent is never used for badges, unread counts, or anything that asks for attention.
 - **Destructive** = red, and red alone signals consequence (remove, delete). The accent never does this job, and destructive never decorates.
 - **Everything else** — surfaces, inks, boundaries — is structurally neutral.
 

@@ -24,6 +24,7 @@
     --text-secondary: #6b6357;
     --text-tertiary: #a39a8b;
     --border: #e3dcc9;
+    --accent: #c8871e;
   }
   * { box-sizing: border-box; }
   body {
@@ -86,7 +87,9 @@
     padding: 12px;
   }
   .answers button[aria-pressed="true"] {
-    background: var(--selected-bg);
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
     font-weight: 700;
   }
   .answers button:disabled { opacity: 0.6; cursor: default; }

@@ -506,8 +506,12 @@ export default function EventDetailScreen() {
                       style={[
                         styles.replyButton,
                         {
+                          // The selected answer gets the accent fill — the
+                          // same selected-state treatment as the calendar's
+                          // selected day. selectedBg was too close to
+                          // surfaceSecondary to read as feedback.
                           backgroundColor: selected
-                            ? theme.selectedBg
+                            ? theme.calendarSelected
                             : theme.surfaceSecondary,
                         },
                       ]}
@@ -520,7 +524,11 @@ export default function EventDetailScreen() {
                       <Text
                         style={[
                           styles.replyButtonText,
-                          { color: theme.textPrimary },
+                          {
+                            color: selected
+                              ? theme.calendarSelectedText
+                              : theme.textPrimary,
+                          },
                           selected && { fontWeight: '700' },
                         ]}
                       >
@@ -530,6 +538,11 @@ export default function EventDetailScreen() {
                   );
                 })}
               </View>
+              {replyTo.response ? (
+                <Text style={[styles.replyStatus, { color: theme.textSecondary }]}>
+                  {replyTo.response === 'yes' ? 'You said yes.' : 'You said no.'}
+                </Text>
+              ) : null}
             </View>
           ) : null}
           {sharedWith.length > 0 ? (
@@ -712,6 +725,10 @@ const styles = StyleSheet.create({
   replyButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  replyStatus: {
+    fontSize: 13,
+    marginTop: 10,
   },
   revokedContainer: {
     flex: 1,

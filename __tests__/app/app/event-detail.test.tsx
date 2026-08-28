@@ -390,7 +390,20 @@ describe('app/(app)/event/[id]', () => {
     await screen.findByText('Alice asked — are you in?');
     expect(screen.getByLabelText("Yes, I'm in")).toBeTruthy();
     expect(screen.getByLabelText("No, I'm out")).toBeTruthy();
+    // Unanswered: no status line yet.
+    expect(screen.queryByText('You said yes.')).toBeNull();
+    expect(screen.queryByText('You said no.')).toBeNull();
     expect(mockRpc).toHaveBeenCalledWith('get_my_send_response', { p_event_id: 'e1' });
+  });
+
+  it('shows the saved answer as persistent feedback on load', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockReplyState('no');
+
+    const screen = render(<EventDetailScreen />);
+
+    // The answer survives server-side, so reopening the event shows it.
+    await screen.findByText('You said no.');
   });
 
   it('shows no reply widget on a self-created event', async () => {
@@ -435,6 +448,8 @@ describe('app/(app)/event/[id]', () => {
         body: { eventId: 'e1' },
       });
     });
+    // The answer reads back as persistent on-screen feedback.
+    await screen.findByText('You said yes.');
   });
 
   it('does not ping the asker when the server reports the answer unchanged', async () => {
@@ -476,6 +491,8 @@ describe('app/(app)/event/[id]', () => {
     mockReplyState('yes', true);
 
     const screen = render(<EventDetailScreen />);
+    // The stored answer shows before the flip.
+    await screen.findByText('You said yes.');
     const noButton = await screen.findByLabelText("No, I'm out");
 
     fireEvent.press(noButton);
@@ -489,6 +506,9 @@ describe('app/(app)/event/[id]', () => {
     expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-response-notification', {
       body: { eventId: 'e1' },
     });
+    // ...and the on-screen feedback flips with it.
+    await screen.findByText('You said no.');
+    expect(screen.queryByText('You said yes.')).toBeNull();
   });
 
   it('shows a short alert when saving the answer fails', async () => {
