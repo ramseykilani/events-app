@@ -1,0 +1,9 @@
+# Who's Coming receipt page (FEATURES.md → Who's Coming): the tiny confirm
+# page linked from the share SMS. A separate Pages project on purpose — the
+# receipt host must not be the web app (docs/distribution-strategy.md), and a
+# short dedicated host keeps the text readable and its reputation independent.
+# Deploy: npm run deploy:receipt (Wrangler direct-upload, same Cloudflare
+# secrets as the web app). The send-response edge function is the API; the
+# SMS link base is the RESPONSE_LINK_BASE_URL function secret.
+name = "events-reply"
+pages_build_output_dir = "receipt"

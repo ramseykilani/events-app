@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Are you in?</title>
+<!--
+  Who's Coming receipt page (FEATURES.md → Who's Coming). One capability URL
+  per send, texted to recipients who don't have the app. It shows who asked,
+  the event, and Yes / No — nothing else: no other people, no comments, no
+  install CTA. The page is inert until the visitor chooses an answer: state
+  loads over GET (which never writes, so SMS/iMessage prefetch can't answer
+  for them) and the write fires only on an explicit tap. Last write wins —
+  the same link changes the answer later.
+-->
+<style>
+  :root {
+    --background: #faf7f0;
+    --surface: #ffffff;
+    --surface-secondary: #f1ece0;
+    --selected-bg: #f3ecda;
+    --text-primary: #1a1815;
+    --text-secondary: #6b6357;
+    --text-tertiary: #a39a8b;
+    --border: #e3dcc9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+    min-height: 100vh;
+  }
+  main {
+    width: 100%;
+    max-width: 420px;
+    align-self: center;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+  }
+  .asker {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+  }
+  .title {
+    font-size: 26px;
+    line-height: 1.25;
+    margin: 0 0 6px;
+  }
+  .meta {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin: 0 0 24px;
+  }
+  .question {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+  .answers {
+    display: flex;
+    gap: 12px;
+  }
+  .answers button {
+    flex: 1;
+    min-height: 52px;
+    font-size: 17px;
+    font-weight: 600;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 12px;
+  }
+  .answers button[aria-pressed="true"] {
+    background: var(--selected-bg);
+    font-weight: 700;
+  }
+  .answers button:disabled { opacity: 0.6; cursor: default; }
+  .hint {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+    margin: 20px 0 0;
+  }
+  .status {
+    font-size: 16px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+  }
+  .error .status { color: var(--text-primary); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card" id="card">
+    <p class="status" id="status">Loading…</p>
+    <div id="content" hidden>
+      <p class="asker" id="asker"></p>
+      <h1 class="title" id="title"></h1>
+      <p class="meta" id="meta"></p>
+      <p class="question">Are you in?</p>
+      <div class="answers">
+        <button type="button" id="yes" aria-pressed="false">Yes</button>
+        <button type="button" id="no" aria-pressed="false">No</button>
+      </div>
+      <p class="hint" id="hint"></p>
+    </div>
+  </div>
+</main>
+<script>
+(function () {
+  // The edge function is the API; this static page is only the shell. The
+  // function URL never appears in a text message — the SMS carries this
+  // page's short host with the per-send token. (The project URL is a public
+  // identifier baked into every client bundle, not a secret.)
+  var API_URL = 'https://ijmwtjyuvdnvhblwwtpt.supabase.co/functions/v1/send-response'; // pragma: allowlist secret
+
+  var token = new URLSearchParams(window.location.search).get('t');
+  var statusEl = document.getElementById('status');
+  var contentEl = document.getElementById('content');
+  var askerEl = document.getElementById('asker');
+  var titleEl = document.getElementById('title');
+  var metaEl = document.getElementById('meta');
+  var hintEl = document.getElementById('hint');
+  var yesBtn = document.getElementById('yes');
+  var noBtn = document.getElementById('no');
+  var current = null;
+  var askerName = '';
+  var saving = false;
+
+  function formatDate(dateStr) {
+    var parts = dateStr.split('-').map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric'
+    });
+  }
+
+  function formatTime(timeStr) {
+    return new Date('1970-01-01T' + timeStr).toLocaleTimeString('en-US', {
+      hour: 'numeric', minute: '2-digit'
+    });
+  }
+
+  function showError(message) {
+    statusEl.textContent = message;
+    statusEl.parentElement.classList.add('error');
+    statusEl.hidden = false;
+    contentEl.hidden = true;
+  }
+
+  function renderHint() {
+    hintEl.textContent = current
+      ? (current === 'yes'
+          ? "You're in — " + askerName + ' knows. Changed your mind? Tap No.'
+          : 'Noted — ' + askerName + ' knows. Changed your mind? Tap Yes.')
+      : 'Yes means ' + askerName + ' puts you in the group chat. You can change your answer anytime with this link.';
+  }
+
+  function render(state) {
+    current = state.response;
+    askerName = state.askerName;
+    askerEl.textContent = askerName + ' asked';
+    titleEl.textContent = state.title || 'an event';
+    metaEl.textContent = formatDate(state.date) + (state.time ? ' · ' + formatTime(state.time) : '');
+    yesBtn.setAttribute('aria-pressed', String(current === 'yes'));
+    noBtn.setAttribute('aria-pressed', String(current === 'no'));
+    renderHint();
+    statusEl.hidden = true;
+    contentEl.hidden = false;
+  }
+
+  function answer(response) {
+    if (saving || response === current) return;
+    saving = true;
+    yesBtn.disabled = true;
+    noBtn.disabled = true;
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ t: token, response: response })
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error('save failed: ' + res.status);
+        return res.json();
+      })
+      .then(function (out) {
+        current = out.response;
+        yesBtn.setAttribute('aria-pressed', String(current === 'yes'));
+        noBtn.setAttribute('aria-pressed', String(current === 'no'));
+        renderHint();
+      })
+      .catch(function () {
+        hintEl.textContent = "That didn't save. Check your connection and try again.";
+      })
+      .finally(function () {
+        saving = false;
+        yesBtn.disabled = false;
+        noBtn.disabled = false;
+      });
+  }
+
+  yesBtn.addEventListener('click', function () { answer('yes'); });
+  noBtn.addEventListener('click', function () { answer('no'); });
+
+  if (!token) {
+    showError("This link doesn't work — it has no response code.");
+    return;
+  }
+
+  // Inert read: loading state never records an answer.
+  fetch(API_URL + '?t=' + encodeURIComponent(token))
+    .then(function (res) {
+      if (res.status === 404) throw new Error('gone');
+      if (!res.ok) throw new Error('load failed: ' + res.status);
+      return res.json();
+    })
+    .then(render)
+    .catch(function (err) {
+      showError(
+        err && err.message === 'gone'
+          ? "This link doesn't work anymore — the event may have been removed."
+          : "Couldn't load. Check your connection and reopen the link."
+      );
+    });
+})();
+</script>
+</body>
+</html>
