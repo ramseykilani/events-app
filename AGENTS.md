@@ -36,7 +36,7 @@ printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_
 Six test accounts are configured on the Supabase project, all with test OTP `123456` (expires March 31, 2027) and all sharing one password:
 
 - **Standing pair:** account A `+15555550100`, account B `+15555550103` — the e2e defaults.
-- **Pool accounts C–F:** `+15555550110`–`+15555550113` — for parallel agents. The dispatcher assigns each agent its own pair in the task prompt (`E2E_PHONE_A` / `E2E_PHONE_B` env overrides) so two runs never race the same calendars, and CI never fights a local run for A/B. Agents: use the pair you were assigned, or A/B when working alone.
+- **Parallel runs self-serve:** `node scripts/create-test-accounts.mjs --fresh-pair` provisions two fresh numbers (random unregistered picks from the fictional 555-01xx block) and prints the `E2E_PHONE_A` / `E2E_PHONE_B` exports — export them and every e2e run in that session uses a private pair. Costs two one-time rejected Twilio sends and needs `SUPABASE_ACCESS_TOKEN` (cloud agents have it). Without it: pre-provisioned spares C–F `+15555550110`–`+15555550113`, or A/B when working alone — A/B are CI's defaults.
 
 **Password sign-in (preferred):** the password lives in `E2E_ACCOUNT_PASSWORD` (`.env` locally, repo/Cursor secrets in CI/cloud). The e2e setup signs in via the token endpoint, which fires **no SMS**. Without the password it falls back to driving the OTP UI — one rejected Twilio send per account per run, so keep that the exception. The OTP UI itself stays covered by `auth.spec.ts`; that is the product surface. Provisioning is idempotent — to grow the pool, rotate the password, or create a throwaway account: `node scripts/create-test-accounts.mjs [+15555550114 ...]` (needs `SUPABASE_ACCESS_TOKEN`).
 
@@ -112,11 +112,12 @@ Then follow:
 
 A feature task = its `FEATURES.md` section (Problem / Solution / Technical Notes / Acceptance Criteria — that is the brief) + a **scope** + the **verify bar**.
 
-- **Scope:** whoever dispatches the task assigns the files/screens the agent owns ("you own `components/ShareSheet.tsx`"). One writer per scope — two agents never edit the same files at the same time. `FEATURES.md` has an **In progress** status: the dispatcher flips it when an agent starts, and agents never touch a feature marked In progress that isn't theirs.
+- **Scope:** the agent owns the files its feature touches, derived from the FEATURES.md section; the dispatcher may narrow it ("you own `components/ShareSheet.tsx`"). One writer per scope — two agents never edit the same files at the same time, so the dispatcher sequences features that obviously share code instead of running them in parallel.
+- **Status self-service:** the agent's first commit flips its feature to **In progress** in `FEATURES.md`; its last flips it to Implemented. Never start a feature already marked In progress — report back instead. The dispatcher's only coordination duty is checking the table before dispatching.
 - **Verify bar:** the fast checks (`npx tsc --noEmit && npm run test:conventions && npm test -- --runInBand && npm run test:sql`) **plus a new or updated Playwright spec covering the feature's web actions**, run locally on desktop Chrome (`npm run build:web && npx playwright test e2e/<spec> --project=desktop-chrome`) before pushing. CI runs the full three-browser suite on push. The suite grows toward covering every web action: every screen's save/cancel/confirm/empty/validation paths — not every click permutation.
 - **Specs describe intended behavior.** Making a test match what was built — weaker assertion, skip, rewritten expectation — is never an allowed fix. A red spec means the code is wrong, or the intent changed (which is the owner's call, not the agent's).
 - **Second opinion (risky changes only):** for migrations, RLS, or share/hide/auth logic, have a second agent on `cursor-grok-4.6-high-fast` review the diff and run the tests before pushing. Scary changes only — not every commit.
-- **Sign-in discipline:** sign in once per run and reuse stored sessions; never sign in per test. Prefer password sign-in (see Signing in) — OTP sign-ins fire real Twilio send attempts.
+- **Sign-in discipline:** sign in once per run and reuse stored sessions; never sign in per test. Before running e2e locally, provision your own pair — `node scripts/create-test-accounts.mjs --fresh-pair`, then export the printed `E2E_PHONE_A/B`. Password sign-in (see Signing in) fires no SMS; OTP sign-ins fire real Twilio send attempts.
 
 ### Deploying migrations & edge functions (runbook)
 

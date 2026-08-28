@@ -7,11 +7,16 @@
 //
 // Usage:
 //   node scripts/create-test-accounts.mjs [+15555550114 ...]
+//   node scripts/create-test-accounts.mjs --fresh-pair
 //
 // With no arguments it provisions the default pool: standing accounts A/B
 // (password only — they already exist) plus pool accounts C–F. With
 // arguments it provisions exactly those numbers (for growing the pool or
 // creating a throwaway account, e.g. M-003's fresh onboarding account).
+// With --fresh-pair it picks two random unregistered numbers from the
+// fictional 555-01xx block, provisions them, and prints the E2E_PHONE_A/B
+// exports — how a parallel agent self-serves its own account pair without
+// the dispatcher assigning one.
 //
 // Required env (.env is loaded automatically, without overriding real env):
 //   EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY
@@ -29,7 +34,7 @@
 // config is merged, and password setting is idempotent.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 
 if (existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split('\n')) {
@@ -53,8 +58,13 @@ const DEFAULT_POOL = [
   '+15555550113', // F ─┘
 ];
 
-const phones = process.argv.slice(2);
-const targets = phones.length > 0 ? phones : DEFAULT_POOL;
+const FRESH_PAIR = process.argv.includes('--fresh-pair');
+const phones = process.argv.slice(2).filter((a) => a !== '--fresh-pair');
+if (FRESH_PAIR && phones.length > 0) {
+  console.error('--fresh-pair picks the numbers itself; pass it alone');
+  process.exit(1);
+}
+let targets = phones.length > 0 ? phones : DEFAULT_POOL;
 
 for (const [name, value] of Object.entries({
   EXPO_PUBLIC_SUPABASE_URL: SUPABASE_URL,
@@ -100,11 +110,10 @@ async function api(path, { method = 'GET', token, body } = {}) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 1. Merge the targets into the project's test-OTP config (read-then-write —
-// a wholesale PATCH of sms_test_otp would clobber the standing accounts).
-async function ensureTestOtps() {
-  const configPath = `https://api.supabase.com/v1/projects/${projectRef}/config/auth`;
-  const res = await fetch(configPath, {
+const CONFIG_PATH = `https://api.supabase.com/v1/projects/${projectRef}/config/auth`;
+
+async function getAuthConfig() {
+  const res = await fetch(CONFIG_PATH, {
     headers: { authorization: `Bearer ${ACCESS_TOKEN}` },
   });
   if (!res.ok) {
@@ -112,7 +121,41 @@ async function ensureTestOtps() {
       `GET config/auth failed: ${res.status} ${await res.text()}`
     );
   }
-  const config = await res.json();
+  return res.json();
+}
+
+// Picks two random numbers from the fictional 555-01xx block that no test
+// OTP is registered for yet. The reserved fictional range tops out at
+// 555-0199, and 0100–0113 are the standing/pool accounts — fresh pairs come
+// from 0114–0199.
+async function pickFreshPair() {
+  const config = await getAuthConfig();
+  const registered = new Set(
+    String(config.sms_test_otp ?? '')
+      .split(',')
+      .filter(Boolean)
+      .map((pair) => pair.split('=')[0])
+  );
+  const free = [];
+  for (let n = 14; n <= 99; n += 1) {
+    const phone = `+155555501${String(n).padStart(2, '0')}`;
+    if (!registered.has(phone.replace(/^\+/, ''))) free.push(phone);
+  }
+  if (free.length < 2) {
+    throw new Error(
+      'fresh-pair block exhausted (555-0114–0199 all registered) — reuse an ' +
+        'existing pair or retire dead accounts from sms_test_otp'
+    );
+  }
+  const first = free.splice(randomInt(free.length), 1)[0];
+  const second = free.splice(randomInt(free.length), 1)[0];
+  return [first, second];
+}
+
+// 1. Merge the targets into the project's test-OTP config (read-then-write —
+// a wholesale PATCH of sms_test_otp would clobber the standing accounts).
+async function ensureTestOtps() {
+  const config = await getAuthConfig();
   // The Management API serializes sms_test_otp as one comma-separated string
   // of `phone=code` pairs, phones WITHOUT the leading '+':
   // "15555550100=123456,15555550103=123456". Merge in that shape and PATCH it
@@ -137,7 +180,7 @@ async function ensureTestOtps() {
   const serialized = [...merged.entries()]
     .map(([phone, code]) => `${phone}=${code}`)
     .join(',');
-  const patch = await fetch(configPath, {
+  const patch = await fetch(CONFIG_PATH, {
     method: 'PATCH',
     headers: {
       authorization: `Bearer ${ACCESS_TOKEN}`,
@@ -226,11 +269,20 @@ async function provision(phone) {
   console.log(`${phone}: provisioned — password sign-in verified`);
 }
 
+if (FRESH_PAIR) {
+  targets = await pickFreshPair();
+  console.log(`fresh pair: ${targets[0]} / ${targets[1]}`);
+}
 await ensureTestOtps();
 for (const phone of targets) {
   await provision(phone);
   // Stay under the 1-OTP/60s/number limit without serializing the whole pool
   // on the full cooldown — the limit is per number, so only a re-run of the
   // SAME number hits it. No sleep needed between distinct numbers.
+}
+if (FRESH_PAIR) {
+  console.log(
+    `\nexport E2E_PHONE_A=${targets[0]}\nexport E2E_PHONE_B=${targets[1]}`
+  );
 }
 console.log('done.');
