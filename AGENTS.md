@@ -36,7 +36,7 @@ printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_
 Six test accounts are configured on the Supabase project, all with test OTP `123456` (expires March 31, 2027) and all sharing one password:
 
 - **Standing pair:** account A `+15555550100`, account B `+15555550103` — the e2e defaults.
-- **Pool accounts C–F:** `+15555550110`–`+15555550113` — for parallel agents. An agent running e2e locally claims its own pair via `E2E_PHONE_A` / `E2E_PHONE_B` env overrides so two runs never race the same calendars, and CI never fights a local run for A/B.
+- **Pool accounts C–F:** `+15555550110`–`+15555550113` — for parallel agents. The dispatcher assigns each agent its own pair in the task prompt (`E2E_PHONE_A` / `E2E_PHONE_B` env overrides) so two runs never race the same calendars, and CI never fights a local run for A/B. Agents: use the pair you were assigned, or A/B when working alone.
 
 **Password sign-in (preferred):** the password lives in `E2E_ACCOUNT_PASSWORD` (`.env` locally, repo/Cursor secrets in CI/cloud). The e2e setup signs in via the token endpoint, which fires **no SMS**. Without the password it falls back to driving the OTP UI — one rejected Twilio send per account per run, so keep that the exception. The OTP UI itself stays covered by `auth.spec.ts`; that is the product surface. Provisioning is idempotent — to grow the pool, rotate the password, or create a throwaway account: `node scripts/create-test-accounts.mjs [+15555550114 ...]` (needs `SUPABASE_ACCESS_TOKEN`).
 
