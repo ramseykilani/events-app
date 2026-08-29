@@ -336,14 +336,14 @@ For each executed scenario:
 1. As account A, create an event and share it with B.
 2. As B, open the event from the calendar — a reply block ("<name> asked — are you in?") shows above "Shared with". Tap **Yes**.
 3. As A, open (or reopen) the event — "Shared with" shows B with "Yes".
-4. As B, reopen the event and tap **No** (a flip), then tap **No** again (a no-op re-tap).
+4. As B, reopen the event and tap **No** (a flip), then tap **No** again (a same-answer re-tap).
 5. As A, reload and reopen the event.
 6. As A (self-created event check): create a second event and do not share it — open it.
 
 **Expected**
-- Step 2: the widget appears only because the row was received; answering records the answer and (on native, with push granted) A gets a "B said yes"-style push. Web fires the `send-response-notification` invoke but delivers no push.
+- Step 2: the widget appears only because the row was received; answering records the answer and (on native, with push granted) A gets a "B said yes"-style push. Web fires the `send-response-notification` invoke but delivers no push. The tapped button spins while saving, then a "✓ Saved." line appears and stays until you leave the screen.
 - Step 3: the answer is visible to the asker only — B never sees A's list; if B forwards to C, C's answer lands on B's "Shared with", not A's.
-- Step 4: the flip updates the answer and pings A once; the re-tap changes nothing and pings nobody (the RPC reports unchanged).
+- Step 4: the flip updates the answer and pings A once; the re-tap round-trips but changes nothing and pings nobody (the RPC reports unchanged) — it re-asserts "✓ Saved.". Reopening the event shows the answer as the selected button with no "✓ Saved." line — a fresh visit shows state only.
 - Step 5: A sees "No" (pull model — the list updates on open, not live).
 - Step 6: a self-created event has no Yes/No block — there is nobody to reply to.
 - Removing the event copy does not change the answer; deleting A's event removes the send (and the answer) entirely.
@@ -362,7 +362,7 @@ For each executed scenario:
 
 **Expected**
 - Step 3/4: the page renders the question and records nothing on load.
-- Step 5: the tap confirms immediately; the same link shows and changes the answer later (last write wins).
+- Step 5: the tapped button spins while saving, then the hint reads "Saved. You can change your answer anytime with this link." and stays; after a reload the answer is pressed with the plain hint (no "Saved." — nothing was saved this visit); re-tapping the selected button re-confirms against the server and re-asserts "Saved.". The same link shows and changes the answer later (last write wins).
 - Step 6: "Shared with" shows the pending contact's "No".
 - Step 7: a clear "this link doesn't work" state; the API answers 404.
 - The page has no install CTA, no other people, and no link to the web app.

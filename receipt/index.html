@@ -93,6 +93,23 @@
     font-weight: 700;
   }
   .answers button:disabled { opacity: 0.6; cursor: default; }
+  /* Pending: the tapped button shows a spinner in its label's own ink — the
+     visible working phase that makes the confirmed fill trustworthy. */
+  .answers button.pending { font-size: 0; }
+  .answers button.pending::after {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* The confirmation re-asserts on every save (a re-tap re-runs the fade). */
+  .hint.flash { animation: hint-in 0.25s ease-out; }
+  @keyframes hint-in { from { opacity: 0; } to { opacity: 1; } }
   .hint {
     font-size: 13px;
     color: var(--text-tertiary);
@@ -121,7 +138,7 @@
         <button type="button" id="yes" aria-pressed="false">Yes</button>
         <button type="button" id="no" aria-pressed="false">No</button>
       </div>
-      <p class="hint" id="hint"></p>
+      <p class="hint" id="hint" role="status"></p>
     </div>
   </div>
 </main>
@@ -145,6 +162,7 @@
   var current = null;
   var askerName = '';
   var saving = false;
+  var savedThisVisit = false;
 
   function formatDate(dateStr) {
     var parts = dateStr.split('-').map(Number);
@@ -167,11 +185,12 @@
   }
 
   function renderHint() {
-    hintEl.textContent = current
-      ? (current === 'yes'
-          ? "You're in — " + askerName + ' knows. Changed your mind? Tap No.'
-          : 'Noted — ' + askerName + ' knows. Changed your mind? Tap Yes.')
-      : 'You can change your answer anytime with this link.';
+    // One standing hint; the "Saved." prefix appears only after a successful
+    // write this visit and stays until reload. A fresh load shows state (the
+    // pressed button) with no event prose — nothing here auto-dismisses.
+    hintEl.textContent =
+      (savedThisVisit ? 'Saved. ' : '') +
+      'You can change your answer anytime with this link.';
   }
 
   function render(state) {
@@ -188,10 +207,15 @@
   }
 
   function answer(response) {
-    if (saving || response === current) return;
+    // Re-tapping the selected answer round-trips on purpose: the server
+    // no-ops it (changed=false, the asker is never re-pinged) and the
+    // re-asserted "Saved." keeps the reassurance probe truthful.
+    if (saving) return;
     saving = true;
+    var tappedBtn = response === 'yes' ? yesBtn : noBtn;
     yesBtn.disabled = true;
     noBtn.disabled = true;
+    tappedBtn.classList.add('pending');
     fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -203,15 +227,20 @@
       })
       .then(function (out) {
         current = out.response;
+        savedThisVisit = true;
         yesBtn.setAttribute('aria-pressed', String(current === 'yes'));
         noBtn.setAttribute('aria-pressed', String(current === 'no'));
         renderHint();
+        hintEl.classList.remove('flash');
+        void hintEl.offsetWidth; // restart the fade so a re-tap re-asserts
+        hintEl.classList.add('flash');
       })
       .catch(function () {
         hintEl.textContent = "That didn't save. Check your connection and try again.";
       })
       .finally(function () {
         saving = false;
+        tappedBtn.classList.remove('pending');
         yesBtn.disabled = false;
         noBtn.disabled = false;
       });

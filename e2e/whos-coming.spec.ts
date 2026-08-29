@@ -60,14 +60,19 @@ test('recipient answers yes/no and the asker sees it on Shared with', async ({
       pageB.getByText(/are you in\?/).filter({ visible: true })
     ).toBeVisible({ timeout: 15000 });
 
-    // --- B answers yes → one asker notification.
+    // --- B answers yes → one asker notification, and the save confirmation
+    // appears and persists (nothing auto-dismisses).
     await pageB.getByLabel("Yes, I'm in").filter({ visible: true }).click();
     await expect
       .poll(() => notifyCalls, { timeout: 15000 })
       .toBe(1);
+    await expect(visibleText(pageB, '✓ Saved.')).toBeVisible();
 
-    // --- Re-tapping the current answer is a no-op (no RPC, no push).
+    // --- Re-tapping the current answer re-confirms: the write round-trips
+    // (the RPC reports changed=false) and the confirmation stays — but the
+    // asker is never re-pinged for a same-answer write.
     await pageB.getByLabel("Yes, I'm in").filter({ visible: true }).click();
+    await expect(visibleText(pageB, '✓ Saved.')).toBeVisible();
     await pageB.waitForTimeout(1500);
     expect(notifyCalls).toBe(1);
 

@@ -390,20 +390,26 @@ describe('app/(app)/event/[id]', () => {
     await screen.findByText('Alice asked — are you in?');
     expect(screen.getByLabelText("Yes, I'm in")).toBeTruthy();
     expect(screen.getByLabelText("No, I'm out")).toBeTruthy();
-    // Unanswered: no status line yet.
-    expect(screen.queryByText('You said yes.')).toBeNull();
-    expect(screen.queryByText('You said no.')).toBeNull();
+    // Unanswered: no confirmation line yet.
+    expect(screen.queryByText('✓ Saved.')).toBeNull();
     expect(mockRpc).toHaveBeenCalledWith('get_my_send_response', { p_event_id: 'e1' });
   });
 
-  it('shows the saved answer as persistent feedback on load', async () => {
+  it('shows the saved answer as selected state on load, with no prose', async () => {
     mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
     mockReplyState('no');
 
     const screen = render(<EventDetailScreen />);
 
-    // The answer survives server-side, so reopening the event shows it.
-    await screen.findByText('You said no.');
+    // The answer survives server-side; reopening shows it as the selected
+    // button. A fresh visit renders no "Saved." — nothing was just saved.
+    await screen.findByText('Alice asked — are you in?');
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("No, I'm out").props.accessibilityState?.selected
+      ).toBe(true);
+    });
+    expect(screen.queryByText('✓ Saved.')).toBeNull();
   });
 
   it('shows no reply widget on a self-created event', async () => {
@@ -448,8 +454,8 @@ describe('app/(app)/event/[id]', () => {
         body: { eventId: 'e1' },
       });
     });
-    // The answer reads back as persistent on-screen feedback.
-    await screen.findByText('You said yes.');
+    // The save confirmation appears and stays.
+    await screen.findByText('✓ Saved.');
   });
 
   it('does not ping the asker when the server reports the answer unchanged', async () => {
@@ -467,22 +473,30 @@ describe('app/(app)/event/[id]', () => {
         p_response: 'yes',
       });
     });
+    // The confirmation still appears — a saved answer is confirmed even when
+    // the server reports it unchanged.
+    await screen.findByText('✓ Saved.');
     expect(mockFunctionsInvoke).not.toHaveBeenCalled();
   });
 
-  it('re-tapping the current answer is a local no-op (no RPC, no push)', async () => {
+  it('re-tapping the current answer re-confirms (RPC round-trip, no push)', async () => {
     mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
-    mockReplyState('yes');
+    mockReplyState('yes', false); // same answer server-side → changed=false
 
     const screen = render(<EventDetailScreen />);
     const yesButton = await screen.findByLabelText("Yes, I'm in");
 
     fireEvent.press(yesButton);
 
+    // The reassurance probe round-trips: the RPC fires, the confirmation
+    // re-asserts, and the asker is never re-pinged for a same-answer write.
     await waitFor(() => {
-      expect(screen.getByText('Alice asked — are you in?')).toBeTruthy();
+      expect(mockRpc).toHaveBeenCalledWith('respond_to_send', {
+        p_event_id: 'e1',
+        p_response: 'yes',
+      });
     });
-    expect(mockRpc).not.toHaveBeenCalledWith('respond_to_send', expect.anything());
+    await screen.findByText('✓ Saved.');
     expect(mockFunctionsInvoke).not.toHaveBeenCalled();
   });
 
@@ -491,8 +505,13 @@ describe('app/(app)/event/[id]', () => {
     mockReplyState('yes', true);
 
     const screen = render(<EventDetailScreen />);
-    // The stored answer shows before the flip.
-    await screen.findByText('You said yes.');
+    // The stored answer shows as selected state before the flip.
+    await screen.findByText('Alice asked — are you in?');
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Yes, I'm in").props.accessibilityState?.selected
+      ).toBe(true);
+    });
     const noButton = await screen.findByLabelText("No, I'm out");
 
     fireEvent.press(noButton);
@@ -506,9 +525,13 @@ describe('app/(app)/event/[id]', () => {
     expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-response-notification', {
       body: { eventId: 'e1' },
     });
-    // ...and the on-screen feedback flips with it.
-    await screen.findByText('You said no.');
-    expect(screen.queryByText('You said yes.')).toBeNull();
+    // ...and the confirmation and selected state move with it.
+    await screen.findByText('✓ Saved.');
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("No, I'm out").props.accessibilityState?.selected
+      ).toBe(true);
+    });
   });
 
   it('shows a short alert when saving the answer fails', async () => {

@@ -120,6 +120,18 @@ Events is soft, not flat-brutalist and not floating-card-heavy.
 
 **Default: nothing moves.** Motion is earned — it happens on a state change, a summoned surface, or a genuine wait — and it is short and calm. There is no ambient animation, no shimmer, no breathing, no attention-seeking pulse. Motion communicates; it never decorates.
 
+### Confirmation feedback
+
+A write that matters announces itself once, then stays visible for the rest of the visit. The rules (owner, 2026-08-29):
+
+- **Feedback never auto-dismisses.** The confirmation appears when the server confirms the write and remains until you leave the screen. A message that vanishes punishes the distracted — the person who looked away is exactly who needed it. A fresh visit shows state only, no prose.
+- **The control shows the state; the line reports the event.** A selected button's fill is the answer; "✓ Saved." is the fact that the tap landed. Neither restates the other.
+- **The working phase is visible.** The tapped control spins while the write is in flight, and the confirmation only ever follows a server confirmation — never a pixel change. That transition is what makes the feedback trustworthy.
+- **Certainty is always re-derivable.** State renders from a server read on every load, and re-tapping the same control re-confirms against the server (a same-value write is a no-op and re-pings nobody) — the reassurance probe always gets a truthful answer.
+- **Glyphs have fixed meanings.** Circle = selectable. ✓ = confirmed/done ("✓ Saved.", "✓ Sent", "✓ On their calendar"). Accent fill = selection/state. Plain words = information that isn't a confirmation (a person's "No" is not a failure). Destructive = consequence.
+
+First instance: the Who's Coming reply widget and SMS receipt page. The share screen's sent confirmation (FEATURES.md → Share Sent Confirmation) follows the same template.
+
 ---
 
 ## 7. The theme control

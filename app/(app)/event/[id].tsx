@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Linking,
   ScrollView,
   ActivityIndicator,
+  AccessibilityInfo,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -45,6 +47,35 @@ function firstParam(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+// The answer-save confirmation (design-language §6 → Confirmation feedback):
+// appears on every successful write and stays until the screen unmounts —
+// nothing auto-dismisses. The parent keys it by the save timestamp so a
+// re-tap re-mounts and re-runs the fade, re-asserting the confirmation.
+function SavedLine({
+  textColor,
+  accentColor,
+}: {
+  textColor: string;
+  accentColor: string;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [opacity]);
+  return (
+    <Animated.Text
+      style={[styles.replyStatus, { color: textColor, opacity }]}
+      accessibilityLiveRegion="polite"
+    >
+      <Text style={{ color: accentColor }}>✓</Text> Saved.
+    </Animated.Text>
+  );
+}
+
 export default function EventDetailScreen() {
   const params = useLocalSearchParams<{
     id?: string | string[];
@@ -67,6 +98,11 @@ export default function EventDetailScreen() {
   );
   const [isHidden, setIsHidden] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyState | null>(null);
+  // Who's Coming save feedback: `responding` drives the in-flight spinner on
+  // the tapped button; `savedAt` gates the "✓ Saved." line, which persists
+  // for the screen's mount lifetime (a fresh mount shows state only).
+  const [responding, setResponding] = useState<'yes' | 'no' | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const loadSeq = useRef(0);
   const hasContentRef = useRef(!!seeded);
   const writeInFlightRef = useRef(false);
@@ -335,13 +371,14 @@ export default function EventDetailScreen() {
   };
 
   // Who's Coming: the recipient's yes/no reply to the person who sent them
-  // this event. Last write wins; re-tapping the current answer is a no-op
-  // (the RPC reports changed=false and the asker is never pinged for it).
+  // this event. Last write wins. Re-tapping the current answer round-trips
+  // on purpose — the RPC reports changed=false so the asker is never
+  // re-pinged, and the re-asserted "Saved." keeps the probe truthful.
   const handleRespond = async (answer: 'yes' | 'no') => {
     if (!event || !replyTo) return;
-    if (answer === replyTo.response) return;
     if (writeInFlightRef.current) return;
     writeInFlightRef.current = true;
+    setResponding(answer);
     try {
       const changed = await withWriteTimeout(async (signal) => {
         const { data, error } = await supabase
@@ -351,6 +388,8 @@ export default function EventDetailScreen() {
         return data as boolean;
       });
       setReplyTo({ ...replyTo, response: answer });
+      setSavedAt(Date.now());
+      AccessibilityInfo.announceForAccessibility('Saved.');
       // Fire-and-forget, outside the write budget: the asker gets a push
       // only when the answer actually changed (first answer and flips).
       if (changed) {
@@ -368,6 +407,7 @@ export default function EventDetailScreen() {
       );
     } finally {
       writeInFlightRef.current = false;
+      setResponding(null);
     }
   };
 
@@ -517,31 +557,46 @@ export default function EventDetailScreen() {
                       ]}
                       onPress={() => handleRespond(answer)}
                       activeOpacity={0.7}
+                      disabled={responding !== null}
                       accessibilityRole="button"
                       accessibilityLabel={answer === 'yes' ? "Yes, I'm in" : "No, I'm out"}
-                      accessibilityState={{ selected }}
+                      accessibilityState={{ selected, disabled: responding !== null }}
                     >
-                      <Text
-                        style={[
-                          styles.replyButtonText,
-                          {
-                            color: selected
+                      {responding === answer ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={
+                            selected
                               ? theme.calendarSelectedText
-                              : theme.textPrimary,
-                          },
-                          selected && { fontWeight: '700' },
-                        ]}
-                      >
-                        {answer === 'yes' ? 'Yes' : 'No'}
-                      </Text>
+                              : theme.textSecondary
+                          }
+                        />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.replyButtonText,
+                            {
+                              color: selected
+                                ? theme.calendarSelectedText
+                                : theme.textPrimary,
+                            },
+                            selected && { fontWeight: '700' },
+                            responding !== null && { opacity: 0.6 },
+                          ]}
+                        >
+                          {answer === 'yes' ? 'Yes' : 'No'}
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   );
                 })}
               </View>
-              {replyTo.response ? (
-                <Text style={[styles.replyStatus, { color: theme.textSecondary }]}>
-                  {replyTo.response === 'yes' ? 'You said yes.' : 'You said no.'}
-                </Text>
+              {savedAt !== null ? (
+                <SavedLine
+                  key={savedAt}
+                  textColor={theme.textSecondary}
+                  accentColor={theme.accent}
+                />
               ) : null}
             </View>
           ) : null}
