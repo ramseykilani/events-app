@@ -103,7 +103,7 @@ export function ShareSheet({
                       { color: allShared ? theme.textTertiary : theme.textPrimary },
                     ]}
                   >
-                    {allSelected || allShared ? `✓ ${circle.name}` : circle.name}
+                    {allShared ? `✓ ${circle.name}` : circle.name}
                   </Text>
                 </TouchableOpacity>
               );
@@ -193,7 +193,17 @@ export function ShareSheet({
                       {status.label}
                     </Text>
                   ) : (
-                    selected && <Text style={[styles.checkmark, { color: theme.textPrimary }]}>✓</Text>
+                    // Circle = selectable, ✓ = confirmed/done (shared design
+                    // vocabulary): selection is a circle outline that fills
+                    // with the accent, never a checkmark.
+                    <View
+                      testID={selected ? 'selection-circle-selected' : 'selection-circle'}
+                      style={[
+                        styles.selectionCircle,
+                        { borderColor: selected ? theme.accent : theme.border },
+                        selected && { backgroundColor: theme.accent },
+                      ]}
+                    />
                   )}
                 </TouchableOpacity>
               );
@@ -284,9 +294,11 @@ const styles = StyleSheet.create({
   personName: {
     fontSize: 16,
   },
-  checkmark: {
-    fontSize: 18,
-    fontWeight: '600',
+  selectionCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
   },
   sharedLabel: {
     fontSize: 14,

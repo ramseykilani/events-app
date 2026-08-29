@@ -191,23 +191,30 @@ export async function createEventAndShareToB(
     await fillNameGateIfShown(page);
     // Self-verifying selection: a tap that races a list re-render can be eaten
     // (the row node gets replaced mid-click), leaving Share disabled forever.
-    // Retry until the row's ✓ shows — guarded so an already-selected row isn't
-    // toggled back off by the retry. Match the row by role, not text-parent:
-    // the name sits inside a nested View since Share Delivery Status wrapped
-    // it (a `.locator('..')` chain lands on that wrapper, not the row), and
-    // covered nav screens stay mounted, so filter to the visible copy. The
-    // accessible name gains the ✓ when selected — substring name matching
-    // covers both states.
+    // Retry until the row's selection circle fills — guarded so an
+    // already-selected row isn't toggled back off by the retry. Match the row
+    // by role, not text-parent: the name sits inside a nested View since Share
+    // Delivery Status wrapped it (a `.locator('..')` chain lands on that
+    // wrapper, not the row), and covered nav screens stay mounted, so filter
+    // to the visible copy. Selection is a circle indicator (circle =
+    // selectable, ✓ = confirmed/done), so the retry keys off the circle's
+    // testID; the accessible name no longer changes on selection.
     const rowB = page
       .getByRole('button', { name: PERSON_B_NAME })
       .filter({ visible: true });
     await expect(async () => {
-      if (!(await rowB.getByText('✓', { exact: true }).isVisible().catch(() => false))) {
+      if (!(await rowB.getByTestId('selection-circle-selected').isVisible().catch(() => false))) {
         await rowB.click();
       }
-      await expect(rowB.getByText('✓', { exact: true })).toBeVisible({ timeout: 2000 });
+      await expect(rowB.getByTestId('selection-circle-selected')).toBeVisible({ timeout: 2000 });
     }).toPass();
     await page.getByRole('button', { name: 'Share', exact: true }).click();
+    // Share Sent Confirmation: the screen stays open with a persistent
+    // "✓ Sent to N people" line — the sender leaves via Done.
+    await expect(
+      page.getByText('✓ Sent to 1 person').filter({ visible: true })
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Done' }).click();
     await expectCalendar(page);
     await expect(page.getByText(title, { exact: true })).toBeVisible();
     expect(errorDialog).toBeNull();

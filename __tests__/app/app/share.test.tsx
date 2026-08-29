@@ -79,6 +79,12 @@ jest.mock('../../../components/ShareSheet', () => {
           <Text>Select only p2</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          testID="mock-share-sheet-select-p3"
+          onPress={() => onSelectionChange(new Set(['p3']))}
+        >
+          <Text>Select only p3</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           testID="mock-share-sheet-clear"
           onPress={() => onSelectionChange(new Set())}
         >
@@ -202,7 +208,7 @@ describe('app/(app)/share', () => {
     expect(populatedProps.peopleCount).toBe(2);
   });
 
-  it('shares via the share_event RPC, notifies, and navigates back', async () => {
+  it('shares via the share_event RPC, notifies, and confirms without navigating', async () => {
     const screen = render(<ShareScreen />);
 
     fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
@@ -218,7 +224,19 @@ describe('app/(app)/share', () => {
     expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-notification', {
       body: { eventId: 'e1', personIds: ['p1', 'p2'] },
     });
-    expect(router.back).toHaveBeenCalled();
+
+    // Share Sent Confirmation: the screen stays put, a persistent line
+    // echoes the send, the recipients flip to shared, and Cancel becomes
+    // Done — leaving is the sender's choice.
+    expect(router.back).not.toHaveBeenCalled();
+    expect(await screen.findByText('✓ Sent to 2 people')).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1,p2')
+    );
+    expect(screen.queryByText('Cancel')).toBeNull();
+
+    fireEvent.press(screen.getByText('Done'));
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 
   it('does not share or navigate when Share is pressed with no people selected', async () => {
@@ -278,7 +296,73 @@ describe('app/(app)/share', () => {
     expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-notification', {
       body: { eventId: 'e1', personIds: ['p2'] },
     });
-    expect(router.back).toHaveBeenCalled();
+    // No navigation: the confirmation line echoes just this send, and the
+    // shared set now covers both people.
+    expect(router.back).not.toHaveBeenCalled();
+    expect(await screen.findByText('✓ Sent to 1 person')).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1,p2')
+    );
+  });
+
+  it('updates the confirmation count on an additive re-send', async () => {
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: [
+            {
+              id: 'p1',
+              owner_id: 'u1',
+              phone_number: '+14165550001',
+              user_id: null,
+              contact_name: 'Alice',
+              added_at: '2026-01-01T00:00:00.000Z',
+              last_shared_at: null,
+            },
+            {
+              id: 'p2',
+              owner_id: 'u1',
+              phone_number: '+14165550002',
+              user_id: null,
+              contact_name: 'Bob',
+              added_at: '2026-01-02T00:00:00.000Z',
+              last_shared_at: null,
+            },
+            {
+              id: 'p3',
+              owner_id: 'u1',
+              phone_number: '+14165550003',
+              user_id: null,
+              contact_name: 'Carol',
+              added_at: '2026-01-03T00:00:00.000Z',
+              last_shared_at: null,
+            },
+          ],
+          error: null,
+        })
+      )
+    );
+
+    const screen = render(<ShareScreen />);
+
+    fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
+    fireEvent.press(screen.getByText('Share'));
+    expect(await screen.findByText('✓ Sent to 2 people')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('mock-share-sheet-select-p3'));
+    fireEvent.press(screen.getByText('Share'));
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('share_event', {
+        p_event_id: 'e1',
+        p_person_ids: ['p3'],
+      });
+    });
+    // The line echoes the send that just completed; the rows carry the
+    // cumulative record.
+    expect(await screen.findByText('✓ Sent to 1 person')).toBeTruthy();
+    expect(screen.queryByText('✓ Sent to 2 people')).toBeNull();
+    expect(router.back).not.toHaveBeenCalled();
   });
 
   it('shows a short alert, not a stack dump, when the share_event RPC fails', async () => {
@@ -303,6 +387,9 @@ describe('app/(app)/share', () => {
       );
     });
     expect(router.back).not.toHaveBeenCalled();
+    // A failed send shows no confirmation and keeps the honest Cancel.
+    expect(screen.queryByText(/✓ Sent to/)).toBeNull();
+    expect(screen.getByText('Cancel')).toBeTruthy();
   });
 
   describe('no-unshare note', () => {
@@ -382,7 +469,8 @@ describe('app/(app)/share', () => {
           p_person_ids: ['p1', 'p2'],
         });
       });
-      expect(router.back).toHaveBeenCalled();
+      expect(router.back).not.toHaveBeenCalled();
+      expect(await screen.findByText('✓ Sent to 2 people')).toBeTruthy();
     });
 
     it('keeps Save disabled while the name input is empty', async () => {

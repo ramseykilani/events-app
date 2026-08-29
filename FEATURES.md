@@ -36,7 +36,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Share Delivery Status](#share-delivery-status) | Implemented | Per-person received/not-received on the share sheet; STOP is visible. |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
 | [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
-| [Share Sent Confirmation](#share-sent-confirmation) | Planned | After Share, the screen just goes back. |
+| [Share Sent Confirmation](#share-sent-confirmation) | Implemented | Persistent "✓ Sent to N people" on the sheet after a send; selection is circles now, ✓ means done. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Implemented | Storage rewrite + silent edit propagation. Spec: [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Shipped 2026-08-24. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
@@ -1025,7 +1025,7 @@ Decisions on the original open questions: **always-visible line** (a first-send 
 
 ## Share Delivery Status
 
-**Status:** Implemented (2026-08-28). Related: [Share Sent Confirmation](#share-sent-confirmation) (that you sent it — still Planned).
+**Status:** Implemented (2026-08-28). Related: [Share Sent Confirmation](#share-sent-confirmation) (that you sent it — shipped 2026-08-29).
 
 ### Problem
 
@@ -1172,23 +1172,33 @@ Revisit button size and clickability across the app on a native device: switches
 
 ## Share Sent Confirmation
 
-**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Related: [Share Delivery Status](#share-delivery-status) (whether each person received it).
+**Status:** Implemented (2026-08-29). Recorded 2026-08-16 from internal testing. Related: [Share Delivery Status](#share-delivery-status) (whether each person received it — the lasting record this confirmation sits next to).
 
 ### Problem
 
-After Share succeeds, the screen just goes back (`router.back()` in `app/(app)/share.tsx`). There is no confirmation that it was sent.
+After Share succeeded, the screen just went back (`router.back()` in `app/(app)/share.tsx`). There was no confirmation that it was sent — and in the create flow the landing spot (the calendar) showed no evidence of the share at all.
 
-### Proposed Solution
+### Solution (as shipped 2026-08-29)
 
-When you send a share, confirm that it has been sent.
+The screen stays open after a successful send. A persistent line under the header — **"✓ Sent to N people"** (accent, one calm ~250ms fade-in per send) — echoes the send that just completed, and the picked rows flip to their delivery-status state in place. The line never auto-dismisses (persistence is a house rule: feedback appears on server confirmation and stays until you leave the screen); the header's Cancel becomes **Done**, and leaving is the sender's choice. A count, not names — a send to 50 people stays one quiet line.
+
+This resolves the open question: the line is the one-shot confirmation; the per-person status rows are the lasting record. Different jobs, no conflict.
+
+The send also settled the checkmark collision on the sheet (shared vocabulary with Who's Coming, recorded in `docs/events-design-language.md`): **circle = selectable, ✓ = confirmed/done**. The bare ✓ selection mark on person rows became a circle indicator (outline → accent fill); circle chips show all-selected as accent fill without the ✓ prefix, while all-shared keeps `✓ name`.
+
+### Technical Notes
+
+- `app/(app)/share.tsx`: on `share_event` success the newly shared ids merge into the sheet's shared state (null SMS status → app users read "✓ On their calendar" immediately, SMS contacts "✓ Shared" until delivery status advances), the selection clears, and `sentCount` drives the line. The `send-notification` invoke stays fire-and-forget and does not gate the line. Refresh commits now union (never replace) the shared ids/statuses, so a focus refresh that started before a send can't un-flip just-sent rows.
+- Failure path unchanged: stay + `showAlert('Could not share', …)`, no line, Cancel stays Cancel.
+- Tests: Jest (confirmation line, count/pluralization, additive re-send, Cancel→Done, no-navigation, failure path; ShareSheet circle indicator + chip glyphs) and Playwright (`share.spec.ts` sent-confirmation test; `createEventAndShareToB` keys selection off the circle's testID).
 
 ### Acceptance Criteria
 
-- [ ] After a successful share, the sender sees a confirmation that it was sent
+- [x] After a successful share, the sender sees a confirmation that it was sent
 
 ### Open Questions
 
-- How this sits next to per-person received status — a one-shot “sent” vs the lasting ✓ / received rows.
+- None
 
 ---
 

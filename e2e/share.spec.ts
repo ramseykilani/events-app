@@ -105,3 +105,59 @@ test('share screen explains no-unshare before the first send', async ({
   await openEventFromCalendar(page, title);
   await removeOpenEvent(page);
 });
+
+// Share Sent Confirmation: a successful share keeps the sender on the sheet
+// with a persistent "✓ Sent to N people" line — no navigation, no
+// auto-dismiss — the picked rows flip to their sent state, and Cancel
+// becomes Done for the exit.
+test('share stays on the sheet with a persistent sent confirmation', async ({
+  page,
+}, testInfo) => {
+  const title = uniqueTitle('E2E sent confirmation', testInfo.project.name);
+
+  await page.goto('/');
+  await expectCalendar(page);
+  await page.getByRole('button', { name: 'People' }).click();
+  await addPersonManually(page, PERSON_B_NAME, ACCOUNT_B.phone);
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  // Create an event; the share screen follows automatically.
+  await expectCalendar(page);
+  await page.getByRole('button', { name: 'Add event' }).click();
+  await page.getByPlaceholder('Event title').fill(title);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Share with')).toBeVisible();
+
+  // Select B — retry until the selection circle fills (taps can race
+  // re-renders), then send.
+  const rowB = page
+    .getByRole('button', { name: PERSON_B_NAME })
+    .filter({ visible: true });
+  await expect(async () => {
+    if (!(await rowB.getByTestId('selection-circle-selected').isVisible().catch(() => false))) {
+      await rowB.click();
+    }
+    await expect(rowB.getByTestId('selection-circle-selected')).toBeVisible({ timeout: 2000 });
+  }).toPass();
+  await page.getByRole('button', { name: 'Share', exact: true }).click();
+
+  // The confirmation appears and the screen does not navigate. B has an
+  // account, so the flipped row reads "✓ On their calendar".
+  await expect(
+    page.getByText('✓ Sent to 1 person').filter({ visible: true })
+  ).toBeVisible();
+  await expect(page.getByText('Share with')).toBeVisible();
+  await expect(
+    page.getByText('✓ On their calendar').filter({ visible: true })
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
+
+  // Done is the exit; the calendar shows the event.
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expectCalendar(page);
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
+
+  // Cleanup.
+  await openEventFromCalendar(page, title);
+  await removeOpenEvent(page);
+});

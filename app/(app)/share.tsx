@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import {
+  Animated,
   View,
   Text,
   TextInput,
@@ -53,6 +54,12 @@ export default function ShareScreen() {
   const [savingName, setSavingName] = useState(false);
   const [peopleLoaded, setPeopleLoaded] = useState(false);
   const [flowRestartKey, setFlowRestartKey] = useState(0);
+  // Share Sent Confirmation: after a successful send the screen stays put and
+  // a persistent line confirms it (house rule: feedback never auto-dismisses).
+  // The count echoes the send that just completed; the flipped rows are the
+  // lasting record.
+  const [sentCount, setSentCount] = useState<number | null>(null);
+  const sentOpacity = useRef(new Animated.Value(0)).current;
   const shareInFlightRef = useRef(false);
   const nameSaveInFlightRef = useRef(false);
 
@@ -139,8 +146,11 @@ export default function ShareScreen() {
       setPeople(staged.people);
       setCircles(staged.circles);
       setCircleMembers(staged.members);
-      setAlreadySharedIds(staged.sharedNow);
-      setSharedStatuses(staged.statuses);
+      // Union, never replace: a refresh that started before a successful
+      // send can land after it carrying a sends list that predates the send.
+      // Shares are additive-only, so just-sent rows must survive a refresh.
+      setAlreadySharedIds((prev) => new Set([...staged.sharedNow, ...prev]));
+      setSharedStatuses((prev) => new Map([...prev, ...staged.statuses]));
       // Preserve in-flight selections: a user who taps while the sheet is
       // still loading must not lose their picks when the fetch lands (CI
       // caught this — the reset raced the tap and left Share disabled). Only
@@ -251,9 +261,31 @@ export default function ShareScreen() {
             body: { eventId, personIds: notifiedPersonIds },
           })
           .catch((err) => console.error('send-notification error:', err));
-      }
 
-      router.back();
+        // Stay on the sheet: flip the new recipients to their sent state,
+        // clear the picks, and show the confirmation line. Leaving is the
+        // sender's choice (Done), never a timer's. New rows get a null SMS
+        // status — app users read "✓ On their calendar" immediately, SMS
+        // contacts "✓ Shared" until the delivery webhook advances them.
+        setAlreadySharedIds((prev) => new Set([...prev, ...notifiedPersonIds]));
+        setSharedStatuses((prev) => {
+          const next = new Map(prev);
+          for (const pid of notifiedPersonIds) {
+            next.set(pid, { sms_status: null, sms_error_code: null });
+          }
+          return next;
+        });
+        setSelectedPersonIds(new Set());
+        setSentCount(notifiedPersonIds.length);
+        sentOpacity.setValue(0);
+        Animated.timing(sentOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      } else {
+        router.back();
+      }
     } catch (err: unknown) {
       console.error('Failed to share:', err);
       showAlert(
@@ -277,7 +309,9 @@ export default function ShareScreen() {
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity style={styles.headerAction} onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
+          <Text style={[styles.cancel, { color: theme.textSecondary }]}>
+            {sentCount !== null ? 'Done' : 'Cancel'}
+          </Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
         <TouchableOpacity
@@ -299,6 +333,15 @@ export default function ShareScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+      {sentCount !== null ? (
+        <Animated.Text
+          style={[styles.sentLine, { color: theme.accent, opacity: sentOpacity }]}
+          accessibilityLiveRegion="polite"
+          accessibilityRole="text"
+        >
+          ✓ Sent to {sentCount} {sentCount === 1 ? 'person' : 'people'}
+        </Animated.Text>
+      ) : null}
       {displayName === null && (
         <View style={[styles.nameGate, { borderBottomColor: theme.borderLight }]}>
           <Text style={[styles.nameGateText, { color: theme.textSecondary }]}>
@@ -401,6 +444,12 @@ const styles = StyleSheet.create({
   },
   loadError: {
     fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  sentLine: {
+    fontSize: 15,
+    fontWeight: '600',
     textAlign: 'center',
     paddingVertical: 12,
   },

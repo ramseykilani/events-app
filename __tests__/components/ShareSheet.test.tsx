@@ -130,8 +130,9 @@ describe('components/ShareSheet', () => {
       />
     );
 
-    // All members selected → chip shows its selected state
-    fireEvent.press(screen.getByText('✓ Friends'));
+    // All members selected → chip shows its selected state (accent fill,
+    // plain name — ✓ is reserved for confirmed/done).
+    fireEvent.press(screen.getByText('Friends'));
     const selected = onSelectionChange.mock.calls[0][0] as Set<string>;
     expect(Array.from(selected)).toEqual([]);
   });
@@ -150,7 +151,27 @@ describe('components/ShareSheet', () => {
       />
     );
 
-    expect(screen.getByText('✓ Friends')).toBeTruthy();
+    // Selected state is the accent fill, not a ✓ prefix (✓ = confirmed/done).
+    expect(screen.getByText('Friends')).toBeTruthy();
+    expect(screen.queryByText('✓ Friends')).toBeNull();
+  });
+
+  it('marks selection with a circle indicator, not a checkmark', () => {
+    const screen = render(
+      <ShareSheet
+        people={people}
+        circles={[]}
+        circleMembers={[]}
+        selectedPersonIds={new Set(['p1'])}
+        onSelectionChange={jest.fn()}
+      />
+    );
+
+    // Circle = selectable: the picked row's circle is filled, the unpicked
+    // row's is an outline, and no bare ✓ is spent on selection.
+    expect(screen.getByTestId('selection-circle-selected')).toBeTruthy();
+    expect(screen.getByTestId('selection-circle')).toBeTruthy();
+    expect(screen.queryByText('✓')).toBeNull();
   });
 
   it('renders already-shared people as completed and ignores taps on them', () => {
