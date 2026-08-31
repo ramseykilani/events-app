@@ -19,6 +19,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Contacts Permission Explainer](#contacts-permission-explainer) | Implemented | First Share already adds people |
 | [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Implemented | |
 | [Delete Account](#delete-account) | Implemented | |
+| [Remove Event Confirm](#remove-event-confirm) | In progress | In-app confirm before an irreversible remove. |
+| [Re-share After Recipient Remove](#re-share-after-recipient-remove) | In progress | If they removed their copy, you can send it to them again. |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
 | [Richer Link Autofill](#richer-link-autofill) | Planned | Upgrade. Paste already stores the URL; OG title/image already work on open pages. |
@@ -1596,3 +1598,89 @@ Fetch the visible grid's full date range (Sunday on/before the 1st through Satur
 - [x] Tapping an overflow day with an event flips the month and lists the event (existing behavior preserved)
 - [x] Month navigation fetches the grid range (April 2026 → 2026-03-29..2026-05-02)
 - [x] Pixel baselines unaffected (the grid is masked in `e2e/visual.spec.ts`)
+
+---
+
+## Remove Event Confirm
+
+**Status:** In progress. Recorded 2026-08-31 from owner feedback after a friend accidentally removed a shared event. Related: [Forwarding Shares](#forwarding-shares) (remove is personal), [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) (the existing confirm copy), [Sign Out Pop-up](#sign-out-pop-up) (same "thin OS dialog" class — that one stays undesigned), [Re-share After Recipient Remove](#re-share-after-recipient-remove) (the recovery path).
+
+### Problem
+
+Removing an event is irreversible for the person who does it: their row is deleted, and until restore exists they cannot get it back themselves. The action already goes through `showConfirm` (`lib/dialogs.ts`) — native `Alert.alert`, web `window.confirm` — with copy that reassures the *sender* ("This only affects you — everyone you shared it with keeps their own copy") instead of stating the consequence for the person tapping Remove.
+
+That dialog is easy to tap through, and on web it is a browser confirm, not an app pop-up. A friend deleted a shared event by accident.
+
+### Solution
+
+Replace the OS confirm on **Remove Event** (event detail and edit) with an in-app dialog (`components/ConfirmModal.tsx`): themed card, Cancel / Remove, destructive styling, `onRequestClose` = Cancel. Copy states the irreversibility, then the personal-remove rule:
+
+> Remove this from your calendar? You can't undo this. Anyone you already sent it to keeps their copy.
+
+Do not replace every `showConfirm` in the app. Sign-out / delete-account / contacts still use `showConfirm` until those surfaces are designed.
+
+### Technical Notes
+
+- `app/(app)/event/[id].tsx` and `app/(app)/edit-event.tsx` open the modal instead of `showConfirm`.
+- Playwright: `removeOpenEvent` clicks the in-app dialog's Remove, not `page.once('dialog')`. Add a Cancel path that leaves the event.
+- Pixel-diff baselines of the resting event-detail screen are unchanged (the dialog is not in the screenshot).
+
+### Acceptance Criteria
+
+- [ ] Tapping Remove Event opens an in-app confirm (not `window.confirm` / `Alert.alert`)
+- [ ] Cancel leaves the event on the calendar
+- [ ] Confirm deletes only the caller's row
+- [ ] Copy says the action can't be undone
+
+### Open Questions
+
+- None on this surface. Sign-out pop-up remains a separate, undesigned feature.
+
+---
+
+## Re-share After Recipient Remove
+
+**Status:** In progress. Recorded 2026-08-31 from the same accidental-remove: the sender could not share the event with that person again. Related: [Forwarding Shares](#forwarding-shares) (no unshare), [Share Delivery Status](#share-delivery-status), [Who's Coming](#whos-coming) (the send row is the ask).
+
+### Problem
+
+A share is a completed action — there is no unshare, and `sends` is unique on `(event_id, person_id)`. The share sheet treats anyone with a send as ✓ Shared and will not select them. `share_event` is `ON CONFLICT DO NOTHING` on that send, and the client never passes those ids through, so `send-notification` never fires for them either.
+
+That conflates two different facts:
+
+1. **You already told them** (`sends` — history, Who's Coming, delivery status). This should stay forever. No unshare.
+2. **It is on their calendar** (their `events` row following yours). They can remove that row; it is theirs.
+
+After they remove their copy, (2) is false and (1) is still true. The sheet still shows ✓ Shared. The sender cannot put it back. `share_event`'s events `INSERT` would actually succeed (the `(owner_id, from_event_id)` unique index is empty), but the UI never calls it.
+
+No-unshare is "you can't take it off their calendar." It is not "you can never send it to them again."
+
+### Solution
+
+Keep no-unshare. Change what ✓ Shared means on the **share sheet** to "this is currently on their calendar, or they don't have an account yet (pending delivery on sign-up)."
+
+- **App user who still has a copy** — ✓ Shared, locked. Additive share must not re-notify them (KI-003).
+- **Pending contact (no account)** — ✓ Shared, locked. They get the copy at sign-up.
+- **App user who removed their copy** — selectable again, no ✓. Sharing runs `share_event` (send row `ON CONFLICT DO NOTHING`, so Who's Coming and the receipt token stay; a new copy is inserted) and `send-notification` for that person only.
+
+The event-detail **Shared with** list still reads every send (history + answers). That list is a record, not the lock. We do not add a "they removed it" badge — they simply appear as someone you can share with again.
+
+### Technical Notes
+
+- New RPC `get_completed_sends(p_event_id)` (SECURITY DEFINER, caller must own the event): returns the send rows that should lock on the sheet. A send is completed when the person has no account, **or** they still have an `events` row with `from_event_id = p_event_id`. The sender cannot read other people's rows through RLS, so this lookup cannot be a client join.
+- `app/(app)/share.tsx` loads completed sends from that RPC instead of a raw `sends` select. The filter `toShare = selected.filter(id => !alreadySharedIds.has(id))` and KI-003 notify list stay; they now follow live copies, not send history.
+- `share_event` body is unchanged — the events INSERT already restores a missing copy.
+- Tests: SQL (B deletes copy → completed set drops B, pending stays; re-share restores one copy, send count unchanged); Jest (completed set, not raw sends, is the lock); Playwright (A shares → B removes → A can share again → B sees it).
+
+### Acceptance Criteria
+
+- [ ] After B removes A's share, A's share sheet lets A select B again
+- [ ] Sharing then puts a new copy on B's calendar and notifies B
+- [ ] A person who still has the copy stays ✓ Shared and is not re-notified
+- [ ] Pending contacts stay ✓ Shared
+- [ ] Who's Coming answer and receipt token survive the restore (`ON CONFLICT DO NOTHING` on sends)
+- [ ] There is still no unshare — a person with a live copy cannot be deselected
+
+### Open Questions
+
+- None. The leak ("I can tell they don't currently have it") is accepted: the sheet just shows them as shareable, with no "removed it" copy.
