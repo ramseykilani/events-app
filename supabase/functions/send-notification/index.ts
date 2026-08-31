@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendExpoPush, type PushMessage } from '../_shared/expoPush.ts';
+import { buildSmsBody } from '../_shared/smsBody.ts';
 
 // supabase-js always sends apikey and x-client-info alongside Authorization;
 // all four must be allowed or the browser preflight blocks the call.
@@ -9,16 +10,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Internal-testing CTA (2026-08-17): while beta access is owner-gated
-// (TestFlight / Play internal tracks), the SMS to recipients without an
-// account invites them to email the owner to get signed up — an interested
-// stranger has no other way in. App users already have the app, so their SMS
-// stays a pure notification. At launch this line is replaced by store links
-// for non-users, and app-user SMS gains an event deep link — same change,
-// never one without the other (FEATURES.md → SMS Links at Launch).
-const SIGNUP_INVITE_LINE =
-  'Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -246,7 +237,7 @@ serve(async (req) => {
     // phone number — scoped to the just-shared person ids when the client
     // passes them. sends.id is needed to write each SMS's delivery outcome
     // back onto the share record; response_token builds the Who's Coming
-    // receipt link for non-app recipients.
+    // receipt link both SMS variants carry.
     let sendsQuery = db
       .from('sends')
       .select('id, person_id, response_token, my_people(user_id, owner_id, phone_number)')
@@ -311,48 +302,14 @@ serve(async (req) => {
     const dateLine = `${dateStr}${timeStr}`;
     const descriptionLine = event.description ? excerpt(event.description, 90) : null;
 
-    // One message for both variants: the share framing (a share means "I
-    // want to go with you", not "this exists"), event details, the event's
-    // own URL when one exists, and the STOP footer — A2P best practice is
-    // opt-out instructions on every message, and Twilio intercepts STOP
-    // account-wide either way. No app/web links: the web app is a dev
-    // surface, not somewhere we want first impressions, and link-free SMS
-    // reads less like spam to carrier filters. The non-app variant also
-    // carries SIGNUP_INVITE_LINE — the one acquisition element, kept
-    // link-free. Launch pair (store link for non-users, event deep link
-    // for app users) is FEATURES.md → SMS Links at Launch; not before
-    // listings, never one variant without the other.
-    //
-    // Who's Coming: the non-app variant can carry ONE more link — the
-    // per-send receipt page where the recipient answers yes/no (the share
-    // already is the ask; app users answer on the event, so their SMS is
-    // unchanged). Gated on RESPONSE_LINK_BASE_URL: unset = no line, which
-    // is also the strip switch if carriers or the A2P campaign hate it.
-    // The host is a receipt page, not the web app
-    // (docs/distribution-strategy.md). Wording is owner-approved on a real
-    // text before it ships (FEATURES.md → Who's Coming → Open Questions).
+    // Body assembly lives in _shared/smsBody.ts (unit-tested directly —
+    // reserved 555 numbers never reach Twilio, so no e2e observes a real
+    // text). Both variants carry the Who's Coming receipt link while
+    // RESPONSE_LINK_BASE_URL is set; unset = no line on either variant,
+    // which is also the strip switch if carriers or the A2P campaign hate
+    // it.
     const responseLinkBase = Deno.env.get('RESPONSE_LINK_BASE_URL')?.replace(/\/$/, '') ?? null;
-    // Hoisted out of the closure: TS narrowing doesn't cross into the
-    // function body for the compound guard above.
     const eventUrl = event.url;
-    function buildSmsBody(
-      sharerName: string,
-      signupInvite: boolean,
-      responseLink: string | null,
-    ): string {
-      const lines = [
-        eventTitle
-          ? `${sharerName} wants to go to "${eventTitle}" with you`
-          : `${sharerName} wants to go to an event with you`,
-        dateLine,
-      ];
-      if (descriptionLine) lines.push(descriptionLine);
-      if (eventUrl) lines.push(eventUrl);
-      if (responseLink) lines.push('', `Coming? ${responseLink}`);
-      if (signupInvite) lines.push('', SIGNUP_INVITE_LINE);
-      lines.push('', 'Reply STOP to unsubscribe.');
-      return lines.join('\n');
-    }
 
     for (const send of sends) {
       // Many-to-one embed arrives as a single object at runtime; the
@@ -365,6 +322,14 @@ serve(async (req) => {
 
       if (!person) continue;
 
+      // Who's Coming receipt link, identical on both SMS variants — the
+      // per-send token is the only credential, so answering never requires
+      // an account or the app. Null when RESPONSE_LINK_BASE_URL is unset.
+      const responseLink =
+        responseLinkBase && send.response_token
+          ? `${responseLinkBase}/?t=${send.response_token}`
+          : null;
+
       // ── Non-app user: SMS only ──────────────────────────────────────────────
       if (!person.user_id) {
         if (
@@ -376,17 +341,20 @@ serve(async (req) => {
         }
 
         // The SMS is the whole message for non-app recipients — there is no
-        // other surface. This variant carries the signup invite, plus the
-        // Who's Coming receipt link when RESPONSE_LINK_BASE_URL is set.
-        const responseLink =
-          responseLinkBase && send.response_token
-            ? `${responseLinkBase}/?t=${send.response_token}`
-            : null;
+        // other surface. This variant also carries the signup invite.
         smsSends.push(
           sendAndRecord(
             send.id,
             person.phone_number,
-            buildSmsBody(sharerDisplayName ?? sharerPhone, true, responseLink),
+            buildSmsBody({
+              eventTitle,
+              dateLine,
+              descriptionLine,
+              eventUrl,
+              sharerName: sharerDisplayName ?? sharerPhone,
+              signupInvite: true,
+              responseLink,
+            }),
           ).catch(console.error),
         );
         continue;
@@ -466,9 +434,11 @@ serve(async (req) => {
       }
 
       // Queue the same SMS unless the recipient turned text messages off.
-      // Push is the tappable path for app users — the SMS is a pure
-      // notification (no signup invite; they already have the app).
-      // Skipped gracefully if Twilio is not configured.
+      // App users get the same Coming? receipt link as non-app recipients
+      // (FEATURES.md → Coming Link in Every Share SMS) — the SMS is another
+      // way to answer, not a lure into the app. No signup invite; they
+      // already have the app. Skipped gracefully if Twilio is not
+      // configured.
       if (
         twilioConfigured &&
         person.phone_number &&
@@ -479,7 +449,15 @@ serve(async (req) => {
           sendAndRecord(
             send.id,
             person.phone_number,
-            buildSmsBody(displayName, false, null),
+            buildSmsBody({
+              eventTitle,
+              dateLine,
+              descriptionLine,
+              eventUrl,
+              sharerName: displayName,
+              signupInvite: false,
+              responseLink,
+            }),
           ).catch(console.error),
         );
       }
