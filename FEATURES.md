@@ -43,7 +43,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
-| [Adjacent-Month Event Dots](#adjacent-month-event-dots) | In progress | Greyed overflow days in the month grid never showed event dots. |
+| [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
@@ -1571,7 +1571,7 @@ Undecided — maybe never. Nothing in this section is actionable.
 
 ## Adjacent-Month Event Dots
 
-**Status:** In progress (2026-08-31).
+**Status:** Implemented (2026-08-31).
 
 ### Problem
 
@@ -1591,8 +1591,8 @@ Fetch the visible grid's full date range (Sunday on/before the 1st through Satur
 
 ### Acceptance Criteria
 
-- [ ] An event on a visible overflow day (previous or next month) shows the accent dot, identical to in-month dots
-- [ ] Overflow days without events stay unmarked; in-month marking unchanged
-- [ ] Tapping an overflow day with an event flips the month and lists the event (existing behavior preserved)
-- [ ] Month navigation fetches the grid range (April 2026 → 2026-03-29..2026-05-02)
-- [ ] Pixel baselines unaffected (the grid is masked in `e2e/visual.spec.ts`)
+- [x] An event on a visible overflow day (previous or next month) shows the accent dot, identical to in-month dots
+- [x] Overflow days without events stay unmarked; in-month marking unchanged
+- [x] Tapping an overflow day with an event flips the month and lists the event (existing behavior preserved)
+- [x] Month navigation fetches the grid range (April 2026 → 2026-03-29..2026-05-02)
+- [x] Pixel baselines unaffected (the grid is masked in `e2e/visual.spec.ts`)
