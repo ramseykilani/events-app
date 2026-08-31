@@ -42,7 +42,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
-| [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Planned | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
+| [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | In progress | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
@@ -1460,7 +1460,7 @@ The story that waits without the link is the SMS-only recipient. The asker's sto
 
 ## Coming Link in Every Share SMS
 
-**Status:** Planned (recorded 2026-08-31). Follow-up to [Who's Coming](#whos-coming). Related: [SMS Invitations](#sms-invitations), [Notification On/Off](#notification-onoff), [SMS Links at Launch](#sms-links-at-launch).
+**Status:** In progress (recorded 2026-08-31). Follow-up to [Who's Coming](#whos-coming). Related: [SMS Invitations](#sms-invitations), [Notification On/Off](#notification-onoff), [SMS Links at Launch](#sms-links-at-launch).
 
 ### Problem
 
