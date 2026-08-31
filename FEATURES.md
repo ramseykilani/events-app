@@ -44,6 +44,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
+| [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Planned | Overflow days in the month grid don't show event dots. |
 
 ## Using and testing
 
@@ -1501,3 +1502,45 @@ Some things people share aren't one-offs — a weekly dinner, a monthly meetup. 
 ### Decision
 
 Undecided — maybe never. Nothing in this section is actionable.
+
+---
+
+## Adjacent-Month Event Dots
+
+**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-31 from owner feedback. The calendar works; the overflow days at the edge of the month grid are missing their event markers.
+
+### Problem
+
+The month grid shows a few days from the previous month and a few from the next (the grayed-out "extra" days). Those days do not get an event dot even when there is an event on them.
+
+That is confusing. You can see the 1st or 2nd of next month from this month, it looks empty, you tap it (which correctly switches you into next month), and then the events are there. The missing marker made you think nothing was on that day.
+
+Tapping an overflow day and landing on that month is the right behavior. Keep it. The gap is only that the peek does not tell you the day has something on it.
+
+The same hole exists in both directions: last days of the previous month that still show at the top of this month's grid, and first days of the next month at the bottom.
+
+### Proposed Solution
+
+Show the same accent event dot on overflow days that have events, using the same marker as in-month days. Do not hide extra days, and do not stop the tap-to-switch-month behavior.
+
+### Technical Notes
+
+- `getMonthRange` in `components/Calendar.tsx` currently returns the 1st through last of the named month. `app/(app)/index.tsx` fetches `get_calendar_events` for that window only. `markedDates` is built from that list, so overflow dates never have `marked: true`.
+- `react-native-calendars` paints extra days by default (`hideExtraDays` is unset). Extra days are the library's `disabled` state (tertiary text); the day component still passes `marked` through to the dot. Once those dates are in `markedDates`, the dots should appear — if a disabled style swallows the dot, that is a library workaround, not a reason to hide extra days.
+- Do not set `disableMonthChange`. Tapping an extra day should keep switching the visible month (the library fires `onMonthChange`; we already set `selectedDate` from it).
+- Expand the fetch window so it covers every date the grid actually paints — typically up to a week before the 1st and a week after the last — not only the named month. The day list under the grid still filters to the selected date; loading a few adjacent days does not dump next month's events into this month's list.
+- Dots stay the accent token (`theme.accent` / `todayDotColor` / `selectedDotColor`). Design language §3: the accent is spent on the selected day, event dots, the primary action, and "From X".
+- `__tests__/components/Calendar.test.tsx` currently asserts the initial fetch is `'2026-04-01', '2026-04-30'`. Update that when the window expands. Visual snapshots mask the month grid (`e2e/visual.spec.ts`); do not unmask it to assert dots — cover this in Jest and/or a Playwright spec against a known event on an overflow date.
+- Native is the product; confirm the dots on a phone-sized viewport as well as desktop Chrome.
+
+### Acceptance Criteria
+
+- [ ] Days from the next month that are visible on this month's grid show an event dot when they have events
+- [ ] Days from the previous month that are visible on this month's grid show an event dot when they have events
+- [ ] Tapping an overflow day still switches the calendar to that month
+- [ ] Extra days stay visible in the grid (do not hide them to dodge the problem)
+- [ ] In-month event dots, selected-day treatment, and today treatment are unchanged
+
+### Open Questions
+
+- None — the wanted behavior is the current month-switch tap plus dots on the overflow days.
