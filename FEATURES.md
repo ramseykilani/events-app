@@ -42,6 +42,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
+| [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Planned | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
@@ -1289,7 +1290,7 @@ Not designed. The need is: the sign-out pop-up should not feel lacking, especial
 
 ## SMS Links at Launch
 
-**Status:** Planned — launch-time. Store links were already the launch CTA in `docs/distribution-strategy.md` (2026-08-09). The app-user event deep link was recorded as Considering on 2026-08-18. Owner confirmed 2026-08-20 that the two are one change: store link for non-users, event deep link for app users. Testers asked for the deep link. **Do not implement before the app is listed. Ship both in the same `send-notification` change — never one variant without the other.** Related: [SMS Invitations](#sms-invitations), [Notifications](#notifications), [Share SMS Content & Formatting](#share-sms-content--formatting).
+**Status:** Planned — launch-time. Store links were already the launch CTA in `docs/distribution-strategy.md` (2026-08-09). The app-user event deep link was recorded as Considering on 2026-08-18. Owner confirmed 2026-08-20 that the two are one change: store link for non-users, event deep link for app users. Testers asked for the deep link. **Do not implement before the app is listed. Ship both in the same `send-notification` change — never one variant without the other.** Related: [SMS Invitations](#sms-invitations), [Notifications](#notifications), [Share SMS Content & Formatting](#share-sms-content--formatting). The Who's Coming receipt line (`Coming? <link>`) is a different URL and a different job — [Coming Link in Every Share SMS](#coming-link-in-every-share-sms); do not fold it into this pair or strip it from app-user texts when the launch links land.
 
 Previously titled "Open Event from SMS Link."
 
@@ -1313,7 +1314,7 @@ Who gets which extra URL:
 | Non-app (`my_people.user_id IS NULL`) | Store link(s) — App Store / Play — replacing the email signup invite | An event deep link, or any URL into the web build |
 | App user (`my_people.user_id IS NOT NULL`) | One https event deep link that opens the native app on that event (same as tapping the push) | A store link, a custom-scheme `events-app://` URL, or a web-app session |
 
-The event's own original listing URL stays in both variants when present — that is event content, not app promo.
+The event's own original listing URL stays in both variants when present — that is event content, not app promo. The Who's Coming `Coming?` receipt line is also not this pair (already live for non-app recipients; planned on app-user texts too).
 
 Do not send the event deep link to non-app users (it would open the web product, which is the 2026-08-09 rejection). Do not send store links to people who already have the app.
 
@@ -1358,7 +1359,7 @@ At launch, in the same `send-notification` change:
 
 ## Who's Coming
 
-**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building).
+**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building). Follow-up (planned 2026-08-31): [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) puts the receipt link on app-user texts too — the original ship aimed the SMS line at non-app recipients only.
 
 ### User stories
 
@@ -1406,7 +1407,7 @@ One capability URL per send, in the share SMS:
 - The page shows who asked, title, date, and Yes / No. If you already answered, it shows that and lets you flip. Same link still works after a later invite's text arrives.
 - Tapping the link must not record the answer by itself (SMS/iMessage prefetch would submit for you). The page is inert until they choose Yes or No.
 - No other people, no comments, no install CTA on that page. The write already happened; the receipt stops there.
-- Aimed at recipients **without** the app. App users answer on the event. Don't pile this URL onto the launch store / deep-link pair ([SMS Links at Launch](#sms-links-at-launch)); different job.
+- Aimed at recipients **without** the app (as shipped 2026-08-28). App users answered on the event. Don't pile this URL onto the launch store / deep-link pair ([SMS Links at Launch](#sms-links-at-launch)); different job. Reversed for app-user SMS by [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) — same page, same token, both variants.
 
 Own-domain links in cold texts are the top carrier-filter risk. A short host is part of making the text readable, not polish. The host is a receipt page, not the web app (`docs/distribution-strategy.md`).
 
@@ -1453,6 +1454,69 @@ The story that waits without the link is the SMS-only recipient. The asker's sto
 - A2P campaign description must mention this link type before the first live send (owner action in the Twilio console).
 - ~~Link host / short URL~~ — decided 2026-08-28: dedicated `events-reply.pages.dev` Pages project, not the web app.
 - ~~Whether the in-app slice ships before the SMS line~~ — decided 2026-08-28: shipped together; the SMS line is config-gated.
+- ~~Whether app users get the SMS line~~ — decided 2026-08-31: yes; see [Coming Link in Every Share SMS](#coming-link-in-every-share-sms).
+
+---
+
+## Coming Link in Every Share SMS
+
+**Status:** Planned (recorded 2026-08-31). Follow-up to [Who's Coming](#whos-coming). Related: [SMS Invitations](#sms-invitations), [Notification On/Off](#notification-onoff), [SMS Links at Launch](#sms-links-at-launch).
+
+### Problem
+
+Who's Coming put a yes/no on every send and a `Coming? <link>` line on the share SMS — but only for people without an account. App users were expected to answer on the event in the app, usually after the share push.
+
+That split assumes they will see a push and will open the app. We don't know that. Push is explainer-gated and independently muteable (`users.notify_push`); Not now, a denied OS prompt, or the Notifications toggle all leave the share SMS as the ping they actually get (unless they also muted SMS). Some people would rather answer from the text they already have. Withholding the receipt link from them forces the app for a yes/no the share already asked.
+
+The page does not need an account — the per-send `response_token` is the credential. Keeping the link off app-user texts is an audience choice, not a technical limit. That choice is wrong: answering should not require opening the app.
+
+### Solution
+
+When `RESPONSE_LINK_BASE_URL` is set, both share-SMS variants carry the same Who's Coming receipt line:
+
+```
+Coming? https://events-reply.pages.dev/?t=<response_token>
+```
+
+- **Non-app:** unchanged (link + internal-testing signup invite + STOP).
+- **App user:** the same `Coming? <link>` line on the text they already get. Push and the in-app Yes/No stay. The SMS is another way to answer, not a replacement, and not a lure into the app.
+
+Last write still wins across the two surfaces (receipt page and in-app widget write the same `sends.response`). The host stays the dedicated receipt page, never the web app. Unsetting the secret still strips the line from **both** variants with no redeploy; in-app yes/no is untouched.
+
+This is not [SMS Links at Launch](#sms-links-at-launch). That pair is store CTA + event deep link, one change, not before listings. This link is already live for non-app recipients; this feature only stops withholding it from app users.
+
+### What this is not
+
+- Not turning Who's Coming into a hosted RSVP or a public guest list.
+- Not removing the in-app Yes/No block.
+- Not an install CTA, store link, or event deep link.
+- Not sending anyone to `shared-events.pages.dev`.
+- Not bypassing `notify_sms`: muted texts mean no SMS and therefore no link; they can still answer in the app.
+
+### Technical Notes
+
+- Scope is `supabase/functions/send-notification/index.ts`. The app-user branch currently calls `buildSmsBody(displayName, false, null)`. Pass the same `responseLink` the non-app branch already builds from `RESPONSE_LINK_BASE_URL` + `send.response_token`. Hoist that URL construction so the two variants cannot drift.
+- No schema, no RLS, no receipt-page, no `send-response` changes. Every send already has a token; the page already accepts it from whoever has the link.
+- Hide, reserved-555 skip, and `notify_sms` still run before the SMS is queued. A muted-SMS app user is not a reason to invent a second channel.
+- Deploy is function-only: `npx supabase functions deploy send-notification --project-ref ijmwtjyuvdnvhblwwtpt`. No `db push`.
+- Same change updates the comments and docs that still say "non-app variant only" (`send-notification`, `docs/events-technical-architecture.md`, `AGENTS.md`, `.cursor/rules/project.mdc`, E-116 in `manual-tests/cloud_manual_regression.md`). There is no automated assertion on SMS body shape today ([Share SMS Content & Formatting](#share-sms-content--formatting)); do not invent a weaker e2e. If the implementer adds a function-level test of `buildSmsBody`, both variants include the line when the base URL is set and omit it when unset.
+- Copy: reuse the shipped `Coming? <link>`. Do not write a different line for people who also have the app.
+
+### Acceptance Criteria
+
+- [ ] App-user share SMS includes `Coming? <receipt url>` when `RESPONSE_LINK_BASE_URL` is set
+- [ ] Non-app share SMS still includes that line
+- [ ] Same URL layout and receipt page as today; answering there writes the same send slot as the in-app Yes/No; last write wins
+- [ ] Unsetting the secret strips the line from both variants; in-app yes/no still works
+- [ ] Recipients who muted SMS still receive no text (and therefore no link)
+- [ ] The receipt page still has no install CTA and does not open the web app
+- [ ] Owner approves the wording on a real text to an app-user number before it ships (same bar as [Share SMS Content & Formatting](#share-sms-content--formatting))
+
+### Open Questions
+
+- None on audience — owner decided 2026-08-31: both variants get the link; do not force the app to answer.
+- Exact wording stays the shipped `Coming? <link>` unless the owner wants a different line now that app users see it too (approve on a real text).
+- A2P: the campaign already has to mention this link type ([Who's Coming](#whos-coming) open question). This change puts that same link on more messages (app-user texts), not a new link type.
 
 ---
 
