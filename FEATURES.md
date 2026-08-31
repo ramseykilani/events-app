@@ -1513,12 +1513,12 @@ This is not [SMS Links at Launch](#sms-links-at-launch). That pair is store CTA 
 - [x] Unsetting the secret strips the line from both variants; in-app yes/no still works
 - [x] Recipients who muted SMS still receive no text (and therefore no link)
 - [x] The receipt page still has no install CTA and does not open the web app
-- [ ] Owner approves the wording on a real text to an app-user number before it ships (same bar as [Share SMS Content & Formatting](#share-sms-content--formatting))
+- [x] Owner approves the wording on a real text to an app-user number before it ships (same bar as [Share SMS Content & Formatting](#share-sms-content--formatting)) — approved 2026-08-31 on a real text to the owner's app-user number
 
 ### Open Questions
 
 - None on audience — owner decided 2026-08-31: both variants get the link; do not force the app to answer.
-- Exact wording stays the shipped `Coming? <link>` unless the owner wants a different line now that app users see it too (approve on a real text).
+- ~~Exact wording stays the shipped `Coming? <link>` unless the owner wants a different line now that app users see it too (approve on a real text).~~ — approved 2026-08-31 on a real text to the owner's app-user number; wording unchanged.
 - A2P: the campaign already has to mention this link type ([Who's Coming](#whos-coming) open question). This change puts that same link on more messages (app-user texts), not a new link type.
 
 ---
