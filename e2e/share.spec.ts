@@ -215,7 +215,12 @@ test('A can share again after B removes their copy', async ({
       page.getByText('✓ Sent to 1 person').filter({ visible: true })
     ).toBeVisible();
     await page.getByRole('button', { name: 'Done' }).click();
-    await expectCalendar(page);
+    // Share was opened from event detail, so Done returns there — not the
+    // calendar. Wait for the sheet to unmount before touching the detail.
+    await expect(page.getByText('Share with').filter({ visible: true })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
+    ).toBeVisible();
 
     await pageB.reload();
     await expectCalendar(pageB);
@@ -229,6 +234,5 @@ test('A can share again after B removes their copy', async ({
     await contextB.close();
   }
 
-  await openEventFromCalendar(page, title);
   await removeOpenEvent(page);
 });
