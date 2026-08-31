@@ -15,7 +15,8 @@ type Props = {
   // not interactive.
   sharedPersonIds?: Set<string>;
   // Per-person delivery status for shared rows (Share Delivery Status),
-  // keyed by person_id. Absent entry = legacy "✓ Shared".
+  // keyed by person_id. Absent/NULL entry renders "✓ Shared" — success is
+  // assumed and only carrier-reported failures surface (✕).
   sharedStatuses?: Map<string, Pick<Send, 'sms_status' | 'sms_error_code'>>;
   onSelectionChange: (ids: Set<string>) => void;
   onAddPeople?: () => void;
@@ -172,11 +173,6 @@ export function ShareSheet({
                     >
                       {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                     </Text>
-                    {status?.subLabel ? (
-                      <Text style={[styles.sharedSubLabel, { color: theme.destructiveText }]}>
-                        {status.subLabel}
-                      </Text>
-                    ) : null}
                   </View>
                   {isShared && status ? (
                     <Text
@@ -303,9 +299,5 @@ const styles = StyleSheet.create({
   sharedLabel: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  sharedSubLabel: {
-    fontSize: 13,
-    marginTop: 2,
   },
 });

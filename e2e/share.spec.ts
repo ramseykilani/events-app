@@ -141,14 +141,15 @@ test('share stays on the sheet with a persistent sent confirmation', async ({
   }).toPass();
   await page.getByRole('button', { name: 'Share', exact: true }).click();
 
-  // The confirmation appears and the screen does not navigate. B has an
-  // account, so the flipped row reads "✓ On their calendar".
+  // The confirmation appears and the screen does not navigate. The flipped
+  // row reads "✓ Shared" — success is one word for app users and SMS
+  // contacts alike; only carrier-reported failures read differently.
   await expect(
     page.getByText('✓ Sent to 1 person').filter({ visible: true })
   ).toBeVisible();
   await expect(page.getByText('Share with')).toBeVisible();
   await expect(
-    page.getByText('✓ On their calendar').filter({ visible: true })
+    page.getByText('✓ Shared').filter({ visible: true })
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
 

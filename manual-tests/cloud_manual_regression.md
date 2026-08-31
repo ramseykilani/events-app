@@ -261,25 +261,25 @@ For each executed scenario:
 3. Try tapping B's row.
 
 **Expected**
-- B's row shows its delivery status ("✓ On their calendar" for app users — see E-114), is muted, and does not toggle — sharing is a completed action and can't be unsent.
+- B's row shows its delivery status ("✓ Shared" — see E-114), is muted, and does not toggle — sharing is a completed action and can't be unsent.
 - The header action reads **Share** (not Done) and is disabled until at least one never-shared person is selected.
 - Only newly selected people trigger notifications when sharing again.
 
 ---
 
-### E-114 Share delivery status (per-person received / not received)
+### E-114 Share delivery status (success assumed; only failures surface)
 **Steps**
 1. As account A, create an event and share it with B (an app user). Reopen the event's share sheet.
 2. Add a pending contact with an invalid real-format number (e.g. `+19999999999` — unassigned NANP, Twilio rejects it synchronously and no real phone is texted), share the event to them, and reopen the share sheet.
 3. STOP path: do NOT reply STOP from a real device (it poisons the number account-wide). Instead, read the sends row's `sms_sid` (Management API query or the Supabase dashboard), then POST a signed callback to the twilio-status webhook — signature = base64 HMAC-SHA1(`TWILIO_AUTH_TOKEN`, the webhook URL (`$EXPO_PUBLIC_SUPABASE_URL` + `/functions/v1/twilio-status`) + sorted POST params concatenated key+value) sent as the `X-Twilio-Signature` header, form body `MessageSid=<sid>&MessageStatus=failed&ErrorCode=21610`. Reopen the share sheet.
-4. Optionally, with a real mobile number that has NOT opted out: share to it and watch the label advance "✓ Sent" → "✓ Delivered" within a minute or two (the real Twilio callback).
+4. Optionally, with a real mobile number that has NOT opted out: share to it and confirm the label stays "✓ Shared" even after the carrier's delivered callback lands (there is no delivered ladder — success is one word).
 
 **Expected**
-- Step 1: B shows "✓ On their calendar" — the calendar copy is the delivery for app users.
-- Step 2: the invalid number shows "Not delivered" in red (synchronous 21211 recorded at send time).
-- Step 3: the row shows "Not delivered" with the sub-line "They unsubscribed from texts"; an unsigned or wrongly-signed POST to the webhook is rejected (403).
-- Step 4: the ladder advances on its own between sheet opens (pull model — no realtime).
-- Pre-feature sends rows (NULL status) still show the legacy "✓ Shared".
+- Step 1: B shows "✓ Shared" — app users and SMS contacts are indistinguishable on success.
+- Step 2: the invalid number shows "✕ Undelivered" in red (synchronous 21211 recorded at send time).
+- Step 3: the row shows "✕ Unsubscribed" in red; an unsigned or wrongly-signed POST to the webhook is rejected (403).
+- Step 4: the label never advances past "✓ Shared" on success (pull model — no realtime; failures surface on the next open).
+- Pre-feature sends rows (NULL status) show "✓ Shared" like everything else that didn't fail.
 
 ---
 

@@ -70,7 +70,8 @@ export interface Send {
   // by send-notification (at send time) and the twilio-status webhook
   // (carrier states). NULL sms_status = no SMS was attempted (app user with
   // texts off, Twilio unconfigured, reserved test number) or a pre-feature
-  // row — rendered as the legacy "✓ Shared".
+  // row. The sheet assumes success — only terminal failures change the label
+  // (✕ Unsubscribed / ✕ Undelivered); everything else renders "✓ Shared".
   sms_sid: string | null;
   sms_status: 'queued' | 'sent' | 'delivered' | 'undelivered' | 'failed' | null;
   sms_error_code: string | null;

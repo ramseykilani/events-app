@@ -128,7 +128,7 @@ A write that matters announces itself once, then stays visible for the rest of t
 - **The control shows the state; the line reports the event.** A selected button's fill is the answer; "✓ Saved." is the fact that the tap landed. Neither restates the other.
 - **The working phase is visible.** The tapped control spins while the write is in flight, and the confirmation only ever follows a server confirmation — never a pixel change. That transition is what makes the feedback trustworthy.
 - **Certainty is always re-derivable.** State renders from a server read on every load, and re-tapping the same control re-confirms against the server (a same-value write is a no-op and re-pings nobody) — the reassurance probe always gets a truthful answer.
-- **Glyphs have fixed meanings.** Circle = selectable. ✓ = confirmed/done ("✓ Saved.", "✓ Sent", "✓ On their calendar"). Accent fill = selection/state. Plain words = information that isn't a confirmation (a person's "No" is not a failure). Destructive = consequence.
+- **Glyphs have fixed meanings.** Circle = selectable. ✓ = confirmed/done ("✓ Saved.", "✓ Shared"). ✕ = failed ("✕ Unsubscribed", "✕ Undelivered"). Accent fill = selection/state. Plain words = information that isn't a confirmation (a person's "No" is not a failure). Destructive = consequence.
 
 First instance: the Who's Coming reply widget and SMS receipt page. The share screen's sent confirmation (FEATURES.md → Share Sent Confirmation) follows the same template.
 

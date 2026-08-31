@@ -219,7 +219,8 @@ describe('components/ShareSheet', () => {
         sharedPersonIds={new Set(['p1', 'p2', 'p3'])}
         sharedStatuses={
           new Map([
-            // p1 (no account): the text reached their phone.
+            // p1 (no account): the carrier confirmed delivery — still just
+            // "✓ Shared" (success is assumed; there is no delivered ladder).
             ['p1', { sms_status: 'delivered' as const, sms_error_code: null }],
             // p2 (no account): they replied STOP — the text never made it.
             ['p2', { sms_status: 'failed' as const, sms_error_code: '21610' }],
@@ -231,11 +232,13 @@ describe('components/ShareSheet', () => {
       />
     );
 
-    expect(screen.getByText('✓ Delivered')).toBeTruthy();
-    expect(screen.getByText('Not delivered')).toBeTruthy();
-    expect(screen.getByText('They unsubscribed from texts')).toBeTruthy();
-    expect(screen.getByText('✓ On their calendar')).toBeTruthy();
-    expect(screen.queryByText('✓ Shared')).toBeNull();
+    // p1 and p3 both read "✓ Shared" — app users and SMS contacts are
+    // indistinguishable on success.
+    expect(screen.getAllByText('✓ Shared')).toHaveLength(2);
+    expect(screen.getByText('✕ Unsubscribed')).toBeTruthy();
+    expect(screen.queryByText('✓ On their calendar')).toBeNull();
+    expect(screen.queryByText('✓ Delivered')).toBeNull();
+    expect(screen.queryByText('Not delivered')).toBeNull();
 
     // Status rows stay non-interactive.
     const onSelectionChange = jest.fn();

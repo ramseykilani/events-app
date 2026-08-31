@@ -39,7 +39,7 @@ export default function ShareScreen() {
     new Set()
   );
   // Per-person delivery status for already-shared rows (Share Delivery
-  // Status), keyed by person_id. Absent entry = legacy "✓ Shared".
+  // Status), keyed by person_id. Absent entry renders "✓ Shared".
   const [sharedStatuses, setSharedStatuses] = useState<
     Map<string, Pick<Send, 'sms_status' | 'sms_error_code'>>
   >(new Map());
@@ -265,8 +265,8 @@ export default function ShareScreen() {
         // Stay on the sheet: flip the new recipients to their sent state,
         // clear the picks, and show the confirmation line. Leaving is the
         // sender's choice (Done), never a timer's. New rows get a null SMS
-        // status — app users read "✓ On their calendar" immediately, SMS
-        // contacts "✓ Shared" until the delivery webhook advances them.
+        // status, which renders "✓ Shared" for everyone — the label only
+        // ever advances to a ✕ failure state via the delivery webhook.
         setAlreadySharedIds((prev) => new Set([...prev, ...notifiedPersonIds]));
         setSharedStatuses((prev) => {
           const next = new Map(prev);

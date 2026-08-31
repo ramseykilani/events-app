@@ -33,7 +33,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). Broader Android Back: [KI-012](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
 | [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
-| [Share Delivery Status](#share-delivery-status) | Implemented | Per-person received/not-received on the share sheet; STOP is visible. |
+| [Share Delivery Status](#share-delivery-status) | Implemented | One-word per-person status on the share sheet — "✓ Shared" for everyone; only failures differ (✕). |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
 | [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
 | [Share Sent Confirmation](#share-sent-confirmation) | Implemented | Persistent "✓ Sent to N people" on the sheet after a send; selection is circles now, ✓ means done. |
@@ -1033,32 +1033,34 @@ After you share, those people show as ✓ Shared. That only means the share was 
 
 `send-notification` is fire-and-forget after `share_event`. SMS failures — including Twilio STOP / unsubscribed — are swallowed. The sender is sent back as if it went through.
 
-### Solution (as shipped 2026-08-28)
+### Solution (as shipped 2026-08-28; vocabulary simplified 2026-08-31)
 
-Per-person delivery status on the share sheet, replacing the bare ✓ Shared for rows where delivery is known:
+Per-person delivery status on the share sheet. Three one-word states — success is assumed and only failures surface (the Partiful model: "Invited" / "Error" / "Unsubscribed"):
 
-- **App users** show **"✓ On their calendar"** — `share_event` placed their copy synchronously, so the calendar copy *is* the delivery; push and their SMS are only pings. (Resolves the open question: "received" for app users = the copy landed, guaranteed once the share succeeds.)
-- **SMS-only contacts** follow the Twilio ladder: **"✓ Sent"** (accepted, no terminal state yet) → **"✓ Delivered"**, or **"Not delivered"** in destructive red — with the sub-line "They unsubscribed from texts" for `21610` (STOP), the failure mode this feature exists to surface. Other error codes render as plain "Not delivered" (no reason breakdown).
-- **NULL status** (no SMS attempted — texts off, Twilio unconfigured, reserved test number — or a pre-feature row) keeps the legacy **"✓ Shared"**.
+- **"✓ Shared"** — everyone, the moment the share completes. App users and SMS-only contacts are indistinguishable on success: for app users the calendar copy *is* the delivery (push and their SMS are only pings, so even a failed ping keeps "✓ Shared"); for SMS contacts the text is assumed through unless the carrier reports otherwise. There is no sent/delivered ladder — carrier receipts lag or never arrive even when the text did, so an in-transit window is noise, and a handset-delivery checkmark is close to a read receipt.
+- **"✕ Unsubscribed"** in destructive red — the carrier rejected the text with `21610` (Twilio STOP), the failure mode this feature exists to surface. The cause is the label.
+- **"✕ Undelivered"** in destructive red — any other terminal failure. States the fact without claiming a cause (a phone that's off looks the same as a dead number) and without implying the sender can fix it.
 
-Labels come from a pure mapper (`lib/deliveryStatus.ts`); the share screen reads the status columns with the existing sends fetch, so statuses advance on the next open of the sheet (pull model). The event detail "Shared with" list stays a plain record.
+Labels come from a pure mapper (`lib/deliveryStatus.ts`); the share screen reads the status columns with the existing sends fetch, so failures surface on the next open of the sheet (pull model). The event detail "Shared with" list stays a plain record.
+
+**Vocabulary history (owner decision, 2026-08-31).** The shipped labels distinguished mechanism: app users read "✓ On their calendar", SMS contacts climbed "✓ Sent" → "✓ Delivered", and failures read "Not delivered" with a "They unsubscribed from texts" sub-line. Owner feedback: wordy and explanatory where Partiful transmits one word; the bare "Not delivered" carried no mark while every other state had ✓ (inconsistent), and it raised a "why?" it didn't answer. The collapse: one success word for everyone, failures named by cause where known. ✕ joins the glyph vocabulary (✓ = it went out, ✕ = it didn't) — see `docs/events-design-language.md` §6.
 
 ### Technical Notes
 
 - Migration `20260828000001`: `sends` gains `sms_sid` (unique where present — the webhook's lookup key), `sms_status` (`queued`/`sent`/`delivered`/`undelivered`/`failed`, CHECK), `sms_error_code`, `sms_status_at`. No new RLS — `sends_select_owner` already scopes reads to the sender; writes are service-role only.
 - `send-notification`: `sendSms()` parses the Messages API response (layer 1 — rejections logged with `error_code`/`error_message`, ending the log-blindness from the 2026-08-17 diagnosis), sets a per-message `StatusCallback` (which overrides the Messaging Service's callback URL — no Twilio console config), and writes the synchronous outcome onto each sends row: accepted → SID + `queued`; 21xxx rejection → `failed` + code.
 - `supabase/functions/twilio-status` (new, deployed `--no-verify-jwt`): Twilio's StatusCallback webhook. Auth is the Twilio request signature (`X-Twilio-Signature`, HMAC-SHA1 with the auth token — fail-closed when unset). Records `sent` + terminal states by message SID; a late non-terminal callback never downgrades a terminal one; an unknown SID answers 500 so Twilio retries (the first callback can beat the send-time SID write).
-- Tests: `supabase/tests/send_delivery_status_test.sql` (schema, CHECK, SID uniqueness, RLS read), Jest `__tests__/lib/deliveryStatus.test.ts` + ShareSheet status rendering, live verification 2026-08-28 (synchronous 21211 → "Not delivered" in the UI; signed webhook POSTs advanced a row through sent → delivered, kept terminal under a late `sent`, and recorded `failed`/`21610` → "They unsubscribed from texts"). Manual: E-114.
+- Tests: `supabase/tests/send_delivery_status_test.sql` (schema, CHECK, SID uniqueness, RLS read), Jest `__tests__/lib/deliveryStatus.test.ts` + ShareSheet status rendering, live verification 2026-08-28 (synchronous 21211 → failure shown in the UI; signed webhook POSTs advanced a row through sent → delivered, kept terminal under a late `sent`, and recorded `failed`/`21610` → unsubscribed shown). Manual: E-114.
 
 ### Acceptance Criteria
 
-- [x] After sharing, the sender can see per person whether the message was received
-- [x] A recipient who has unsubscribed (STOP) is shown as not having received it
-- [x] ✓ Shared is no longer the only signal
+- [x] After sharing, the sender can see per person that the message went out — one success word ("✓ Shared") for app users and SMS contacts alike
+- [x] A recipient whose text failed is surfaced: "✕ Unsubscribed" (STOP) or "✕ Undelivered" (any other carrier-reported failure)
+- [x] ✓ Shared is no longer the only signal — failures carry their own mark (✕) and word
 
 ### Open Questions
 
-- None. (Resolved: app-user "received" = calendar copy; STOP gets an explicit sub-line, other failures are undifferentiated; layer 1 shipped as its own commit ahead of the feature. Push delivery receipts remain untracked — the calendar copy covers app users.)
+- None. (Resolved: app-user "received" = calendar copy; STOP is named ("✕ Unsubscribed"), other failures are undifferentiated ("✕ Undelivered"); layer 1 shipped as its own commit ahead of the feature. Push delivery receipts remain untracked — the calendar copy covers app users. Delivery confirmations were dropped 2026-08-31: success is assumed, only failures surface.)
 
 ---
 
@@ -1188,7 +1190,7 @@ The send also settled the checkmark collision on the sheet (shared vocabulary wi
 
 ### Technical Notes
 
-- `app/(app)/share.tsx`: on `share_event` success the newly shared ids merge into the sheet's shared state (null SMS status → app users read "✓ On their calendar" immediately, SMS contacts "✓ Shared" until delivery status advances), the selection clears, and `sentCount` drives the line. The `send-notification` invoke stays fire-and-forget and does not gate the line. Refresh commits now union (never replace) the shared ids/statuses, so a focus refresh that started before a send can't un-flip just-sent rows.
+- `app/(app)/share.tsx`: on `share_event` success the newly shared ids merge into the sheet's shared state (null SMS status → everyone reads "✓ Shared" immediately; the label only ever advances to a ✕ failure state), the selection clears, and `sentCount` drives the line. The `send-notification` invoke stays fire-and-forget and does not gate the line. Refresh commits now union (never replace) the shared ids/statuses, so a focus refresh that started before a send can't un-flip just-sent rows.
 - Failure path unchanged: stay + `showAlert('Could not share', …)`, no line, Cancel stays Cancel.
 - Tests: Jest (confirmation line, count/pluralization, additive re-send, Cancel→Done, no-navigation, failure path; ShareSheet circle indicator + chip glyphs) and Playwright (`share.spec.ts` sent-confirmation test; `createEventAndShareToB` keys selection off the circle's testID).
 
