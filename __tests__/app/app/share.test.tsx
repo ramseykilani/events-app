@@ -318,6 +318,70 @@ describe('app/(app)/share', () => {
     );
   });
 
+  it('unlocks a person whose copy disappeared on a later load', async () => {
+    completedSends = [
+      { person_id: 'p1', sms_status: null, sms_error_code: null },
+    ];
+
+    const screen = render(<ShareScreen />);
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1')
+    );
+
+    // Same event, new params identity — retriggers useFocusEffect the way
+    // returning to a still-mounted share screen does after B removed.
+    completedSends = [];
+    useLocalSearchParamsMock.mockReturnValue({ eventId: ['e1'] });
+    screen.rerender(<ShareScreen />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('')
+    );
+  });
+
+  it('keeps just-sent people when a stale load lands after the send', async () => {
+    let resolveSends!: (value: {
+      data: typeof completedSends;
+      error: null;
+    }) => void;
+    const sendsDeferred = new Promise<{
+      data: typeof completedSends;
+      error: null;
+    }>((resolve) => {
+      resolveSends = resolve;
+    });
+
+    mockRpc.mockImplementation((name: string) => {
+      if (name === 'get_completed_sends') {
+        return abortablePromise(sendsDeferred);
+      }
+      if (name === 'share_event') {
+        return abortablePromise(Promise.resolve({ data: 2, error: null }));
+      }
+      return abortablePromise(Promise.resolve({ data: null, error: null }));
+    });
+
+    const screen = render(<ShareScreen />);
+    fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
+    fireEvent.press(screen.getByText('Share'));
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('share_event', {
+        p_event_id: 'e1',
+        p_person_ids: ['p1', 'p2'],
+      });
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1,p2')
+    );
+
+    resolveSends({ data: [], error: null });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1,p2')
+    );
+  });
+
   it('updates the confirmation count on an additive re-send', async () => {
     mockMyPeopleOrder.mockImplementation(() =>
       abortablePromise(
