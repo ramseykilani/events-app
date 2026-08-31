@@ -28,7 +28,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
-| [Notification Explainer Clarity](#notification-explainer-clarity) | Planned | Pre-ask screen doesn't make the OS prompt or Continue obvious. |
+| [Permission Explainer Clarity](#permission-explainer-clarity) | Planned | Notification + contacts pre-asks: Continue is opaque, and on Android the sheet doesn't read as a pop-up. |
 | [Circles UX](#circles-ux) | Planned | Current circles are hard to use, poorly explained, and not intuitive. Not designed — do not implement from this section. |
 | [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). Broader Android Back: [KI-012](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
@@ -527,7 +527,7 @@ Web is unchanged (no contacts API → manual form). [Inline add-by-phone](#inlin
 
 ### Open Questions
 
-- None
+- None on the original spec. Follow-up: the explainer itself is unclear — same Continue / Android-sheet problems as notifications, recorded in [Permission Explainer Clarity](#permission-explainer-clarity).
 
 ---
 
@@ -987,7 +987,7 @@ Copy decision (2026-08-17): the spec’s draft ended “— never anything else�
 
 ### Open Questions
 
-- None on the original spec (decided 2026-08-17: Not now persists forever with no later re-ask; no post-deny recovery screen — SMS covers it). Follow-up: the explainer itself is unclear — [Notification Explainer Clarity](#notification-explainer-clarity).
+- None on the original spec (decided 2026-08-17: Not now persists forever with no later re-ask; no post-deny recovery screen — SMS covers it). Follow-up: the explainer itself is unclear — [Permission Explainer Clarity](#permission-explainer-clarity).
 
 ---
 
@@ -1204,28 +1204,38 @@ The send also settled the checkmark collision on the sheet (shared vocabulary wi
 
 ---
 
-## Notification Explainer Clarity
+## Permission Explainer Clarity
 
-**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-20 from owner feedback. **Not designed; do not implement from this section.** Related: [Notification Permission Explainer](#notification-permission-explainer) (the shipped pre-ask).
+**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-20 from owner feedback (notifications); expanded 2026-08-31 with the same Continue problem on contacts and the Android sheet presentation. **Not designed; do not implement from this section.** This is a feature, not a known-issue ledger entry: testers should still notice if it gets worse, and a later pass should redesign it. Related: [Notification Permission Explainer](#notification-permission-explainer), [Contacts Permission Explainer](#contacts-permission-explainer) (the shipped pre-asks; the notification screen was cloned from the contacts one).
+
+Previously titled "Notification Explainer Clarity."
 
 ### Problem
 
-The way we tell people we are about to ask for notification permission is a little weird. When that screen appears, it is unclear what is about to happen, and unclear what tapping Continue means.
+Both permission explainers fire as an in-app sheet *before* the OS prompt, and neither currently reads as "we are about to ask the system for permission."
 
-Today the explainer (`components/NotificationExplainer.tsx`) is one sentence — “Events notifies you when someone shares an event with you.” — and a Continue / Not now pair. Continue fires the OS prompt. The screen never says a system dialog is next, or that Continue is the ask.
+**Notifications (first authenticated native launch, after the calendar settles).** You open the app, a sheet appears, and the only primary action is Continue. You don't know what Continue is going to do. The body is one sentence — “Events notifies you when someone shares an event with you.” — which states a product fact but never says *why this sheet is here* or that tapping Continue will bring up a system permission dialog. Continue then does fire the OS prompt, and that prompt works — but you don't really know what's going on.
+
+**Contacts (first Share, or People with an empty list).** Same pattern, same Continue: “Events uses your contacts so you can pick who to text when you share.” Continue fires the OS contacts prompt. Same opacity about what the button means.
+
+**Android presentation.** On Android the sheet covers most of the screen other than the notification bar at the top. It does not feel like a pop-up — it feels like the app just replaced itself with a full screen of unexplained copy. Both explainers are `Modal` with `presentationStyle="pageSheet"` (`components/NotificationExplainer.tsx`, `components/ContactsExplainer.tsx`); `pageSheet` is an iOS card that peeks the previous screen, and Android does not get that treatment, so the `flex: 1` body fills the window under the status bar.
+
+The screens never say a system dialog is next, or that Continue is the ask.
 
 ### Proposed Solution
 
-Not designed. The need is: when the explainer appears, it should be obvious that a system permission prompt is about to happen, and obvious what Continue does. Copy, layout, and button labels are all open.
+Not designed. The need is: when either explainer appears, it should be obvious that a system permission prompt is about to happen, obvious what Continue does, and on Android the surface should read as a sheet/pop-up rather than a mysterious full-screen takeover. Copy, layout, button labels, and the Android presentation are all open.
 
 ### Acceptance Criteria
 
 - [ ] On the notification permission explainer, it is clear that a system permission prompt is about to appear
-- [ ] It is clear what Continue does
+- [ ] On the contacts permission explainer, it is clear that a system permission prompt is about to appear
+- [ ] It is clear what Continue does (both screens)
+- [ ] On Android, the explainer reads as a pop-up / sheet, not a near-full-screen takeover under the notification bar
 
 ### Open Questions
 
-- Copy, button labels, and whether the screen itself changes — none of that is decided.
+- Copy, button labels, whether the screen itself changes, and how the Android sheet should present — none of that is decided.
 
 ---
 
