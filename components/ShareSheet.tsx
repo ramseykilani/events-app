@@ -10,9 +10,10 @@ type Props = {
   circles: Circle[];
   circleMembers: { circle_id: string; person_id: string }[];
   selectedPersonIds: Set<string>;
-  // People the event was already shared with. A share is a completed action
-  // (it delivered them their own copy), so these rows render as done and are
-  // not interactive.
+  // People the event is currently delivered to (pending, or app users who
+  // still have a copy). A share is a completed action while they have it, so
+  // these rows render as done and are not interactive. App users who removed
+  // their copy are not in this set — they can be shared with again.
   sharedPersonIds?: Set<string>;
   // Per-person delivery status for shared rows (Share Delivery Status),
   // keyed by person_id. Absent/NULL entry renders "✓ Shared" — success is

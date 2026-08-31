@@ -124,6 +124,86 @@ BEGIN
   RAISE NOTICE 'PASS T1b: re-share from the same sender row is a no-op for the recipient copy';
 END $$;
 
+-- ===== T1c: B removes their copy; the sheet lock drops B (pending D stays);
+-- A sharing again restores one copy without a second send =====
+DO $$
+DECLARE v_ids uuid[];
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
+  SELECT array_agg(person_id ORDER BY person_id) INTO v_ids
+    FROM public.get_completed_sends('eeeeeeee-0000-0000-0000-000000000001');
+  IF v_ids IS DISTINCT FROM ARRAY[
+    '11111111-0000-0000-0000-000000000001',
+    '11111111-0000-0000-0000-000000000004'
+  ]::uuid[] THEN
+    RAISE EXCEPTION 'FAIL T1c: completed sends before remove expected B+D, got %', v_ids;
+  END IF;
+END $$;
+
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'bbbbbbbb-0000-0000-0000-000000000002', true);
+SET LOCAL ROLE authenticated;
+DELETE FROM public.events
+ WHERE owner_id = 'bbbbbbbb-0000-0000-0000-000000000002'
+   AND from_event_id = 'eeeeeeee-0000-0000-0000-000000000001';
+COMMIT;
+
+DO $$
+DECLARE v_ids uuid[];
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
+  SELECT array_agg(person_id ORDER BY person_id) INTO v_ids
+    FROM public.get_completed_sends('eeeeeeee-0000-0000-0000-000000000001');
+  IF v_ids IS DISTINCT FROM ARRAY['11111111-0000-0000-0000-000000000004']::uuid[] THEN
+    RAISE EXCEPTION 'FAIL T1c: after B removed, completed sends should be pending D only, got %', v_ids;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.events
+    WHERE owner_id = 'bbbbbbbb-0000-0000-0000-000000000002'
+      AND from_event_id = 'eeeeeeee-0000-0000-0000-000000000001'
+  ) THEN
+    RAISE EXCEPTION 'FAIL T1c: B still has a copy';
+  END IF;
+  RAISE NOTICE 'PASS T1c: completed sends drop an app user who removed their copy; pending stays';
+END $$;
+
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
+SELECT public.share_event(
+  'eeeeeeee-0000-0000-0000-000000000001',
+  ARRAY['11111111-0000-0000-0000-000000000001']::uuid[]
+) AS t1c_restore;
+COMMIT;
+
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM public.events
+      WHERE owner_id = 'bbbbbbbb-0000-0000-0000-000000000002'
+        AND from_event_id = 'eeeeeeee-0000-0000-0000-000000000001') <> 1 THEN
+    RAISE EXCEPTION 'FAIL T1c2: restore did not recreate B''s copy';
+  END IF;
+  IF (SELECT count(*) FROM public.sends
+      WHERE event_id = 'eeeeeeee-0000-0000-0000-000000000001') <> 2 THEN
+    RAISE EXCEPTION 'FAIL T1c2: restore inserted a second send (expected 2)';
+  END IF;
+  RAISE NOTICE 'PASS T1c2: re-share after remove restores one copy; sends stay 2';
+END $$;
+
+DO $$
+BEGIN
+  PERFORM set_config('request.jwt.claim.sub', 'bbbbbbbb-0000-0000-0000-000000000002', true);
+  BEGIN
+    PERFORM * FROM public.get_completed_sends('eeeeeeee-0000-0000-0000-000000000001');
+    RAISE EXCEPTION 'FAIL T1c3: B read A''s completed sends';
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF SQLERRM NOT LIKE '%Not your event%' THEN
+        RAISE;
+      END IF;
+  END;
+  RAISE NOTICE 'PASS T1c3: get_completed_sends is owner-only';
+END $$;
+
 -- ===== T2: re-share chain A->B->C — C's row follows B's row, not A's =====
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'bbbbbbbb-0000-0000-0000-000000000002', true);

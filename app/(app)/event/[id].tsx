@@ -14,7 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { showAlert, showConfirm } from '../../../lib/dialogs';
+import { showAlert } from '../../../lib/dialogs';
+import { ConfirmModal } from '../../../components/ConfirmModal';
 import { formatEventDate, formatPhoneDisplay } from '../../../lib/format';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
@@ -103,6 +104,7 @@ export default function EventDetailScreen() {
   // for the screen's mount lifetime (a fresh mount shows state only).
   const [responding, setResponding] = useState<'yes' | 'no' | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const loadSeq = useRef(0);
   const hasContentRef = useRef(!!seeded);
   const writeInFlightRef = useRef(false);
@@ -280,43 +282,39 @@ export default function EventDetailScreen() {
 
   const handleDelete = () => {
     if (!event) return;
-    const rowId = event.id;
-    showConfirm(
-      'Remove Event',
-      'Remove this event from your calendar? This only affects you — everyone you shared it with keeps their own copy.',
-      {
-        confirmText: 'Remove',
-        destructive: true,
-        onConfirm: async () => {
-          if (writeInFlightRef.current) return;
-          writeInFlightRef.current = true;
-          setLoading(true);
-          try {
-            await withWriteTimeout(async (signal) => {
-              const { error } = await supabase
-                .from('events')
-                .delete()
-                .eq('id', rowId)
-                .eq('owner_id', session?.user?.id ?? '')
-                .abortSignal(signal);
+    setConfirmRemove(true);
+  };
 
-              if (error) throw error;
-            });
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(app)/');
-            }
-          } catch (err) {
-            console.error('Failed to remove event:', err);
-            showAlert('Error', 'Failed to remove event');
-          } finally {
-            writeInFlightRef.current = false;
-            setLoading(false);
-          }
-        },
+  const performDelete = async () => {
+    if (!event) return;
+    const rowId = event.id;
+    setConfirmRemove(false);
+    if (writeInFlightRef.current) return;
+    writeInFlightRef.current = true;
+    setLoading(true);
+    try {
+      await withWriteTimeout(async (signal) => {
+        const { error } = await supabase
+          .from('events')
+          .delete()
+          .eq('id', rowId)
+          .eq('owner_id', session?.user?.id ?? '')
+          .abortSignal(signal);
+
+        if (error) throw error;
+      });
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(app)/');
       }
-    );
+    } catch (err) {
+      console.error('Failed to remove event:', err);
+      showAlert('Error', 'Failed to remove event');
+    } finally {
+      writeInFlightRef.current = false;
+      setLoading(false);
+    }
   };
 
   const handleToggleHide = async () => {
@@ -654,6 +652,17 @@ export default function EventDetailScreen() {
           </View>
         </View>
       </ScrollView>
+      <ConfirmModal
+        visible={confirmRemove}
+        title="Remove Event"
+        message="Remove this from your calendar? You can't undo this. Anyone you already sent it to keeps their copy."
+        confirmText="Remove"
+        destructive
+        onConfirm={() => {
+          void performDelete();
+        }}
+        onCancel={() => setConfirmRemove(false)}
+      />
     </SafeAreaView>
   );
 }

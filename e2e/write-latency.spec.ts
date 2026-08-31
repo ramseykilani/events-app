@@ -1,8 +1,10 @@
 import type { Dialog } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
+  confirmRemoveDialog,
   expectCalendar,
   openEventFromCalendar,
+  removeOpenEvent,
   uniqueTitle,
   visibleText,
 } from './helpers';
@@ -77,11 +79,11 @@ test('write latency: a 3s save_event still saves, with no alert', async ({
   // Cleanup: remove the caller's row. Remove pops back to the pre-edit
   // detail, whose refetch finds the row gone and shows the access-removed
   // screen — its Back lands on the calendar.
-  page.once('dialog', (dialog) => dialog.accept());
   await page
     .getByRole('button', { name: 'Remove Event' })
     .filter({ visible: true })
     .click();
+  await confirmRemoveDialog(page);
   await expect(
     page.getByRole('button', { name: 'Back' }).filter({ visible: true })
   ).toBeVisible({ timeout: 15000 });
@@ -141,11 +143,5 @@ test('read latency: a delayed calendar fetch keeps events and shows the retry ba
 
   // Cleanup: remove the event (refetches succeed again once unrouted).
   await openEventFromCalendar(page, title);
-  page.once('dialog', (dialog) => dialog.accept());
-  await page
-    .getByRole('button', { name: 'Remove Event' })
-    .filter({ visible: true })
-    .click();
-  await expectCalendar(page);
-  await expect(page.getByText(title, { exact: true })).not.toBeVisible();
+  await removeOpenEvent(page);
 });

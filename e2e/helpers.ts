@@ -242,12 +242,18 @@ export async function openEventFromCalendar(
   ).toBeVisible({ timeout: 15000 });
 }
 
-// "Remove Event" confirms via window.confirm on web (lib/dialogs.ts).
+// "Remove Event" confirms via an in-app dialog (components/ConfirmModal).
+export async function confirmRemoveDialog(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog').filter({ hasText: /can't undo this/ });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
+}
+
 export async function removeOpenEvent(page: Page): Promise<void> {
-  page.once('dialog', (dialog) => dialog.accept());
   await page
     .getByRole('button', { name: 'Remove Event' })
     .filter({ visible: true })
     .click();
+  await confirmRemoveDialog(page);
   await expectCalendar(page);
 }

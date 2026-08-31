@@ -109,21 +109,23 @@ export default function ShareScreen() {
           membersData = data ?? [];
         }
 
-        // Load existing sends so already-shared people render as completed
-        // actions. Sharing is forwarding: once shared it cannot be unsent, so
-        // existing sends are shown as done and only new people can be picked.
+        // Lock the sheet on people for whom this event is still delivered:
+        // pending contacts, and app users who still have a copy following
+        // this row. A send row alone is not enough — if they removed their
+        // copy they become selectable again (restore via share_event).
         // The SMS delivery columns drive the per-person status label.
         const eventId = firstParamValue(params.eventId);
         const sharedNow = new Set<string>();
         const statuses = new Map<string, Pick<Send, 'sms_status' | 'sms_error_code'>>();
         if (eventId) {
           const { data: sends, error: sendsErr } = await supabase
-            .from('sends')
-            .select('person_id, sms_status, sms_error_code')
-            .eq('event_id', eventId)
+            .rpc('get_completed_sends', { p_event_id: eventId })
             .abortSignal(signal);
           if (sendsErr) throw sendsErr;
-          for (const s of sends ?? []) {
+          for (const s of (sends ?? []) as Pick<
+            Send,
+            'person_id' | 'sms_status' | 'sms_error_code'
+          >[]) {
             sharedNow.add(s.person_id);
             statuses.set(s.person_id, {
               sms_status: s.sms_status,
@@ -208,8 +210,9 @@ export default function ShareScreen() {
 
   const handleConfirm = async () => {
     // Sharing is mandatory when the event has never been shared (e.g. right
-    // after creating it). Afterwards the action is additive-only: existing
-    // shares are completed and cannot be unsent.
+    // after creating it). Afterwards the action is additive-only: people who
+    // still have a copy (or are pending) are completed and cannot be unsent.
+    // App users who removed their copy are selectable again.
     if (selectedPersonIds.size === 0) {
       showAlert('Select people', 'Please select at least one person to share with.');
       return;

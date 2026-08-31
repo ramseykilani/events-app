@@ -1,5 +1,5 @@
 import { expect, newExtraContext, test } from './fixtures';
-import { expectCalendar } from './helpers';
+import { confirmRemoveDialog, expectCalendar } from './helpers';
 
 // Pixel-diff baselines: the cheap "nothing moved that wasn't asked to" gate.
 // Runs in the normal e2e suite on every staging push, before any agent-review
@@ -96,11 +96,11 @@ test('event detail matches baseline', async ({ page }) => {
     await expect(
       page.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
     ).toBeVisible({ timeout: 15000 });
-    page.once('dialog', (dialog) => dialog.accept());
     await page
       .getByRole('button', { name: 'Remove Event' })
       .filter({ visible: true })
       .click();
+    await confirmRemoveDialog(page);
     await expectCalendar(page);
   }
 
@@ -119,10 +119,10 @@ test('event detail matches baseline', async ({ page }) => {
   await expect(page).toHaveScreenshot('event-detail.png', SHOT);
 
   // Cleanup: the calendar's day list stays deterministically empty next run.
-  page.once('dialog', (dialog) => dialog.accept());
   await page
     .getByRole('button', { name: 'Remove Event' })
     .filter({ visible: true })
     .click();
+  await confirmRemoveDialog(page);
   await expectCalendar(page);
 });

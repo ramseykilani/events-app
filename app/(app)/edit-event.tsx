@@ -15,7 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { WebDateInput, WebTimeInput, isPlausibleEventDate } from '../../components/WebDateTimeInputs';
 import { supabase } from '../../lib/supabase';
-import { showAlert, showConfirm } from '../../lib/dialogs';
+import { showAlert } from '../../lib/dialogs';
+import { ConfirmModal } from '../../components/ConfirmModal';
 import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
@@ -90,6 +91,7 @@ export default function EditEventScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   // A seeded form never refetches on mount: the preview (written from the
   // calendar/detail fetch moments ago) already holds everything the fetch
   // could return — and skipping it means no late response can overwrite what
@@ -271,38 +273,33 @@ export default function EditEventScreen() {
   };
 
   const handleDelete = () => {
-    showConfirm(
-      'Remove Event',
-      'Remove this event from your calendar? This only affects you — everyone you shared it with keeps their own copy.',
-      {
-        confirmText: 'Remove',
-        destructive: true,
-        onConfirm: async () => {
-          if (saveInFlightRef.current) return;
-          saveInFlightRef.current = true;
-          setLoading(true);
-          try {
-            await withWriteTimeout(async (signal) => {
-              const { error } = await supabase
-                .from('events')
-                .delete()
-                .eq('id', eventId ?? '')
-                .eq('owner_id', session?.user?.id ?? '')
-                .abortSignal(signal);
+    setConfirmRemove(true);
+  };
 
-              if (error) throw error;
-            });
-            router.replace('/(app)/');
-          } catch (err) {
-            console.error('Failed to remove event:', err);
-            showAlert('Error', 'Failed to remove event');
-          } finally {
-            saveInFlightRef.current = false;
-            setLoading(false);
-          }
-        },
-      }
-    );
+  const performDelete = async () => {
+    setConfirmRemove(false);
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+    setLoading(true);
+    try {
+      await withWriteTimeout(async (signal) => {
+        const { error } = await supabase
+          .from('events')
+          .delete()
+          .eq('id', eventId ?? '')
+          .eq('owner_id', session?.user?.id ?? '')
+          .abortSignal(signal);
+
+        if (error) throw error;
+      });
+      router.replace('/(app)/');
+    } catch (err) {
+      console.error('Failed to remove event:', err);
+      showAlert('Error', 'Failed to remove event');
+    } finally {
+      saveInFlightRef.current = false;
+      setLoading(false);
+    }
   };
 
   if (loadError && !event) {
@@ -471,6 +468,17 @@ export default function EditEventScreen() {
         </View>
         )}
       </ScrollView>
+      <ConfirmModal
+        visible={confirmRemove}
+        title="Remove Event"
+        message="Remove this from your calendar? You can't undo this. Anyone you already sent it to keeps their copy."
+        confirmText="Remove"
+        destructive
+        onConfirm={() => {
+          void performDelete();
+        }}
+        onCancel={() => setConfirmRemove(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
