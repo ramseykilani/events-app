@@ -43,6 +43,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
+| [Adjacent-Month Event Dots](#adjacent-month-event-dots) | In progress | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
@@ -1565,3 +1566,33 @@ Some things people share aren't one-offs — a weekly dinner, a monthly meetup. 
 ### Decision
 
 Undecided — maybe never. Nothing in this section is actionable.
+
+---
+
+## Adjacent-Month Event Dots
+
+**Status:** In progress (2026-08-31).
+
+### Problem
+
+The month grid shows greyed overflow days from the adjacent months, but never marks them. The calendar fetches only the visible month's 1st–last day, so an event on a visible overflow day carries no dot until you navigate to that month. "Something's coming next Monday" is invisible without changing months.
+
+### Solution
+
+Fetch the visible grid's full date range (Sunday on/before the 1st through Saturday on/after the last day) instead of the calendar month, so overflow days carry the same accent dot as in-month days.
+
+### Technical Notes
+
+- Client-only: `get_calendar_events` already takes an arbitrary date range — no migration, no RPC change.
+- `components/Calendar.tsx`: `getMonthRange` becomes `getGridRange` (week starts Sunday; the app never sets `firstDay`). The fetch effect keys on the month and the grid range is a pure function of it, so fetch caching, pull-to-refresh, and focus refetch are unchanged. At most ~14 extra days of rows per fetch.
+- react-native-calendars renders dots on disabled (overflow) days when marked, but colors them from `disabledDotColor`, which the app theme never set — the library default is an off-token grey (design doc §9: a visual decision without a token is a defect). Set `disabledDotColor: theme.accent` so overflow dots match in-month dots; accent also sidesteps the `disabledDot`-overrides-`todayDot` ordering quirk for a marked overflow today.
+- `RNCalendar` gets `testID="calendar"` so e2e can address day cells (`calendar.day_YYYY-MM-DD`) and arrows (`calendar.leftArrow` / `calendar.rightArrow`).
+- Side benefit: tapping an overflow day already flips the month; its events are now in memory, so the day list no longer flashes "Nothing on this day." while the refetch lands.
+
+### Acceptance Criteria
+
+- [ ] An event on a visible overflow day (previous or next month) shows the accent dot, identical to in-month dots
+- [ ] Overflow days without events stay unmarked; in-month marking unchanged
+- [ ] Tapping an overflow day with an event flips the month and lists the event (existing behavior preserved)
+- [ ] Month navigation fetches the grid range (April 2026 → 2026-03-29..2026-05-02)
+- [ ] Pixel baselines unaffected (the grid is masked in `e2e/visual.spec.ts`)
