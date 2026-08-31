@@ -42,7 +42,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
-| [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | In progress | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
+| [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 
@@ -1314,7 +1314,7 @@ Who gets which extra URL:
 | Non-app (`my_people.user_id IS NULL`) | Store link(s) — App Store / Play — replacing the email signup invite | An event deep link, or any URL into the web build |
 | App user (`my_people.user_id IS NOT NULL`) | One https event deep link that opens the native app on that event (same as tapping the push) | A store link, a custom-scheme `events-app://` URL, or a web-app session |
 
-The event's own original listing URL stays in both variants when present — that is event content, not app promo. The Who's Coming `Coming?` receipt line is also not this pair (already live for non-app recipients; planned on app-user texts too).
+The event's own original listing URL stays in both variants when present — that is event content, not app promo. The Who's Coming `Coming?` receipt line is also not this pair (live on both variants since 2026-08-31).
 
 Do not send the event deep link to non-app users (it would open the web product, which is the 2026-08-09 rejection). Do not send store links to people who already have the app.
 
@@ -1359,7 +1359,7 @@ At launch, in the same `send-notification` change:
 
 ## Who's Coming
 
-**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building). Follow-up (planned 2026-08-31): [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) puts the receipt link on app-user texts too — the original ship aimed the SMS line at non-app recipients only.
+**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building). Follow-up (shipped 2026-08-31): [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) puts the receipt link on app-user texts too — the original ship aimed the SMS line at non-app recipients only.
 
 ### User stories
 
@@ -1460,7 +1460,7 @@ The story that waits without the link is the SMS-only recipient. The asker's sto
 
 ## Coming Link in Every Share SMS
 
-**Status:** In progress (recorded 2026-08-31). Follow-up to [Who's Coming](#whos-coming). Related: [SMS Invitations](#sms-invitations), [Notification On/Off](#notification-onoff), [SMS Links at Launch](#sms-links-at-launch).
+**Status:** Implemented 2026-08-31 (recorded 2026-08-31). Follow-up to [Who's Coming](#whos-coming). Related: [SMS Invitations](#sms-invitations), [Notification On/Off](#notification-onoff), [SMS Links at Launch](#sms-links-at-launch).
 
 ### Problem
 
@@ -1504,12 +1504,12 @@ This is not [SMS Links at Launch](#sms-links-at-launch). That pair is store CTA 
 
 ### Acceptance Criteria
 
-- [ ] App-user share SMS includes `Coming? <receipt url>` when `RESPONSE_LINK_BASE_URL` is set
-- [ ] Non-app share SMS still includes that line
-- [ ] Same URL layout and receipt page as today; answering there writes the same send slot as the in-app Yes/No; last write wins
-- [ ] Unsetting the secret strips the line from both variants; in-app yes/no still works
-- [ ] Recipients who muted SMS still receive no text (and therefore no link)
-- [ ] The receipt page still has no install CTA and does not open the web app
+- [x] App-user share SMS includes `Coming? <receipt url>` when `RESPONSE_LINK_BASE_URL` is set
+- [x] Non-app share SMS still includes that line
+- [x] Same URL layout and receipt page as today; answering there writes the same send slot as the in-app Yes/No; last write wins
+- [x] Unsetting the secret strips the line from both variants; in-app yes/no still works
+- [x] Recipients who muted SMS still receive no text (and therefore no link)
+- [x] The receipt page still has no install CTA and does not open the web app
 - [ ] Owner approves the wording on a real text to an app-user number before it ships (same bar as [Share SMS Content & Formatting](#share-sms-content--formatting))
 
 ### Open Questions
