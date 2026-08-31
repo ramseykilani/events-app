@@ -243,13 +243,8 @@ END;
 ```
 
 - Re-share is the same call: Bob sharing to Carol copies **Bob's** row, so Carol's row has `from_event_id = Bob's row` and follows Bob.
-- The partial-unique `ON CONFLICT` makes a duplicate delivery from the same sender row impossible even if the client passes an already-shared person id. If that person **removed** their copy, the unique index is empty and the INSERT restores one row.
-- The share sheet's ✓ Shared lock is `get_completed_sends` (below), not a raw `sends` select, so a missing copy becomes shareable again without creating a second send.
+- The partial-unique `ON CONFLICT` makes a duplicate delivery from the same sender row impossible even if the client passes an already-shared person id.
 - Forwarding a frozen copy works identically — the recipient's new row follows *your* row, and your future edits cascade to them. (Your row being frozen only ends *your* following of *your* sender.)
-
-### `get_completed_sends(p_event_id uuid) → TABLE(person_id uuid, sms_status text, sms_error_code text)`
-
-The share sheet's lock set. A send locks the row when the person has no account (pending delivery on sign-up) **or** they still have an `events` row with `from_event_id = p_event_id`. App users who removed their copy are omitted so the sender can share again. Caller must own `p_event_id`. The sender cannot see other people's events through RLS, so this cannot be a client join.
 
 ### `get_calendar_events(p_user_id uuid, p_start_date date, p_end_date date)`
 
@@ -503,7 +498,7 @@ Code rollback is a git revert; data rollback is the one-way door. These seven el
 
 Rewrite `supabase/tests/forwarding_semantics.sql` as `copy_follow_semantics.sql` (the harness globs `*_semantics.sql`), covering:
 
-1. Share delivers the recipient's own copy with `from_event_id`/`from_user_id` set; `sends` recorded; pending contact gets no copy yet. Re-share to the same person is a no-op while they have the copy. If they remove it, `get_completed_sends` drops them (pending stays) and a later `share_event` restores one copy without a second send.
+1. Share delivers the recipient's own copy with `from_event_id`/`from_user_id` set; `sends` recorded; pending contact gets no copy yet
 2. Re-share chain A→B→C: C's row follows B's row, not A's
 3. Edit cascade depth ≥ 2: A edits → B's and C's rows updated; both still following
 4. Frozen pruning: B edits → B stops following A; B's edit cascades to C; A's later edit reaches neither B nor C

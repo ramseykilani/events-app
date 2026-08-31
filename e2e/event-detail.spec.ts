@@ -41,17 +41,6 @@ test('event detail: share sheet, edit in place, formatted date, remove', async (
   // Display dates come from lib/format.ts (e.g. "Sun, Aug 9"), never raw ISO.
   await expect(page.getByText(/\d{4}-\d{2}-\d{2}/)).not.toBeVisible();
 
-  // Cancel on the in-app confirm leaves the event.
-  await page
-    .getByRole('button', { name: 'Remove Event' })
-    .filter({ visible: true })
-    .click();
-  const removeDialog = page.getByRole('dialog').filter({ hasText: /can't undo this/ });
-  await expect(removeDialog.getByText(/can't undo this/)).toBeVisible();
-  await removeDialog.getByRole('button', { name: 'Cancel' }).click();
-  await expect(removeDialog).toBeHidden();
-  await expect(visibleText(page, title)).toBeVisible();
-
   // Share from detail routes to the same sheet and back.
   await page.getByRole('button', { name: 'Share', exact: true }).click();
   await expect(page.getByText('Share with')).toBeVisible();

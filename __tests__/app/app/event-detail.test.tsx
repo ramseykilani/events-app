@@ -144,20 +144,17 @@ describe('app/(app)/event/[id]', () => {
     jest.restoreAllMocks();
   });
 
-  it('opens an in-app confirm and only deletes after Remove', async () => {
+  it('removes only the caller\'s own events row', async () => {
     const screen = render(<EventDetailScreen />);
     const removeButton = await screen.findByText('Remove Event');
 
     fireEvent.press(removeButton);
-    expect(screen.getByText(/can't undo this/)).toBeTruthy();
-    expect(mockEventsDeleteEqId).not.toHaveBeenCalled();
-
-    fireEvent.press(screen.getByText('Cancel'));
-    expect(screen.queryByText(/can't undo this/)).toBeNull();
-    expect(mockEventsDeleteEqId).not.toHaveBeenCalled();
-
-    fireEvent.press(removeButton);
-    fireEvent.press(screen.getByText('Remove'));
+    const alertButtons = (Alert.alert as jest.Mock).mock.calls[0][2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+    const destructive = alertButtons.find((b) => b.text === 'Remove');
+    destructive?.onPress?.();
 
     await waitFor(() => {
       expect(mockEventsDeleteEqId).toHaveBeenCalledWith('id', 'e1');

@@ -11,6 +11,9 @@ const mockMyPeopleSelect = jest.fn();
 const mockCirclesEq = jest.fn();
 const mockCirclesSelect = jest.fn();
 
+const mockSendsEq = jest.fn();
+const mockSendsSelect = jest.fn();
+
 const mockUsersSingle = jest.fn();
 const mockUsersEq = jest.fn();
 const mockUsersSelect = jest.fn();
@@ -99,29 +102,15 @@ describe('app/(app)/share', () => {
   const useLocalSearchParamsMock = useLocalSearchParams as jest.MockedFunction<
     typeof useLocalSearchParams
   >;
-  let completedSends: {
-    person_id: string;
-    sms_status: null;
-    sms_error_code: null;
-  }[] = [];
 
   beforeEach(() => {
     jest.clearAllMocks();
-    completedSends = [];
     useLocalSearchParamsMock.mockReturnValue({ eventId: 'e1' });
 
     mockFunctionsInvoke.mockResolvedValue({ data: null, error: null });
-    mockRpc.mockImplementation((name: string) => {
-      if (name === 'get_completed_sends') {
-        return abortablePromise(
-          Promise.resolve({ data: completedSends, error: null })
-        );
-      }
-      if (name === 'share_event') {
-        return abortablePromise(Promise.resolve({ data: 2, error: null }));
-      }
-      return abortablePromise(Promise.resolve({ data: null, error: null }));
-    });
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: 2, error: null }))
+    );
 
     mockMyPeopleOrder.mockImplementation(() =>
       abortablePromise(
@@ -158,6 +147,11 @@ describe('app/(app)/share', () => {
     );
     mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
 
+    mockSendsEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockSendsSelect.mockReturnValue({ eq: mockSendsEq });
+
     mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
     mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
     mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
@@ -175,6 +169,11 @@ describe('app/(app)/share', () => {
       if (table === 'circles') {
         return {
           select: mockCirclesSelect,
+        };
+      }
+      if (table === 'sends') {
+        return {
+          select: mockSendsSelect,
         };
       }
       if (table === 'users') {
@@ -245,50 +244,38 @@ describe('app/(app)/share', () => {
 
     fireEvent.press(screen.getByText('Share'));
 
-    await waitFor(() =>
-      expect(
-        mockRpc.mock.calls.filter(([name]) => name === 'share_event')
-      ).toHaveLength(0)
-    );
+    await waitFor(() => expect(mockRpc).not.toHaveBeenCalled());
     expect(router.back).not.toHaveBeenCalled();
   });
 
   it('never deletes sends (sharing is forwarding, not revocable)', async () => {
-    completedSends = [
-      { person_id: 'p1', sms_status: null, sms_error_code: null },
-    ];
+    mockSendsEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [{ person_id: 'p1' }], error: null }))
+    );
 
     const screen = render(<ShareScreen />);
     await waitFor(() =>
-      expect(mockRpc).toHaveBeenCalledWith('get_completed_sends', {
-        p_event_id: 'e1',
-      })
+      expect(mockSendsEq).toHaveBeenCalledWith('event_id', 'e1')
     );
 
     // Even after clearing the selection, confirming is blocked and nothing
-    // is deleted — live copies stay completed actions.
+    // is deleted — existing sends are completed actions.
     fireEvent.press(screen.getByTestId('mock-share-sheet-clear'));
     fireEvent.press(screen.getByText('Share'));
 
-    await waitFor(() =>
-      expect(
-        mockRpc.mock.calls.filter(([name]) => name === 'share_event')
-      ).toHaveLength(0)
-    );
+    await waitFor(() => expect(mockRpc).not.toHaveBeenCalled());
     expect(mockFunctionsInvoke).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
   });
 
   it('marks already-shared people as completed and excludes them from the RPC', async () => {
-    completedSends = [
-      { person_id: 'p1', sms_status: null, sms_error_code: null },
-    ];
+    mockSendsEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [{ person_id: 'p1' }], error: null }))
+    );
 
     const screen = render(<ShareScreen />);
     await waitFor(() =>
-      expect(mockRpc).toHaveBeenCalledWith('get_completed_sends', {
-        p_event_id: 'e1',
-      })
+      expect(mockSendsEq).toHaveBeenCalledWith('event_id', 'e1')
     );
 
     expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1');
@@ -313,70 +300,6 @@ describe('app/(app)/share', () => {
     // shared set now covers both people.
     expect(router.back).not.toHaveBeenCalled();
     expect(await screen.findByText('✓ Sent to 1 person')).toBeTruthy();
-    await waitFor(() =>
-      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1,p2')
-    );
-  });
-
-  it('unlocks a person whose copy disappeared on a later load', async () => {
-    completedSends = [
-      { person_id: 'p1', sms_status: null, sms_error_code: null },
-    ];
-
-    const screen = render(<ShareScreen />);
-    await waitFor(() =>
-      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1')
-    );
-
-    // Same event, new params identity — retriggers useFocusEffect the way
-    // returning to a still-mounted share screen does after B removed.
-    completedSends = [];
-    useLocalSearchParamsMock.mockReturnValue({ eventId: ['e1'] });
-    screen.rerender(<ShareScreen />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('')
-    );
-  });
-
-  it('keeps just-sent people when a stale load lands after the send', async () => {
-    let resolveSends!: (value: {
-      data: typeof completedSends;
-      error: null;
-    }) => void;
-    const sendsDeferred = new Promise<{
-      data: typeof completedSends;
-      error: null;
-    }>((resolve) => {
-      resolveSends = resolve;
-    });
-
-    mockRpc.mockImplementation((name: string) => {
-      if (name === 'get_completed_sends') {
-        return abortablePromise(sendsDeferred);
-      }
-      if (name === 'share_event') {
-        return abortablePromise(Promise.resolve({ data: 2, error: null }));
-      }
-      return abortablePromise(Promise.resolve({ data: null, error: null }));
-    });
-
-    const screen = render(<ShareScreen />);
-    fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
-    fireEvent.press(screen.getByText('Share'));
-
-    await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith('share_event', {
-        p_event_id: 'e1',
-        p_person_ids: ['p1', 'p2'],
-      });
-    });
-    await waitFor(() =>
-      expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1,p2')
-    );
-
-    resolveSends({ data: [], error: null });
-
     await waitFor(() =>
       expect(screen.getByTestId('mock-shared-ids').props.children).toBe('p1,p2')
     );
@@ -444,19 +367,14 @@ describe('app/(app)/share', () => {
 
   it('shows a short alert, not a stack dump, when the share_event RPC fails', async () => {
     const { showAlert } = require('../../../lib/dialogs');
-    mockRpc.mockImplementation((name: string) => {
-      if (name === 'get_completed_sends') {
-        return abortablePromise(
-          Promise.resolve({ data: completedSends, error: null })
-        );
-      }
-      return abortablePromise(
+    mockRpc.mockImplementation(() =>
+      abortablePromise(
         Promise.resolve({
           data: null,
           error: { code: '42501', message: 'Not your event' },
         })
-      );
-    });
+      )
+    );
 
     const screen = render(<ShareScreen />);
     fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
@@ -486,15 +404,15 @@ describe('app/(app)/share', () => {
     });
 
     it('keeps the note when people are already shared', async () => {
-      completedSends = [
-        { person_id: 'p1', sms_status: null, sms_error_code: null },
-      ];
+      mockSendsEq.mockImplementation(() =>
+        abortablePromise(
+          Promise.resolve({ data: [{ person_id: 'p1' }], error: null })
+        )
+      );
 
       const screen = render(<ShareScreen />);
       await waitFor(() =>
-        expect(mockRpc).toHaveBeenCalledWith('get_completed_sends', {
-          p_event_id: 'e1',
-        })
+        expect(mockSendsEq).toHaveBeenCalledWith('event_id', 'e1')
       );
 
       expect(
@@ -529,9 +447,7 @@ describe('app/(app)/share', () => {
 
       fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
       fireEvent.press(screen.getByText('Share'));
-      expect(
-        mockRpc.mock.calls.filter(([name]) => name === 'share_event')
-      ).toHaveLength(0);
+      expect(mockRpc).not.toHaveBeenCalled();
 
       fireEvent.changeText(screen.getByLabelText('Your name'), '  Ramsey  ');
       fireEvent.press(screen.getByText('Save'));
@@ -602,9 +518,7 @@ describe('app/(app)/share', () => {
       expect(screen.getByText(/Your friends get a text when you share/)).toBeTruthy();
       fireEvent.press(screen.getByTestId('mock-share-sheet-select'));
       fireEvent.press(screen.getByText('Share'));
-      expect(
-        mockRpc.mock.calls.filter(([name]) => name === 'share_event')
-      ).toHaveLength(0);
+      expect(mockRpc).not.toHaveBeenCalled();
     });
 
     it('does not gate sharing when the display name fetch fails', async () => {

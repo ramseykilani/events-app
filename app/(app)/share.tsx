@@ -62,11 +62,6 @@ export default function ShareScreen() {
   const sentOpacity = useRef(new Animated.Value(0)).current;
   const shareInFlightRef = useRef(false);
   const nameSaveInFlightRef = useRef(false);
-  // Load generation vs last successful send: a refresh that started before a
-  // send must still union just-sent ids (stale response). A later refresh
-  // replaces, so a recipient who removed their copy unlocks on the next focus.
-  const loadGenRef = useRef(0);
-  const lastShareGenRef = useRef(0);
 
   const firstParamValue = (value?: string | string[]) =>
     Array.isArray(value) ? value[0] : value;
@@ -88,7 +83,6 @@ export default function ShareScreen() {
       .then((data) => setDisplayName(data?.display_name ?? null))
       .catch((err) => console.error('display name load error:', err));
 
-    const gen = ++loadGenRef.current;
     try {
       const staged = await withRetries(async (signal) => {
         const [peopleRes, circlesRes] = await Promise.all([
@@ -115,23 +109,21 @@ export default function ShareScreen() {
           membersData = data ?? [];
         }
 
-        // Lock the sheet on people for whom this event is still delivered:
-        // pending contacts, and app users who still have a copy following
-        // this row. A send row alone is not enough — if they removed their
-        // copy they become selectable again (restore via share_event).
+        // Load existing sends so already-shared people render as completed
+        // actions. Sharing is forwarding: once shared it cannot be unsent, so
+        // existing sends are shown as done and only new people can be picked.
         // The SMS delivery columns drive the per-person status label.
         const eventId = firstParamValue(params.eventId);
         const sharedNow = new Set<string>();
         const statuses = new Map<string, Pick<Send, 'sms_status' | 'sms_error_code'>>();
         if (eventId) {
           const { data: sends, error: sendsErr } = await supabase
-            .rpc('get_completed_sends', { p_event_id: eventId })
+            .from('sends')
+            .select('person_id, sms_status, sms_error_code')
+            .eq('event_id', eventId)
             .abortSignal(signal);
           if (sendsErr) throw sendsErr;
-          for (const s of (sends ?? []) as Pick<
-            Send,
-            'person_id' | 'sms_status' | 'sms_error_code'
-          >[]) {
+          for (const s of sends ?? []) {
             sharedNow.add(s.person_id);
             statuses.set(s.person_id, {
               sms_status: s.sms_status,
@@ -149,29 +141,16 @@ export default function ShareScreen() {
         };
       });
 
-      // A newer load is in flight — don't apply this stale result.
-      if (gen !== loadGenRef.current) return;
-
       // Commit only a fully successful load — a failed refresh keeps the
       // last-good lists instead of blanking the sheet.
       setPeople(staged.people);
       setCircles(staged.circles);
       setCircleMembers(staged.members);
-      // Replace the lock set from the server, unless a send landed after
-      // this load started (its response predates that send). Just-sent
-      // rows must survive that race; everyone else can unlock on refresh
-      // when they no longer have a copy.
-      const shareLandedDuringThisLoad = lastShareGenRef.current >= gen;
-      setAlreadySharedIds((prev) =>
-        shareLandedDuringThisLoad
-          ? new Set([...staged.sharedNow, ...prev])
-          : staged.sharedNow
-      );
-      setSharedStatuses((prev) =>
-        shareLandedDuringThisLoad
-          ? new Map([...prev, ...staged.statuses])
-          : staged.statuses
-      );
+      // Union, never replace: a refresh that started before a successful
+      // send can land after it carrying a sends list that predates the send.
+      // Shares are additive-only, so just-sent rows must survive a refresh.
+      setAlreadySharedIds((prev) => new Set([...staged.sharedNow, ...prev]));
+      setSharedStatuses((prev) => new Map([...prev, ...staged.statuses]));
       // Preserve in-flight selections: a user who taps while the sheet is
       // still loading must not lose their picks when the fetch lands (CI
       // caught this — the reset raced the tap and left Share disabled). Only
@@ -229,9 +208,8 @@ export default function ShareScreen() {
 
   const handleConfirm = async () => {
     // Sharing is mandatory when the event has never been shared (e.g. right
-    // after creating it). Afterwards the action is additive-only: people who
-    // still have a copy (or are pending) are completed and cannot be unsent.
-    // App users who removed their copy are selectable again.
+    // after creating it). Afterwards the action is additive-only: existing
+    // shares are completed and cannot be unsent.
     if (selectedPersonIds.size === 0) {
       showAlert('Select people', 'Please select at least one person to share with.');
       return;
@@ -289,7 +267,6 @@ export default function ShareScreen() {
         // sender's choice (Done), never a timer's. New rows get a null SMS
         // status, which renders "✓ Shared" for everyone — the label only
         // ever advances to a ✕ failure state via the delivery webhook.
-        lastShareGenRef.current = loadGenRef.current;
         setAlreadySharedIds((prev) => new Set([...prev, ...notifiedPersonIds]));
         setSharedStatuses((prev) => {
           const next = new Map(prev);

@@ -181,12 +181,10 @@ For each executed scenario:
 ### E-103 Remove event
 **Steps**
 1. Open event detail for an event on the current user's calendar.
-2. Tap **Remove Event**. An in-app confirm appears (not a browser `window.confirm`). Tap **Cancel** and confirm the event is still there.
-3. Tap **Remove Event** again and confirm with **Remove**.
+2. Tap **Remove Event** and confirm.
 
 **Expected**
-- Cancel leaves the event on the calendar and on the detail screen.
-- After Remove, the event disappears from the user's calendar and the user is navigated away from the detail page.
+- The event disappears from the user's calendar and the user is navigated away from the detail page.
 - Only the caller's own row is deleted: anyone it was shared with keeps their own row (verify with the second test account if the event was shared onward). Followers' rows keep their field values and simply stop following (their `from_event_id` clears).
 
 ---
@@ -263,24 +261,9 @@ For each executed scenario:
 3. Try tapping B's row.
 
 **Expected**
-- While B still has the copy: B's row shows its delivery status ("✓ Shared" — see E-114), is muted, and does not toggle — sharing is a completed action and can't be unsent.
-- The header action reads **Share** (not Done) and is disabled until at least one never-shared (or restored) person is selected.
+- B's row shows its delivery status ("✓ Shared" — see E-114), is muted, and does not toggle — sharing is a completed action and can't be unsent.
+- The header action reads **Share** (not Done) and is disabled until at least one never-shared person is selected.
 - Only newly selected people trigger notifications when sharing again.
-
----
-
-### E-118 Re-share after recipient remove
-**Steps**
-1. As account A, share an event with account B. Confirm B sees it.
-2. As B, open the event, tap **Remove Event**, confirm. B's calendar no longer shows it.
-3. As A, open the same event, tap **Share**. B should be selectable (not ✓ Shared).
-4. Select B and share.
-
-**Expected**
-- B's copy is restored on B's calendar.
-- A is notified that the send happened (✓ Sent to 1 person).
-- A's "Shared with" list still has one row for B (no duplicate send).
-- Sharing again while B still has the copy keeps B locked as ✓ Shared (E-109).
 
 ---
 

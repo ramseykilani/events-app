@@ -121,9 +121,9 @@ Unique constraint on (event_id, person_id).
 
 **Who's Coming (the response slot).** Every send is also the ask: the recipient's yes/no lives on the send, visible only to the asker ("Shared with"). A forward is a new ask answered to the forwarder — Carol answers Bob, not Alice. Recipients answer in the app via `respond_to_send` (their own row id in, changed-flag out) or from the receipt page linked on the share SMS — both variants carry the link, so answering never requires the app (`events-reply.pages.dev/?t=<response_token>`, backed by the `--no-verify-jwt` `send-response` function; GET is inert so link prefetch can't answer). When an answer *changes*, the asker gets a push (`send-response-notification`, or the receipt function directly) — never an SMS, never a badge, and not when the asker hid the responder. The SMS line exists only while the `RESPONSE_LINK_BASE_URL` function secret is set — unsetting it strips the link without touching the in-app path. Removing the event copy does not change the answer; the answer dies only with the asker's event (sends cascade).
 
-**Sharing is forwarding.** Sharing an event with someone delivers them their own `events` row — a copy of your row as it is at send time (via the `share_event` RPC) — like forwarding a text. A share cannot be unsent: you cannot take the copy off their calendar. Removing your own row never affects anyone else's. If they later remove their copy, you can share it with them again (a new copy of your current row; the original send stays).
+**Sharing is forwarding.** Sharing an event with someone delivers them their own `events` row — a copy of your row as it is at send time (via the `share_event` RPC) — like forwarding a text. A share is a completed action and cannot be unsent; removing your own row never affects anyone else's calendar.
 
-`sends` is the *record* of that action, not the delivery mechanism. It drives the "Shared with" list, Who's Coming, notification sends, and pending delivery for contacts without an account (their copies arrive on sign-up via the `deliver_pending_shares` trigger, stamped from the sender's row as it is at that moment). The share sheet's ✓ Shared lock is `get_completed_sends` — people who still have a copy, or who don't have an account yet — not every historical send. Recipients' calendar visibility does NOT depend on `sends` — the delivered `events` row is their copy.
+`sends` is the *record* of that action, not the delivery mechanism. It drives the "Shared with" list, the share sheet's ✓ Shared, notification sends, and pending delivery for contacts without an account (their copies arrive on sign-up via the `deliver_pending_shares` trigger, stamped from the sender's row as it is at that moment). Recipients' calendar visibility does NOT depend on `sends` — the delivered `events` row is their copy.
 
 Incoming and outgoing are opposite arrows: `from_event_id`/`from_user_id` on your row say where it came from; `sends` on your row say who you sent it to.
 
@@ -238,10 +238,10 @@ People are added from the People screen (or when tapping Share) — there is no 
 
 1. User sees an event on their calendar that someone shared with them — it is already their own row (forwarding)
 2. User taps the event, taps "Share"
-3. **Sharing screen (mandatory):** User must select at least one person before confirming. People who currently have the event (or who don't have an account yet) render as completed actions ("✓ Shared") and cannot be deselected — a share delivers the recipient their own copy, so it can't be unsent. If an app user later removes their copy, they become selectable again so the sender can put it back.
+3. **Sharing screen (mandatory):** User must select at least one person before confirming. People the event was already shared with render as completed actions ("✓ Shared") and cannot be deselected — a share delivers the recipient their own copy, so it can't be unsent
 4. `share_event` records the new sends and delivers copies of the caller's current row; notifications are sent to the newly shared people only
 
-There is no unshare. The share sheet is additive: it shows people who currently have the event (or pending contacts) as done and only offers people who don't. If someone removed their copy, they appear as shareable again — restoring is a new send, not an unshare. The share screen says so up front — whenever people are listed, a quiet line reads "Sharing is like sending a text — once you send it, you can't take it back."
+There is no unshare. The share sheet is additive: it shows existing sends as done and only offers people who don't have the event yet. The share screen says so up front — whenever people are listed, a quiet line reads "Sharing is like sending a text — once you send it, you can't take it back."
 
 ### 5. Edit an Event (Save, and Followers Follow)
 
@@ -259,7 +259,7 @@ This keeps each user's data their own: a correction walks in through the person 
 
 ### 5a. Remove an Event
 
-Removing an event from your calendar is gated by an in-app confirm (`ConfirmModal` — not the OS `Alert` / `window.confirm`), then deletes your own events row (its sends records cascade with it). Because sharing delivered everyone their own row up front, this is purely personal — nobody else's calendar changes when you remove an event, whether you created it or re-shared it. Followers' rows keep their field values with `from_event_id` SET NULL (following ends; attribution via `from_user_id` survives while the sender's account exists). There is no garbage collector in this model: every row has exactly one owner, and removing a row is final for *you*. If a recipient removes their copy, the sender can share it with them again — `share_event` inserts a new copy following the sender's current row; the original `sends` row is unchanged (Who's Coming and the receipt token survive).
+Removing an event from your calendar deletes your own events row (its sends records cascade with it). Because sharing delivered everyone their own row up front, this is purely personal — nobody else's calendar changes when you remove an event, whether you created it or re-shared it. Followers' rows keep their field values with `from_event_id` SET NULL (following ends; attribution via `from_user_id` survives while the sender's account exists). There is no garbage collector in this model: every row has exactly one owner, and removing a row is final.
 
 ### 5b. Delete Account
 

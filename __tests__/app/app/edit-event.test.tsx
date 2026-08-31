@@ -349,28 +349,4 @@ describe('app/(app)/edit-event', () => {
     resolveEvents({ data: eventRow, error: null });
     await screen.findByText('Save');
   });
-
-  it('confirms remove in-app before deleting the row', async () => {
-    seedPreview();
-    const screen = render(<EditEventScreen />);
-    const removeButton = await screen.findByText('Remove Event');
-
-    fireEvent.press(removeButton);
-    expect(screen.getByText(/can't undo this/)).toBeTruthy();
-    expect(mockEventsDeleteEqId).not.toHaveBeenCalled();
-
-    const cancels = screen.getAllByText('Cancel');
-    fireEvent.press(cancels[cancels.length - 1]);
-    expect(screen.queryByText(/can't undo this/)).toBeNull();
-    expect(mockEventsDeleteEqId).not.toHaveBeenCalled();
-
-    fireEvent.press(removeButton);
-    fireEvent.press(screen.getByText('Remove'));
-
-    await waitFor(() => {
-      expect(mockEventsDeleteEqId).toHaveBeenCalledWith('id', 'e-1');
-      expect(mockEventsDeleteEqOwner).toHaveBeenCalledWith('owner_id', 'u1');
-    });
-    expect(router.replace).toHaveBeenCalledWith('/(app)/');
-  });
 });
