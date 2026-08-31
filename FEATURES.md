@@ -19,8 +19,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Contacts Permission Explainer](#contacts-permission-explainer) | Implemented | First Share already adds people |
 | [Themeable Icons (Emoji Audit)](#themeable-icons-emoji-audit) | Implemented | |
 | [Delete Account](#delete-account) | Implemented | |
-| [Remove Event Confirm](#remove-event-confirm) | In progress | In-app confirm before an irreversible remove. |
-| [Re-share After Recipient Remove](#re-share-after-recipient-remove) | In progress | If they removed their copy, you can send it to them again. |
+| [Remove Event Confirm](#remove-event-confirm) | Implemented | In-app confirm before an irreversible remove. |
+| [Re-share After Recipient Remove](#re-share-after-recipient-remove) | Implemented | If they removed their copy, you can send it to them again. |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
 | [Richer Link Autofill](#richer-link-autofill) | Planned | Upgrade. Paste already stores the URL; OG title/image already work on open pages. |
@@ -1603,7 +1603,7 @@ Fetch the visible grid's full date range (Sunday on/before the 1st through Satur
 
 ## Remove Event Confirm
 
-**Status:** In progress. Recorded 2026-08-31 from owner feedback after a friend accidentally removed a shared event. Related: [Forwarding Shares](#forwarding-shares) (remove is personal), [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) (the existing confirm copy), [Sign Out Pop-up](#sign-out-pop-up) (same "thin OS dialog" class — that one stays undesigned), [Re-share After Recipient Remove](#re-share-after-recipient-remove) (the recovery path).
+**Status:** Implemented (2026-08-31). Recorded from owner feedback after a friend accidentally removed a shared event. Related: [Forwarding Shares](#forwarding-shares) (remove is personal), [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) (the existing confirm copy), [Sign Out Pop-up](#sign-out-pop-up) (same "thin OS dialog" class — that one stays undesigned), [Re-share After Recipient Remove](#re-share-after-recipient-remove) (the recovery path).
 
 ### Problem
 
@@ -1627,10 +1627,10 @@ Do not replace every `showConfirm` in the app. Sign-out / delete-account / conta
 
 ### Acceptance Criteria
 
-- [ ] Tapping Remove Event opens an in-app confirm (not `window.confirm` / `Alert.alert`)
-- [ ] Cancel leaves the event on the calendar
-- [ ] Confirm deletes only the caller's row
-- [ ] Copy says the action can't be undone
+- [x] Tapping Remove Event opens an in-app confirm (not `window.confirm` / `Alert.alert`)
+- [x] Cancel leaves the event on the calendar
+- [x] Confirm deletes only the caller's row
+- [x] Copy says the action can't be undone
 
 ### Open Questions
 
@@ -1640,7 +1640,7 @@ Do not replace every `showConfirm` in the app. Sign-out / delete-account / conta
 
 ## Re-share After Recipient Remove
 
-**Status:** In progress. Recorded 2026-08-31 from the same accidental-remove: the sender could not share the event with that person again. Related: [Forwarding Shares](#forwarding-shares) (no unshare), [Share Delivery Status](#share-delivery-status), [Who's Coming](#whos-coming) (the send row is the ask).
+**Status:** Implemented (2026-08-31). Recorded from the same accidental-remove: the sender could not share the event with that person again. Related: [Forwarding Shares](#forwarding-shares) (no unshare), [Share Delivery Status](#share-delivery-status), [Who's Coming](#whos-coming) (the send row is the ask).
 
 ### Problem
 
@@ -1668,18 +1668,18 @@ The event-detail **Shared with** list still reads every send (history + answers)
 ### Technical Notes
 
 - New RPC `get_completed_sends(p_event_id)` (SECURITY DEFINER, caller must own the event): returns the send rows that should lock on the sheet. A send is completed when the person has no account, **or** they still have an `events` row with `from_event_id = p_event_id`. The sender cannot read other people's rows through RLS, so this lookup cannot be a client join.
-- `app/(app)/share.tsx` loads completed sends from that RPC instead of a raw `sends` select. The filter `toShare = selected.filter(id => !alreadySharedIds.has(id))` and KI-003 notify list stay; they now follow live copies, not send history.
+- `app/(app)/share.tsx` loads completed sends from that RPC instead of a raw `sends` select. The filter `toShare = selected.filter(id => !alreadySharedIds.has(id))` and KI-003 notify list stay; they now follow live copies, not send history. A later successful load *replaces* the lock set (so a removed copy unlocks on the next focus) unless a send landed while that load was in flight — then it unions, so just-sent rows survive a stale response.
 - `share_event` body is unchanged — the events INSERT already restores a missing copy.
-- Tests: SQL (B deletes copy → completed set drops B, pending stays; re-share restores one copy, send count unchanged); Jest (completed set, not raw sends, is the lock); Playwright (A shares → B removes → A can share again → B sees it).
+- Tests: SQL (B deletes copy → completed set drops B, pending stays; re-share restores one copy, send count unchanged); Jest (completed set, not raw sends, is the lock; later load unlocks a dropped copy; stale load after a send keeps just-sent ids); Playwright (A shares → B removes → A can share again → B sees it).
 
 ### Acceptance Criteria
 
-- [ ] After B removes A's share, A's share sheet lets A select B again
-- [ ] Sharing then puts a new copy on B's calendar and notifies B
-- [ ] A person who still has the copy stays ✓ Shared and is not re-notified
-- [ ] Pending contacts stay ✓ Shared
-- [ ] Who's Coming answer and receipt token survive the restore (`ON CONFLICT DO NOTHING` on sends)
-- [ ] There is still no unshare — a person with a live copy cannot be deselected
+- [x] After B removes A's share, A's share sheet lets A select B again
+- [x] Sharing then puts a new copy on B's calendar and notifies B
+- [x] A person who still has a copy stays ✓ Shared and is not re-notified
+- [x] Pending contacts stay ✓ Shared
+- [x] Who's Coming answer and receipt token survive the restore (`ON CONFLICT DO NOTHING` on sends)
+- [x] There is still no unshare — a person with a live copy cannot be deselected
 
 ### Open Questions
 
