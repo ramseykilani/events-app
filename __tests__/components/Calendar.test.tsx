@@ -13,15 +13,24 @@ jest.mock('react-native-calendars', () => {
   return {
     Calendar: ({
       current,
+      markedDates,
       onDayPress,
       onMonthChange,
     }: {
       current: string;
+      markedDates?: Record<string, { marked?: boolean }>;
       onDayPress: (date: { dateString: string }) => void;
       onMonthChange: (date: { dateString: string }) => void;
     }) => (
       <View>
         <Text>{current}</Text>
+        {Object.entries(markedDates ?? {})
+          .filter(([, marking]) => marking.marked)
+          .map(([date]) => (
+            <Text key={date} testID={`marked-${date}`}>
+              {date}
+            </Text>
+          ))}
         <TouchableOpacity
           testID="calendar-day-press"
           onPress={() => onDayPress({ dateString: '2026-04-20' })}
@@ -77,12 +86,50 @@ describe('components/Calendar', () => {
     jest.useRealTimers();
   });
 
-  it('fetches the selected month range on initial render', () => {
+  it('fetches the visible grid range on initial render', () => {
     const onMonthChange = jest.fn();
 
     render(<Calendar events={events} onMonthChange={onMonthChange} />);
 
-    expect(onMonthChange).toHaveBeenCalledWith('2026-04-01', '2026-04-30');
+    // April 2026 runs Wednesday the 1st to Thursday the 30th, so the grid
+    // spans Sunday March 29 through Saturday May 2.
+    expect(onMonthChange).toHaveBeenCalledWith('2026-03-29', '2026-05-02');
+  });
+
+  it('fetches the grid range of the new month on month change', () => {
+    const onMonthChange = jest.fn();
+    const screen = render(<Calendar events={events} onMonthChange={onMonthChange} />);
+
+    fireEvent.press(screen.getByTestId('calendar-month-change'));
+
+    // May 2026: Friday the 1st, Sunday the 31st.
+    expect(onMonthChange).toHaveBeenLastCalledWith('2026-04-26', '2026-06-06');
+  });
+
+  it('marks events that fall on adjacent-month overflow days', () => {
+    const onMonthChange = jest.fn();
+    const overflowEvents: CalendarEvent[] = [
+      ...events,
+      {
+        id: 'ce-3',
+        title: 'March 29 Event',
+        description: null,
+        image_url: null,
+        url: null,
+        event_date: '2026-03-29',
+        event_time: null,
+        sharer_contact_name: null,
+        sharer_person_id: null,
+        sharer_user_id: 'u-4',
+      },
+    ];
+
+    const screen = render(
+      <Calendar events={overflowEvents} onMonthChange={onMonthChange} />
+    );
+
+    expect(screen.getByTestId('marked-2026-03-29')).toBeTruthy();
+    expect(screen.getByTestId('marked-2026-04-15')).toBeTruthy();
   });
 
   it('updates day events when a new day is selected', () => {

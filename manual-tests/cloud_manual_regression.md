@@ -372,6 +372,19 @@ Both share-SMS variants (app-user and non-app) carry the `Coming? <link>` line w
 
 ---
 
+### E-117 Adjacent-month event dots
+**Steps**
+1. On the calendar, find a greyed overflow day from the previous or next month in the current grid (any month whose 1st isn't a Sunday shows previous-month days; any whose last day isn't a Saturday shows next-month days).
+2. Create an event dated on that overflow day (`+` → set the date → Save → Cancel the share screen).
+3. Back on the calendar (still showing the original month), inspect the overflow day cell.
+4. Tap the overflow day.
+
+**Expected**
+- Step 3: the overflow day carries the same accent dot as in-month days with events — no navigation to that month needed. Overflow days without events stay unmarked.
+- Step 4: the month flips to the tapped day and its events list immediately (no "Nothing on this day." flash).
+
+---
+
 ## Pass Criteria
 
 Manual suite passes when:

@@ -34,15 +34,20 @@ function toLocalDateString(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function getMonthRange(dateString: string): { start: string; end: string } {
+// The fetch window is the visible grid, not the calendar month: overflow
+// days from adjacent months render in the grid, and their events must be
+// loaded for dots to mark them. Week starts Sunday (the library default —
+// the app never sets firstDay).
+function getGridRange(dateString: string): { start: string; end: string } {
   const [yearStr, monthStr] = dateString.split('-');
   const year = Number(yearStr);
   const month = Number(monthStr);
-  const lastDay = new Date(year, month, 0).getDate();
-  return {
-    start: `${yearStr}-${monthStr}-01`,
-    end: `${yearStr}-${monthStr}-${String(lastDay).padStart(2, '0')}`,
-  };
+  const first = new Date(year, month - 1, 1);
+  const start = new Date(year, month - 1, 1 - first.getDay());
+  const last = new Date(year, month, 0);
+  const end = new Date(last);
+  end.setDate(last.getDate() + (6 - last.getDay()));
+  return { start: toLocalDateString(start), end: toLocalDateString(end) };
 }
 
 export function Calendar({
@@ -63,7 +68,7 @@ export function Calendar({
     const monthKey = selectedDate.slice(0, 7);
 
     if (monthKey !== lastFetchedMonth) {
-      const { start, end } = getMonthRange(selectedDate);
+      const { start, end } = getGridRange(selectedDate);
       onMonthChange(start, end);
       setLastFetchedMonth(monthKey);
     }
@@ -163,6 +168,7 @@ export function Calendar({
         // Remount on theme switch: react-native-calendars caches computed
         // styles internally, so a new theme object alone may not repaint.
         key={themeName}
+        testID="calendar"
         current={selectedDate}
         onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
         onMonthChange={(date: DateData) => {
@@ -193,6 +199,11 @@ export function Calendar({
           monthTextColor: theme.textPrimary,
           textDisabledColor: theme.textTertiary,
           dotColor: theme.accent,
+          // Adjacent-month overflow days render as "disabled", and the
+          // library's Dot pushes disabledDot AFTER visibleDot — without this,
+          // their dots fall back to the library's hard-coded grey instead of
+          // the accent (same off-token default class as selectedDotColor).
+          disabledDotColor: theme.accent,
           // The library's Dot pushes todayDot AFTER visibleDot, so without
           // this a marked-but-unselected today renders the library default
           // blue (#00BBF2) instead of the accent (found in the 2026-08-24
