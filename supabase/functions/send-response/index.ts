@@ -3,9 +3,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { notifyAskerOfResponse } from '../_shared/responseNotify.ts';
 
 // Who's Coming receipt API — the backend for the tiny confirm page linked
-// from the share SMS (one capability URL per send, aimed at recipients
-// WITHOUT the app; app users answer on the event). Deployed
-// --no-verify-jwt: the recipient has no account, so the per-send
+// from the share SMS (one capability URL per send; both SMS variants carry
+// the link since 2026-08-31, so app users may answer here too — FEATURES.md
+// → Coming Link in Every Share SMS). Deployed
+// --no-verify-jwt: the link works without a session, so the per-send
 // response_token is the credential (122-bit uuid, unguessable; it grants
 // exactly one capability — read this send's question and set its answer).
 //

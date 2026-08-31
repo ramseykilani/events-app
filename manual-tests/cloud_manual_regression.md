@@ -234,8 +234,8 @@ For each executed scenario:
 
 **Expected**
 - SMS body opens with `[Name] wants to go to "[title]" with you`, then the date/time line, then the event URL itself — the recipient can act without installing the app.
-- No app/web links anywhere in the message. Before the STOP footer, the non-app recipient sees the signup invite: `Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.` (internal-testing phase). The message ends with `Reply STOP to unsubscribe.`
-- SMS to *app* users (the E-111 path) carries no invite line.
+- No app/web links anywhere in the message. While `RESPONSE_LINK_BASE_URL` is set, both variants carry the Who's Coming receipt line (`Coming? https://events-reply.pages.dev/?t=…`) ahead of the footer. The non-app recipient also sees the signup invite before the STOP footer: `Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.` (internal-testing phase). The message ends with `Reply STOP to unsubscribe.`
+- SMS to *app* users (the E-111 path) carries the same `Coming?` line but no invite line.
 
 ---
 
@@ -350,7 +350,9 @@ For each executed scenario:
 
 ---
 
-### E-116 Who's Coming — SMS receipt link (non-app recipient)
+### E-116 Who's Coming — SMS receipt link
+Both share-SMS variants (app-user and non-app) carry the `Coming? <link>` line while the secret is set (2026-08-31 — FEATURES.md → Coming Link in Every Share SMS). Reserved 555 numbers never reach Twilio, so the SMS body is not observable in this suite — its shape is pinned by `__tests__/edge-functions/smsBody.test.ts`. This scenario covers the receipt page the link opens, using a pending (non-app) contact.
+
 **Steps**
 1. Prereq: the `RESPONSE_LINK_BASE_URL` function secret is set (currently `https://events-reply.pages.dev`); without it the SMS carries no link and this test is limited to the API checks below.
 2. As account A, add a pending contact with a reserved 555 number (no real SMS fires), create an event, and share it to them.
@@ -366,7 +368,7 @@ For each executed scenario:
 - Step 6: "Shared with" shows the pending contact's "No".
 - Step 7: a clear "this link doesn't work" state; the API answers 404.
 - The page has no install CTA, no other people, and no link to the web app.
-- Unsetting `RESPONSE_LINK_BASE_URL` removes the `Coming?` line from future share SMSes; the page and in-app answers keep working.
+- Unsetting `RESPONSE_LINK_BASE_URL` removes the `Coming?` line from future share SMSes (both variants); the page and in-app answers keep working.
 
 ---
 
