@@ -359,7 +359,8 @@ describe('app/(app)/edit-event', () => {
     expect(screen.getByText(/can't undo this/)).toBeTruthy();
     expect(mockEventsDeleteEqId).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByText('Cancel'));
+    const cancels = screen.getAllByText('Cancel');
+    fireEvent.press(cancels[cancels.length - 1]);
     expect(screen.queryByText(/can't undo this/)).toBeNull();
     expect(mockEventsDeleteEqId).not.toHaveBeenCalled();
 

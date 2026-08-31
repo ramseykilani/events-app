@@ -33,12 +33,15 @@ export function ConfirmModal({
       animationType="fade"
       onRequestClose={onCancel}
     >
-      <View style={styles.root} accessibilityRole="dialog" accessibilityLabel={title}>
+      <View style={styles.root}>
         <View
           style={[StyleSheet.absoluteFill, { backgroundColor: theme.shadow, opacity: 0.45 }]}
           pointerEvents="none"
         />
-        <View style={[styles.card, { backgroundColor: theme.surface }]}>
+        <View
+          style={[styles.card, { backgroundColor: theme.surface }]}
+          accessibilityLabel={title}
+        >
           <Text style={[styles.title, { color: theme.textPrimary }]}>{title}</Text>
           <Text style={[styles.message, { color: theme.textSecondary }]}>{message}</Text>
           <TouchableOpacity
