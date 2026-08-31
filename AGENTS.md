@@ -2,6 +2,10 @@
 
 ## Cursor Cloud specific instructions
 
+### Discussion vs. implementation (owner rule, 2026-08-31)
+
+When the owner asks for help thinking through an idea, **discuss — do not implement**. Full rule: `.cursor/rules/project.mdc` → "Discuss first, implement on approval". For cloud runs this means: no branch, no commit, no push, and no PR until the owner explicitly approves an approach — discussion mode overrides the cloud template's "commit and push every iteration" instruction, the same way the staging push policy overrides its PR workflow.
+
 ### Overview
 
 This is a React Native (Expo SDK 54) events-sharing app. The backend is a remote Supabase project (Postgres + Auth + Edge Functions). There is no local backend to start.

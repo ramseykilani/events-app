@@ -11,6 +11,17 @@ A React Native (Expo) app for sharing events between people. No feeds — just a
 
 Read `docs/events-technical-architecture.md` for the full architecture, data model, and flows. That document is the source of truth for how the app should behave.
 
+## Discuss first, implement on approval (owner rule, 2026-08-31)
+
+When the owner asks for help thinking through an idea — "help me think about…", "what do you think of…", "how could we…", "I'm wondering whether…", or floats a half-formed feature — that is a request for **discussion, not implementation**. The owner has been burned by agents running off and building something he never fully specified. In discussion mode:
+
+- **Touch nothing.** No code edits, no scaffolding, no "quick prototype to show what I mean," no branches, commits, or pushes. The repo stays exactly as it was.
+- **Engage like a collaborator, not a ticket-taker.** Ask the questions a good one would ask: who is it for, what problem does it solve, what happens today, what is the simplest version that works. Say what you would need to know before building anything.
+- **Offer options with honest trade-offs.** Sketch two or three approaches — complexity, risk to existing behavior, fit with the architectural rules in this file — and say which you would pick and why. Push back when the idea conflicts with the design language, the data model, or a prior owner decision; that pushback is the job, not insubordination.
+- **End with a recommendation or an open question, then stop.** Wait for an explicit go-ahead ("build it", "go with option 2", "implement that") before touching the repo. Enthusiasm about one approach in the discussion is approval of that approach only — not license to expand the scope.
+
+A direct imperative ("add…", "fix…", "implement…", "ship…") is an implementation request — proceed normally. When a message is genuinely ambiguous between the two, ask one short question instead of guessing your way into code.
+
 ## Stack
 
 - **Frontend:** React Native, Expo SDK 54, Expo Router v6 (file-based routing), TypeScript
