@@ -13,8 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { showAlert, showConfirm } from '../../../lib/dialogs';
+import { addToGoogle, addToOtherCalendar } from '../../../lib/addToCalendar';
 import { formatEventDate, formatPhoneDisplay } from '../../../lib/format';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
@@ -278,6 +280,28 @@ export default function EventDetailScreen() {
     });
   };
 
+  // Add to Other Calendars: one-shot snapshot export (FEATURES.md) — the
+  // external calendar gets a copy; later in-app edits do not reach it.
+  const handleAddToGoogle = async () => {
+    if (!event) return;
+    try {
+      await addToGoogle(event);
+    } catch (err) {
+      console.error('Failed to open Google Calendar:', err);
+      showAlert('Could not open', 'Something went wrong. Try again.');
+    }
+  };
+
+  const handleAddToOtherCalendar = async () => {
+    if (!event) return;
+    try {
+      await addToOtherCalendar(event);
+    } catch (err) {
+      console.error('Failed to add to calendar:', err);
+      showAlert('Could not add to calendar', 'Something went wrong. Try again.');
+    }
+  };
+
   const handleDelete = () => {
     if (!event) return;
     const rowId = event.id;
@@ -530,6 +554,38 @@ export default function EventDetailScreen() {
               <Text style={[styles.linkText, { color: theme.linkText }]}>Open link</Text>
             </TouchableOpacity>
           ) : null}
+          <View style={styles.addToCalendarRow}>
+            <Text style={[styles.addToCalendarLabel, { color: theme.textSecondary }]}>
+              Add to calendar
+            </Text>
+            <View style={styles.addToCalendarButtons}>
+              <TouchableOpacity
+                style={[styles.calendarIconButton, { backgroundColor: theme.surfaceSecondary }]}
+                onPress={handleAddToGoogle}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Add to Google Calendar"
+              >
+                <MaterialCommunityIcons name="google" size={20} color={theme.textPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.calendarIconButton, { backgroundColor: theme.surfaceSecondary }]}
+                onPress={handleAddToOtherCalendar}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Add to Apple, Outlook, or another calendar"
+              >
+                <View style={styles.calendarIconPair}>
+                  <MaterialCommunityIcons name="apple" size={16} color={theme.textPrimary} />
+                  <MaterialCommunityIcons
+                    name="microsoft-outlook"
+                    size={16}
+                    color={theme.textPrimary}
+                  />
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
           {replyTo ? (
             <View style={[styles.replySection, { backgroundColor: theme.surface }]}>
               <Text style={[styles.replyTitle, { color: theme.textSecondary }]}>
@@ -725,6 +781,33 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textDecorationLine: 'underline',
     textAlign: 'center',
+  },
+  addToCalendarRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  addToCalendarLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addToCalendarButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  calendarIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarIconPair: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   sharedWithSection: {
     width: '100%',

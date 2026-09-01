@@ -37,6 +37,8 @@ const mockHiddenDelete = jest.fn();
 const mockFrom = jest.fn();
 const mockRpc = jest.fn();
 const mockFunctionsInvoke = jest.fn();
+const mockAddToGoogle = jest.fn();
+const mockAddToOtherCalendar = jest.fn();
 
 const mockSessionState: { session: { user: { id: string } } | null } = {
   session: { user: { id: 'u1' } },
@@ -54,6 +56,13 @@ jest.mock('../../../lib/supabase', () => ({
     rpc: (...args: unknown[]) => mockRpc(...args),
     functions: { invoke: (...args: unknown[]) => mockFunctionsInvoke(...args) },
   },
+}));
+
+// The platform hand-off (web download / iOS EventKit sheet / Android intent)
+// is mocked — the test asserts the row wires the loaded event to it.
+jest.mock('../../../lib/addToCalendar', () => ({
+  addToGoogle: (...args: unknown[]) => mockAddToGoogle(...args),
+  addToOtherCalendar: (...args: unknown[]) => mockAddToOtherCalendar(...args),
 }));
 
 const eventRow = {
@@ -161,6 +170,34 @@ describe('app/(app)/event/[id]', () => {
       expect(mockEventsDeleteEqOwner).toHaveBeenCalledWith('owner_id', 'u1');
     });
     expect(router.back).toHaveBeenCalled();
+  });
+
+  it('exports the event to other calendars from the Add to calendar row', async () => {
+    const screen = render(<EventDetailScreen />);
+
+    const googleButton = await screen.findByLabelText('Add to Google Calendar');
+    const otherButton = screen.getByLabelText('Add to Apple, Outlook, or another calendar');
+    expect(screen.getByText('Add to calendar')).toBeTruthy();
+
+    fireEvent.press(googleButton);
+    await waitFor(() => expect(mockAddToGoogle).toHaveBeenCalledWith(eventRow));
+
+    fireEvent.press(otherButton);
+    await waitFor(() => expect(mockAddToOtherCalendar).toHaveBeenCalledWith(eventRow));
+  });
+
+  it('shows a short alert when the calendar export fails', async () => {
+    mockAddToOtherCalendar.mockRejectedValue(new Error('no handler'));
+
+    const screen = render(<EventDetailScreen />);
+    fireEvent.press(await screen.findByLabelText('Add to Apple, Outlook, or another calendar'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Could not add to calendar',
+        'Something went wrong. Try again.'
+      );
+    });
   });
 
   it('shows the Shared with list when sends exist', async () => {
