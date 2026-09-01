@@ -351,8 +351,7 @@ export default function EventDetailScreen() {
     if (writeInFlightRef.current) return;
     const rowId = event.id;
     const rowDate = event.event_date;
-    const reply = replyTo;
-    const name = reply?.sharerName ?? sharerName;
+    const answerable = event.from_event_id !== null;
     writeInFlightRef.current = true;
     setLoading(true);
     void (async () => {
@@ -391,11 +390,34 @@ export default function EventDetailScreen() {
       // event with a live send and a NULL/Yes answer asks; past events and
       // an existing No archive silently. The archive stands even if the No
       // write fails — no rollback.
-      const canSayNo = reply !== null && rowDate >= localDateString(new Date()) && reply.response !== 'no';
-      if (!canSayNo) {
+      if (!answerable || rowDate < localDateString(new Date())) {
         navBack();
         return;
       }
+      // Resolve the answer slot fresh: a preview-seeded screen can be
+      // archived before the focus load answers get_my_send_response, and the
+      // prompt must never be skipped by a fast tap. Best-effort — if the
+      // read fails, the archive stands and nobody is asked.
+      let reply: ReplyState | null = null;
+      try {
+        reply = await withRetries(async (signal) => {
+          const { data, error } = await supabase
+            .rpc('get_my_send_response', { p_event_id: rowId })
+            .abortSignal(signal);
+          if (error) throw error;
+          const row = (
+            data as { response: 'yes' | 'no' | null; sharer_name: string | null }[] | null
+          )?.[0];
+          return row ? { response: row.response, sharerName: row.sharer_name } : null;
+        });
+      } catch (err) {
+        console.error('Failed to resolve the answer slot:', err);
+      }
+      if (reply === null || reply.response === 'no') {
+        navBack();
+        return;
+      }
+      const name = reply.sharerName ?? sharerName;
       const who = name ?? 'them';
       showConfirm(
         'Taken off your calendar.',

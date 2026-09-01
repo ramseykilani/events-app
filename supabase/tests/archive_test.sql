@@ -113,6 +113,24 @@ BEGIN
 END $$;
 COMMIT;
 
+-- ===== T1b: unauthenticated drawer read is rejected =====
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', '', true);
+DO $$
+DECLARE v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.get_archived_events('2026-10-10');
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'FAIL T1b: anonymous read the archive drawer';
+  END IF;
+  RAISE NOTICE 'PASS T1b: unauthenticated get_archived_events rejected';
+END $$;
+COMMIT;
+
 -- ===== T2: you cannot archive someone else's row =====
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'ae000000-0000-0000-0000-00000000000b', true);
@@ -190,15 +208,18 @@ SELECT public.save_event('ae000000-0000-0000-0000-0000000000e1', null, 'Archive 
 COMMIT;
 
 DO $$
-DECLARE v_title text;
+DECLARE v record;
 BEGIN
-  SELECT title INTO v_title FROM public.events
+  SELECT title, archived_at INTO v FROM public.events
     WHERE owner_id = 'ae000000-0000-0000-0000-00000000000b'
       AND from_event_id = 'ae000000-0000-0000-0000-0000000000e1';
-  IF v_title IS DISTINCT FROM 'Archive E1 edited' THEN
-    RAISE EXCEPTION 'FAIL T5: cascade missed the archived copy, got %', v_title;
+  IF v.title IS DISTINCT FROM 'Archive E1 edited' THEN
+    RAISE EXCEPTION 'FAIL T5: cascade missed the archived copy, got %', v.title;
   END IF;
-  RAISE NOTICE 'PASS T5: sender edit cascades onto the archived follower';
+  IF v.archived_at IS NULL THEN
+    RAISE EXCEPTION 'FAIL T5b: save_event cleared archived_at';
+  END IF;
+  RAISE NOTICE 'PASS T5: sender edit cascades onto the archived follower (archive survives save_event)';
 END $$;
 
 -- ===== T6: restore returns the row to the calendar; re-restore is a no-op =====
@@ -353,5 +374,60 @@ BEGIN
     RAISE EXCEPTION 'FAIL T12: B read % of A''s rows directly', v_count;
   END IF;
   RAISE NOTICE 'PASS T12: owner-only SELECT covers archived rows';
+END $$;
+COMMIT;
+
+-- ===== T13: self-created rows cannot enter the archive =====
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'ae000000-0000-0000-0000-00000000000a', true);
+DO $$
+DECLARE v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.set_event_archived('ae000000-0000-0000-0000-0000000000e2', true);
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'FAIL T13: A archived a self-created row';
+  END IF;
+  IF (SELECT archived_at FROM public.events WHERE id = 'ae000000-0000-0000-0000-0000000000e2') IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL T13: rejected archive still set archived_at';
+  END IF;
+  RAISE NOTICE 'PASS T13: self-created rows are rejected from the archive';
+END $$;
+COMMIT;
+
+-- ===== T14: RLS — no delete path for received rows; self-created still delete =====
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'ae000000-0000-0000-0000-00000000000b', true);
+SET LOCAL ROLE authenticated;
+DO $$
+DECLARE v_count integer;
+BEGIN
+  -- B's archived copy of E2 is received (from_user_id = A): delete blocked.
+  DELETE FROM public.events
+    WHERE owner_id = 'ae000000-0000-0000-0000-00000000000b'
+      AND from_event_id = 'ae000000-0000-0000-0000-0000000000e2';
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'FAIL T14: B deleted a received row';
+  END IF;
+  RAISE NOTICE 'PASS T14a: received rows cannot be deleted';
+END $$;
+COMMIT;
+
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'ae000000-0000-0000-0000-00000000000a', true);
+SET LOCAL ROLE authenticated;
+DO $$
+DECLARE v_count integer;
+BEGIN
+  DELETE FROM public.events WHERE id = 'ae000000-0000-0000-0000-0000000000e2';
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'FAIL T14: A could not delete a self-created row';
+  END IF;
+  RAISE NOTICE 'PASS T14b: self-created rows still delete';
 END $$;
 COMMIT;

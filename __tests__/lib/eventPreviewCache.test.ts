@@ -56,4 +56,31 @@ describe('lib/eventPreviewCache', () => {
     expect(readEventPreview('e-2')?.title).toBe('Show');
     expect(readEventPreview('e-2')?.event_time).toBe('19:00:00');
   });
+
+  it('keeps provenance when re-seeding from a loaded row (previewFromEvent)', () => {
+    // A received row re-seeded after a detail load or edit save must still
+    // classify as received (and archived) on the next mount — otherwise the
+    // preview would offer a working Remove button on a received event.
+    const received: Event = {
+      id: 'e-3',
+      owner_id: 'u1',
+      url: null,
+      title: 'Forwarded Show',
+      description: null,
+      image_url: null,
+      event_date: '2026-08-15',
+      event_time: null,
+      from_event_id: 'e-sender',
+      from_user_id: 'u-sender',
+      frozen: false,
+      archived_at: '2026-09-01T00:00:00.000Z',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+
+    rememberEventPreview(previewFromEvent(received));
+    const seeded = eventFromPreview(readEventPreview('e-3')!);
+    expect(seeded.from_user_id).toBe('u-sender');
+    expect(seeded.archived_at).toBe('2026-09-01T00:00:00.000Z');
+  });
 });

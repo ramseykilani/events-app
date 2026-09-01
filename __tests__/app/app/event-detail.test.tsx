@@ -364,6 +364,36 @@ describe('app/(app)/event/[id]', () => {
     await waitFor(() => expect(mockEventsMaybeSingle).toHaveBeenCalled());
   });
 
+  it('shows Archive (never Remove Event) immediately from a received calendar preview', async () => {
+    // The preview carries from_user_id, so a received row classifies
+    // correctly before the fetch lands — a fast tap can never reach a
+    // working Remove button on a received event.
+    rememberEventPreview({
+      event_id: 'e1',
+      title: 'Board Game Night',
+      description: null,
+      image_url: null,
+      url: null,
+      event_date: '2026-05-10',
+      event_time: null,
+      from_user_id: 'u-sender',
+    });
+    let resolveEvents!: (value: { data: unknown; error: null }) => void;
+    mockEventsMaybeSingle.mockReturnValue(
+      new Promise((resolve) => {
+        resolveEvents = resolve;
+      })
+    );
+
+    const screen = render(<EventDetailScreen />);
+    expect(screen.getByText('Archive')).toBeTruthy();
+    expect(screen.queryByText('Remove Event')).toBeNull();
+
+    resolveEvents({ data: receivedRow, error: null });
+    await waitFor(() => expect(mockEventsMaybeSingle).toHaveBeenCalled());
+    expect(screen.getByText('Archive')).toBeTruthy();
+  });
+
   it('gives up a hung fetch after a few short attempts and shows Retry', async () => {
     jest.useFakeTimers();
     mockEventsMaybeSingle.mockReturnValue(new Promise(() => {}));

@@ -57,6 +57,12 @@ export function previewFromEvent(event: Event): EventPreview {
     url: event.url,
     event_date: event.event_date,
     event_time: event.event_time,
+    // Provenance must survive the re-seed (post-load, post-edit-save):
+    // dropping it would classify a received row as self-created on the next
+    // mount and offer a working Remove button — the delete path this
+    // feature removes.
+    from_user_id: event.from_user_id,
+    archived_at: event.archived_at,
   };
 }
 

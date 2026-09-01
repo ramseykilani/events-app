@@ -386,13 +386,21 @@ BEGIN
   RAISE NOTICE 'PASS T10: a forward is a new ask, answered to the forwarder';
 END $$;
 
--- ===== T11: removing the copy keeps the answer (not inferred from presence) =====
+-- ===== T11: archiving the copy keeps the answer (not inferred from presence) =====
+-- Archive Received Events (2026-09-01): recipients archive — the RLS delete
+-- policy covers self-created rows only, so there is no delete path for a
+-- received row. The semantics this test pins are unchanged: the answer
+-- lives on the send, not on calendar presence.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'cc000000-0000-0000-0000-00000000000b', true);
-SET LOCAL ROLE authenticated;
-DELETE FROM public.events
-  WHERE owner_id = 'cc000000-0000-0000-0000-00000000000b'
-    AND from_event_id = 'cc000000-0000-0000-0000-0000000000e1';
+DO $$
+DECLARE v_copy uuid;
+BEGIN
+  SELECT id INTO v_copy FROM public.events
+    WHERE owner_id = 'cc000000-0000-0000-0000-00000000000b'
+      AND from_event_id = 'cc000000-0000-0000-0000-0000000000e1';
+  PERFORM public.set_event_archived(v_copy, true);
+END $$;
 COMMIT;
 
 DO $$
@@ -404,7 +412,7 @@ BEGIN
   IF v.response IS DISTINCT FROM 'no' THEN
     RAISE EXCEPTION 'FAIL T11: answer vanished with the copy, got %', v.response;
   END IF;
-  RAISE NOTICE 'PASS T11: removing the copy keeps the answer on the send';
+  RAISE NOTICE 'PASS T11: archiving the copy keeps the answer on the send';
 END $$;
 
 -- ===== T12: the pending contact's send stays unanswered until they exist =====
