@@ -14,20 +14,38 @@ type Props = {
   // spinner while the write is in flight.
   loading?: boolean;
   accessibilityLabel?: string;
+  // compact is for inline row submits (a name gate, a new-circle row) — same
+  // rung and radius, smaller target. fontSize/borderRadius stay unoverridable.
+  size?: 'default' | 'compact';
+  testID?: string;
 };
 
-export function PrimaryButton({ label, onPress, disabled, loading, accessibilityLabel }: Props) {
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled,
+  loading,
+  accessibilityLabel,
+  size = 'default',
+  testID,
+}: Props) {
   const theme = useTheme();
   const inactive = (disabled ?? false) || (loading ?? false);
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: theme.primaryButtonBg }, inactive && styles.dimmed]}
+      style={[
+        styles.button,
+        size === 'compact' && styles.compact,
+        { backgroundColor: theme.primaryButtonBg },
+        inactive && styles.dimmed,
+      ]}
       onPress={onPress}
       disabled={inactive}
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: inactive, busy: loading ?? false }}
+      testID={testID}
     >
       {loading ? (
         <ActivityIndicator color={theme.primaryButtonText} />
@@ -46,6 +64,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  compact: {
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
   dimmed: {
     opacity: 0.6,

@@ -11,20 +11,36 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   accessibilityLabel?: string;
+  size?: 'default' | 'compact';
+  testID?: string;
 };
 
-export function SecondaryButton({ label, onPress, disabled, loading, accessibilityLabel }: Props) {
+export function SecondaryButton({
+  label,
+  onPress,
+  disabled,
+  loading,
+  accessibilityLabel,
+  size = 'default',
+  testID,
+}: Props) {
   const theme = useTheme();
   const inactive = (disabled ?? false) || (loading ?? false);
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: theme.surfaceSecondary }, inactive && styles.dimmed]}
+      style={[
+        styles.button,
+        size === 'compact' && styles.compact,
+        { backgroundColor: theme.surfaceSecondary },
+        inactive && styles.dimmed,
+      ]}
       onPress={onPress}
       disabled={inactive}
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: inactive, busy: loading ?? false }}
+      testID={testID}
     >
       {loading ? (
         <ActivityIndicator color={theme.textPrimary} />
@@ -43,6 +59,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  compact: {
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
   dimmed: {
     opacity: 0.6,

@@ -39,6 +39,17 @@ describe('components/PrimaryButton', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
+  it('compact keeps the rung and radius with a smaller inline target', () => {
+    const screen = render(<PrimaryButton label="Save" onPress={jest.fn()} size="compact" />);
+
+    const style = StyleSheet.flatten(screen.getByRole('button', { name: 'Save' }).props.style);
+    expect(style.minHeight).toBe(44);
+    expect(style.borderRadius).toBe(12);
+    const labelStyle = StyleSheet.flatten(screen.getByText('Save').props.style);
+    expect(labelStyle.fontSize).toBe(16);
+    expect(labelStyle.fontWeight).toBe('600');
+  });
+
   it('shows the working phase (spinner, busy state) while loading', () => {
     const onPress = jest.fn();
     const screen = render(<PrimaryButton label="Share" onPress={onPress} loading />);

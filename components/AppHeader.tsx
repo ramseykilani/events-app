@@ -1,4 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../hooks/useTheme';
 
@@ -26,11 +27,14 @@ type Props = {
     onPress: () => void;
     disabled?: boolean;
   };
+  // Rare: one icon control (e.g. People's settings gear) sitting left of the
+  // right text action. The text action stays the primary.
+  rightAccessory?: ReactNode;
 };
 
 const LEFT_LABELS = { cancel: 'Cancel', close: 'Close', done: 'Done' } as const;
 
-export function AppHeader({ title, left, onLeft, right }: Props) {
+export function AppHeader({ title, left, onLeft, right, rightAccessory }: Props) {
   const theme = useTheme();
   return (
     <View style={[styles.bar, { borderBottomColor: theme.borderLight }]}>
@@ -67,25 +71,30 @@ export function AppHeader({ title, left, onLeft, right }: Props) {
           </Text>
         </View>
       ) : null}
-      {right ? (
-        <TouchableOpacity
-          style={styles.action}
-          onPress={right.onPress}
-          disabled={right.disabled}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: right.disabled ?? false }}
-        >
-          <Text
-            style={[
-              styles.rightText,
-              { color: theme.textPrimary },
-              right.disabled && { color: theme.textTertiary },
-            ]}
-          >
-            {right.label}
-          </Text>
-        </TouchableOpacity>
+      {right || rightAccessory ? (
+        <View style={styles.rightCluster}>
+          {rightAccessory}
+          {right ? (
+            <TouchableOpacity
+              style={styles.action}
+              onPress={right.onPress}
+              disabled={right.disabled}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: right.disabled ?? false }}
+            >
+              <Text
+                style={[
+                  styles.rightText,
+                  { color: theme.textPrimary },
+                  right.disabled && { color: theme.textTertiary },
+                ]}
+              >
+                {right.label}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -126,5 +135,9 @@ const styles = StyleSheet.create({
   rightText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  rightCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
