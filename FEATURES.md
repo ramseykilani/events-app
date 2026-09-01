@@ -47,6 +47,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
+| [Archive Received Events](#archive-received-events) | Planned | Reversible removal for received events; Delete stays for self-created. Spec owner-approved 2026-09-01. |
 
 ## Using and testing
 
@@ -1618,3 +1619,49 @@ Fetch the visible grid's full date range (Sunday on/before the 1st through Satur
 - [x] Tapping an overflow day with an event flips the month and lists the event (existing behavior preserved)
 - [x] Month navigation fetches the grid range (April 2026 → 2026-03-29..2026-05-02)
 - [x] Pixel baselines unaffected (the grid is masked in `e2e/visual.spec.ts`)
+
+---
+
+## Archive Received Events
+
+**Status:** Planned — spec owner-approved in discussion 2026-09-01. Supersedes the reverted Remove Event Confirm & Restore (`f6d83fa`, reverted `3d77c2f`, 2026-08-31): instead of confirming an irreversible delete and unlocking re-share, removal of a received event becomes reversible.
+
+### Problem
+
+Removing is the only visibility control a recipient has, and it is irreversible. A mis-tap (even through the existing confirm dialog, shipped 2026-08-07 in `e33213b`) destroys the recipient's copy with no self-recovery: the share sheet locks already-shared people and the sender cannot see the recipient's calendar (RLS), so "can you send it again?" is a dead end. The confirm guards irreversibility; it does not fix it.
+
+### Solution
+
+Make removal of a received event reversible — **Archive** — and keep true **Delete** for events you created:
+
+- **Received events** (`from_user_id IS NOT NULL`): the detail screen shows Archive instead of Remove Event. Neutral styling (not destructive — the act is reversible, design doc §3) and no confirm dialog (nothing irreversible to confirm). The event leaves the calendar; the row is kept. There is no delete path for received events.
+- **Self-created events** (`from_user_id IS NULL`): Delete stays exactly as today — red, confirmed, permanent — and they never enter the archive (archiving your own creation is meaningless: who is it from that you're archiving?).
+- **Archived screen** (the drawer): one screen listing archived received events — upcoming first (nearest date at top), then past (most recent first). Restore is the only action; there is no remove-forever anywhere for received events.
+- **Entry point:** a plain-words "Archived" link at the foot of the calendar screen, below the selected day's list, present only when the archive is non-empty. No badge, no count (design doc §9). The link's appearance after an archive is the confirmation feedback (§6 — structural, never auto-dismisses).
+- **Conditional say-No prompt:** archiving an *upcoming* received event whose Who's Coming answer is NULL or Yes offers to tell the asker (below). Past events and already-No answers archive silently.
+
+### Technical Notes
+
+- **Schema:** `ALTER TABLE public.events ADD COLUMN archived_at timestamptz` (nullable); `get_calendar_events` gains `AND e.archived_at IS NULL`. One migration + SQL tests.
+- **Write path:** a new `set_event_archived(p_event_id uuid, p_archived boolean)` RPC (SECURITY DEFINER, owner-only, idempotent). It must NOT go through `save_event`: a field-changing save sets `frozen` and cascades, and archiving is neither an edit nor the end of following — an archived row keeps following its sender (edits still land; unarchive later and you see current values).
+- **Classification boundary:** `from_user_id` survives the sender deleting their event row (only `from_event_id` is SET NULL), so a sender-removed received event still shows Archive — deliberate: sender removal is invisible to the recipient, and a button that silently changed consequence would be spooky. When the sender deletes their whole account, `from_user_id` is also scrubbed (attribution disappears by design), so the orphan shows Delete — accepted corner (owner call 2026-09-01): rare and harmless (the sends and the answer slot are already gone, the event is static, and you can re-add it yourself if wanted). No provenance flag.
+- **Say-No prompt:** after the archive write lands, when `event_date >= today` and the answer is NULL or Yes — a dialog via `lib/dialogs.ts` (renders on web): NULL → "Taken off your calendar. Let X know you're not in?"; Yes → "X still has you down as coming — change it to No?"; buttons "Tell X no" / "Not now". The affirmative is the widget's own write — `respond_to_send(p_event_id, 'no')`, with the changed-flag driving the fire-and-forget `send-response-notification` — so the asker push follows the existing freshness rules. The archive stands even if the No write fails (standard `showAlert`, no rollback). Rationale (owner, 2026-09-01): "get this off my calendar" users never return to the event screen, so the answer rides the archive moment or it never happens.
+- **Detail screen:** archived rows still load by id (push deep links keep working); the action slot shows Restore instead of Archive. The calendar's day list and dots never show archived rows.
+- **Drawer query:** own rows with `archived_at IS NOT NULL`, ordered `event_date >= today` ascending first (nearest at top), then `event_date < today` descending; attribution via the same live `from_user_id` → `my_people`/`users` join as the calendar. Hide filters the calendar, not the drawer (you chose to archive; the drawer is yours).
+- **Who's Coming is otherwise untouched:** answering No in the widget never archives (owner call — let the user pick), and the asker's "Shared with" list and answers are unaffected by archive/restore. No notifications on either action.
+- **Re-share-after-delete is absorbed:** recipients can no longer hard-delete received events, so the sender-side dead end that motivated `get_completed_sends` mostly evaporates; the reverted design stays in git history if permanent-delete re-share ever earns it.
+- **Parked as a separate feature:** telling recipients when a sender removes an event (would make sender removal visible for the first time — its own product decision).
+- **Non-goals:** no auto-purge, no search/filter in the drawer (month groupings only if volume ever earns them), no per-day archive scoping (recovery must not require remembering the date), no changes to sends/notifications.
+
+### Acceptance Criteria
+
+- [ ] Received event detail shows Archive (neutral styling); tapping removes the event from the calendar with no confirm dialog
+- [ ] Self-created event detail keeps Delete (red, confirmed, permanent); self-created events never appear in the archive
+- [ ] A received event whose sender deleted their row still shows Archive; an account-deletion orphan shows Delete
+- [ ] "Archived" link shows at the foot of the calendar only when the archive is non-empty, and opens the Archived screen
+- [ ] Archived screen orders upcoming nearest-first, then past most-recent-first; Restore returns the event to its date and removes it from the drawer
+- [ ] Archiving an upcoming received event with answer NULL/Yes shows the say-No prompt; "Tell X no" records No (asker notified per Who's Coming rules) and completes the archive; "Not now" archives silently
+- [ ] No prompt for past events or an existing No answer; widget No never archives
+- [ ] Archived rows keep following (sender edits still land); no notifications on archive/restore; the asker sees no change
+- [ ] Push/deep link to an archived event opens its detail screen with Restore
+- [ ] Works on web (dialogs via `lib/dialogs.ts`) and native; fast checks + a Playwright spec per the verify bar
