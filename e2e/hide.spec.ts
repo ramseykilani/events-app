@@ -5,6 +5,7 @@ import {
   ACCOUNT_B,
   PERSON_B_NAME,
   addPersonManually,
+  archiveOpenEvent,
   createEventAndShareToB,
   expectCalendar,
   openEventFromCalendar,
@@ -88,9 +89,9 @@ test('hiding the sharer suppresses their events until unhidden', async ({
       timeout: 15000,
     });
 
-    // --- Cleanup: both sides remove their copies.
+    // --- Cleanup: B archives their copy (received events have no delete).
     await openEventFromCalendar(pageB, title);
-    await removeOpenEvent(pageB);
+    await archiveOpenEvent(pageB);
   } finally {
     if (hidA) {
       // Best effort: never leave A hidden on the shared account.

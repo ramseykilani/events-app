@@ -4,6 +4,7 @@ import {
   ACCOUNT_B,
   PERSON_B_NAME,
   addPersonManually,
+  archiveOpenEvent,
   createEventAndShareToB,
   expectCalendar,
   openEventFromCalendar,
@@ -102,8 +103,8 @@ test('edits cascade to followers until the follower edits locally', async ({
     // --- And B's edit never travels upstream: A's row keeps A's title.
     await expect(visibleText(page, title)).toBeVisible();
 
-    // --- Cleanup: both sides remove their rows.
-    await removeOpenEvent(pageB);
+    // --- Cleanup: B archives their row (received events have no delete).
+    await archiveOpenEvent(pageB);
   } finally {
     await contextB.close();
   }
@@ -143,20 +144,21 @@ test('navigating to the sender\'s row id lands on the recipient\'s own copy', as
   const pageB = await contextB.newPage();
   try {
     // --- B opens the sender's row id directly (the notification-tap path).
+    // B's copy is a received event, so the action slot shows Archive.
     await pageB.goto(`/event/${senderRowId}`);
     await expect(
-      pageB.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
+      pageB.getByRole('button', { name: 'Archive' }).filter({ visible: true })
     ).toBeVisible({ timeout: 30000 });
     await expect(visibleText(pageB, title)).toBeVisible();
     await expect(pageB.getByText('Event not found')).toBeHidden();
     await expect(pageB.getByText('Access removed')).toBeHidden();
 
-    // --- Cleanup: B removes their copy (via the calendar, so the removal
+    // --- Cleanup: B archives their copy (via the calendar, so the archive
     // pops straight back to it).
     await pageB.goto('/');
     await expectCalendar(pageB);
     await openEventFromCalendar(pageB, title);
-    await removeOpenEvent(pageB);
+    await archiveOpenEvent(pageB);
   } finally {
     await contextB.close();
   }

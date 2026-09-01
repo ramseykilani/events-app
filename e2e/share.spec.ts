@@ -4,6 +4,7 @@ import {
   ACCOUNT_B,
   PERSON_B_NAME,
   addPersonManually,
+  archiveOpenEvent,
   createEventAndShareToB,
   expectCalendar,
   openEventFromCalendar,
@@ -16,10 +17,11 @@ import {
 // of their own copy does not touch B's copy.
 //
 // Both accounts are shared test fixtures, so this test cleans up after
-// itself: A removes their copy as part of the assertion, B removes theirs at
-// the end. A failure mid-test can leave a uniquely-titled event behind —
-// harmless, but subsequent runs stay green regardless because titles are
-// unique per run and the person add is an idempotent upsert.
+// itself: A removes their copy as part of the assertion, B archives theirs
+// at the end (received events have no delete path — archived residue in B's
+// drawer is benign). A failure mid-test can leave a uniquely-titled event
+// behind — harmless, but subsequent runs stay green regardless because
+// titles are unique per run and the person add is an idempotent upsert.
 test('sharing delivers B their own copy that survives A removing theirs', async ({
   browser,
   page,
@@ -63,9 +65,9 @@ test('sharing delivers B their own copy that survives A removing theirs', async 
       timeout: 15000,
     });
 
-    // --- Cleanup: B removes their copy too.
+    // --- Cleanup: B archives their copy (received events have no delete).
     await openEventFromCalendar(pageB, title);
-    await removeOpenEvent(pageB);
+    await archiveOpenEvent(pageB);
     await expect(pageB.getByText(title, { exact: true })).not.toBeVisible();
   } finally {
     await contextB.close();

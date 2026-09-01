@@ -237,8 +237,13 @@ export async function openEventFromCalendar(
   title: string
 ): Promise<void> {
   await visibleText(page, title).click();
+  // The destructive slot depends on provenance (Archive Received Events):
+  // self-created rows show Remove Event, received rows Archive, and an
+  // archived row reached by deep link shows Restore.
   await expect(
-    page.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
+    page
+      .getByRole('button', { name: /^(Remove Event|Archive|Restore)$/ })
+      .filter({ visible: true })
   ).toBeVisible({ timeout: 15000 });
 }
 
@@ -247,6 +252,18 @@ export async function removeOpenEvent(page: Page): Promise<void> {
   page.once('dialog', (dialog) => dialog.accept());
   await page
     .getByRole('button', { name: 'Remove Event' })
+    .filter({ visible: true })
+    .click();
+  await expectCalendar(page);
+}
+
+// Received events archive instead of delete — no confirm dialog. The
+// conditional say-No prompt (upcoming + unanswered/yes) is a window.confirm
+// on web, and Playwright's default dialog dismissal is the "Not now" path,
+// so a bare click archives silently.
+export async function archiveOpenEvent(page: Page): Promise<void> {
+  await page
+    .getByRole('button', { name: 'Archive' })
     .filter({ visible: true })
     .click();
   await expectCalendar(page);

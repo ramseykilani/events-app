@@ -4,6 +4,7 @@ import {
   ACCOUNT_B,
   PERSON_B_NAME,
   addPersonManually,
+  archiveOpenEvent,
   createEventAndShareToB,
   expectCalendar,
   openEventFromCalendar,
@@ -19,7 +20,9 @@ import {
 // native-only; web never carries a push token).
 //
 // Same cleanup discipline as share.spec.ts: both accounts are shared
-// fixtures, so A removes their copy and B removes theirs at the end.
+// fixtures, so A removes their copy and B archives theirs at the end
+// (received events have no delete path). B's answer is No by then, so the
+// archive's say-No prompt does not fire.
 test('recipient answers yes/no and the asker sees it on Shared with', async ({
   browser,
   page,
@@ -97,11 +100,11 @@ test('recipient answers yes/no and the asker sees it on Shared with', async ({
     await expect(visibleText(page, 'Yes')).toBeHidden();
 
     // --- Cleanup: A removes their copy (the sends and answers go with it),
-    // then B removes theirs.
+    // then B archives theirs.
     await removeOpenEvent(page);
     await expect(page.getByText(title, { exact: true })).not.toBeVisible();
     await openEventFromCalendar(pageB, title);
-    await removeOpenEvent(pageB);
+    await archiveOpenEvent(pageB);
   } finally {
     await contextB.close();
   }
