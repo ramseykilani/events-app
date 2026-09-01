@@ -21,7 +21,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Delete Account](#delete-account) | Implemented | |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
-| [Richer Link Autofill](#richer-link-autofill) | Planned | Upgrade. Paste already stores the URL; OG title/image already work on open pages. |
+| [Location](#location) | Planned | Free-text venue field; tappable Maps link on the detail screen. Ships before Richer Link Autofill. Spec owner-approved 2026-09-01. |
+| [Richer Link Autofill](#richer-link-autofill) | Planned | JSON-LD + Ticketmaster/RA lookups fill title/date/time/location/image. Provider evidence: [docs/link-autofill-provider-matrix.md](docs/link-autofill-provider-matrix.md). Spec owner-approved 2026-09-01. |
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. Related: [KI-011](manual-tests/known_issues.md) (person rows too tall). |
 | [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
@@ -48,6 +49,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
+| [Provider Matrix Drift Check](#provider-matrix-drift-check) | Considering | Scheduled CI re-check of the autofill provider matrix. Owner deferred 2026-09-01 — manual agent sweeps suffice. |
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
 
 ## Using and testing
@@ -395,15 +397,49 @@ On the event detail screen ([app/(app)/event/[id].tsx](app/(app)/event/[id].tsx)
 
 ---
 
+## Location
+
+**Status:** Planned — ships before [Richer Link Autofill](#richer-link-autofill), which fills this field from link markup. Spec owner-approved 2026-09-01: free text, no Places autocomplete, tappable Maps link on the detail screen.
+
+### Problem
+
+Events have no "where." Venue/address lives in the description at best, so nothing can link out to maps and calendar exports carry no location.
+
+### Proposed Solution
+
+One free-text `location` column on events. No Google Places API, no autocomplete, no keys — the field is text everywhere ("Sarah's place", "Signal, 175 Morgan Ave"). It renders as:
+
+- A plain input on the Add/Edit forms (placeholder "Venue or address"), same as Title/Description.
+- A tappable row on the event detail screen (pin icon, accent color per the design language) opening `https://www.google.com/maps/search/?api=1&query=<url-encoded text>` via `Linking` — Google's official keyless Maps URL: opens the Maps app when installed, the browser otherwise, and resolves venue names biased to the viewer's location. Never editable-and-tappable in the same place — forms edit, detail links.
+
+### Technical Notes
+
+- Migration: `ALTER TABLE events ADD COLUMN location text`, then thread through the whole Copy + Follow pipeline: `save_event` (new param, no-op comparison, cascade UPDATE), `share_event` and `deliver_pending_shares` (INSERT column lists), `get_calendar_events` (RETURNS TABLE + SELECT). `image_url` is the precedent — same files, same tests.
+- Client: `lib/types.ts` (`Event`, `CalendarEvent`), `add-event.tsx`, `edit-event.tsx`, `event/[id].tsx` (tappable row). EventCard unchanged — no location on cards.
+- Calendar export: `&location=` on the Google template URL and `LOCATION:` in the .ics — `lib/calendarLinks.ts` plus the mirrored port in `receipt/index.html` (`e2e/receipt.spec.ts` pins the port against the Jest-pinned builders). The receipt page also renders the location line.
+- SMS: venue line in `_shared/smsBody.ts` when present, truncated like title/description (GSM-7 segment budget).
+- The Maps URL needs no API key (Maps URLs, `api=1&query=`). Places autocomplete is a possible later upgrade that changes only the input, not the data model — don't build it now.
+- Tests: SQL semantics (save/share/cascade/pending-delivery carry location), Jest (`calendarLinks` location param + ics line), Playwright (add/edit fill; detail row href), visual baselines for the two forms and the detail screen.
+
+### Acceptance Criteria
+
+- [ ] Location round-trips: create → edit → share → follower cascade → pending-share delivery
+- [ ] Detail screen row opens the Maps search URL; forms never render it as a link
+- [ ] Google link and .ics carry location; the receipt page port matches and renders it
+- [ ] Share SMS includes the venue line when present
+- [ ] Empty location renders nothing anywhere (no empty row, no stray export param)
+
+---
+
 ## Richer Link Autofill
 
-**Status:** Planned — upgrade, not a blocker. Paste-a-link already works: the URL is stored, Open Graph title/description/image fill when the page allows it, and the user can always type a title and pick a date.
+**Status:** Planned — upgrade, not a blocker. Depends on [Location](#location). Provider evidence and re-verify runbook: [docs/link-autofill-provider-matrix.md](docs/link-autofill-provider-matrix.md) (82 providers verified 2026-09-01). Paste-a-link already works: the URL is stored, Open Graph title/description/image fill when the page allows it, and the user can always type a title and pick a date.
 
 ### What this is not
 
 This is not a new add-event path. [Add Event](app/(app)/add-event.tsx) already pastes a URL, calls `og-metadata` on blur, and saves `url` / `title` / `description` / `image_url`. Failures are best-effort and must stay that way — a dead preview must never block Save.
 
-This is also not a license to scrape Ticketmaster (or anyone else) with a headless browser. Walled gardens go through their official APIs or they stay "URL stored, type the rest."
+This is also not a license to scrape Ticketmaster (or anyone else) with a headless browser. Walled gardens go through their official APIs or they stay "URL stored, type the rest." The single exception is Resident Advisor (owner-approved 2026-09-01): RA's own no-auth GraphQL backend is reachable even though its HTML is walled — see layer 3.
 
 ### Problem
 
@@ -413,42 +449,47 @@ So a Ticketmaster paste often lands as **Untitled event** on today, with the lis
 
 ### Proposed Solution
 
-Keep the current paste → blur → preview → confirm → Save flow. Make the preview actually fill a calendar row for real event listings.
+Keep the current paste → blur → preview → confirm → Save flow. Make the preview actually fill a calendar row for real event listings. Three layers, cheapest first:
 
-Do it in two layers, cheapest first:
+1. **JSON-LD Event parse (open web).** In `og-metadata`, also read `application/ld+json` Event-family blocks and return date/time/location alongside the OG fields. Verified working on 26 providers (2026-09-01 snapshot), including Eventbrite, Meetup, Luma, Partiful, Dice, Ticketweb, The Ticket Fairy, ShowClix, Prekindle, TickPick, Gametime, AllEvents, TicketLeap, Discotech, Tixel, TodayTix, and Live Nation — the full list with per-provider evidence is in the [matrix](docs/link-autofill-provider-matrix.md). Same edge function, no new vendors.
 
-1. **JSON-LD Event parse (open web).** In `og-metadata`, also read `application/ld+json` `Event` / `MusicEvent` / `TheaterEvent` and return `startDate` (and end/venue later if we want). Add Event sets date and time from that when present. This is the same edge function, no new vendors. Helps any host that already publishes schema.org in the HTML we can fetch.
+2. **Ticketmaster Discovery (official API).** TM blocks the HTML fetch (403), so parse `/event/{id}` from the URL and call Discovery → name, `localDate`, `localTime`, venue, image. Also covers livenation.com and admission.com (same inventory and ids). API key as a function secret.
 
-2. **First-party APIs for walled gardens.** For hosts that block the HTML fetch, parse the URL and call their official API. Ticketmaster Discovery (`/event/{id}` → name, `localDate`, `localTime`, image) is the first candidate. Eventbrite is the obvious second. Artist/tour pages that list many nights must not silently pick a date — show a picker or fall back to "URL stored, you pick the night."
+3. **Resident Advisor GraphQL (owner-approved exception).** RA's HTML 403s, but `ra.co/graphql` — the no-auth, introspectable backend their own site and app use — answers from a datacenter IP (verified 2026-09-01). Parse the id from `ra.co/events/{id}`, single-event query, browser-like UA + `Origin`/`Referer`. Isolated provider module, fail-open: if RA ever locks it down, RA degrades to URL-stored and nothing else is affected. Not an official API — re-verified on the matrix cadence.
 
-Until layer 2 ships for a host, soften the onboarding line so it matches today: paste a link, confirm the title and date. The product doc already says that.
+Everything else stays "URL stored, type the rest" (AXS, StubHub, Vivid, Posh, Tixr, Shotgun, Songkick, Fever dates, and the rest of the URL-only list in the matrix). SeatGeek is the next official-API candidate (Platform API, portal approval) if resale links ever matter. Artist/tour and multi-date pages must not silently pick a date — fall back to "URL stored, you pick the night."
+
+Until a host is covered, the onboarding line stays softened to match reality: paste a link, confirm the title and date.
 
 ### Technical Notes
 
-- `og-metadata` (`supabase/functions/og-metadata/index.ts`) stays JWT-gated, 5s / 1MB capped, fail-open. Extend the JSON body to `{ title, description, image_url, event_date, event_time }` — all nullable.
-- Client: `fetchOgMetadata` in [app/(app)/add-event.tsx](app/(app)/add-event.tsx) already writes title/description/image. Also set the date/time fields when the response has them; never overwrite a date the user already changed.
-- Edit Event does not fetch OG today. URL is editable on Edit (KI-004 fixed
-  2026-08-16); refetching OG on a URL change is this upgrade, not the bugfix.
-- Ticketmaster: API key as a function secret; parse `/event/{id}` only for the automatic path. Do not add a scraping/bypass dependency.
-- Timezones: prefer the listing's local date/time (Discovery's `localDate` / `localTime`, JSON-LD `startDate` without forcing UTC). Same "land on the day the user meant" rule as the web date inputs.
-- Dedup is unchanged: `find_or_create_event` still keys on `(url, title, event_date, event_time)`. Better autofill makes collisions more likely and more correct.
-- Tests: this is the gap. Jest the parser (OG + JSON-LD fixtures, including a TM-shaped Event block). Playwright: paste a fixture URL (mock `og-metadata`) and assert title + date fill; a failed preview still saves. Manual E-102 stays best-effort against live hosts.
+- `og-metadata` (`supabase/functions/og-metadata/index.ts`) stays JWT-gated, 5s / 1MB capped, fail-open. Extend the JSON body to `{ title, description, image_url, event_date, event_time, location }` — all nullable. JSON-LD lives in `<head>`, so the 1MB cap is safe even on multi-MB pages; fixtures prove it per provider.
+- Parser rules, each pinned by a recorded HTML fixture per provider (the matrix's "What the parser must handle" is the authoritative list):
+  - Match any Event-family `@type` (Event, MusicEvent, SportsEvent, BusinessEvent, TheaterEvent, Festival…), including arrays and `@graph`.
+  - startDate flavors: offset with colon, offset without colon (`-0400` — ShowClix, TicketLeap), floating local (Ticketweb, TickPick — take the wall clock as-is), UTC `Z`/`+00:00` (convert via the device timezone — same-city assumption), UTC with the IANA tz in a separate field (Partiful `__NEXT_DATA__`), date-only (Prekindle — fill the date, leave time). Same "land on the day the user meant" rule as the web date inputs.
+  - Per-provider quirk table, isolated per provider (e.g. Gametime's `startDate` is unmarked UTC; its `og:title` carries the local time).
+  - Multi-date rule: `startDate` in the past or a long span (TodayTix's opening date, Airbnb slots, artist/tour pages) → skip date/time.
+  - Sanitize every extracted string (Events.com emitted the literal `"streetAddress": "undefined"`).
+- Client: `fetchOgMetadata` in [app/(app)/add-event.tsx](app/(app)/add-event.tsx) fills empty fields only — never overwrites anything the user typed or changed. Edit Event refetches on a URL change with the same rules (decided 2026-09-01; the URL field became editable with KI-004).
+- Location autofill requires [Location](#location) shipped first — the field must exist to be filled.
+- Ticketmaster: API key as a function secret; parse `/event/{id}` only for the automatic path. No scraping/bypass dependency. RA: isolated module, no secret needed (no-auth endpoint), browser-like headers.
+- Dedup is unchanged: the per-user pasted-URL check in Add Event. Better autofill makes collisions more likely and more correct.
+- Tests: Jest the parser with one recorded fixture per Layer-1 matrix row (plus TM- and RA-shaped responses). Playwright: paste a fixture URL (mock `og-metadata`) and assert title + date + location fill; a failed preview still saves. Manual E-102 stays best-effort against live hosts.
 
 ### Acceptance Criteria
 
-- [ ] Open-web event pages that publish JSON-LD fill title and date/time, not just OG title
-- [ ] A Ticketmaster `/event/{id}` link fills title, date/time, and image via Discovery (or we explicitly do not claim TM in onboarding)
+- [ ] JSON-LD providers fill title + date/time + location + image — fixtures green for every Layer-1 row in the matrix
+- [ ] A Ticketmaster `/event/{id}` link fills title, date/time, venue, and image via Discovery (also livenation.com and admission.com)
+- [ ] An `ra.co/events/{id}` link fills via the GraphQL module; module failure degrades to URL-stored
 - [ ] A blocked/failed preview still saves the URL; Save never waits on the fetch
-- [ ] Artist/tour multi-date URLs do not invent a single night
+- [ ] Multi-date pages (tour, opening-date, bookable-slot) never invent a single night
+- [ ] Fields the user edited are never overwritten
 - [ ] Onboarding copy matches what we actually do
-- [ ] Autofill is covered by Jest (parser) and Playwright (form wiring), not only E-102
+- [ ] Autofill is covered by Jest (per-provider parser fixtures) and Playwright (form wiring), not only E-102
 
 ### Open Questions
 
-- Ticketmaster only, or Eventbrite in the same slice?
-- After a URL change on Edit Event, should OG refetch (architecture says yes;
-  the screen does not today)? KI-004 (URL field was read-only) is fixed.
-- Venue/location: we have no field. Leave it in description, or add a field later?
+- None. (2026-09-01 research resolved the prior three: Eventbrite needs no API — its pages carry JSON-LD; Edit Event does refetch on URL change; location ships as its own feature first.)
 
 ---
 
@@ -1645,6 +1686,22 @@ Some things people share aren't one-offs — a weekly dinner, a monthly meetup. 
 ### Decision
 
 Undecided — maybe never. Nothing in this section is actionable.
+
+---
+
+## Provider Matrix Drift Check
+
+**Status:** Considering (2026-09-01) — deferred by the owner; manual agent sweeps of [the provider matrix](docs/link-autofill-provider-matrix.md) (~6-month cadence, runbook embedded in the doc) suffice for now. Recorded so the idea isn't lost — do not build.
+
+### What this would be
+
+A scheduled CI job that re-fetches one canonical event URL per matrix provider, re-runs the mechanical classification (HTTP status + Event JSON-LD present + startDate flavor), and flags rows whose bucket changed. CI runners are datacenter IPs, so results are representative of `og-metadata`.
+
+### Design constraints (if ever built)
+
+- Flag drift, never fail a build — provider changes are external reality, not code regressions.
+- Never auto-edit the matrix; a human or agent updates it and bumps the changelog.
+- Needs the retry-once rule from the runbook or flaky providers (Ticketweb) will cry wolf.
 
 ---
 
