@@ -14,11 +14,14 @@ export async function addToGoogle(event: CalendarExportEvent): Promise<void> {
 
 export async function addToOtherCalendar(event: CalendarExportEvent): Promise<void> {
   const details = buildNativeDetails(event);
+  // CalendarContract keys (developer.android.com calendar-intents): title /
+  // description / beginTime / endTime / allDay against the events content URI.
   await IntentLauncher.startActivityAsync('android.intent.action.INSERT', {
+    data: 'content://com.android.calendar/events',
     type: 'vnd.android.cursor.item/event',
     extra: {
-      'android.intent.extra.TITLE': details.title,
-      ...(details.notes ? { 'android.intent.extra.DESCRIPTION': details.notes } : {}),
+      title: details.title,
+      ...(details.notes ? { description: details.notes } : {}),
       beginTime: details.startDate.getTime(),
       endTime: details.endDate.getTime(),
       allDay: details.allDay,

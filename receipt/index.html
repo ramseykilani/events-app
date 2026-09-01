@@ -221,7 +221,7 @@
       dates = ymd(y, m, d) + '/' + ymd(next.getFullYear(), next.getMonth() + 1, next.getDate());
     }
     var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' +
-      encodeURIComponent(state.title || 'Untitled event') + '&dates=' + dates;
+      encodeURIComponent(state.title == null ? 'Untitled event' : state.title) + '&dates=' + dates;
     var details = eventDetails(state);
     if (details) url += '&details=' + encodeURIComponent(details);
     return url;
@@ -285,7 +285,7 @@
       'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''),
       startLine,
       endLine,
-      'SUMMARY:' + escapeIcsText(state.title || 'Untitled event')
+      'SUMMARY:' + escapeIcsText(state.title == null ? 'Untitled event' : state.title)
     ];
     if (details) lines.push('DESCRIPTION:' + escapeIcsText(details));
     lines.push('END:VEVENT', 'END:VCALENDAR');

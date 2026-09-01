@@ -115,7 +115,8 @@ try {
   check('GET returns full description + url for the calendar links',
     g1.description === 'Receipt API verification details.' && g1.url === 'https://example.com/receipt-verify');
   check('GET exposes no internal ids or other people',
-    !('event_id' in g1) && !('person_id' in g1) && !('owner_id' in g1) && !('response_token' in g1));
+    !('event_id' in g1) && !('person_id' in g1) && !('owner_id' in g1) && !('response_token' in g1) &&
+    !('id' in g1) && !('send_id' in g1));
 
   // GET is inert (prefetch safety).
   const afterGet = await (
