@@ -21,6 +21,11 @@ import { formatEventDate, formatPhoneDisplay, localDateString } from '../../../l
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
 import { useTheme } from '../../../hooks/useTheme';
+import { AppHeader } from '../../../components/AppHeader';
+import { PrimaryButton } from '../../../components/PrimaryButton';
+import { SecondaryButton } from '../../../components/SecondaryButton';
+import { TextAction } from '../../../components/TextAction';
+import { IconButton } from '../../../components/IconButton';
 import {
   eventFromPreview,
   previewFromEvent,
@@ -619,24 +624,14 @@ export default function EventDetailScreen() {
       })
     : null;
 
-  const navBack = (
-    <View style={styles.navRow}>
-      <TouchableOpacity
-        onPress={() => router.back()}
-        activeOpacity={0.6}
-        accessibilityRole="button"
-        // hitSlop (not padding): this screen has a pixel-diff baseline.
-        hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-      >
-        <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  // The header carries no title: the event's own centered title below is the
+  // headline (owner-reserved ceremonial title).
+  const header = <AppHeader left={{ kind: 'back', label: 'Events' }} onLeft={() => router.back()} />;
 
   if (accessRevoked) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        {navBack}
+        {header}
         <View style={styles.revokedContainer}>
           <Text style={[styles.revokedTitle, { color: theme.textPrimary }]}>Access removed</Text>
           <Text style={[styles.revokedMessage, { color: theme.textSecondary }]}>
@@ -651,7 +646,7 @@ export default function EventDetailScreen() {
   if (!event) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        {navBack}
+        {header}
         <View style={styles.revokedContainer}>
           {loading ? (
             <ActivityIndicator color={theme.textPrimary} />
@@ -661,14 +656,7 @@ export default function EventDetailScreen() {
                 {loadError ? 'Could not load this event.' : 'Event not found'}
               </Text>
               {loadError ? (
-                <TouchableOpacity
-                  onPress={handleRetry}
-                  activeOpacity={0.6}
-                  accessibilityRole="button"
-                  hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-                >
-                  <Text style={[styles.navBack, { color: theme.linkText }]}>Retry</Text>
-                </TouchableOpacity>
+                <TextAction label="Retry" tone="link" onPress={handleRetry} />
               ) : null}
             </>
           )}
@@ -679,7 +667,7 @@ export default function EventDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      {navBack}
+      {header}
       {loadError ? (
         <TouchableOpacity
           style={[styles.refreshBanner, { backgroundColor: theme.surface }]}
@@ -729,7 +717,6 @@ export default function EventDetailScreen() {
               activeOpacity={0.6}
               accessibilityRole="button"
               accessibilityLabel={`Open ${event.location} in Maps`}
-              hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
             >
               <MaterialCommunityIcons name="map-marker-outline" size={20} color={theme.linkText} />
               <Text style={[styles.locationText, { color: theme.linkText }]}>{event.location}</Text>
@@ -753,20 +740,11 @@ export default function EventDetailScreen() {
               Add to calendar
             </Text>
             <View style={styles.addToCalendarButtons}>
-              <TouchableOpacity
-                style={[styles.calendarIconButton, { backgroundColor: theme.surfaceSecondary }]}
-                onPress={handleAddToGoogle}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Add to Google Calendar"
-              >
+              <IconButton onPress={handleAddToGoogle} accessibilityLabel="Add to Google Calendar">
                 <MaterialCommunityIcons name="google" size={20} color={theme.textPrimary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.calendarIconButton, { backgroundColor: theme.surfaceSecondary }]}
+              </IconButton>
+              <IconButton
                 onPress={handleAddToOtherCalendar}
-                activeOpacity={0.7}
-                accessibilityRole="button"
                 accessibilityLabel="Add to Apple, Outlook, or another calendar"
               >
                 <View style={styles.calendarIconPair}>
@@ -777,7 +755,7 @@ export default function EventDetailScreen() {
                     color={theme.textPrimary}
                   />
                 </View>
-              </TouchableOpacity>
+              </IconButton>
             </View>
           </View>
           {replyTo ? (
@@ -867,66 +845,35 @@ export default function EventDetailScreen() {
               ))}
             </View>
           ) : null}
+          {/* One high-emphasis action per view (audit UX-05): primary Share,
+              secondary Edit, and the consequential/restorative actions demoted
+              to quiet text actions — Hide leaves the jumbo row entirely. */}
           <View style={styles.actions}>
-            <TouchableOpacity style={[styles.shareButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleShare} activeOpacity={0.7} accessibilityRole="button">
-              <Text style={[styles.shareButtonText, { color: theme.primaryButtonText }]}>Share</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.editButton, { backgroundColor: theme.surfaceSecondary }]}
-              onPress={handleEdit}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.editButtonText, { color: theme.textPrimary }]}>Edit</Text>
-            </TouchableOpacity>
+            <PrimaryButton label="Share" onPress={handleShare} />
+            <SecondaryButton label="Edit" onPress={handleEdit} />
             {event.from_user_id === null ? (
               // Self-created (or an account-deletion orphan): true delete —
               // red, confirmed, permanent. Self-created events never enter
               // the archive.
-              <TouchableOpacity
-                style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
-                onPress={handleDelete}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
-              </TouchableOpacity>
+              <TextAction label="Remove Event" tone="destructive" onPress={handleDelete} />
             ) : event.archived_at === null ? (
               // Received: reversible Archive. Neutral styling (nothing
               // irreversible happens here) and no confirm dialog.
-              <TouchableOpacity
-                style={[styles.deleteButton, { backgroundColor: theme.surfaceSecondary }]}
-                onPress={handleArchive}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.deleteButtonText, { color: theme.textPrimary }]}>Archive</Text>
-              </TouchableOpacity>
+              <TextAction label="Archive" onPress={handleArchive} />
             ) : (
               // An archived row still loads by id (push deep links keep
               // working); Restore puts it back on its date.
-              <TouchableOpacity
-                style={[styles.deleteButton, { backgroundColor: theme.surfaceSecondary }]}
-                onPress={handleRestore}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.deleteButtonText, { color: theme.textPrimary }]}>Restore</Text>
-              </TouchableOpacity>
+              <TextAction label="Restore" onPress={handleRestore} />
             )}
             {sharedByPersonId && (
-              <TouchableOpacity
-                style={[styles.hideButton, { backgroundColor: theme.surfaceSecondary }]}
-                onPress={handleToggleHide}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hideButtonText, { color: theme.textSecondary }]}>
-                  {isHidden
+              <TextAction
+                label={
+                  isHidden
                     ? `Unhide ${sharerName ?? 'this person'}`
-                    : `Hide ${sharerName ?? 'this person'}`}
-                </Text>
-              </TouchableOpacity>
+                    : `Hide ${sharerName ?? 'this person'}`
+                }
+                onPress={handleToggleHide}
+              />
             )}
           </View>
         </View>
@@ -939,31 +886,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
   },
+  // One content measure (audit UX-11): the app-wide full-width left-aligned
+  // grammar. The 600/400/centered mix is gone; the ceremonial title stays
+  // centered (owner-reserved).
   innerContent: {
     padding: 24,
     width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-    alignItems: 'center',
-  },
-  loading: {
-    padding: 24,
-    fontSize: 16,
-  },
-  navRow: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  navBack: {
-    fontSize: 16,
   },
   refreshBanner: {
     paddingVertical: 12,
@@ -992,9 +923,10 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
     marginBottom: 24,
+    // Real 44pt visible target, not hitSlop (audit UX-10).
+    minHeight: 44,
   },
   locationText: {
     fontSize: 18,
@@ -1003,15 +935,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 28,
     marginBottom: 24,
-    textAlign: 'center',
   },
   link: {
     marginBottom: 32,
+    alignSelf: 'flex-start',
+    // Real 44pt visible target — was an ~18px word with no expansion (UX-10).
+    minHeight: 44,
+    justifyContent: 'center',
   },
   linkText: {
     fontSize: 18,
     textDecorationLine: 'underline',
-    textAlign: 'center',
   },
   addToCalendarRow: {
     width: '100%',
@@ -1027,13 +961,6 @@ const styles = StyleSheet.create({
   addToCalendarButtons: {
     flexDirection: 'row',
     gap: 12,
-  },
-  calendarIconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   calendarIconPair: {
     flexDirection: 'row',
@@ -1107,7 +1034,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   revokedTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     marginBottom: 12,
     textAlign: 'center',
@@ -1120,44 +1047,5 @@ const styles = StyleSheet.create({
   actions: {
     gap: 16,
     width: '100%',
-    maxWidth: 400,
-  },
-  shareButton: {
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  shareButtonText: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  editButton: {
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  editButtonText: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  deleteButtonText: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  hideButton: {
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  hideButtonText: {
-    fontSize: 20,
-    fontWeight: '600',
   },
 });

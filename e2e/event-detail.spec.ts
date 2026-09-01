@@ -117,12 +117,14 @@ test('event detail: share sheet, edit in place, formatted date, remove', async (
 
   // Back out (past the pre-edit detail the replace left underneath), select
   // the new day on the calendar, and the edited event is listed there.
+  // AppHeader's back control is chevron + destination label (Design System
+  // Consolidation): accessible name "Back to Events".
   await page
-    .getByRole('button', { name: 'Back' })
+    .getByRole('button', { name: 'Back to Events' })
     .filter({ visible: true })
     .click();
   await page
-    .getByRole('button', { name: 'Back' })
+    .getByRole('button', { name: 'Back to Events' })
     .filter({ visible: true })
     .click();
   await expectCalendar(page);

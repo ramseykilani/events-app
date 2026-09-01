@@ -250,7 +250,7 @@ describe('app/(app)/event/[id]', () => {
     const screen = render(<EventDetailScreen />);
 
     await screen.findByText('Access removed');
-    fireEvent.press(screen.getByText('Back'));
+    fireEvent.press(screen.getByLabelText('Back to Events'));
     expect(router.back).toHaveBeenCalled();
   });
 
@@ -356,7 +356,7 @@ describe('app/(app)/event/[id]', () => {
 
     await screen.findByText('Could not load this event.');
     expect(screen.getByText('Retry')).toBeTruthy();
-    expect(screen.getByText('Back')).toBeTruthy();
+    expect(screen.getByLabelText('Back to Events')).toBeTruthy();
   });
 
   it('shows retry instead of spinning forever when session is missing', async () => {
@@ -519,7 +519,7 @@ describe('app/(app)/event/[id]', () => {
     mockEventsMaybeSingle.mockReturnValue(new Promise(() => {}));
 
     const screen = render(<EventDetailScreen />);
-    expect(screen.getByText('Back')).toBeTruthy();
+    expect(screen.getByLabelText('Back to Events')).toBeTruthy();
 
     await act(async () => {
       await jest.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS * FETCH_ATTEMPTS);
@@ -539,7 +539,7 @@ describe('app/(app)/event/[id]', () => {
     );
 
     const screen = render(<EventDetailScreen />);
-    const back = await screen.findByText('Back');
+    const back = await screen.findByLabelText('Back to Events');
     fireEvent.press(back);
     expect(router.back).toHaveBeenCalled();
 
