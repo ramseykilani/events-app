@@ -16,6 +16,7 @@ import { formatPhoneDisplay } from '../lib/format';
 import { useTheme } from '../hooks/useTheme';
 import { withFetchTimeout } from '../lib/timeoutSignal';
 import { AppHeader } from './AppHeader';
+import { TextAction } from './TextAction';
 
 type Props = {
   onSelect: (contacts: { phoneNumber: string; name: string | null }[]) => void;
@@ -130,9 +131,7 @@ export function PeoplePicker({
             <Text style={[styles.errorText, { color: theme.textSecondary }]}>
               Couldn't load your contacts.
             </Text>
-            <TouchableOpacity onPress={() => setRetryKey((k) => k + 1)} activeOpacity={0.6} accessibilityRole="button">
-              <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
-            </TouchableOpacity>
+            <TextAction label="Retry" tone="link" onPress={() => setRetryKey((k) => k + 1)} />
           </View>
         ) : (
           <>
@@ -220,17 +219,13 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
   },
-  retry: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
   searchInput: {
     marginHorizontal: 20,
     marginVertical: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     fontSize: 16,
   },
   row: {

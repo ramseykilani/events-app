@@ -15,6 +15,8 @@ import { showAlert } from '../../lib/dialogs';
 import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
 import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
+import { AppHeader } from '../../components/AppHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import type { MyPerson, Circle, CircleMember, Send } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 import { isAbortError, withFetchTimeout, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
@@ -314,32 +316,16 @@ export default function ShareScreen() {
         },
       ]}
     >
-      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity style={styles.headerAction} onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.cancel, { color: theme.textSecondary }]}>
-            {sentCount !== null ? 'Done' : 'Cancel'}
-          </Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Share with</Text>
-        <TouchableOpacity
-          style={styles.headerAction}
-          onPress={handleConfirm}
-          disabled={loading || selectedPersonIds.size === 0 || displayName === null}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: loading || selectedPersonIds.size === 0 || displayName === null }}
-        >
-          <Text
-            style={[
-              styles.done,
-              { color: theme.textPrimary },
-              (loading || selectedPersonIds.size === 0 || displayName === null) && { color: theme.textTertiary },
-            ]}
-          >
-            Share
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        title="Share with"
+        left={sentCount !== null ? { kind: 'done' } : { kind: 'cancel' }}
+        onLeft={() => router.back()}
+        right={{
+          label: 'Share',
+          onPress: handleConfirm,
+          disabled: loading || selectedPersonIds.size === 0 || displayName === null,
+        }}
+      />
       {sentCount !== null ? (
         <Animated.Text
           style={[styles.sentLine, { color: theme.accent, opacity: sentOpacity }]}
@@ -366,18 +352,13 @@ export default function ShareScreen() {
               editable={!savingName}
               accessibilityLabel="Your name"
             />
-            <TouchableOpacity
-              style={[styles.nameSaveButton, { backgroundColor: theme.primaryButtonBg }]}
+            <PrimaryButton
+              label="Save"
+              size="compact"
               onPress={handleSaveName}
               disabled={!nameDraft.trim() || savingName}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !nameDraft.trim() || savingName }}
-            >
-              <Text style={[styles.nameSaveText, { color: theme.primaryButtonText }]}>
-                {savingName ? 'Saving...' : 'Save'}
-              </Text>
-            </TouchableOpacity>
+              loading={savingName}
+            />
           </View>
         </View>
       )}
@@ -394,9 +375,16 @@ export default function ShareScreen() {
         }
       />
       {loadError ? (
-        <TouchableOpacity style={styles.headerAction} onPress={loadData} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.loadError, { color: theme.textSecondary }]}>
-            Could not load people. Tap to retry.
+        // The one retry grammar (audit UX-17/23): banner when content is
+        // present, linkText everywhere.
+        <TouchableOpacity
+          style={[styles.refreshBanner, { backgroundColor: theme.surface }]}
+          onPress={loadData}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.refreshBannerText, { color: theme.linkText }]}>
+            Could not load people. Retry
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -424,35 +412,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  cancel: {
-    fontSize: 16,
-  },
-  // 44pt minimum touch target for the bare-text header actions (and the
-  // load-error retry). No pixel baseline covers this screen.
-  headerAction: {
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  done: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadError: {
-    fontSize: 14,
-    textAlign: 'center',
+  refreshBanner: {
     paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  refreshBannerText: {
+    fontSize: 14,
   },
   sentLine: {
     fontSize: 15,
@@ -477,21 +443,11 @@ const styles = StyleSheet.create({
   nameInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 16,
     minHeight: 44,
-  },
-  nameSaveButton: {
-    borderRadius: 10,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  nameSaveText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
   forwardingNote: {
     fontSize: 13,

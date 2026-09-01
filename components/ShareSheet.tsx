@@ -4,6 +4,9 @@ import type { MyPerson, Circle, Send } from '../lib/types';
 import { formatPhoneDisplay } from '../lib/format';
 import { shareDeliveryStatus } from '../lib/deliveryStatus';
 import { useTheme } from '../hooks/useTheme';
+import { Chip } from './Chip';
+import { PrimaryButton } from './PrimaryButton';
+import { TextAction } from './TextAction';
 
 type Props = {
   people: MyPerson[];
@@ -81,32 +84,13 @@ export function ShareSheet({
                 selectableIds.length > 0 &&
                 selectableIds.every((id) => selectedPersonIds.has(id));
               return (
-                <TouchableOpacity
+                <Chip
                   key={circle.id}
+                  label={allShared ? `✓ ${circle.name}` : circle.name}
+                  selected={allSelected}
                   disabled={allShared}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: allSelected
-                        ? theme.selectedBg
-                        : theme.surfaceSecondary,
-                    },
-                    allShared && { opacity: 0.5 },
-                  ]}
                   onPress={() => toggleCircle(circle)}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: allSelected, disabled: allShared }}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: allShared ? theme.textTertiary : theme.textPrimary },
-                    ]}
-                  >
-                    {allShared ? `✓ ${circle.name}` : circle.name}
-                  </Text>
-                </TouchableOpacity>
+                />
               );
             })}
           </View>
@@ -116,14 +100,11 @@ export function ShareSheet({
         <View style={styles.peopleHeader}>
           <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>People</Text>
           {people.length > 0 && (
-            <TouchableOpacity
+            <TextAction
+              label="Manage"
+              tone="link"
               onPress={() => router.push('/(app)/people')}
-              activeOpacity={0.6}
-              accessibilityRole="button"
-              hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-            >
-              <Text style={[styles.manageLink, { color: theme.linkText }]}>Manage</Text>
-            </TouchableOpacity>
+            />
           )}
         </View>
         {people.length === 0 ? (
@@ -132,14 +113,11 @@ export function ShareSheet({
               No people added yet. Add contacts to your people list so you can
               invite them to events.
             </Text>
-            <TouchableOpacity
-              style={[styles.emptyPeopleButton, { backgroundColor: theme.primaryButtonBg }]}
+            <PrimaryButton
+              label="Add People"
+              size="compact"
               onPress={() => (onAddPeople ? onAddPeople() : router.push('/(app)/people'))}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.emptyPeopleButtonText, { color: theme.primaryButtonText }]}>Add People</Text>
-            </TouchableOpacity>
+            />
           </View>
         ) : (
           <FlatList
@@ -229,18 +207,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 22,
-    // 44pt touch target — the pills grow slightly taller; no pixel baseline
-    // covers the share sheet.
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  chipText: {
-    fontSize: 14,
-  },
   peopleSection: {
     flex: 1,
     padding: 20,
@@ -250,9 +216,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  manageLink: {
-    fontSize: 14,
   },
   emptyPeople: {
     alignItems: 'center',
@@ -264,15 +227,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 16,
-  },
-  emptyPeopleButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  emptyPeopleButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
   personRow: {
     flexDirection: 'row',
