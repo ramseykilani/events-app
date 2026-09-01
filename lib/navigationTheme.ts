@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { DefaultTheme, type Theme } from '@react-navigation/native';
 import type { ThemePalette } from '../constants/Colors';
 
@@ -24,5 +25,12 @@ export function themedScreenOptions(palette: ThemePalette) {
   return {
     headerShown: false,
     contentStyle: { backgroundColor: palette.background },
+    // Android's default full-width slide reads as janky (every dropped frame is
+    // visible judder); the Material-style fade is short and calm per the design
+    // language (§6). iOS keeps its standard interactive slide.
+    animation: Platform.OS === 'android' ? ('fade_from_bottom' as const) : ('default' as const),
+    // Covered screens stop re-rendering underneath a transition, freeing frame
+    // budget. Data freshness is unaffected: every screen refetches on focus.
+    freezeOnBlur: true,
   };
 }

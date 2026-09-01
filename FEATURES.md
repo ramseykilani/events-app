@@ -937,7 +937,7 @@ Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the
 
 ## Screen Transition Polish (Android)
 
-**Status:** In progress — root cause confirmed 2026-09-01. The new-arch preview build (`78e23b64`) removed the flash in Paper but not Evening — exactly the spec's diagnostic for a hard-coded light background: React Navigation's default card/container background is white, and the moving card's edge exposes it during the slide (invisible against Paper's near-white, glaring against Evening). Fix: navigator chrome derived from the palette (`lib/navigationTheme.ts` — `ThemeProvider` + themed `contentStyle` on all three Stack layouts). Found in the 2026-08-15 owner device smoke.
+**Status:** In progress — flash fixed, motion tuning in verification. Root cause confirmed 2026-09-01: React Navigation's default card/container background is white, and the moving card's edge exposes it during the slide (invisible against Paper's near-white, glaring against Evening) — the new-arch build (`78e23b64`) had already cleared Paper's artifact layer. Fix: navigator chrome derived from the palette (`lib/navigationTheme.ts` — `ThemeProvider` + themed `contentStyle` on all three Stack layouts); Evening flash owner-verified fixed on build `14edebaf`. Residual transition judder addressed in the same helper: Android uses the short Material `fade_from_bottom` (design language §6: motion is short and calm; iOS keeps its interactive slide) and `freezeOnBlur` stops covered screens re-rendering mid-transition. Found in the 2026-08-15 owner device smoke.
 
 ### Problem
 
