@@ -85,8 +85,11 @@ test('event detail matches baseline', async ({ page }) => {
 
   // Residue from a failed earlier run would break the strict-mode locator
   // below (two cards with the pinned title) — remove leftovers first. Rows
-  // are per-user now, so nothing dedups them away.
-  for (let i = 0; i < 5; i++) {
+  // are per-user now, so nothing dedups them away. The cap is a loop-safety
+  // bound, not a residue budget: shared accounts accumulate one row per
+  // failed run across every branch and CI job, so it must exceed the worst
+  // accumulation, not the expected case.
+  for (let i = 0; i < 30; i++) {
     const leftover = page
       .getByText('Baseline event', { exact: true })
       .filter({ visible: true })
