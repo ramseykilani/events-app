@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
+import { PrimaryButton } from '../../components/PrimaryButton';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 
@@ -199,7 +200,9 @@ export default function OnboardingScreen() {
           },
         ]}
       >
-        <View style={styles.dots} accessibilityRole="adjustable">
+        {/* The dots are a position indicator, not a control — no
+            accessibilityRole (audit UX-24: a role must match behavior). */}
+        <View style={styles.dots}>
           {pages.map((_, i) => (
             <View
               key={i}
@@ -229,17 +232,11 @@ export default function OnboardingScreen() {
           ) : (
             <View style={styles.skipHit} />
           )}
-          <TouchableOpacity
-            style={[styles.nextButton, { backgroundColor: theme.primaryButtonBg }]}
+          <PrimaryButton
+            label={isLastPage ? 'Get Started' : 'Next'}
             onPress={handleNext}
-            activeOpacity={0.7}
-            accessibilityRole="button"
             accessibilityLabel={isLastPage ? 'Get Started' : 'Next'}
-          >
-            <Text style={[styles.nextText, { color: theme.primaryButtonText }]}>
-              {isLastPage ? 'Get Started' : 'Next'}
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
       </View>
     </View>
@@ -300,17 +297,5 @@ const styles = StyleSheet.create({
   },
   skip: {
     fontSize: 16,
-  },
-  nextButton: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  nextText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
