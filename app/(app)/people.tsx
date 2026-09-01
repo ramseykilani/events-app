@@ -20,6 +20,9 @@ import { useSession } from '../_context/SessionContext';
 import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
 import { ManualAddPersonModal } from '../../components/ManualAddPersonModal';
 import { ThemedSwitch } from '../../components/ThemedSwitch';
+import { AppHeader } from '../../components/AppHeader';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { TextAction } from '../../components/TextAction';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 import { isAbortError, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
@@ -462,13 +465,11 @@ export default function PeopleScreen() {
         { backgroundColor: theme.background, paddingTop: insets.top + 12 },
       ]}
     >
-      <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        {/* conventions-ok: migrates to AppHeader in Design System Consolidation Phase 3 */}
-        <TouchableOpacity style={styles.textAction} onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.back, { color: theme.textSecondary }]}>Back</Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>My People</Text>
-        <View style={styles.headerActions}>
+      <AppHeader
+        title="My People"
+        left={{ kind: 'back', label: 'Events' }}
+        onLeft={() => router.back()}
+        rightAccessory={
           <TouchableOpacity
             style={styles.settingsButton}
             onPress={() => setShowSettings(true)}
@@ -478,33 +479,27 @@ export default function PeopleScreen() {
           >
             <Ionicons name="settings-outline" size={22} color={theme.textSecondary} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.textAction}
-            onPress={handleAddPeople}
-            disabled={people.length >= 50}
-            activeOpacity={0.6}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: people.length >= 50 }}
-          >
-            <Text
-              style={[
-                styles.add,
-                { color: theme.textPrimary },
-                people.length >= 50 && { color: theme.textTertiary },
-              ]}
-            >
-              Add
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        }
+        right={{
+          label: 'Add',
+          onPress: handleAddPeople,
+          disabled: people.length >= 50,
+        }}
+      />
       <Text style={[styles.count, { color: theme.textSecondary }]}>
         {people.length} / 50 people
       </Text>
       {loadError ? (
-        <TouchableOpacity style={styles.textAction} onPress={() => loadData()} activeOpacity={0.6} accessibilityRole="button">
-          <Text style={[styles.loadError, { color: theme.destructiveLink }]}>
-            Could not refresh. Tap to retry.
+        // The one retry grammar (audit UX-17/23): banner when content is
+        // present, linkText everywhere — red is consequence, not information.
+        <TouchableOpacity
+          style={[styles.refreshBanner, { backgroundColor: theme.surface }]}
+          onPress={() => loadData()}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.refreshBannerText, { color: theme.linkText }]}>
+            Could not refresh. Retry
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -524,11 +519,10 @@ export default function PeopleScreen() {
               ? 'Add people by name and phone number to organize them into circles and invite them to events.'
               : 'Add people from your contacts to organize them into circles and invite them to events.'}
           </Text>
-          <TouchableOpacity style={[styles.emptyButton, { backgroundColor: theme.primaryButtonBg }]} onPress={handleAddPeople} activeOpacity={0.7} accessibilityRole="button">
-            <Text style={[styles.emptyButtonText, { color: theme.primaryButtonText }]}>
-              {Platform.OS === 'web' ? 'Add Manually' : 'Add from Contacts'}
-            </Text>
-          </TouchableOpacity>
+          <PrimaryButton
+            label={Platform.OS === 'web' ? 'Add Manually' : 'Add from Contacts'}
+            onPress={handleAddPeople}
+          />
         </View>
       ) : (
         <>
@@ -547,12 +541,8 @@ export default function PeopleScreen() {
                     </Text>
                   </View>
                   <View style={styles.circleActions}>
-                    <TouchableOpacity style={styles.textAction} onPress={() => handleEditCircleMembers(circle)} activeOpacity={0.6} accessibilityRole="button">
-                      <Text style={[styles.manage, { color: theme.linkText }]}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.textAction} onPress={() => handleRemoveCircle(circle)} activeOpacity={0.6} accessibilityRole="button">
-                      <Text style={[styles.remove, { color: theme.destructiveLink }]}>Delete</Text>
-                    </TouchableOpacity>
+                    <TextAction label="Edit" tone="link" onPress={() => handleEditCircleMembers(circle)} />
+                    <TextAction label="Delete" tone="destructive" onPress={() => handleRemoveCircle(circle)} />
                   </View>
                 </View>
               ))}
@@ -565,15 +555,12 @@ export default function PeopleScreen() {
                 value={newCircleName}
                 onChangeText={setNewCircleName}
               />
-              <TouchableOpacity
-                style={[styles.addCircleBtn, { backgroundColor: theme.primaryButtonBg }]}
-                accessibilityRole="button"
+              <PrimaryButton
+                label="Add"
+                size="compact"
                 onPress={handleAddCircle}
                 disabled={!newCircleName.trim() || busy}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.addCircleBtnText, { color: theme.primaryButtonText }]}>Add</Text>
-              </TouchableOpacity>
+              />
             </View>
           </View>
           <View style={styles.peopleSection}>
@@ -589,9 +576,7 @@ export default function PeopleScreen() {
                   <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                   </Text>
-                  <TouchableOpacity style={styles.textAction} onPress={() => handleRemovePerson(item)} activeOpacity={0.6} accessibilityRole="button">
-                    <Text style={[styles.remove, { color: theme.destructiveLink }]}>Remove</Text>
-                  </TouchableOpacity>
+                  <TextAction label="Remove" tone="destructive" onPress={() => handleRemovePerson(item)} />
                 </View>
               )}
             />
@@ -627,18 +612,11 @@ export default function PeopleScreen() {
             { backgroundColor: theme.background, paddingTop: insets.top + 12 },
           ]}
         >
-          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
-            <TouchableOpacity
-              style={styles.textAction}
-              onPress={() => setShowSettings(false)}
-              activeOpacity={0.6}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.back, { color: theme.textSecondary }]}>Close</Text>
-            </TouchableOpacity>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Settings</Text>
-            <View style={styles.textAction} />
-          </View>
+          <AppHeader
+            title="Settings"
+            left={{ kind: 'close' }}
+            onLeft={() => setShowSettings(false)}
+          />
           <ScrollView
             style={styles.settingsScroll}
             contentContainerStyle={{ paddingBottom: 20 + insets.bottom }}
@@ -655,24 +633,51 @@ export default function PeopleScreen() {
               </Text>
             </TouchableOpacity>
             <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Notifications</Text>
-            <View style={styles.prefRow}>
+            {/* KI-008: the whole row is the switch — one accessible control
+                (role=switch, checked state) with a full-width 44pt+ target;
+                the visual switch inside is inert so taps anywhere toggle.
+                aria-checked/aria-hidden ride alongside the RN props because
+                react-native-web maps only the direct aria-* props. */}
+            <TouchableOpacity
+              style={styles.prefRow}
+              onPress={() => handleTogglePref('notify_push', !notifyPush)}
+              disabled={prefSaving}
+              activeOpacity={0.6}
+              accessibilityRole="switch"
+              accessibilityLabel="Push notifications"
+              accessibilityState={{ checked: notifyPush, disabled: prefSaving }}
+              aria-checked={notifyPush}
+            >
               <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Push notifications</Text>
-              <ThemedSwitch
-                value={notifyPush}
-                onValueChange={(value) => handleTogglePref('notify_push', value)}
-                disabled={prefSaving}
-                accessibilityLabel="Push notifications"
-              />
-            </View>
-            <View style={styles.prefRow}>
+              <View
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                aria-hidden
+              >
+                <ThemedSwitch value={notifyPush} disabled={prefSaving} />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.prefRow}
+              onPress={() => handleTogglePref('notify_sms', !notifySms)}
+              disabled={prefSaving}
+              activeOpacity={0.6}
+              accessibilityRole="switch"
+              accessibilityLabel="Text messages (SMS)"
+              accessibilityState={{ checked: notifySms, disabled: prefSaving }}
+              aria-checked={notifySms}
+            >
               <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Text messages (SMS)</Text>
-              <ThemedSwitch
-                value={notifySms}
-                onValueChange={(value) => handleTogglePref('notify_sms', value)}
-                disabled={prefSaving}
-                accessibilityLabel="Text messages (SMS)"
-              />
-            </View>
+              <View
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                aria-hidden
+              >
+                <ThemedSwitch value={notifySms} disabled={prefSaving} />
+              </View>
+            </TouchableOpacity>
             <Text style={[styles.manualHint, { color: theme.textTertiary }]}>
               Events still land on your calendar either way.
             </Text>
@@ -689,9 +694,7 @@ export default function PeopleScreen() {
                   <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                   </Text>
-                  <TouchableOpacity style={styles.textAction} onPress={() => handleUnhide(item.id)} activeOpacity={0.6} accessibilityRole="button">
-                    <Text style={[styles.unhide, { color: theme.linkText }]}>Unhide</Text>
-                  </TouchableOpacity>
+                  <TextAction label="Unhide" tone="link" onPress={() => handleUnhide(item.id)} />
                 </View>
               ))
             )}
@@ -723,35 +726,16 @@ export default function PeopleScreen() {
             { backgroundColor: theme.background, paddingTop: insets.top + 12 },
           ]}
         >
-          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
-            <TouchableOpacity
-              style={styles.textAction}
-              onPress={() => setShowNameEdit(false)}
-              activeOpacity={0.6}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Your name</Text>
-            <TouchableOpacity
-              style={styles.textAction}
-              onPress={handleSaveName}
-              disabled={nameSaving || !nameDraft.trim()}
-              activeOpacity={0.6}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: nameSaving || !nameDraft.trim() }}
-            >
-              <Text
-                style={[
-                  styles.add,
-                  { color: theme.textPrimary },
-                  (nameSaving || !nameDraft.trim()) && { color: theme.textTertiary },
-                ]}
-              >
-                Save
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <AppHeader
+            title="Your name"
+            left={{ kind: 'cancel' }}
+            onLeft={() => setShowNameEdit(false)}
+            right={{
+              label: 'Save',
+              onPress: handleSaveName,
+              disabled: nameSaving || !nameDraft.trim(),
+            }}
+          />
           <View style={styles.manualForm}>
             <Text style={[styles.manualLabel, { color: theme.textSecondary }]}>Name</Text>
             <TextInput
@@ -778,30 +762,12 @@ export default function PeopleScreen() {
             { backgroundColor: theme.background, paddingTop: insets.top + 12 },
           ]}
         >
-          <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
-            <TouchableOpacity style={styles.textAction} onPress={() => setEditingCircle(null)} activeOpacity={0.6} accessibilityRole="button">
-              <Text style={[styles.back, { color: theme.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>{editingCircle?.name ?? 'Circle'}</Text>
-            <TouchableOpacity
-              style={styles.textAction}
-              onPress={handleSaveCircleMembers}
-              disabled={busy}
-              activeOpacity={0.6}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: busy }}
-            >
-              <Text
-                style={[
-                  styles.add,
-                  { color: theme.textPrimary },
-                  busy && { color: theme.textTertiary },
-                ]}
-              >
-                Save
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <AppHeader
+            title={editingCircle?.name ?? 'Circle'}
+            left={{ kind: 'cancel' }}
+            onLeft={() => setEditingCircle(null)}
+            right={{ label: 'Save', onPress: handleSaveCircleMembers, disabled: busy }}
+          />
           <FlatList
             data={people}
             keyExtractor={(item) => item.id}
@@ -825,7 +791,17 @@ export default function PeopleScreen() {
                   <Text style={[styles.personName, { color: theme.textPrimary }]}>
                     {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
                   </Text>
-                  {selected && <Text style={[styles.checkmark, { color: theme.textPrimary }]}>✓</Text>}
+                  {/* Circle = selectable, ✓ = confirmed/done (design-language
+                      §6): selection is a circle outline that fills with the
+                      accent, never a checkmark (audit UX-09). */}
+                  <View
+                    testID={selected ? 'selection-circle-selected' : 'selection-circle'}
+                    style={[
+                      styles.selectionCircle,
+                      { borderColor: selected ? theme.accent : theme.border },
+                      selected && { backgroundColor: theme.accent },
+                    ]}
+                  />
                 </TouchableOpacity>
               );
             }}
@@ -840,34 +816,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  back: {
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  add: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
   count: {
     fontSize: 14,
     paddingHorizontal: 20,
     paddingVertical: 8,
   },
-  loadError: {
+  refreshBanner: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  refreshBannerText: {
     fontSize: 14,
-    paddingHorizontal: 20,
-    paddingBottom: 8,
   },
   circlesSection: {
     paddingHorizontal: 20,
@@ -911,9 +871,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  manage: {
-    fontSize: 14,
-  },
   addCircleRow: {
     flexDirection: 'row',
     gap: 8,
@@ -922,21 +879,9 @@ const styles = StyleSheet.create({
   circleInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
     fontSize: 16,
-  },
-  addCircleBtn: {
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    borderRadius: 8,
-  },
-  addCircleBtnText: {
-    fontWeight: '600',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   settingsButton: {
     minHeight: 44,
@@ -967,13 +912,6 @@ const styles = StyleSheet.create({
   prefLabel: {
     fontSize: 16,
   },
-  // 44pt minimum touch target for bare-text buttons (header actions, row
-  // Remove/Edit/Delete/Unhide). Rows are already ≥44 tall, so this grows the
-  // tap area without shifting row layout.
-  textAction: {
-    minHeight: 44,
-    justifyContent: 'center',
-  },
   personRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -984,15 +922,11 @@ const styles = StyleSheet.create({
   personName: {
     fontSize: 16,
   },
-  checkmark: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  remove: {
-    fontSize: 14,
-  },
-  unhide: {
-    fontSize: 14,
+  selectionCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
   },
   emptyState: {
     flex: 1,
@@ -1004,9 +938,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
-    // conventions-ok: off-scale 20px — migrates to the §4 scale in Design
-    // System Consolidation Phase 3 (audit UX-06).
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
   },
@@ -1016,25 +948,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 24,
   },
-  emptyButton: {
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 10,
-  },
-  emptyButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
   modalContainer: {
     flex: 1,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
   },
   manualForm: {
     padding: 20,

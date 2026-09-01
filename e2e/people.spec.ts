@@ -51,15 +51,16 @@ test('add person, manage a circle, then remove both', async ({
     const membersDialog = page.getByRole('dialog');
     await circleRow.getByRole('button', { name: 'Edit' }).click();
     // Same retry-guarded selection as the share sheet: the tap can be eaten
-    // by a re-render, so retry until the row's ✓ shows.
+    // by a re-render, so retry until the row's selection circle fills
+    // (circle = selectable, ✓ = confirmed/done — UX-09).
     const memberRow = membersDialog
       .getByText(personName, { exact: true })
       .locator('..');
     await expect(async () => {
-      if (!(await memberRow.getByText('✓').isVisible().catch(() => false))) {
+      if (!(await memberRow.getByTestId('selection-circle-selected').isVisible().catch(() => false))) {
         await memberRow.click();
       }
-      await expect(memberRow.getByText('✓')).toBeVisible({ timeout: 2000 });
+      await expect(memberRow.getByTestId('selection-circle-selected')).toBeVisible({ timeout: 2000 });
     }).toPass();
     await membersDialog.getByRole('button', { name: 'Save', exact: true }).click();
     // As with the add-person modal, wait for the slide-out to fully unmount

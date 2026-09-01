@@ -603,14 +603,17 @@ describe('app/(app)/people notification toggles', () => {
     });
   });
 
+  // KI-008: each notifications row is one switch control (role=switch, the
+  // whole row is the target); the visual switch inside is inert. State reads
+  // as accessibilityState.checked; a press toggles.
   it('renders both toggles with the loaded values', async () => {
     const { getByLabelText } = render(<PeopleScreen />);
 
     fireEvent.press(getByLabelText('Settings'));
     await waitFor(() =>
-      expect(getByLabelText('Text messages (SMS)').props.value).toBe(false)
+      expect(getByLabelText('Text messages (SMS)').props.accessibilityState.checked).toBe(false)
     );
-    expect(getByLabelText('Push notifications').props.value).toBe(true);
+    expect(getByLabelText('Push notifications').props.accessibilityState.checked).toBe(true);
   });
 
   it('flipping a toggle writes the pref scoped to the caller', async () => {
@@ -618,15 +621,15 @@ describe('app/(app)/people notification toggles', () => {
 
     fireEvent.press(getByLabelText('Settings'));
     await waitFor(() =>
-      expect(getByLabelText('Text messages (SMS)').props.value).toBe(false)
+      expect(getByLabelText('Text messages (SMS)').props.accessibilityState.checked).toBe(false)
     );
-    fireEvent(getByLabelText('Text messages (SMS)'), 'onValueChange', true);
+    fireEvent.press(getByLabelText('Text messages (SMS)'));
 
     await waitFor(() => {
       expect(mockUsersUpdate).toHaveBeenCalledWith({ notify_sms: true });
     });
     expect(mockUsersUpdateEq).toHaveBeenCalledWith('id', 'u1');
-    expect(getByLabelText('Text messages (SMS)').props.value).toBe(true);
+    expect(getByLabelText('Text messages (SMS)').props.accessibilityState.checked).toBe(true);
   });
 
   it('a failed write reverts the switch and shows a short alert', async () => {
@@ -637,9 +640,9 @@ describe('app/(app)/people notification toggles', () => {
 
     fireEvent.press(getByLabelText('Settings'));
     await waitFor(() =>
-      expect(getByLabelText('Push notifications').props.value).toBe(true)
+      expect(getByLabelText('Push notifications').props.accessibilityState.checked).toBe(true)
     );
-    fireEvent(getByLabelText('Push notifications'), 'onValueChange', false);
+    fireEvent.press(getByLabelText('Push notifications'));
 
     await waitFor(() => {
       expect(showAlert).toHaveBeenCalledWith(
@@ -647,7 +650,7 @@ describe('app/(app)/people notification toggles', () => {
         'Something went wrong. Try again.'
       );
     });
-    expect(getByLabelText('Push notifications').props.value).toBe(true);
+    expect(getByLabelText('Push notifications').props.accessibilityState.checked).toBe(true);
   });
 
   it('a failed prefs read keeps the defaults instead of failing the load', async () => {
@@ -656,8 +659,8 @@ describe('app/(app)/people notification toggles', () => {
 
     await waitFor(() => expect(getByText('No people yet')).toBeTruthy());
     fireEvent.press(getByLabelText('Settings'));
-    expect(getByLabelText('Push notifications').props.value).toBe(true);
-    expect(getByLabelText('Text messages (SMS)').props.value).toBe(true);
+    expect(getByLabelText('Push notifications').props.accessibilityState.checked).toBe(true);
+    expect(getByLabelText('Text messages (SMS)').props.accessibilityState.checked).toBe(true);
   });
 });
 
