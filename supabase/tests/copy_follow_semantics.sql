@@ -726,7 +726,8 @@ BEGIN
 END $$;
 
 -- ===== T13: the pre-Location 7-arg signature still works — installed
--- builds (TestFlight 9 / Play v7) call it; it delegates with NULL location.
+-- builds (TestFlight 9 / Play v7) call it; on create it delegates with NULL
+-- location (edits preserve the row's current location — T13b).
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
 SELECT public.save_event('eeeeeeee-0000-0000-0000-00000000000a', null, 'Old Client', null, null, '2026-12-07', null);

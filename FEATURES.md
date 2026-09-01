@@ -21,7 +21,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Delete Account](#delete-account) | Implemented | |
 | [Inline Add-by-Phone in Share Sheet](#inline-add-by-phone-in-share-sheet) | Planned | Convenience. A new user can already share. |
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
-| [Location](#location) | In progress | Free-text venue field; tappable Maps link on the detail screen. Ships before Richer Link Autofill. Spec owner-approved 2026-09-01. |
+| [Location](#location) | Implemented | Free-text venue field; tappable Maps link on the detail screen. Ships before Richer Link Autofill. Spec owner-approved 2026-09-01. |
 | [Richer Link Autofill](#richer-link-autofill) | Planned | JSON-LD + Ticketmaster/RA lookups fill title/date/time/location/image. Provider evidence: [docs/link-autofill-provider-matrix.md](docs/link-autofill-provider-matrix.md). Spec owner-approved 2026-09-01. |
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. Related: [KI-011](manual-tests/known_issues.md) (person rows too tall). |
 | [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
@@ -400,7 +400,7 @@ On the event detail screen ([app/(app)/event/[id].tsx](app/(app)/event/[id].tsx)
 
 ## Location
 
-**Status:** In progress — ships before [Richer Link Autofill](#richer-link-autofill), which fills this field from link markup. Spec owner-approved 2026-09-01: free text, no Places autocomplete, tappable Maps link on the detail screen.
+**Status:** Implemented 2026-09-01 — ships before [Richer Link Autofill](#richer-link-autofill), which fills this field from link markup. Spec owner-approved 2026-09-01: free text, no Places autocomplete, tappable Maps link on the detail screen. The pre-Location 7-arg `save_event` survives as a delegating wrapper (passes the row's current location through on edit) so installed builds keep working until their next update.
 
 ### Problem
 
@@ -424,11 +424,11 @@ One free-text `location` column on events. No Google Places API, no autocomplete
 
 ### Acceptance Criteria
 
-- [ ] Location round-trips: create → edit → share → follower cascade → pending-share delivery
-- [ ] Detail screen row opens the Maps search URL; forms never render it as a link
-- [ ] Google link and .ics carry location; the receipt page port matches and renders it
-- [ ] Share SMS includes the venue line when present
-- [ ] Empty location renders nothing anywhere (no empty row, no stray export param)
+- [x] Location round-trips: create → edit → share → follower cascade → pending-share delivery
+- [x] Detail screen row opens the Maps search URL; forms never render it as a link
+- [x] Google link and .ics carry location; the receipt page port matches and renders it
+- [x] Share SMS includes the venue line when present
+- [x] Empty location renders nothing anywhere (no empty row, no stray export param)
 
 ---
 
