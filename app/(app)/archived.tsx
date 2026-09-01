@@ -16,6 +16,8 @@ import { useSession } from '../_context/SessionContext';
 import type { ArchivedEvent } from '../../lib/types';
 import { useTheme } from '../../hooks/useTheme';
 import { EventCard } from '../../components/EventCard';
+import { AppHeader } from '../../components/AppHeader';
+import { Chip } from '../../components/Chip';
 import {
   previewFromCalendarEvent,
   rememberEventPreview,
@@ -132,17 +134,7 @@ export default function ArchivedScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.navRow}>
-        {/* conventions-ok: migrates to AppHeader in Design System Consolidation Phase 3 */}
-        <TouchableOpacity
-          onPress={() => router.back()}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-        >
-          <Text style={[styles.navBack, { color: theme.textSecondary }]}>Back</Text>
-        </TouchableOpacity>
-      </View>
+      <AppHeader left={{ kind: 'back', label: 'Events' }} onLeft={() => router.back()} />
       {loadError ? (
         <TouchableOpacity
           style={[styles.refreshBanner, { backgroundColor: theme.surface }]}
@@ -154,7 +146,7 @@ export default function ArchivedScreen() {
           activeOpacity={0.6}
           accessibilityRole="button"
         >
-          <Text style={[styles.refreshBannerText, { color: theme.textPrimary }]}>
+          <Text style={[styles.refreshBannerText, { color: theme.linkText }]}>
             Could not refresh. Retry
           </Text>
         </TouchableOpacity>
@@ -184,22 +176,14 @@ export default function ArchivedScreen() {
               <View style={styles.cardWrap}>
                 <EventCard event={event} onPress={() => openEvent(event)} />
               </View>
-              <TouchableOpacity
-                style={[styles.restoreButton, { backgroundColor: theme.surfaceSecondary }]}
+              <Chip
+                label="Restore"
                 onPress={() => handleRestore(event)}
-                activeOpacity={0.7}
+                loading={restoringId === event.id}
                 disabled={restoringId !== null}
-                accessibilityRole="button"
                 accessibilityLabel={`Restore ${event.title ?? 'untitled event'}`}
-              >
-                {restoringId === event.id ? (
-                  <ActivityIndicator size="small" color={theme.textSecondary} />
-                ) : (
-                  <Text style={[styles.restoreButtonText, { color: theme.textPrimary }]}>
-                    Restore
-                  </Text>
-                )}
-              </TouchableOpacity>
+                style={styles.restoreChip}
+              />
             </View>
           ))
         )}
@@ -211,13 +195,6 @@ export default function ArchivedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  navRow: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  navBack: {
-    fontSize: 16,
   },
   refreshBanner: {
     paddingVertical: 12,
@@ -249,18 +226,8 @@ const styles = StyleSheet.create({
   cardWrap: {
     flex: 1,
   },
-  restoreButton: {
-    minHeight: 44,
-    minWidth: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    borderRadius: 22,
+  restoreChip: {
     marginLeft: 12,
     marginBottom: 12,
-  },
-  restoreButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
