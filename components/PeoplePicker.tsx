@@ -15,6 +15,7 @@ import type { ContactWithPhone } from '../lib/contacts';
 import { formatPhoneDisplay } from '../lib/format';
 import { useTheme } from '../hooks/useTheme';
 import { withFetchTimeout } from '../lib/timeoutSignal';
+import { AppHeader } from './AppHeader';
 
 type Props = {
   onSelect: (contacts: { phoneNumber: string; name: string | null }[]) => void;
@@ -107,29 +108,16 @@ export function PeoplePicker({
           { backgroundColor: theme.background, paddingTop: insets.top + 12 },
         ]}
       >
-        <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-          <TouchableOpacity onPress={onCancel} activeOpacity={0.6} accessibilityRole="button">
-            <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Add people</Text>
-          <TouchableOpacity
-            onPress={handleConfirm}
-            disabled={selected.size === 0}
-            activeOpacity={0.6}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: selected.size === 0 }}
-          >
-            <Text
-              style={[
-                styles.done,
-                { color: theme.textPrimary },
-                selected.size === 0 && { color: theme.textTertiary },
-              ]}
-            >
-              Add {selected.size > 0 ? `(${selected.size})` : ''}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <AppHeader
+          title="Add people"
+          left={{ kind: 'cancel' }}
+          onLeft={onCancel}
+          right={{
+            label: selected.size > 0 ? `Add (${selected.size})` : 'Add',
+            onPress: handleConfirm,
+            disabled: selected.size === 0,
+          }}
+        />
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={theme.textPrimary} />
@@ -190,7 +178,17 @@ export function PeoplePicker({
                         </Text>
                       ) : null}
                     </View>
-                    {isSelected && <Text style={[styles.check, { color: theme.textPrimary }]}>✓</Text>}
+                    {/* Circle = selectable, ✓ = confirmed/done (design-language
+                        §6): selection is a circle outline that fills with the
+                        accent, never a checkmark (audit UX-09). */}
+                    <View
+                      testID={isSelected ? 'selection-circle-selected' : 'selection-circle'}
+                      style={[
+                        styles.selectionCircle,
+                        { borderColor: isSelected ? theme.accent : theme.border },
+                        isSelected && { backgroundColor: theme.accent },
+                      ]}
+                    />
                   </TouchableOpacity>
                 );
               }}
@@ -205,25 +203,6 @@ export function PeoplePicker({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  cancel: {
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  done: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   loadingContainer: {
     padding: 24,
@@ -273,8 +252,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  check: {
-    fontSize: 18,
-    fontWeight: '600',
+  selectionCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
   },
 });

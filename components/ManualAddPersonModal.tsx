@@ -6,6 +6,7 @@ import { showAlert } from '../lib/dialogs';
 import { normalizeToE164 } from '../lib/contacts';
 import { useTheme } from '../hooks/useTheme';
 import { isAbortError, withWriteTimeout } from '../lib/timeoutSignal';
+import { AppHeader } from './AppHeader';
 
 type Props = {
   visible: boolean;
@@ -96,29 +97,12 @@ export function ManualAddPersonModal({
         // window bottom, so no bottom inset is needed (KI-005 rule).
         style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + 12 }]}
       >
-        <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-          <TouchableOpacity onPress={handleClose} activeOpacity={0.6} accessibilityRole="button">
-            <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Add person</Text>
-          <TouchableOpacity
-            onPress={handleSave}
-            disabled={saving || !phone.trim()}
-            activeOpacity={0.6}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: saving || !phone.trim() }}
-          >
-            <Text
-              style={[
-                styles.save,
-                { color: theme.textPrimary },
-                (saving || !phone.trim()) && { color: theme.textTertiary },
-              ]}
-            >
-              Save
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <AppHeader
+          title="Add person"
+          left={{ kind: 'cancel' }}
+          onLeft={handleClose}
+          right={{ label: 'Save', onPress: handleSave, disabled: saving || !phone.trim() }}
+        />
         <View style={styles.form}>
           <Text style={[styles.label, { color: theme.textSecondary }]}>Name (optional)</Text>
           <TextInput
@@ -151,26 +135,6 @@ export function ManualAddPersonModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    minHeight: 44,
-  },
-  cancel: {
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  save: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   form: {
     padding: 20,
