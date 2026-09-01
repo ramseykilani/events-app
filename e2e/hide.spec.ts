@@ -1,3 +1,4 @@
+import { type Dialog } from '@playwright/test';
 import { expect, newExtraContext, test } from './fixtures';
 import { AUTH_FILE_B } from './constants';
 import {
@@ -15,8 +16,9 @@ import {
 
 const PERSON_A_NAME = 'E2E Account A';
 
-// Hide/unhide (E-105): B hides A from a shared event's detail, the event
-// disappears from B's calendar, and unhiding from People brings it back.
+// Hide/unhide (E-105): B hides A from a shared event's detail — after a
+// confirm dialog — the event disappears from B's calendar, and unhiding from
+// the People Settings sheet brings it back.
 //
 // The Hide button needs B to have A in My People (sharer attribution resolves
 // to the recipient's own person row for the sharer), so the test upserts that
@@ -55,32 +57,68 @@ test('hiding the sharer suppresses their events until unhidden', async ({
     await expect(pageB.getByText(title, { exact: true })).toBeVisible({
       timeout: 15000,
     });
+    // The Hide button rides on the calendar row's sharer_person_id, which
+    // only resolves once B's just-added person row for A is linked and the
+    // post-add refetch lands. "From E2E Account A" (B's contact name, not
+    // A's display-name fallback) is the visible proof of that join — the
+    // standing accounts never race this because their link predates the run.
+    // Scope to this run's card: failed runs can leave same-attribution
+    // residue on the shared calendar.
+    await expect(
+      pageB
+        .getByRole('button', { name: title })
+        .getByText(`From ${PERSON_A_NAME}`, { exact: true })
+    ).toBeVisible();
     await openEventFromCalendar(pageB, title);
+
+    // Cancel path: dismissing the confirm changes nothing and stays on the
+    // event (Playwright's default dialog dismissal is the Cancel path).
+    pageB.once('dialog', (dialog) => dialog.dismiss());
+    await pageB.getByRole('button', { name: /^Hide / }).click();
+    await expect(
+      pageB.getByRole('button', { name: /^Hide / })
+    ).toBeVisible();
+
+    // Confirm path: the dialog names the consequence, the silence, and the
+    // undo path before anything writes.
+    const confirmMessages: string[] = [];
+    pageB.once('dialog', (dialog: Dialog) => {
+      confirmMessages.push(dialog.message());
+      void dialog.accept();
+    });
     await pageB.getByRole('button', { name: /^Hide / }).click();
     hidA = true;
+    expect(confirmMessages).toHaveLength(1);
+    expect(confirmMessages[0]).toContain(`Hide ${PERSON_A_NAME}?`);
+    expect(confirmMessages[0]).toContain("won't see events they send you");
+    expect(confirmMessages[0]).toContain("aren't told");
+    expect(confirmMessages[0]).toContain('unhide them anytime from My People');
 
     // Hiding navigates back; the calendar refetch drops A's event.
     await expectCalendar(pageB);
     await expect(pageB.getByText(title, { exact: true })).not.toBeVisible();
 
-    // Unhide from the People screen's Hidden section. Hidden people still
-    // appear in the main People list too, so scope strictly to the section.
+    // Unhide from the People Settings sheet's Hidden section — its permanent
+    // home. A still appears in the main People list behind the sheet, so
+    // scope strictly to the dialog.
     await pageB.getByRole('button', { name: 'People' }).click();
-    const hiddenSection = pageB
-      .getByText('Hidden', { exact: true })
-      .locator('..');
+    await pageB.getByRole('button', { name: 'Settings' }).click();
+    const settingsSheet = pageB.getByRole('dialog');
     await expect(
-      hiddenSection.getByText(PERSON_A_NAME, { exact: true })
+      settingsSheet.getByText('Hidden (1)', { exact: true })
     ).toBeVisible();
-    await hiddenSection
+    await settingsSheet
       .getByText(PERSON_A_NAME, { exact: true })
       .locator('..')
       .getByRole('button', { name: 'Unhide' })
       .click();
-    await expect(
-      hiddenSection.getByText(PERSON_A_NAME, { exact: true })
-    ).not.toBeVisible();
+    // The section stays put with a quiet empty state once the last hidden
+    // person is unhidden.
+    await expect(settingsSheet.getByText('No hidden people')).toBeVisible();
     hidA = false;
+    await settingsSheet.getByRole('button', { name: 'Close' }).click();
+    // Wait for the sheet to unmount before touching what's underneath.
+    await expect(settingsSheet).toBeHidden();
     await pageB.getByRole('button', { name: 'Back' }).click();
 
     // The event is back on B's calendar.
@@ -97,9 +135,9 @@ test('hiding the sharer suppresses their events until unhidden', async ({
       // Best effort: never leave A hidden on the shared account.
       try {
         await pageB.getByRole('button', { name: 'People' }).click();
+        await pageB.getByRole('button', { name: 'Settings' }).click();
         await pageB
-          .getByText('Hidden', { exact: true })
-          .locator('..')
+          .getByRole('dialog')
           .getByText(PERSON_A_NAME, { exact: true })
           .locator('..')
           .getByRole('button', { name: 'Unhide' })

@@ -640,7 +640,7 @@ export default function PeopleScreen() {
             contentContainerStyle={{ paddingBottom: 20 + insets.bottom }}
           >
             <TouchableOpacity
-              style={[styles.settingsRow, { borderBottomColor: theme.borderLight }]}
+              style={styles.settingsRow}
               onPress={openNameEditor}
               activeOpacity={0.6}
               accessibilityRole="button"

@@ -51,7 +51,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Provider Matrix Drift Check](#provider-matrix-drift-check) | Considering | Scheduled CI re-check of the autofill provider matrix. Owner deferred 2026-09-01 — manual agent sweeps suffice. |
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
-| [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | In progress | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. |
+| [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. |
 
 ## Using and testing
 
@@ -1791,7 +1791,7 @@ Implementation notes (2026-09-01): the say-No prompt resolves the answer slot fr
 
 ## Hide Confirmation & People Settings Sheet
 
-**Status:** In progress — spec owner-approved in discussion 2026-09-01. Amends [Hide](#hide) (the action gains a confirm) and the People screen chrome (the footer becomes a gear-opened sheet). Related: [Display Names](#display-names) and [Notification On/Off](#notification-onoff) (their footer entry points move into the sheet), [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the footer this removes).
+**Status:** Implemented (2026-09-01) — spec owner-approved in discussion 2026-09-01. Amends [Hide](#hide) (the action gains a confirm) and the People screen chrome (the footer becomes a gear-opened sheet). Related: [Display Names](#display-names) and [Notification On/Off](#notification-onoff) (their footer entry points move into the sheet), [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the footer this removes).
 
 ### Problem
 

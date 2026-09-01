@@ -203,13 +203,14 @@ For each executed scenario:
 
 ### E-105 Hide suppresses calendar entries and notifications
 **Steps**
-1. As account B (with an event shared by A), open the shared event's detail and tap **Hide [name]**.
+1. As account B (with an event shared by A), open the shared event's detail and tap **Hide [name]** — a confirm dialog ("Hide [name]?") appears; Cancel keeps everything unchanged and stays on the event. Tap Hide to confirm.
 2. Return to the calendar and confirm A's shared events are gone.
 3. As account A, share another event with B.
 4. As B, confirm no push notification (and no SMS, if Twilio is configured) arrives for the new share.
-5. From B's People screen, unhide A and confirm events reappear after refresh.
+5. From B's People screen, open the Settings sheet (header gear) and unhide A from the **Hidden** section (always visible, with a count when non-empty). Confirm events reappear after refresh.
 
 **Expected**
+- The hide confirm names the consequence, the silence (they aren't told), and the undo path; its Hide button is not red. Unhide has no dialog.
 - Hidden person's events disappear from the calendar immediately.
 - New shares from a hidden person produce no push and no SMS.
 - Unhide restores visibility.
@@ -286,7 +287,7 @@ For each executed scenario:
 
 ### E-111 Notification on/off toggles gate push and SMS independently
 **Steps**
-1. As account B, open People → **Notifications** and turn **Text messages (SMS)** off; leave push on. Close the modal, reopen it — the setting persists.
+1. As account B, open People → Settings gear → **Notifications** and turn **Text messages (SMS)** off; leave push on. Close the sheet, reopen it — the setting persists.
 2. As account A, create an event and share it with B.
 3. Confirm B's copy lands on B's calendar regardless, and B gets no SMS (push still allowed). The share's `send-notification` call reports `sms: 0` for B.
 4. As B, turn SMS back on and turn **Push notifications** off.

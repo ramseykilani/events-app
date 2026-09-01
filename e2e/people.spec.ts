@@ -85,22 +85,22 @@ test('add person, manage a circle, then remove both', async ({
   }
 });
 
-// Notification On/Off: the People footer's Notifications modal carries
-// independent push and SMS toggles persisted on the users row. Flips must
-// survive a reload (server state, not local), and the shared account must end
-// with both channels back where they started.
+// Notification On/Off: the People Settings sheet carries independent push and
+// SMS toggles inline, persisted on the users row. Flips must survive a reload
+// (server state, not local), and the shared account must end with both
+// channels back where they started.
 test('notification toggles persist across reload', async ({ page }) => {
   await page.goto('/');
   await expectCalendar(page);
   await page.getByRole('button', { name: 'People' }).click();
   await expect(page.getByText('My People')).toBeVisible();
 
-  // The toggles live in a modal (role=dialog) over the People screen.
+  // The toggles live in the Settings sheet (role=dialog) over the People screen.
   const dialog = page.getByRole('dialog');
   const smsToggle = dialog.getByRole('switch', { name: 'Text messages (SMS)' });
   const pushToggle = dialog.getByRole('switch', { name: 'Push notifications' });
   const openPrefs = async () => {
-    await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(smsToggle).toBeVisible();
   };
   await openPrefs();
@@ -152,4 +152,39 @@ test('notification toggles persist across reload', async ({ page }) => {
       // run's isChecked() baseline read makes any state self-correcting.
     }
   }
+});
+
+// Settings sheet: the People header gear opens it and Close closes it. The
+// sheet holds every ex-footer action, and the Hidden section is always
+// visible — the quiet empty state when nobody is hidden (the populated state
+// and Unhide are covered end-to-end in hide.spec.ts).
+test('settings sheet opens from the gear and always shows the Hidden section', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expectCalendar(page);
+  await page.getByRole('button', { name: 'People' }).click();
+  await expect(page.getByText('My People')).toBeVisible();
+
+  // The footer is gone — no account actions on the screen itself.
+  await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete account' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByText('Settings')).toBeVisible();
+  await expect(sheet.getByRole('button', { name: /Your name:/ })).toBeVisible();
+  await expect(
+    sheet.getByRole('switch', { name: 'Push notifications' })
+  ).toBeVisible();
+  await expect(
+    sheet.getByRole('switch', { name: 'Text messages (SMS)' })
+  ).toBeVisible();
+  await expect(sheet.getByText('Hidden', { exact: true })).toBeVisible();
+  await expect(sheet.getByText('No hidden people')).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Delete account' })).toBeVisible();
+
+  await sheet.getByRole('button', { name: 'Close' }).click();
+  await expect(sheet).toBeHidden();
 });
