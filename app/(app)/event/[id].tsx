@@ -351,7 +351,11 @@ export default function EventDetailScreen() {
     if (writeInFlightRef.current) return;
     const rowId = event.id;
     const rowDate = event.event_date;
-    const answerable = event.from_event_id !== null;
+    // Gate on from_user_id (the received classification), NOT from_event_id:
+    // calendar previews carry from_user_id but not from_event_id, so a
+    // preview-seeded row must still resolve the answer slot below — the
+    // prompt must ride even a fast tap straight off the calendar.
+    const received = event.from_user_id !== null;
     writeInFlightRef.current = true;
     setLoading(true);
     void (async () => {
@@ -390,14 +394,16 @@ export default function EventDetailScreen() {
       // event with a live send and a NULL/Yes answer asks; past events and
       // an existing No archive silently. The archive stands even if the No
       // write fails — no rollback.
-      if (!answerable || rowDate < localDateString(new Date())) {
+      if (!received || rowDate < localDateString(new Date())) {
         navBack();
         return;
       }
       // Resolve the answer slot fresh: a preview-seeded screen can be
       // archived before the focus load answers get_my_send_response, and the
-      // prompt must never be skipped by a fast tap. Best-effort — if the
-      // read fails, the archive stands and nobody is asked.
+      // prompt must never be skipped by a fast tap. (A received row whose
+      // send is gone — the sender deleted their row — returns zero rows and
+      // archives silently.) Best-effort: if the read fails, the archive
+      // stands and nobody is asked.
       let reply: ReplyState | null = null;
       try {
         reply = await withRetries(async (signal) => {

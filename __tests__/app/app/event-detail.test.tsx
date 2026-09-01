@@ -394,6 +394,40 @@ describe('app/(app)/event/[id]', () => {
     expect(screen.getByText('Archive')).toBeTruthy();
   });
 
+  it('still offers the say-No prompt when archiving before the detail fetch lands', async () => {
+    // A preview-seeded received row (from_user_id carried, from_event_id
+    // not) archived with the own-row fetch still in flight: the archive flow
+    // resolves the answer slot itself, so a fast tap off the calendar cannot
+    // skip the prompt.
+    rememberEventPreview({
+      event_id: 'e1',
+      title: 'Board Game Night',
+      description: null,
+      image_url: null,
+      url: null,
+      event_date: '2099-10-10',
+      event_time: null,
+      from_user_id: 'u-sender',
+    });
+    mockEventsMaybeSingle.mockReturnValue(new Promise(() => {})); // hung load
+    mockReplyState(null, true);
+
+    const screen = render(<EventDetailScreen />);
+    fireEvent.press(screen.getByText('Archive'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Taken off your calendar.',
+        "Let Alice know you're not in?",
+        expect.any(Array)
+      );
+    });
+    expect(mockRpc).toHaveBeenCalledWith('set_event_archived', {
+      p_event_id: 'e1',
+      p_archived: true,
+    });
+  });
+
   it('gives up a hung fetch after a few short attempts and shows Retry', async () => {
     jest.useFakeTimers();
     mockEventsMaybeSingle.mockReturnValue(new Promise(() => {}));
