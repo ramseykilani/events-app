@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import { Colors, THEME_REGISTRY } from '../../constants/Colors';
 import { navigationTheme, themedScreenOptions } from '../../lib/navigationTheme';
 
@@ -27,12 +26,6 @@ describe('navigationTheme', () => {
 });
 
 describe('themedScreenOptions', () => {
-  const originalOS = Platform.OS;
-
-  afterEach(() => {
-    Platform.OS = originalOS;
-  });
-
   it.each(THEME_REGISTRY.map(({ name }) => [name] as const))(
     'paints the transitioning card with the %s background',
     (name) => {
@@ -42,11 +35,8 @@ describe('themedScreenOptions', () => {
     }
   );
 
-  it('uses the calm fade on Android and the standard slide elsewhere', () => {
-    Platform.OS = 'android';
-    expect(themedScreenOptions(Colors.paper).animation).toBe('fade_from_bottom');
-    Platform.OS = 'ios';
-    expect(themedScreenOptions(Colors.paper).animation).toBe('default');
+  it('keeps the platform-default slide animation (fade was owner-rejected)', () => {
+    expect(themedScreenOptions(Colors.paper)).not.toHaveProperty('animation');
   });
 
   it('freezes covered screens so they stop re-rendering mid-transition', () => {
