@@ -52,6 +52,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Provider Matrix Drift Check](#provider-matrix-drift-check) | Considering | Scheduled CI re-check of the autofill provider matrix. Owner deferred 2026-09-01 — manual agent sweeps suffice. |
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. |
+| [Design System Consolidation](#design-system-consolidation) | Planned | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Worst-first from the event detail screen; form grammar lands before Richer Link Autofill. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). |
 
 ## Using and testing
 
@@ -1845,3 +1846,77 @@ Rationale for the gear living on the People screen and not the calendar header: 
 ### Open Questions
 
 - None
+
+---
+
+## Design System Consolidation
+
+**Status:** Planned. Recorded 2026-09-01 from the app-wide UX pattern audit — [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md) (per-screen inventories, severity-ranked findings UX-01…UX-27, each marked DERIVED/JUDGMENT with its basis cite). Related: [Button Size & Clickability](#button-size--clickability) (Planned — the native feel pass; this entry is the structural superset and may absorb it — owner call), [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass, which covered one screen), [KI-008](manual-tests/known_issues.md) (switch sizing rides Phase 3). **Sequencing: the form-grammar work (Phase 2) must land before [Richer Link Autofill](#richer-link-autofill) starts** — that feature rebuilds the add/edit forms, and building it on today's drifted form grammar would bake the drift in.
+
+### Problem
+
+The design language defines color roles, a type scale, and a radius spectrum, but nothing enforces them at the component level, so every screen invented its own grammar. The audit (at `91ff1e2`) found:
+
+- **Four header/back grammars** across the seven visible `router.back()` call sites — floating hitSlop-only "Back" text (event detail, archived), bordered bars with real 44pt text actions (share, people), bordered bars with hitSlop-only actions (add/edit), and bordered bars with no target expansion at all (PeoplePicker, ManualAddPersonModal — ~22px targets, and the manual-add modal is the web path). Auth screens have no header grammar; verify has no exit at all (UX-04).
+- **Five button-text sizes (15/16/18/20) and button radii from 8 to 16**, both off the §4/§5 scales — the event detail screen stacks four same-geometry jumbo buttons (20px/600, r16) differentiated only by fill, so the primary action competes with three equals (Gestalt similarity; HIG's one-high-emphasis-action rule). §4 defines no button-label rung, which is how the drift was invited.
+- **Sub-44pt visible targets on the most-tapped navigation chrome** — hitSlop expands the touchable area but the visible target stays a 16px word; "Open link" has no expansion at all (~18px, under even WCAG 2.5.8's 24px floor).
+- **Color-role drift** — the location row spends `accent` on a functional link (2.83:1 in Paper, failing §3's own contrast sentence; the Location spec and §3 currently disagree), the people retry line spends `destructiveLink` on information, and selection glyphs split between the §6 circle and ✓.
+- **One screen over the choice-count line** — event detail presents up to 12 simultaneous touch targets (Hick).
+
+Each screen passes review alone; the system drifts because `check-conventions.mjs` watches colors, dialogs, timeouts, and modal chrome — nothing visual-structural.
+
+### Proposed Solution
+
+Three pieces, adopted worst-first:
+
+**1. `components/AppHeader.tsx` — one header grammar.** A real 44pt bar (the bar and each action carry `minHeight: 44` — visible targets, never hitSlop-only): chevron-back icon + destination label on the left, centered 18px/600 title, right slot for the primary text action. Fixed left-control vocabulary: chevron + label for navigation, **Cancel** for abandoning edits, **Close** for dismissing sheets, **Done** after a completed send. Replaces grammars A–D on every pushed screen and sheet.
+
+**2. A button-tier component set** — exactly three tiers, none accepting fontSize/borderRadius overrides:
+
+- `PrimaryButton` — `primaryButtonBg` fill, 16px/600 label (assigned to §4's Body rung), radius 12, minHeight 48. One per view.
+- `SecondaryButton` — `surfaceSecondary` fill, same geometry.
+- `QuietDestructiveLink` — `destructiveLink` text action with a real 44pt target, for Remove/Delete row actions and footer entries (the pattern people's `textAction` already pioneered).
+
+Named `IconButton` (44×44, r10) and `Chip`/`Pill` (fully rounded) components cover the remaining legit shapes. The event-detail action stack becomes: primary Share, secondary Edit, quiet Archive/Restore, Hide demoted out of the jumbo row — one high-emphasis action per view.
+
+**3. Phased adoption, worst-first.**
+
+- **Phase 1 — event detail** (`app/(app)/event/[id].tsx`): AppHeader, tiered action stack, one content measure, and the location-row restyle to `linkText` once the owner rules on audit UX-13 (the audit's recommendation: restyle, don't amend §3 — it fixes the role-law violation and the 2.83:1 contrast in one move and is invisible in Evening). Plus the two grammar-D modal headers (PeoplePicker, ManualAddPersonModal) — the worst targets in the app.
+- **Phase 2 — add/edit forms**: AppHeader + one input grammar (16px text, r12 everywhere). Lands before Richer Link Autofill starts. Includes gating edit-event's Remove Event to self-created rows (audit UX-20 — the shipped Archive spec promises no delete path for received events).
+- **Phase 3 — people, share, archived, verify**: AppHeader everywhere, retry/error grammar unified (one layout, one color — audit UX-17/UX-23), verify gains a wrong-number exit (UX-04), ThemedSwitch sizing (KI-008).
+- **Phase 4 — calendar header**: protected chrome (swatch / `?` / People / `+`) stays; target and grammar normalization only.
+
+Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar, add-event, event detail, edit-event) regenerates baselines via the **Regenerate visual baselines** workflow — never a locally regenerated mobile-safari baseline.
+
+### Technical Notes
+
+- **New `check-conventions.mjs` rules** (each with the `conventions-ok` escape hatch, matching the existing nine):
+  - **fontSize cap** — flag `fontSize` outside the §4 scale: allow 12–18 and 28–32; flag 19–27 and anything over 32. Kills the 20px/24px drift class without needing to know context.
+  - **borderRadius spectrum** — flag numeric `borderRadius` outside 4–12 unless the same style object sets a matching `width`/`height` of `2 × radius` (the pill heuristic: chips, FAB, help button, swatch) or carries `conventions-ok`. Kills r16 buttons and r8 inputs.
+  - **No bare Back text buttons** — flag a `TouchableOpacity`/`Pressable` whose text child is `Back` outside `components/AppHeader.tsx` (post-action programmatic `router.back()` calls are unaffected). Lands with Phase 1, enforcement flipping on as screens adopt AppHeader.
+  - **Selection glyph** (code-review rule first, lint if a clean heuristic emerges): ✓ means confirmed/done (§6); selection is the circle. PeoplePicker and the circle editor are the known violators (UX-09).
+- **The standing convention** — proposed text for AGENTS.md / the project rules, a per-task holistic definition of done:
+
+  > **Holistic screen review (per task).** Before pushing, re-open every screen your change touched and check it against the UX checklist dimensions: header/back grammar, button tiers, ≥44pt visible targets, one content measure, §3 color roles, consequential-action confirms, target count. Fix holistic regressions your change introduced, in scope. If the screen already violates a dimension beyond your scope, flag it in FEATURES.md — never ship the local win at the screen's expense. `npm run test:conventions` is the floor, not the ceiling.
+
+- **Palette-level findings are not in this feature's scope.** The Paper contrast cluster (accent-as-text 2.83:1, selected-day text 3.03:1, destructive-on-destructiveBg 3.99:1 — audit UX-14/15/16) is owner territory; the component set must not hard-code around it. §3's stale token table (UX-19) is a docs sync for the owner to bless.
+- **Tests:** Jest coverage for the new components; the existing e2e suite drives the same flows through the new chrome (selectors may need updating — strengthening assertions is fine, weakening is not); visual baselines regenerated per phase via CI.
+- **Verify bar:** fast checks + a new or updated Playwright spec per phase, desktop Chrome locally, per AGENTS.md.
+
+### Acceptance Criteria
+
+- [ ] `components/AppHeader.tsx` exists; every pushed screen and sheet uses it; no bare "Back" text buttons remain (lint-enforced); verify has a wrong-number exit
+- [ ] The three-tier button set exists; event detail's action stack is primary Share + secondary Edit + quiet Archive/Remove; no 20px button text or r16 buttons remain (lint-enforced)
+- [ ] Every header/modal action has a real 44pt visible target without hitSlop (PeoplePicker and ManualAddPersonModal included)
+- [ ] Add/edit forms consolidated to one input grammar before Richer Link Autofill starts; edit-event no longer offers Remove Event on received rows
+- [ ] `check-conventions.mjs` gains the fontSize cap, borderRadius spectrum, and bare-Back rules; fast checks green
+- [ ] Location-row color resolved per the owner's UX-13 ruling
+- [ ] Visual baselines regenerated per touched screen via the CI workflow; full suite green on every phase
+- [ ] The holistic-screen-review convention text lands in AGENTS.md / project rules with Phase 1
+
+### Open Questions
+
+- Does this absorb Button Size & Clickability (recommended — this is the structural superset; KI-008's switch sizing rides Phase 3 either way)?
+- The event-detail content measure: collapse the 600/400/centered mix to the app-wide full-width grammar, or keep a centered ceremonial column (owner — audit UX-11)? The centered title itself is not in question.
+- Exact pill heuristic for the radius lint (style-local `2 × radius` match vs an explicit allowlist).
+- Whether the selection-glyph rule graduates from code review to lint.
