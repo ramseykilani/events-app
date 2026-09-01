@@ -34,6 +34,11 @@
 //      handler leaves the sheet swallowing Back (KI-009/KI-012); on iOS a
 //      pageSheet swipe-down attempt rubber-bands instead of closing. Wire it
 //      to the sheet's own Close/Cancel.
+//   9. A file that spends insets.top must also spend insets.bottom — Android
+//      15+ enforces edge-to-edge (android.edgeToEdgeEnabled is inert), so the
+//      window bottom sits under the 3-button nav bar and only explicit bottom
+//      padding lifts content clear (KI-005). Short top-pinned forms that
+//      never reach the window bottom opt out with conventions-ok.
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -208,6 +213,26 @@ function checkModalRequestClose(path, source, text) {
   visit(source);
 }
 
+function checkBottomInset(path, text) {
+  const relPath = rel(path);
+  const lines = text.split('\n');
+  // Same comment-line tolerance as the hex/emoji rules: a trimmed line
+  // starting with // or * is prose, not usage.
+  const isCode = (l) => {
+    const t = l.trim();
+    return !t.startsWith('//') && !t.startsWith('*');
+  };
+  const topIdx = lines.findIndex((l) => isCode(l) && /insets\.top/.test(l));
+  if (topIdx === -1) return;
+  const hasBottom = lines.some((l) => isCode(l) && /insets\.bottom/.test(l));
+  if (hasBottom) return;
+  const line = topIdx + 1; // 1-indexed
+  if (hasAllowComment(lines, line)) return;
+  violations.push(
+    `${relPath}:${line} — pads insets.top but never insets.bottom; Android 15+ enforces edge-to-edge, so the 3-button nav bar covers the unpadded window bottom (KI-005). Pad the scroll content or container by insets.bottom, or mark conventions-ok with why nothing reaches the bottom`
+  );
+}
+
 function checkRawSwitchImport(path, source) {
   const relPath = rel(path);
   if (relPath === THEMED_SWITCH_FILE) return;
@@ -289,6 +314,7 @@ for (const dir of SCAN_DIRS) {
     checkShowErrorCalls(path, source, text);
     checkRawSwitchImport(path, source);
     checkModalRequestClose(path, source, text);
+    checkBottomInset(path, text);
   }
 }
 

@@ -218,6 +218,10 @@ export function Calendar({
       />
       <ScrollView
         style={styles.eventsList}
+        // KI-005: end-of-scroll clearance for the system nav/home indicator —
+        // Android 15+ enforces edge-to-edge, so the window bottom sits under
+        // the 3-button bar. 0 on web.
+        contentContainerStyle={{ paddingBottom: insets.bottom }}
         refreshControl={
           onRefresh ? (
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

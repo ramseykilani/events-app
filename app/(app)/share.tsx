@@ -304,7 +304,14 @@ export default function ShareScreen() {
     <View
       style={[
         styles.container,
-        { backgroundColor: theme.background, paddingTop: insets.top + 12 },
+        // KI-005: paddingBottom keeps the footer note / list end clear of the
+        // Android 3-button nav bar (edge-to-edge is OS-enforced on Android
+        // 15+; insets.bottom is 0 on web).
+        {
+          backgroundColor: theme.background,
+          paddingTop: insets.top + 12,
+          paddingBottom: insets.bottom,
+        },
       ]}
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>

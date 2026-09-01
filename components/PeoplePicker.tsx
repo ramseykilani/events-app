@@ -162,6 +162,9 @@ export function PeoplePicker({
               data={filteredContacts}
               extraData={searchQuery}
               keyboardShouldPersistTaps="handled"
+              // KI-005: keep the last contact clear of the Android 3-button
+              // nav bar (edge-to-edge is OS-enforced on Android 15+).
+              contentContainerStyle={{ paddingBottom: insets.bottom }}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => {
                 const isSelected = selected.has(item.normalized);

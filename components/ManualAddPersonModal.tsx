@@ -92,6 +92,8 @@ export function ManualAddPersonModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // conventions-ok: top-pinned two-field form — nothing reaches the
+        // window bottom, so no bottom inset is needed (KI-005 rule).
         style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top + 12 }]}
       >
         <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>

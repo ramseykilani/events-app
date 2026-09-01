@@ -1,10 +1,24 @@
 import React from 'react';
 import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
+import { ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { Calendar } from '../../components/Calendar';
 import { ThemeContextProvider } from '../../app/_context/ThemeContext';
 import type { CalendarEvent } from '../../lib/types';
+
+// Mutable insets so the KI-005 pin below can simulate a device whose bottom
+// system bar is non-zero (Android 3-button nav). The global jest.setup mock
+// returns all-zero insets; this file-level mock replaces it.
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = require('react-native');
+  return {
+    SafeAreaView: View,
+    SafeAreaProvider: View,
+    useSafeAreaInsets: () => mockInsets,
+  };
+});
 
 jest.mock('react-native-calendars', () => {
   const React = require('react');
@@ -84,6 +98,7 @@ describe('components/Calendar', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     jest.setSystemTime(new Date(2026, 3, 15, 12, 0, 0));
+    mockInsets.bottom = 0;
   });
 
   afterEach(() => {
@@ -215,5 +230,19 @@ describe('components/Calendar', () => {
 
     fireEvent.press(screen.getByLabelText('Archived events'));
     expect(router.push).toHaveBeenCalledWith('/(app)/archived');
+  });
+
+  // KI-005 regression pin: with a non-zero bottom system bar (Android
+  // 3-button nav — edge-to-edge is OS-enforced on Android 15+), the events
+  // list must pad its scroll content so the last event / Archived link can
+  // scroll fully clear of the bar.
+  it('pads the events list clear of the bottom system bar (KI-005)', () => {
+    mockInsets.bottom = 48;
+    const onMonthChange = jest.fn();
+    const screen = render(<Calendar events={events} onMonthChange={onMonthChange} />);
+
+    const list = screen.UNSAFE_getByType(ScrollView);
+    const contentStyle = list.props.contentContainerStyle;
+    expect(contentStyle?.paddingBottom).toBeGreaterThanOrEqual(48);
   });
 });

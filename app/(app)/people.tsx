@@ -580,6 +580,9 @@ export default function PeopleScreen() {
             <FlatList
               data={people}
               keyExtractor={(item) => item.id}
+              // KI-005: keep the last row clear of the Android 3-button nav
+              // bar (edge-to-edge is OS-enforced on Android 15+; 0 on web).
+              contentContainerStyle={{ paddingBottom: insets.bottom }}
               renderItem={({ item }) => (
                 <View style={[styles.personRow, { borderBottomColor: theme.surfaceSecondary }]}>
                   <Text style={[styles.personName, { color: theme.textPrimary }]}>
@@ -801,6 +804,9 @@ export default function PeopleScreen() {
           <FlatList
             data={people}
             keyExtractor={(item) => item.id}
+            // KI-005: keep the last row clear of the Android 3-button nav bar
+            // (edge-to-edge is OS-enforced on Android 15+; 0 on web).
+            contentContainerStyle={{ paddingBottom: insets.bottom }}
             renderItem={({ item }) => {
               const selected = selectedMemberIds.has(item.id);
               return (

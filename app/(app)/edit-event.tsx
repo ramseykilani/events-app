@@ -347,7 +347,12 @@ export default function EditEventScreen() {
         { backgroundColor: theme.background, paddingTop: insets.top + 12 },
       ]}
     >
-      <ScrollView keyboardShouldPersistTaps="handled">
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        // KI-005: keep Remove Event clear of the Android 3-button nav bar
+        // (edge-to-edge is OS-enforced on Android 15+; 0 on web).
+        contentContainerStyle={{ paddingBottom: insets.bottom }}
+      >
         <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
         <TouchableOpacity
           onPress={() => router.back()}
