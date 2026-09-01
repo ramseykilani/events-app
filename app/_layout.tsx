@@ -2,10 +2,12 @@ import { useEffect, useRef } from 'react';
 import { ActivityIndicator, LogBox, StatusBar, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
+import { ThemeProvider } from '@react-navigation/native';
 import { SessionContextProvider, useSession } from './_context/SessionContext';
 import { ThemeContextProvider, useThemePreference } from './_context/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { getExpoPushToken } from '../lib/pushNotifications';
+import { navigationTheme, themedScreenOptions } from '../lib/navigationTheme';
 
 LogBox.ignoreLogs(['unable to keep activate awake']);
 
@@ -98,13 +100,13 @@ function RootLayoutNav() {
   }
 
   return (
-    <>
+    <ThemeProvider value={navigationTheme(theme)}>
       <StatusBar barStyle={theme.statusBar} />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={themedScreenOptions(theme)}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
       </Stack>
-    </>
+    </ThemeProvider>
   );
 }
 

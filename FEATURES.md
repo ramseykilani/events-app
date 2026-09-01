@@ -26,7 +26,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. Related: [KI-011](manual-tests/known_issues.md) (person rows too tall). |
 | [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
-| [Screen Transition Polish (Android)](#screen-transition-polish-android) | Implemented | White bar flashes on the right edge during screen swipes. Fixed by the new-arch migration. |
+| [Screen Transition Polish (Android)](#screen-transition-polish-android) | In progress | White bar flashes on the right edge during screen swipes. New arch fixed Paper; Evening flash is the unthemed navigator card. |
 | [New Architecture Migration (React Native)](#new-architecture-migration-react-native) | In progress | Landed + Android-verified 2026-09-01; iOS TestFlight smoke still open. Mooted the transition flash. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
@@ -936,7 +936,7 @@ Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the
 
 ## Screen Transition Polish (Android)
 
-**Status:** Implemented 2026-09-01 — closed as moot: the [New Architecture Migration](#new-architecture-migration-react-native) removed the flash (owner-verified on the new-arch preview build, both themes). Found in the 2026-08-15 owner device smoke.
+**Status:** In progress — root cause confirmed 2026-09-01. The new-arch preview build (`78e23b64`) removed the flash in Paper but not Evening — exactly the spec's diagnostic for a hard-coded light background: React Navigation's default card/container background is white, and the moving card's edge exposes it during the slide (invisible against Paper's near-white, glaring against Evening). Fix: navigator chrome derived from the palette (`lib/navigationTheme.ts` — `ThemeProvider` + themed `contentStyle` on all three Stack layouts). Found in the 2026-08-15 owner device smoke.
 
 ### Problem
 
@@ -948,13 +948,13 @@ Investigate on a development build before changing anything. Likely suspects: th
 
 ### Acceptance Criteria
 
-- [x] No white flash at the screen edge during push/pop transitions on Android, in either theme — owner-verified 2026-09-01 on the new-arch preview build (EAS build `78e23b64`)
+- [ ] No white flash at the screen edge during push/pop transitions on Android, in either theme — new-arch build `78e23b64` cleared Paper (owner-verified 2026-09-01); Evening awaits owner verification of the themed-navigator build
 
 ---
 
 ## New Architecture Migration (React Native)
 
-**Status:** In progress — landed on `staging` and Android-verified 2026-09-01 (owner device smoke on preview build `78e23b64`: launches clean, pull-to-refresh fine, and the transition flash is gone). Remaining: iOS smoke on the next TestFlight build. Unblocked 2026-09-01: the `react-native-screens` crash that forced `newArchEnabled: false` (`ScreenStack.getChildDrawingOrder()` off-by-one, upstream #3096) was fixed in ≥4.17.1. Supersedes the re-enable note in SETUP.md → Required for native builds. Made [Screen Transition Polish (Android)](#screen-transition-polish-android) moot.
+**Status:** In progress — landed on `staging` and Android-verified 2026-09-01 (owner device smoke on preview build `78e23b64`: launches clean, pull-to-refresh fine, and the transition flash is gone). Remaining: iOS smoke on the next TestFlight build. Unblocked 2026-09-01: the `react-native-screens` crash that forced `newArchEnabled: false` (`ScreenStack.getChildDrawingOrder()` off-by-one, upstream #3096) was fixed in ≥4.17.1. Supersedes the re-enable note in SETUP.md → Required for native builds. Cleared the Paper half of [Screen Transition Polish (Android)](#screen-transition-polish-android); the Evening half was the unthemed navigator card, fixed there.
 
 ### Problem
 
@@ -968,7 +968,7 @@ Bump `react-native-screens` to `~4.23.0` — the highest release that still comp
 
 - [x] Android new-arch preview build launches and passes an owner device smoke, including calendar pull-to-refresh (the original crash trigger) — owner-verified 2026-09-01 (EAS build `78e23b64`)
 - [ ] iOS build smokes clean via TestFlight — open; gates on the next iOS build (builds are metered, none cut speculatively)
-- [x] Screen Transition Polish re-verified on the new-arch build — closed as moot 2026-09-01
+- [x] Screen Transition Polish re-verified on the new-arch build — 2026-09-01: flash gone in Paper, still present in Evening; traced to the unthemed navigator card and fixed under Screen Transition Polish (themed navigator)
 - [x] SETUP.md "Required for native builds" table updated to reflect the re-enablement
 
 ---
