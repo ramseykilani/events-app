@@ -49,7 +49,8 @@ Color is assigned **by role, never by value**. Every visual decision traces to a
 
 ### The semantic law
 
-- **Accent** = a small moment of warmth: the selected day, the dots marking days that have events, the primary action, and the quiet "From X" attribution. The selected answer in the Who's Coming reply widget uses the same selected-state fill as the selected day (`calendarSelected`) — a chosen answer is a selection, and the two creams (`surfaceSecondary` vs `selectedBg`) proved too close to read as feedback (owner call, 2026-08-28). That is the entire job. The accent is never used for badges, unread counts, or anything that asks for attention.
+- **Accent** = a small moment of warmth: the selected day, the dots marking days that have events, the primary action, and the quiet "From X" attribution. The selected answer in the Who's Coming reply widget uses the same selected-state fill as the selected day (`calendarSelected`) — a chosen answer is a selection, and the two creams (`surfaceSecondary` vs `selectedBg`) proved too close to read as feedback (owner call, 2026-08-28). That is the entire job for the accent as a *role*. The accent is never used for badges, unread counts, or anything that asks for attention.
+- **`linkText` shares the accent's value in both themes** — one warm color per mood, so the themes can never disagree about what reads as warm (owner ruling, 2026-09-01: the accent/linkText relationship must be identical across themes — same in both or different in both, never mixed). It remains its own role: a link is an action, not a moment, and a future theme may part the values again.
 - **Destructive** = red, and red alone signals consequence (remove, delete). The accent never does this job, and destructive never decorates.
 - **Everything else** — surfaces, inks, boundaries — is structurally neutral.
 
@@ -73,7 +74,7 @@ A user should be able to read the state of the app from color alone, precisely b
 | `destructiveBg` | `#f7e3dd` | `#38222a` | destructive surface |
 | `destructiveText` | `#b4402a` | `#e08a7a` | destructive text |
 | `destructiveLink` | `#b4402a` | `#e08a7a` | destructive inline action |
-| `linkText` | `#8f5a10` | `#d9a05b` | links, inline actions |
+| `linkText` | `#96680a` | `#d9a05b` | links, inline actions — shares the accent's value in both themes (see law) |
 | `calendarSelected` | `#96680a` | `#d9a05b` | selected day |
 | `calendarSelectedText` | `#ffffff` | `#2a1d10` | selected-day number |
 | `calendarTodayText` | `#96680a` | `#d9a05b` | today's number |

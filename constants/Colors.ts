@@ -69,8 +69,11 @@ export const Colors: Record<'paper' | 'evening', ThemePalette> = {
     // destructiveBg — under the doc §3 ≥4.5:1 floor; UX audit 2026-09-01).
     destructiveText: '#b4402a',
     destructiveLink: '#b4402a',
-    // 5.40:1 on background (was #a3691a at 4.27:1, under the doc's ≥4.5:1 floor).
-    linkText: '#8f5a10',
+    // Shares the accent's value — one warm color per mood, so the
+    // accent/linkText relationship is identical across themes (owner ruling
+    // 2026-09-01). The role stays named: a link is an action, not a moment,
+    // and a future theme can part the values again. 4.58:1 on background.
+    linkText: '#96680a',
     // 4.58:1 on background as text, and calendarSelectedText (white) on it is
     // 4.91:1 (was #c8871e at 2.83:1 as text / 3.03:1 under white — both under
     // the doc §3 ≥4.5:1 floor; UX audit 2026-09-01). One value carries the

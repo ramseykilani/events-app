@@ -731,8 +731,8 @@ export default function EventDetailScreen() {
               accessibilityLabel={`Open ${event.location} in Maps`}
               hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
             >
-              <MaterialCommunityIcons name="map-marker-outline" size={20} color={theme.accent} />
-              <Text style={[styles.locationText, { color: theme.accent }]}>{event.location}</Text>
+              <MaterialCommunityIcons name="map-marker-outline" size={20} color={theme.linkText} />
+              <Text style={[styles.locationText, { color: theme.linkText }]}>{event.location}</Text>
             </TouchableOpacity>
           ) : null}
           {event.description ? (
