@@ -47,7 +47,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
-| [Archive Received Events](#archive-received-events) | Planned | Reversible removal for received events; Delete stays for self-created. Spec owner-approved 2026-09-01. |
+| [Archive Received Events](#archive-received-events) | In progress | Reversible removal for received events; Delete stays for self-created. Spec owner-approved 2026-09-01. |
 
 ## Using and testing
 
@@ -1658,7 +1658,7 @@ Fetch the visible grid's full date range (Sunday on/before the 1st through Satur
 
 ## Archive Received Events
 
-**Status:** Planned — spec owner-approved in discussion 2026-09-01. Supersedes the reverted Remove Event Confirm & Restore (`f6d83fa`, reverted `3d77c2f`, 2026-08-31): instead of confirming an irreversible delete and unlocking re-share, removal of a received event becomes reversible.
+**Status:** In progress — spec owner-approved in discussion 2026-09-01. Supersedes the reverted Remove Event Confirm & Restore (`f6d83fa`, reverted `3d77c2f`, 2026-08-31): instead of confirming an irreversible delete and unlocking re-share, removal of a received event becomes reversible.
 
 ### Problem
 
