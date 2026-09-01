@@ -36,7 +36,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
 | [Share Delivery Status](#share-delivery-status) | Implemented | One-word per-person status on the share sheet — "✓ Shared" for everyone; only failures differ (✕). |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
-| [Add to Other Calendars](#add-to-other-calendars) | In progress | Events live only on the in-app calendar. |
+| [Add to Other Calendars](#add-to-other-calendars) | Implemented | One-shot export: Google template link + .ics (Apple/Outlook/Other), in-app and on the receipt page. Native sheets land with the next EAS build. |
 | [Share Sent Confirmation](#share-sent-confirmation) | Implemented | Persistent "✓ Sent to N people" on the sheet after a send; selection is circles now, ✓ means done. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Implemented | Storage rewrite + silent edit propagation. Spec: [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Shipped 2026-08-24. |
@@ -1095,7 +1095,7 @@ Support US phone numbers end-to-end (add person, sign-in, share SMS). Look into 
 
 ## Add to Other Calendars
 
-**Status:** In progress — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Scoped with the owner 2026-09-01 — every decision below is owner-approved. Related: [Who's Coming](#whos-coming) (the receipt page is the second surface).
+**Status:** Implemented (2026-09-01) — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Scoped with the owner 2026-09-01 — every decision below is owner-approved. Related: [Who's Coming](#whos-coming) (the receipt page is the second surface).
 
 ### Problem
 
@@ -1132,20 +1132,21 @@ Field mapping (the `events` row has no location, end time, or timezone — `lib/
 - New pure module `lib/calendarLinks.ts`: `buildGoogleUrl(event)` + `buildIcs(event)`. The only real care points are RFC 5545 text escaping (newlines, commas, semicolons; 75-octet line folding) and the all-day/timed branches. Jest-covered directly.
 - Verify bar: Jest for the builders + a new Playwright spec for the web actions (assert the Google href and the downloaded `.ics` content), desktop Chrome locally per AGENTS.md.
 - No migrations, no RLS, no new RPCs. The only backend change is the `send-response` GET select extension above.
+- **As shipped (2026-09-01):** the hand-off lives in `lib/addToCalendar.ts` (web: `Linking.openURL` + Blob `.ics` download) with `.ios.ts` (`expo-calendar` `createEventInCalendarAsync`) and `.android.ts` (`expo-intent-launcher` `ACTION_INSERT`) variants Metro resolves per platform; `buildNativeDetails` in `lib/calendarLinks.ts` is the shared pre-fill mapping. The Google button opens the template link on every platform. Two new native modules ⇒ the next EAS build carries them; older binaries simply lack the row's native hand-off (web/staging builds have it today). The receipt page's `.ics` UID derives from the send's `response_token` (`<token>@shared-events`) rather than the event id — the `send-response` GET deliberately exposes no internal ids (`scripts/verify-receipt-api.mjs` pins that), and the token gives the same update-not-duplicate property for re-downloads from the same link. Tests: `__tests__/lib/calendarLinks.test.ts`, the event-detail screen test (hand-off mocked), `e2e/add-to-calendar.spec.ts` (popup URL + downloaded `.ics` content, timed and all-day), `e2e/receipt.spec.ts` (route-mocked API; pins the page's inline port of the builders + the inert-GET rule). Manual: E-118, E-116 extended.
 
 ### Acceptance Criteria
 
-- [ ] Event detail shows an "Add to calendar" row with two icon buttons (Google; paired Apple/Outlook) — secondary styling, accessibilityLabels, 44pt targets
-- [ ] The Google button opens the template link pre-filled: title, timed (1h) or all-day dates, full description + listing URL in details
-- [ ] The `.ics` button delivers a valid iCalendar file with the same fields, a stable `<event-id>@shared-events` UID, floating local time
-- [ ] iOS presents the pre-filled native New Event sheet and Android the calendar insert screen — no permission prompt on either
-- [ ] The receipt page renders the same two links; `send-response` GET returns full `description` + `url` and remains inert (no writes)
-- [ ] Jest coverage for the builders (escaping, all-day, no-time, no-description, untitled) and a Playwright spec for both web actions
-- [ ] Snapshot semantics (later edits don't propagate) stated in this section — accepted behavior, not a bug
+- [x] Event detail shows an "Add to calendar" row with two icon buttons (Google; paired Apple/Outlook) — secondary styling, accessibilityLabels, 44pt targets
+- [x] The Google button opens the template link pre-filled: title, timed (1h) or all-day dates, full description + listing URL in details
+- [x] The `.ics` button delivers a valid iCalendar file with the same fields, a stable `<event-id>@shared-events` UID, floating local time
+- [ ] iOS presents the pre-filled native New Event sheet and Android the calendar insert screen — no permission prompt on either — *code shipped (`lib/addToCalendar.ios.ts` / `.android.ts`); device verification lands with the next EAS build (builds are metered — none cut speculatively)*
+- [x] The receipt page renders the same two links; `send-response` GET returns full `description` + `url` and remains inert (no writes)
+- [x] Jest coverage for the builders (escaping, all-day, no-time, no-description, untitled) and a Playwright spec for both web actions
+- [x] Snapshot semantics (later edits don't propagate) stated in this section — accepted behavior, not a bug
 
 ### Open Questions
 
-- Pixel-level calls at implementation: exact row-label copy, icon sizes, whether the paired glyphs beat `calendar-plus` in practice.
+- None. (Resolved at implementation: the row label is "Add to calendar"; the paired `apple` + `microsoft-outlook` glyphs render cleanly inside the 44pt target — screenshot-verified on web — so the `calendar-plus` fallback was not needed.)
 
 ---
 

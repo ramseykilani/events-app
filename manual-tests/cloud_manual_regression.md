@@ -368,6 +368,7 @@ Both share-SMS variants (app-user and non-app) carry the `Coming? <link>` line w
 - Step 6: "Shared with" shows the pending contact's "No".
 - Step 7: a clear "this link doesn't work" state; the API answers 404.
 - The page has no install CTA, no other people, and no link to the web app.
+- Under the event details, the page shows two Add to Other Calendars links (2026-09-01 — FEATURES.md → Add to Other Calendars): "Add to Google Calendar" opens Google's pre-filled template (new tab), and "Apple / Outlook / Other (.ics)" downloads a valid iCalendar file (floating local time; timed → 1-hour block, no time → all-day; full description + listing URL in the body). Both are built client-side from the GET's fields — loading the page still writes nothing.
 - Unsetting `RESPONSE_LINK_BASE_URL` removes the `Coming?` line from future share SMSes (both variants); the page and in-app answers keep working.
 
 ---
@@ -382,6 +383,25 @@ Both share-SMS variants (app-user and non-app) carry the `Coming? <link>` line w
 **Expected**
 - Step 3: the overflow day carries the same accent dot as in-month days with events — no navigation to that month needed. Overflow days without events stay unmarked.
 - Step 4: the month flips to the tapped day and its events list immediately (no "Nothing on this day." flash).
+
+---
+
+### E-118 Add to Other Calendars (snapshot export)
+The event detail screen has an "Add to calendar" row (label left, two icon buttons right — Google; paired Apple/Outlook) between the listing link and the reply/"Shared with" sections. The export is a one-shot snapshot: later in-app edits do not propagate to the external calendar (accepted behavior, FEATURES.md → Add to Other Calendars). Covered on web by `e2e/add-to-calendar.spec.ts`; this scenario is the human pass, including the native hand-offs e2e cannot reach.
+
+**Steps**
+1. Create an event with a title, a time, a description, and a listing URL. Open its detail.
+2. Tap the Google button (web: new tab; native: the link opens in the browser/calendar app).
+3. Tap the Apple/Outlook button. On web: an `.ics` downloads — open it. On iOS: Apple's pre-filled New Event sheet appears. On Android: the calendar app's new-event screen appears.
+4. Repeat for an event with no time set.
+
+**Expected**
+- Step 2: Google's template opens pre-filled — title, the date, a 1-hour block at the event's time, and the full description + listing URL in the details. No sign-in or permission interstitial beyond Google's own.
+- Step 3 web: the downloaded file imports cleanly into Apple Calendar/Outlook as one event with the same fields (timed → 1-hour block; floating local time — no timezone conversion). Re-importing the same file updates rather than duplicates in apps that dedupe by UID.
+- Step 3 native: the pre-filled compose UI appears with title/date/time/notes — and **no permission prompt** on either platform (iOS EventKit UI and Android ACTION_INSERT are both user-in-the-loop). Dismissing the sheet saves nothing.
+- Step 4: an all-day event in both formats (Google `dates=YYYYMMDD/next-day`; `.ics` `DTSTART;VALUE=DATE`).
+- An untitled event exports as "Untitled event"; an event with no description/URL exports with no details body.
+- The row uses secondary styling (never the accent), both targets are at least 44pt, and both carry accessibility labels ("Add to Google Calendar" / "Add to Apple, Outlook, or another calendar").
 
 ---
 

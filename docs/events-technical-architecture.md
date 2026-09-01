@@ -267,6 +267,17 @@ Removing an event from your calendar deletes your own events row (its sends reco
 
 The cascades do the rest: `public.users` (and with it the push token), `my_people`, `circles`, `hidden_people`, `events` (the caller's rows), and `sends` all die with the account. Followers' rows survive with `from_event_id`/`from_user_id` SET NULL — they keep the event, following ends, and attribution disappears. Other users' `my_people` rows pointing at the deleted account get `user_id` SET NULL — the contact reverts to a pending phone-number entry, so future shares get the non-app SMS and a re-signup triggers pending-share delivery. That last part is why friends' previously shared events can reappear after delete + sign-in with the same number ([KI-007](../manual-tests/known_issues.md)); it is working as coded, not a failed delete of the caller's rows. Re-signing up with the same phone number starts a new account (new `auth.users` / `users` row).
 
+### 5c. Add to Other Calendars (Snapshot Export)
+
+Event detail carries an "Add to calendar" row with two icon buttons — a one-shot **export**, never subscribe/sync (owner decision 2026-09-01; FEATURES.md → Add to Other Calendars). Once the event lands in someone's Google/Apple/Outlook calendar, later in-app edits do not reach it — the accepted price of no-subscribe.
+
+1. **Google button** — opens the Google Calendar template link (`calendar.google.com/calendar/render?action=TEMPLATE&…`) via `Linking.openURL` on every platform; no auth, no SDK.
+2. **Apple / Outlook / Other button** — web downloads a JS-generated `.ics` (Blob + object URL); iOS presents Apple's pre-filled New Event sheet (`expo-calendar` `createEventInCalendarAsync`, permission-free EventKit UI); Android fires `ACTION_INSERT` (`expo-intent-launcher`) into the calendar app's new-event screen.
+
+Field mapping is shared pure functions in `lib/calendarLinks.ts` (`buildGoogleUrl` / `buildIcs` / `buildNativeDetails`): timed event → floating 1-hour block (no `Z`/`TZID`/`ctz` — the recipient's calendar interprets it in their own zone, matching the app's local-date semantics); no `event_time` → all-day (exclusive next-day end); full description + listing URL in the body; "Untitled event" fallback; stable `.ics` UID `<event-id>@shared-events` so UID-deduping apps update rather than duplicate on re-add.
+
+The Who's Coming receipt page (`receipt/index.html`) renders the same two links from an inline vanilla-JS port of the builders (static page, no build step), fed by the `send-response` GET's `description` + `url` fields — a read-only extension that expands no disclosure (the share SMS already carries a description excerpt and the full listing URL to the same token holder). The receipt `.ics` UID derives from the send's `response_token` — the GET deliberately exposes no event id.
+
 ### 6. Hide / Unhide a Person
 
 1. User opens an event detail for an event someone else shared with them
@@ -367,7 +378,7 @@ events-app/
 │   │   ├── index.tsx               # Calendar (main screen)
 │   │   ├── add-event.tsx           # Paste URL or enter details, set date/time
 │   │   ├── edit-event.tsx          # Edit screen — one save_event call; any change ends following
-│   │   ├── event/[id].tsx          # Event detail — who shared it, share/hide/remove buttons
+│   │   ├── event/[id].tsx          # Event detail — who shared it, share/hide/remove buttons, Add to calendar export row
 │   │   ├── onboarding.tsx          # Optional walkthrough — auto-shows once when the calendar is empty
 │   │   ├── people.tsx              # My People — manage list, circles, hidden people
 │   │   └── share.tsx               # Sharing screen — select people/circles; existing shares show as completed
@@ -393,16 +404,20 @@ events-app/
 ├── hooks/
 │   └── useTheme.ts                 # Theme hook (light/dark)
 ├── lib/
+│   ├── addToCalendar.ts            # Calendar export hand-off (web; .ios/.android variants resolved by Metro)
+│   ├── calendarLinks.ts            # Pure Google template URL + RFC 5545 .ics builders (snapshot export)
 │   ├── contacts.ts                 # Phone contact access + E.164 normalization
 │   ├── showError.ts                # Error display utility
 │   ├── supabase.ts                 # Supabase client init
 │   └── types.ts                    # TypeScript types matching DB schema
 ├── manual-tests/                   # Manual regression suite for cloud agents
+├── receipt/                        # Who's Coming receipt page (static; events-reply.pages.dev) — answer + calendar links
 ├── supabase/
 │   ├── functions/
 │   │   ├── cleanup-people/         # Cron: 6-month auto-removal
 │   │   ├── og-metadata/            # Link preview metadata fetch
 │   │   ├── send-notification/      # Push + SMS share notifications
+│   │   ├── send-response/          # Receipt-page API (no JWT; per-send response_token)
 │   │   └── twilio-status/          # SMS delivery-status webhook (Twilio-signed)
 │   └── migrations/                 # Applied in filename order
 ├── __tests__/                      # Jest + React Native Testing Library
@@ -419,7 +434,9 @@ events-app/
 
 - **expo** (~54) — managed workflow
 - **expo-router** — file-based navigation
+- **expo-calendar** — iOS permission-free New Event sheet (Add to Other Calendars)
 - **expo-contacts** — device contact list access
+- **expo-intent-launcher** — Android calendar ACTION_INSERT (Add to Other Calendars)
 - **expo-notifications** — push notification registration and handling
 - **expo-linear-gradient** — gradient UI elements
 - **@react-native-community/datetimepicker** — native date/time picker
