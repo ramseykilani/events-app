@@ -629,8 +629,13 @@ Full inventory — each action, its guard, and its rationale:
   owner-reserved.
 - **UX-20: saved as [KI-015](known_issues.md)** — a standalone fixer task
   for another agent (owner dispatch), not part of the consolidation.
-- **UX-13 (location-row color): pending.** Explained to the owner
-  2026-09-01; awaiting the restyle-vs-amend ruling. Note the ruling's
-  stakes shifted with the contrast fix: Paper accent (`#96680a`) and
-  `linkText` (`#8f5a10`) are now near-neighbors, so the visual cost of
-  restyling to `linkText` is smaller than when this was written.
+- **UX-13 (location-row color): RESOLVED.** Owner ruling 2026-09-01: the
+  accent/linkText relationship must be identical across themes — "same in
+  both or different in both, never mixed." Direction: merge (Evening's
+  documented mood is one warm amber; inventing a second Evening link
+  color was the bigger design move). Paper `linkText` took the accent's
+  value (`#8f5a10 → #96680a`), so each theme has exactly one warm color;
+  the roles stay separately named so a future theme can part them. The
+  location row moved from `accent` to `linkText` — role-correct (a link
+  wears the link role) and a visual no-op under the merged values. §3's
+  law gained one sentence recording the shared value.
