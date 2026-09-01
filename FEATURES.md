@@ -26,7 +26,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. Related: [KI-011](manual-tests/known_issues.md) (person rows too tall). |
 | [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
-| [Screen Transition Polish (Android)](#screen-transition-polish-android) | In progress | White bar flashes on the right edge during screen swipes. New arch fixed Paper; Evening flash is the unthemed navigator card. |
+| [Screen Transition Polish (Android)](#screen-transition-polish-android) | Implemented | White bar flashes on the right edge during screen swipes. |
 | [New Architecture Migration (React Native)](#new-architecture-migration-react-native) | In progress | Landed + Android-verified 2026-09-01; iOS TestFlight smoke still open. Mooted the transition flash. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
@@ -937,7 +937,7 @@ Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the
 
 ## Screen Transition Polish (Android)
 
-**Status:** In progress — flash fixed, motion tuning in verification. Root cause confirmed 2026-09-01: React Navigation's default card/container background is white, and the moving card's edge exposes it during the slide (invisible against Paper's near-white, glaring against Evening) — the new-arch build (`78e23b64`) had already cleared Paper's artifact layer. Fix: navigator chrome derived from the palette (`lib/navigationTheme.ts` — `ThemeProvider` + themed `contentStyle` on all three Stack layouts); Evening flash owner-verified fixed on build `14edebaf`. Residual judder: a `fade_from_bottom` motion swap was owner-rejected on device (2026-09-01 — "feels worse"); the platform slide stays, and `freezeOnBlur` (covered screens stop re-rendering mid-transition) carries the frame-budget fix. If judder persists after freeze, the next lever is screen-mount cost (the calendar is the prime suspect), not motion type. Found in the 2026-08-15 owner device smoke.
+**Status:** Implemented 2026-09-01 — owner-verified on device and locked in: flash gone in both themes (Evening verified on build `14edebaf`), motion approved (build `73ffc739`: platform slide + `freezeOnBlur`). Root cause: React Navigation's default card/container background is white, and the moving card's edge exposes it during the slide (invisible against Paper's near-white, glaring against Evening) — the new-arch build (`78e23b64`) had already cleared Paper's artifact layer. Fix: navigator chrome derived from the palette (`lib/navigationTheme.ts` — `ThemeProvider` + themed `contentStyle` on all three Stack layouts, regression-tested per theme). A `fade_from_bottom` motion swap was owner-rejected on device ("feels worse"); the platform slide stays, and `freezeOnBlur` (covered screens stop re-rendering mid-transition) carries the frame-budget fix. If judder ever resurfaces, the next lever is screen-mount cost (the calendar is the prime suspect), not motion type. Found in the 2026-08-15 owner device smoke.
 
 ### Problem
 
@@ -949,7 +949,7 @@ Investigate on a development build before changing anything. Likely suspects: th
 
 ### Acceptance Criteria
 
-- [ ] No white flash at the screen edge during push/pop transitions on Android, in either theme — new-arch build `78e23b64` cleared Paper (owner-verified 2026-09-01); Evening awaits owner verification of the themed-navigator build
+- [x] No white flash at the screen edge during push/pop transitions on Android, in either theme — owner-verified 2026-09-01 (Paper on `78e23b64`, Evening on `14edebaf`, motion approved on `73ffc739`)
 
 ---
 
