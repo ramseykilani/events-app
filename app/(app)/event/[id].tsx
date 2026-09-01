@@ -500,13 +500,33 @@ export default function EventDetailScreen() {
     }
   };
 
-  const handleToggleHide = async () => {
+  const handleToggleHide = () => {
+    if (!sharedByPersonId || !session?.user?.id) return;
+    // Unhide is restorative, so it stays confirm-free. Hide confirms first —
+    // every other consequential action in the app already does. The confirm
+    // is deliberately not destructive-red: hide is reversible with zero data
+    // loss, and red is reserved for remove/delete (design-language §3).
+    if (!isHidden) {
+      showConfirm(
+        `Hide ${sharerName ?? 'this person'}?`,
+        "You won't see events they send you, and their shares won't notify you. They aren't told — you can unhide them anytime from My People.",
+        {
+          confirmText: 'Hide',
+          onConfirm: () => void writeHidden(isHidden),
+        }
+      );
+      return;
+    }
+    void writeHidden(isHidden);
+  };
+
+  const writeHidden = async (currentlyHidden: boolean) => {
     if (!sharedByPersonId || !session?.user?.id) return;
     if (writeInFlightRef.current) return;
     writeInFlightRef.current = true;
     try {
       await withWriteTimeout(async (signal) => {
-        if (isHidden) {
+        if (currentlyHidden) {
           const { error } = await supabase
             .from('hidden_people')
             .delete()
@@ -537,7 +557,7 @@ export default function EventDetailScreen() {
     } finally {
       writeInFlightRef.current = false;
     }
-    if (isHidden) {
+    if (currentlyHidden) {
       setIsHidden(false);
     } else {
       setIsHidden(true);

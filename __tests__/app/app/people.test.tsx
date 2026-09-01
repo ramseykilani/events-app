@@ -282,7 +282,12 @@ describe('app/(app)/people sign out', () => {
 
   it('asks for confirmation with the account phone number before signing out', async () => {
     Platform.OS = 'web';
-    const { getByText } = render(<PeopleScreen />);
+    const { getByText, getByLabelText, queryByText } = render(<PeopleScreen />);
+
+    // The footer is gone — account actions live in the Settings sheet.
+    await waitFor(() => expect(getByLabelText('Settings')).toBeTruthy());
+    expect(queryByText('Sign out')).toBeNull();
+    fireEvent.press(getByLabelText('Settings'));
 
     await waitFor(() => expect(getByText('Sign out')).toBeTruthy());
     fireEvent.press(getByText('Sign out'));
@@ -296,7 +301,10 @@ describe('app/(app)/people sign out', () => {
 
   it('calls supabase signOut when the confirmation is accepted', async () => {
     Platform.OS = 'web';
-    const { getByText } = render(<PeopleScreen />);
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByLabelText('Settings')).toBeTruthy());
+    fireEvent.press(getByLabelText('Settings'));
 
     await waitFor(() => expect(getByText('Sign out')).toBeTruthy());
     fireEvent.press(getByText('Sign out'));
@@ -366,7 +374,10 @@ describe('app/(app)/people delete account', () => {
 
   it('asks for confirmation with honest copy before deleting', async () => {
     Platform.OS = 'web';
-    const { getByText } = render(<PeopleScreen />);
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByLabelText('Settings')).toBeTruthy());
+    fireEvent.press(getByLabelText('Settings'));
 
     await waitFor(() => expect(getByText('Delete account')).toBeTruthy());
     fireEvent.press(getByText('Delete account'));
@@ -383,7 +394,10 @@ describe('app/(app)/people delete account', () => {
 
   it('calls delete_my_account then signs out when the confirmation is accepted', async () => {
     Platform.OS = 'web';
-    const { getByText } = render(<PeopleScreen />);
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByLabelText('Settings')).toBeTruthy());
+    fireEvent.press(getByLabelText('Settings'));
 
     await waitFor(() => expect(getByText('Delete account')).toBeTruthy());
     fireEvent.press(getByText('Delete account'));
@@ -401,7 +415,10 @@ describe('app/(app)/people delete account', () => {
     mockRpc.mockImplementation(() =>
       abortablePromise(Promise.resolve({ data: null, error: { message: 'boom' } }))
     );
-    const { getByText } = render(<PeopleScreen />);
+    const { getByText, getByLabelText } = render(<PeopleScreen />);
+
+    await waitFor(() => expect(getByLabelText('Settings')).toBeTruthy());
+    fireEvent.press(getByLabelText('Settings'));
 
     await waitFor(() => expect(getByText('Delete account')).toBeTruthy());
     fireEvent.press(getByText('Delete account'));
@@ -469,13 +486,15 @@ describe('app/(app)/people display name', () => {
     Platform.OS = originalOS;
   });
 
-  it('shows the current name in the footer and edits it via the modal', async () => {
-    const { getByText, getByLabelText, queryByLabelText } = render(<PeopleScreen />);
+  it('shows the current name in the Settings sheet and edits it via the modal', async () => {
+    const { getByText, getByLabelText, findByLabelText, queryByLabelText } = render(<PeopleScreen />);
 
+    fireEvent.press(getByLabelText('Settings'));
     await waitFor(() => expect(getByText('Your name: Test User')).toBeTruthy());
     fireEvent.press(getByText('Your name: Test User'));
 
-    const input = getByLabelText('Your name');
+    // The editor opens after the sheet closes (no stacked modals).
+    const input = await findByLabelText('Your name');
     expect(input.props.value).toBe('Test User');
 
     fireEvent.changeText(input, 'Ramsey');
@@ -486,19 +505,21 @@ describe('app/(app)/people display name', () => {
     });
     expect(mockUsersUpdateEq).toHaveBeenCalledWith('id', 'u1');
 
-    // Modal closed and the footer reflects the new name.
+    // Modal closed; the sheet row reflects the new name on the next open.
     await waitFor(() => expect(queryByLabelText('Your name')).toBeNull());
-    expect(getByText('Your name: Ramsey')).toBeTruthy();
+    fireEvent.press(getByLabelText('Settings'));
+    await waitFor(() => expect(getByText('Your name: Ramsey')).toBeTruthy());
   });
 
   it('shows Not set and keeps Save disabled while the field is empty', async () => {
     mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
-    const { getByText, getByLabelText } = render(<PeopleScreen />);
+    const { getByText, getByLabelText, findByLabelText } = render(<PeopleScreen />);
 
+    fireEvent.press(getByLabelText('Settings'));
     await waitFor(() => expect(getByText('Your name: Not set')).toBeTruthy());
     fireEvent.press(getByText('Your name: Not set'));
 
-    const input = getByLabelText('Your name');
+    const input = await findByLabelText('Your name');
     expect(input.props.value).toBe('');
 
     // Names are never removable: an empty (or whitespace-only) field cannot save.
@@ -514,11 +535,14 @@ describe('app/(app)/people display name', () => {
         Promise.resolve({ error: { code: '23514', message: 'check violation' } })
       )
     );
-    const { getByText, getByLabelText } = render(<PeopleScreen />);
+    const { getByText, getByLabelText, findByLabelText } = render(<PeopleScreen />);
 
+    fireEvent.press(getByLabelText('Settings'));
     await waitFor(() => expect(getByText('Your name: Test User')).toBeTruthy());
     fireEvent.press(getByText('Your name: Test User'));
-    fireEvent.changeText(getByLabelText('Your name'), 'Ramsey');
+
+    const input = await findByLabelText('Your name');
+    fireEvent.changeText(input, 'Ramsey');
     fireEvent.press(getByText('Save'));
 
     await waitFor(() => {
@@ -580,19 +604,22 @@ describe('app/(app)/people notification toggles', () => {
   });
 
   it('renders both toggles with the loaded values', async () => {
-    const { getByText, getByLabelText } = render(<PeopleScreen />);
+    const { getByLabelText } = render(<PeopleScreen />);
 
-    await waitFor(() => expect(getByText('Notifications')).toBeTruthy());
-    fireEvent.press(getByText('Notifications'));
+    fireEvent.press(getByLabelText('Settings'));
+    await waitFor(() =>
+      expect(getByLabelText('Text messages (SMS)').props.value).toBe(false)
+    );
     expect(getByLabelText('Push notifications').props.value).toBe(true);
-    expect(getByLabelText('Text messages (SMS)').props.value).toBe(false);
   });
 
   it('flipping a toggle writes the pref scoped to the caller', async () => {
-    const { getByText, getByLabelText } = render(<PeopleScreen />);
+    const { getByLabelText } = render(<PeopleScreen />);
 
-    await waitFor(() => expect(getByText('Notifications')).toBeTruthy());
-    fireEvent.press(getByText('Notifications'));
+    fireEvent.press(getByLabelText('Settings'));
+    await waitFor(() =>
+      expect(getByLabelText('Text messages (SMS)').props.value).toBe(false)
+    );
     fireEvent(getByLabelText('Text messages (SMS)'), 'onValueChange', true);
 
     await waitFor(() => {
@@ -606,10 +633,12 @@ describe('app/(app)/people notification toggles', () => {
     mockUsersUpdateEq.mockImplementation(() =>
       abortablePromise(Promise.resolve({ error: { message: 'boom' } }))
     );
-    const { getByText, getByLabelText } = render(<PeopleScreen />);
+    const { getByLabelText } = render(<PeopleScreen />);
 
-    await waitFor(() => expect(getByText('Notifications')).toBeTruthy());
-    fireEvent.press(getByText('Notifications'));
+    fireEvent.press(getByLabelText('Settings'));
+    await waitFor(() =>
+      expect(getByLabelText('Push notifications').props.value).toBe(true)
+    );
     fireEvent(getByLabelText('Push notifications'), 'onValueChange', false);
 
     await waitFor(() => {
@@ -626,7 +655,7 @@ describe('app/(app)/people notification toggles', () => {
     const { getByText, getByLabelText } = render(<PeopleScreen />);
 
     await waitFor(() => expect(getByText('No people yet')).toBeTruthy());
-    fireEvent.press(getByText('Notifications'));
+    fireEvent.press(getByLabelText('Settings'));
     expect(getByLabelText('Push notifications').props.value).toBe(true);
     expect(getByLabelText('Text messages (SMS)').props.value).toBe(true);
   });
@@ -705,11 +734,11 @@ describe('app/(app)/people sheets dismiss via onRequestClose', () => {
     act(() => open[0].props.onRequestClose());
   };
 
-  it('Notifications sheet: Back closes it like Close', async () => {
+  it('Settings sheet: Back closes it like Close', async () => {
     const screen = render(<PeopleScreen />);
 
-    await waitFor(() => expect(screen.getByText('Notifications')).toBeTruthy());
-    fireEvent.press(screen.getByText('Notifications'));
+    await waitFor(() => expect(screen.getByLabelText('Settings')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Settings'));
     expect(screen.getByLabelText('Push notifications')).toBeTruthy();
 
     requestClose(screen);
@@ -720,9 +749,13 @@ describe('app/(app)/people sheets dismiss via onRequestClose', () => {
   it('Your name sheet: Back closes it like Cancel', async () => {
     const screen = render(<PeopleScreen />);
 
+    await waitFor(() => expect(screen.getByLabelText('Settings')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Settings'));
     await waitFor(() => expect(screen.getByText('Your name: Test User')).toBeTruthy());
     fireEvent.press(screen.getByText('Your name: Test User'));
-    expect(screen.getByLabelText('Your name')).toBeTruthy();
+
+    // The editor opens after the Settings sheet closes (no stacked modals).
+    await screen.findByLabelText('Your name');
 
     requestClose(screen);
 
@@ -757,5 +790,104 @@ describe('app/(app)/people sheets dismiss via onRequestClose', () => {
     requestClose(screen);
 
     expect(screen.queryByText('Cancel')).toBeNull();
+  });
+});
+
+describe('app/(app)/people settings sheet hidden people', () => {
+  const mockHiddenDeleteEq = jest.fn();
+  const mockHiddenDelete = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockMyPeopleOrder.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockMyPeopleEq.mockReturnValue({ order: mockMyPeopleOrder });
+    mockMyPeopleSelect.mockReturnValue({ eq: mockMyPeopleEq });
+
+    mockCirclesEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockCirclesSelect.mockReturnValue({ eq: mockCirclesEq });
+
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockHiddenSelect.mockReturnValue({ eq: mockHiddenEq });
+    mockHiddenDeleteEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
+    mockHiddenDelete.mockReturnValue({ eq: mockHiddenDeleteEq });
+
+    mockUsersSelect.mockReturnValue({ eq: mockUsersEq });
+    mockUsersEq.mockReturnValue(abortable({ single: mockUsersSingle }));
+    mockUsersSingle.mockResolvedValue({ data: { display_name: 'Test User' }, error: null });
+    mockUsersUpdate.mockReturnValue({ eq: mockUsersUpdateEq });
+    mockUsersUpdateEq.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ error: null }))
+    );
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'my_people') {
+        return { select: mockMyPeopleSelect, upsert: mockMyPeopleUpsert };
+      }
+      if (table === 'circles') {
+        return { select: mockCirclesSelect };
+      }
+      if (table === 'hidden_people') {
+        return { select: mockHiddenSelect, delete: mockHiddenDelete };
+      }
+      if (table === 'users') {
+        return { select: mockUsersSelect, update: mockUsersUpdate };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+  });
+
+  it('always shows the Hidden section, with a quiet empty state when none', async () => {
+    const screen = render(<PeopleScreen />);
+
+    fireEvent.press(screen.getByLabelText('Settings'));
+
+    await screen.findByText('Hidden');
+    expect(screen.getByText('No hidden people')).toBeTruthy();
+  });
+
+  it('lists hidden people with a count and unhides from the sheet', async () => {
+    mockHiddenEq.mockImplementation(() =>
+      abortablePromise(
+        Promise.resolve({
+          data: [
+            {
+              id: 'h1',
+              owner_id: 'u1',
+              person_id: 'p1',
+              hidden_at: '2026-01-01T00:00:00.000Z',
+              my_people: { contact_name: 'Alice', phone_number: '+14165550001' },
+            },
+            {
+              id: 'h2',
+              owner_id: 'u1',
+              person_id: 'p2',
+              hidden_at: '2026-01-01T00:00:00.000Z',
+              my_people: { contact_name: null, phone_number: '+14165550002' },
+            },
+          ],
+          error: null,
+        })
+      )
+    );
+    const screen = render(<PeopleScreen />);
+
+    fireEvent.press(screen.getByLabelText('Settings'));
+
+    await screen.findByText('Hidden (2)');
+    expect(screen.getByText('Alice')).toBeTruthy();
+    // No contact name falls back to the formatted phone number.
+    expect(screen.getByText('(416) 555-0002')).toBeTruthy();
+
+    fireEvent.press(screen.getAllByText('Unhide')[0]);
+    await waitFor(() => expect(mockHiddenDeleteEq).toHaveBeenCalledWith('id', 'h1'));
   });
 });

@@ -253,6 +253,58 @@ describe('app/(app)/event/[id]', () => {
     expect(router.back).toHaveBeenCalled();
   });
 
+  // showConfirm's native path is Alert.alert(title, message, buttons) — find
+  // the hide confirm among any later alerts (e.g. the failure showAlert).
+  const hideConfirmButtons = () => {
+    const call = (Alert.alert as jest.Mock).mock.calls.find(
+      ([title]) => typeof title === 'string' && title.startsWith('Hide ')
+    );
+    expect(call).toBeTruthy();
+    return call![2] as { text: string; style?: string; onPress?: () => void }[];
+  };
+
+  it('confirms before hiding, with honest copy and a non-destructive button', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
+
+    const screen = render(<EventDetailScreen />);
+    const hideButton = await screen.findByText('Hide Alice');
+
+    fireEvent.press(hideButton);
+
+    const call = (Alert.alert as jest.Mock).mock.calls.find(
+      ([title]) => title === 'Hide Alice?'
+    );
+    expect(call).toBeTruthy();
+    const message = call![1] as string;
+    expect(message).toContain("won't see events they send you");
+    expect(message).toContain("aren't told");
+    expect(message).toContain('unhide them anytime from My People');
+
+    const buttons = hideConfirmButtons();
+    // Hide is reversible with zero data loss — red stays reserved for
+    // remove/delete (design-language §3).
+    expect(buttons.find((b) => b.text === 'Hide')?.style).toBe('default');
+    expect(buttons.find((b) => b.text === 'Cancel')?.style).toBe('cancel');
+
+    // Nothing writes and nothing navigates until the confirm is accepted.
+    expect(mockHiddenInsert).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('does not hide when the confirm is canceled', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
+
+    const screen = render(<EventDetailScreen />);
+    const hideButton = await screen.findByText('Hide Alice');
+
+    fireEvent.press(hideButton);
+    const cancel = hideConfirmButtons().find((b) => b.text === 'Cancel');
+    act(() => cancel?.onPress?.());
+
+    expect(mockHiddenInsert).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
   it('shows a short alert instead of navigating back when hide fails', async () => {
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
     mockHiddenInsert.mockImplementation(() =>
@@ -263,6 +315,8 @@ describe('app/(app)/event/[id]', () => {
     const hideButton = await screen.findByText('Hide Alice');
 
     fireEvent.press(hideButton);
+    const hide = hideConfirmButtons().find((b) => b.text === 'Hide');
+    await act(async () => hide?.onPress?.());
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -273,13 +327,15 @@ describe('app/(app)/event/[id]', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 
-  it('navigates back after a successful hide', async () => {
+  it('navigates back after a confirmed hide', async () => {
     useLocalSearchParamsMock.mockReturnValue({ id: 'e1', sharedByPersonId: 'mp-9' });
 
     const screen = render(<EventDetailScreen />);
     const hideButton = await screen.findByText('Hide Alice');
 
     fireEvent.press(hideButton);
+    const hide = hideConfirmButtons().find((b) => b.text === 'Hide');
+    await act(async () => hide?.onPress?.());
 
     await waitFor(() => {
       expect(mockHiddenInsert).toHaveBeenCalledWith({
@@ -287,7 +343,7 @@ describe('app/(app)/event/[id]', () => {
         person_id: 'mp-9',
       });
     });
-    expect(router.back).toHaveBeenCalled();
+    await waitFor(() => expect(router.back).toHaveBeenCalled());
   });
 
   it('shows retry instead of spinning forever when the events fetch throws', async () => {

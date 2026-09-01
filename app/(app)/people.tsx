@@ -44,7 +44,7 @@ export default function PeopleScreen() {
   const [notifyPush, setNotifyPush] = useState(true);
   const [notifySms, setNotifySms] = useState(true);
   const [prefSaving, setPrefSaving] = useState(false);
-  const [showNotifPrefs, setShowNotifPrefs] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showNameEdit, setShowNameEdit] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [nameSaving, setNameSaving] = useState(false);
@@ -345,6 +345,15 @@ export default function PeopleScreen() {
     });
   };
 
+  // The name editor is its own pageSheet; iOS won't present one sheet while
+  // another is mid-dismiss, so it opens just after Settings starts closing
+  // (next tick on web, where the modals don't animate).
+  const openNameEditor = () => {
+    setNameDraft(displayName ?? '');
+    setShowSettings(false);
+    setTimeout(() => setShowNameEdit(true), Platform.OS === 'web' ? 0 : 300);
+  };
+
   const handleSaveName = async () => {
     const name = nameDraft.trim();
     if (!name || !userId || nameSaving) return;
@@ -458,24 +467,35 @@ export default function PeopleScreen() {
           <Text style={[styles.back, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.textPrimary }]}>My People</Text>
-        <TouchableOpacity
-          style={styles.textAction}
-          onPress={handleAddPeople}
-          disabled={people.length >= 50}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: people.length >= 50 }}
-        >
-          <Text
-            style={[
-              styles.add,
-              { color: theme.textPrimary },
-              people.length >= 50 && { color: theme.textTertiary },
-            ]}
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => setShowSettings(true)}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
           >
-            Add
-          </Text>
-        </TouchableOpacity>
+            <Ionicons name="settings-outline" size={22} color={theme.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.textAction}
+            onPress={handleAddPeople}
+            disabled={people.length >= 50}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: people.length >= 50 }}
+          >
+            <Text
+              style={[
+                styles.add,
+                { color: theme.textPrimary },
+                people.length >= 50 && { color: theme.textTertiary },
+              ]}
+            >
+              Add
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <Text style={[styles.count, { color: theme.textSecondary }]}>
         {people.length} / 50 people
@@ -570,77 +590,10 @@ export default function PeopleScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              ListFooterComponent={
-                hiddenPeople.length > 0 ? (
-                  <View style={[styles.hiddenSection, { borderTopColor: theme.borderLight }]}>
-                    <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Hidden</Text>
-                    {hiddenPeople.map((item) => (
-                      <View key={item.id} style={[styles.personRow, { borderBottomColor: theme.surfaceSecondary }]}>
-                        <Text style={[styles.personName, { color: theme.textPrimary }]}>
-                          {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
-                        </Text>
-                        <TouchableOpacity style={styles.textAction} onPress={() => handleUnhide(item.id)} activeOpacity={0.6} accessibilityRole="button">
-                          <Text style={[styles.unhide, { color: theme.linkText }]}>Unhide</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                ) : null
-              }
             />
           </View>
         </>
       )}
-      <View
-        style={[
-          styles.footer,
-          {
-            borderTopColor: theme.borderLight,
-            // Keep the footer actions clear of 3-button nav / the home
-            // indicator. 0 on web, so desktop pixels are unchanged.
-            paddingBottom: 4 + insets.bottom,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => setShowNotifPrefs(true)}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          style={styles.footerButton}
-        >
-          <Text style={[styles.footerAction, { color: theme.textSecondary }]}>Notifications</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            setNameDraft(displayName ?? '');
-            setShowNameEdit(true);
-          }}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          accessibilityLabel={`Your name: ${displayName ?? 'not set'}`}
-          style={styles.footerButton}
-        >
-          <Text style={[styles.footerAction, { color: theme.textSecondary }]}>
-            Your name: {displayName ?? 'Not set'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleSignOut}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          style={styles.footerButton}
-        >
-          <Text style={[styles.footerAction, { color: theme.textTertiary }]}>Sign out</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleDeleteAccount}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          style={styles.footerButton}
-        >
-          <Text style={[styles.footerAction, { color: theme.destructiveLink }]}>Delete account</Text>
-        </TouchableOpacity>
-      </View>
       {userId && Platform.OS !== 'web' ? (
         <ContactsPermissionFlow
           userId={userId}
@@ -663,7 +616,7 @@ export default function PeopleScreen() {
           }}
         />
       ) : null}
-      <Modal visible={showNotifPrefs} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowNotifPrefs(false)}>
+      <Modal visible={showSettings} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowSettings(false)}>
         <View
           style={[
             styles.modalContainer,
@@ -673,16 +626,31 @@ export default function PeopleScreen() {
           <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
             <TouchableOpacity
               style={styles.textAction}
-              onPress={() => setShowNotifPrefs(false)}
+              onPress={() => setShowSettings(false)}
               activeOpacity={0.6}
               accessibilityRole="button"
             >
               <Text style={[styles.back, { color: theme.textSecondary }]}>Close</Text>
             </TouchableOpacity>
-            <Text style={[styles.title, { color: theme.textPrimary }]}>Notifications</Text>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Settings</Text>
             <View style={styles.textAction} />
           </View>
-          <View style={styles.manualForm}>
+          <ScrollView
+            style={styles.settingsScroll}
+            contentContainerStyle={{ paddingBottom: 20 + insets.bottom }}
+          >
+            <TouchableOpacity
+              style={[styles.settingsRow, { borderBottomColor: theme.borderLight }]}
+              onPress={openNameEditor}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel={`Your name: ${displayName ?? 'not set'}`}
+            >
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>
+                Your name: {displayName ?? 'Not set'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Notifications</Text>
             <View style={styles.prefRow}>
               <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Push notifications</Text>
               <ThemedSwitch
@@ -704,7 +672,44 @@ export default function PeopleScreen() {
             <Text style={[styles.manualHint, { color: theme.textTertiary }]}>
               Events still land on your calendar either way.
             </Text>
-          </View>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+              Hidden{hiddenPeople.length > 0 ? ` (${hiddenPeople.length})` : ''}
+            </Text>
+            {hiddenPeople.length === 0 ? (
+              <Text style={[styles.manualHint, { color: theme.textTertiary }]}>
+                No hidden people
+              </Text>
+            ) : (
+              hiddenPeople.map((item) => (
+                <View key={item.id} style={[styles.personRow, { borderBottomColor: theme.surfaceSecondary }]}>
+                  <Text style={[styles.personName, { color: theme.textPrimary }]}>
+                    {item.contact_name ?? formatPhoneDisplay(item.phone_number)}
+                  </Text>
+                  <TouchableOpacity style={styles.textAction} onPress={() => handleUnhide(item.id)} activeOpacity={0.6} accessibilityRole="button">
+                    <Text style={[styles.unhide, { color: theme.linkText }]}>Unhide</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+            <View style={[styles.settingsAccount, { borderTopColor: theme.borderLight }]}>
+              <TouchableOpacity
+                onPress={handleSignOut}
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                style={styles.settingsRow}
+              >
+                <Text style={[styles.prefLabel, { color: theme.textTertiary }]}>Sign out</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDeleteAccount}
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                style={styles.settingsRow}
+              >
+                <Text style={[styles.prefLabel, { color: theme.destructiveLink }]}>Delete account</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
       <Modal visible={showNameEdit} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowNameEdit(false)}>
@@ -921,10 +926,28 @@ const styles = StyleSheet.create({
   addCircleBtnText: {
     fontWeight: '600',
   },
-  footer: {
-    borderTopWidth: 1,
+  headerActions: {
+    flexDirection: 'row',
     alignItems: 'center',
+  },
+  settingsButton: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsScroll: {
+    paddingHorizontal: 20,
+  },
+  settingsRow: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  settingsAccount: {
+    marginTop: 12,
     paddingTop: 4,
+    borderTopWidth: 1,
   },
   prefRow: {
     flexDirection: 'row',
@@ -943,14 +966,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
-  footerButton: {
-    minHeight: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  footerAction: {
-    fontSize: 14,
-  },
   personRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -967,11 +982,6 @@ const styles = StyleSheet.create({
   },
   remove: {
     fontSize: 14,
-  },
-  hiddenSection: {
-    marginTop: 8,
-    paddingTop: 4,
-    borderTopWidth: 1,
   },
   unhide: {
     fontSize: 14,
