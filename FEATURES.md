@@ -51,6 +51,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Provider Matrix Drift Check](#provider-matrix-drift-check) | Considering | Scheduled CI re-check of the autofill provider matrix. Owner deferred 2026-09-01 — manual agent sweeps suffice. |
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
+| [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Planned | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. |
 
 ## Using and testing
 
@@ -1785,3 +1786,62 @@ Implementation notes (2026-09-01): the say-No prompt resolves the answer slot fr
 
 - **2026-09-01 (delete-policy hardening went live early; restored).** The branch's migrations `20260901000001_archive_received_events` and `20260901000002_archive_delete_hardening` were applied to the live project before the client shipped. The hardening (`events_delete_own` gaining `AND from_user_id IS NULL`) immediately bound every client — including the production app, where received events still show **Remove Event** — so recipients' removes silently no-opped (204, zero rows) and `e2e/share.spec.ts` went red. The live policy was restored to the repo state (`USING (owner_id = auth.uid())`); the `archived_at` column and `set_event_archived` RPC remain live (additive, harmless to the shipped client). Backend and client must move together (AGENTS.md runbook): when this feature merges, if the RLS hardening is still wanted as defense-in-depth alongside the UI change, re-apply it as a **new** migration — the already-recorded `20260901000002` will not re-apply. The approved Technical Notes deliver "no delete path for received events" via the UI (Archive replaces Remove Event); the policy hardening is optional belt-and-braces, not load-bearing.
 - **2026-09-01 (hardening deliberately dropped at merge).** With the production-breakage window demonstrated above and the ship-it protocol carrying no migration-timing step, the RLS hardening is not worth its coordination cost: the UI never renders Remove Event on a received row (pinned by Jest, e2e, and preview provenance), and `set_event_archived` itself rejects self-created rows server-side. `20260901000003_archive_delete_policy_restore` re-creates `events_delete_own` as owner-only in the migration chain, so local scratch DBs and any future fresh project match the live policy instead of silently drifting (the local-vs-live gap called out above).
+
+---
+
+## Hide Confirmation & People Settings Sheet
+
+**Status:** Planned — spec owner-approved in discussion 2026-09-01. Amends [Hide](#hide) (the action gains a confirm) and the People screen chrome (the footer becomes a gear-opened sheet). Related: [Display Names](#display-names) and [Notification On/Off](#notification-onoff) (their footer entry points move into the sheet), [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the footer this removes).
+
+### Problem
+
+Two owner-reported friction points from the same moment (2026-09-01):
+
+1. **Hide fires instantly.** Tapping "Hide {name}" on a shared event hides the person with no confirmation and navigates away — the only consequential action in the app without a confirm. Remove person, Delete circle, Sign out, and Delete account all confirm; Hide is the outlier.
+2. **Hidden people are undiscoverable.** The "Hidden" section renders only once a hidden person exists, and then as the footer of the people list — below the fold under a full list. The owner hid someone and could not find where to undo it, despite having built the screen.
+
+### Solution
+
+**1. Confirm the hide.** Tapping "Hide {name}" on the event detail screen opens a confirm dialog before anything writes:
+
+> **Hide {name}?**
+> You won't see events they send you, and their shares won't notify you. They aren't told — you can unhide them anytime from My People.
+
+Buttons: Cancel / Hide. The Hide button is **not** destructive-red: red is reserved for remove/delete with real consequence (design doc §3), and hide is reversible with zero data loss. Unhide stays confirm-free — it is restorative. Post-hide behavior is unchanged (navigate back off the now-filtered event).
+
+**2. Give Hidden a permanent, labeled home — and consolidate the footer.** The People screen footer (Notifications / Your name / Sign out / Delete account — four stacked text rows of permanent chrome for set-once and rare actions) collapses into a single gear button in the People header, opening a **Settings** sheet. The sheet holds, in order:
+
+- **Your name** — a row showing the current name; opens the existing name-edit modal (closing the sheet first — no stacked modals).
+- **Notifications** — the existing push/SMS switches, inline in the sheet.
+- **Hidden people** — an always-visible section (this is the discoverability fix): header "Hidden" with a count when non-empty ("Hidden (2)"), the list with Unhide, or a quiet "No hidden people" line when empty.
+- **Sign out** and **Delete account** (red, last) — unchanged behavior, one tap deeper.
+
+The "Hidden" section leaves the people list's `ListFooterComponent`; the footer itself disappears, giving the list the space back.
+
+Rationale for the gear living on the People screen and not the calendar header: everything in the sheet is account/people-domain, and the calendar header is protected chrome (theme swatch + `?` only). The design doc's own precedent applies — the theme-swatch drift note (§7): permanent rows spend chrome that set-once actions haven't earned.
+
+### Technical Notes
+
+- Dialog via `showConfirm` in `lib/dialogs.ts` (native `Alert.alert`; `window.confirm` on web) — the same helper as the other confirms, so e2e can drive it.
+- Gear: Ionicons `settings-outline` in the People header (top-right, left of Add), tinted by a role token (conventions: vector icons, never emoji; `accessibilityLabel` since the icon has no visible text; 44pt target).
+- Sheet: the existing `pageSheet` Modal pattern already used for Notifications/name-edit on the People screen, with `onRequestClose` wired to Close (conventions — KI-009/KI-012).
+- What hide does, for the copy's honesty (all shipped behavior, unchanged here): their events are filtered from the calendar server-side (the `get_calendar_events` hide join), not deleted; `send-notification` skips both push and SMS to the hider; the hidden person is never told and can still share; unhide restores everything. `hidden_people.person_id` cascades on `my_people` delete, so Removing a person also unhides them — hidden ⊆ people today, but the sheet makes the home structural rather than list-length-dependent.
+- Vocabulary stays "hide", never "block" — [Hide](#hide) §Philosophy records the word as intentional (one-directional, silent, no social signal). True block semantics would be a different feature.
+- Test moves: `__tests__/app/app/people.test.tsx` and the e2e specs that drive the footer buttons (`people`, `display-name`, `smoke`, `whos-coming`, `edit-propagation`) open the sheet first; `e2e/hide.spec.ts` gains the confirm step; new spec coverage for the sheet's open/close and the Hidden section's empty and populated states.
+- Verify bar: fast checks + a new or updated Playwright spec on desktop Chrome per AGENTS.md.
+
+### Acceptance Criteria
+
+- [ ] Tapping "Hide {name}" shows the confirm dialog before any write; Cancel changes nothing and stays on the event
+- [ ] Confirm copy names the consequence (no events from them, no share notifications), the silence (they aren't told), and the undo path (unhide from My People)
+- [ ] The confirm button is not destructive-red; Unhide has no dialog
+- [ ] Confirming hides exactly as today: their events leave the calendar, their shares don't notify, and the app navigates back
+- [ ] People header shows a gear; the footer (Notifications / Your name / Sign out / Delete account) is gone
+- [ ] The gear opens a Settings sheet holding Your name, Notifications (push/SMS switches), Hidden people, Sign out, Delete account — each behaving exactly as its footer predecessor
+- [ ] The Hidden section is visible in the sheet whether or not anyone is hidden (quiet empty state when none); Unhide works from there
+- [ ] The people list no longer renders the Hidden section at its foot
+- [ ] Works on web (dialogs via `lib/dialogs.ts`) and native; fast checks + Playwright per the verify bar
+
+### Open Questions
+
+- None
