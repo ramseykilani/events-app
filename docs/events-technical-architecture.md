@@ -95,6 +95,7 @@ Circles are saved selections — shortcuts for quickly selecting a group of peop
 | from_event_id | uuid (FK → events, nullable) | The sender's row this copy came from. NULL = the owner created it (or the link was cleared when the sender removed their row / deleted their account — ON DELETE SET NULL). Never updated after copy creation, so the follow graph is a forest. |
 | from_user_id | uuid (FK → users, nullable) | The sender's account, for attribution + hide. SET NULL when the sender deletes their account (attribution disappears). |
 | frozen | boolean | The owner edited this row; it no longer follows `from_event_id`. Any field-changing save sets it (owner decision 2026-08-21). |
+| archived_at | timestamptz (nullable) | Archive Received Events (2026-09-01): set = archived — off the calendar, restorable from the Archived screen. Written only by `set_event_archived`, never by `save_event` (archiving is not an edit and never ends following). |
 | created_at | timestamptz | |
 | updated_at | timestamptz | Bumped by `save_event` on edits and cascade updates. |
 
@@ -257,9 +258,13 @@ A frozen intermediary prunes its whole subtree from later cascades: if Bob edite
 
 This keeps each user's data their own: a correction walks in through the person you follow, and your own Save always wins over an incoming cascade (the cascade skips rows marked frozen; a concurrent follower save wins the lock race via the outer UPDATE's `NOT frozen` re-check).
 
-### 5a. Remove an Event
+### 5a. Remove or Archive an Event
 
-Removing an event from your calendar deletes your own events row (its sends records cascade with it). Because sharing delivered everyone their own row up front, this is purely personal — nobody else's calendar changes when you remove an event, whether you created it or re-shared it. Followers' rows keep their field values with `from_event_id` SET NULL (following ends; attribution via `from_user_id` survives while the sender's account exists). There is no garbage collector in this model: every row has exactly one owner, and removing a row is final.
+**Self-created events** (`from_user_id IS NULL`) are deleted: removing deletes your own events row (its sends records cascade with it). Because sharing delivered everyone their own row up front, this is purely personal — nobody else's calendar changes when you remove an event. Followers' rows keep their field values with `from_event_id` SET NULL (following ends; attribution via `from_user_id` survives while the sender's account exists). There is no garbage collector in this model: every row has exactly one owner, and removing a row is final.
+
+**Received events** (`from_user_id IS NOT NULL`) are archived instead (Archive Received Events, 2026-09-01) — reversible removal, because a mis-tapped delete had no self-recovery (the share sheet locks already-shared people, and RLS hides the recipient's calendar from the sender, so "send it again?" was a dead end). Archive sets `archived_at` via the `set_event_archived` RPC (SECURITY DEFINER, owner-only, idempotent — a write matching the current state is a no-op). It deliberately does NOT go through `save_event`: archiving is not an edit, so it never sets `frozen` and never cascades — an archived row keeps following its sender and edits still land on it. The calendar RPC filters archived rows (`AND e.archived_at IS NULL`); the detail screen still loads them by id, so push/deep links keep working and show Restore. The Archived screen (`app/(app)/archived.tsx`, entered via a plain-words "Archived" link at the foot of the calendar, shown only when the archive is non-empty) lists them via `get_archived_events` — upcoming first (nearest at top), then past (most recent first), with the same live attribution join as the calendar but no hide filter (hide filters the calendar, not the drawer). Restore clears `archived_at`; there is no remove-forever anywhere for received events. Archiving an *upcoming* received event whose Who's Coming answer is NULL or Yes offers to tell the asker No (the answer rides the archive moment — "get this off my calendar" users never return to the event screen); past events and existing No answers archive silently. Neither archive nor restore notifies anyone.
+
+The classification boundary is `from_user_id`, not `from_event_id`: `from_user_id` survives the sender deleting their event row, so a sender-removed received event still shows Archive; only an account-deletion orphan (both scrubbed) shows Delete — accepted corner (owner call 2026-09-01).
 
 ### 5b. Delete Account
 
@@ -360,7 +365,7 @@ Supabase RLS policies ensure users can only access data they should see. Key pol
 - **users:** Users can read and update their own row (update exists so the app can persist `expo_push_token`). Phone number lookups restricted to server-side functions.
 - **circles:** Users can only CRUD their own circles.
 - **circle_members:** Users can only CRUD members of their own circles.
-- **events:** Owner-only, period — users can SELECT and DELETE their own rows; there are no client INSERT/UPDATE policies at all. Creates and edits go through `save_event` (SECURITY DEFINER, ownership verified) so the frozen/cascade logic cannot be bypassed, and recipient copies are written only by `share_event` / `deliver_pending_shares` (definer). All cross-user writes happen inside those functions.
+- **events:** Owner-only, period — users can SELECT and DELETE their own rows; there are no client INSERT/UPDATE policies at all. Creates and edits go through `save_event` (SECURITY DEFINER, ownership verified) so the frozen/cascade logic cannot be bypassed, recipient copies are written only by `share_event` / `deliver_pending_shares` (definer), and `archived_at` is written only by `set_event_archived` (definer, owner-only). All cross-user writes happen inside those functions.
 - **sends:** Readable by the owner of the event they hang off (for ✓ Shared and "Shared with"). Written only by the definer functions.
 - **hidden_people:** Owner-only CRUD.
 - **auth.users:** No client access. Account deletion goes through `delete_my_account()` (SECURITY DEFINER, `authenticated` only), which deletes exactly the caller's row.
@@ -378,7 +383,8 @@ events-app/
 │   │   ├── index.tsx               # Calendar (main screen)
 │   │   ├── add-event.tsx           # Paste URL or enter details, set date/time
 │   │   ├── edit-event.tsx          # Edit screen — one save_event call; any change ends following
-│   │   ├── event/[id].tsx          # Event detail — who shared it, share/hide/remove buttons, Add to calendar export row
+│   │   ├── event/[id].tsx          # Event detail — who shared it, share/hide/archive (received) or remove (self-created), Add to calendar export row
+│   │   ├── archived.tsx            # Archived drawer — archived received events; Restore is the only action
 │   │   ├── onboarding.tsx          # Optional walkthrough — auto-shows once when the calendar is empty
 │   │   ├── people.tsx              # My People — manage list, circles, hidden people
 │   │   └── share.tsx               # Sharing screen — select people/circles; existing shares show as completed

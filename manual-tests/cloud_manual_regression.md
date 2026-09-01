@@ -178,14 +178,15 @@ For each executed scenario:
 
 ---
 
-### E-103 Remove event
+### E-103 Remove event (self-created only)
 **Steps**
-1. Open event detail for an event on the current user's calendar.
+1. Open event detail for an event the current user CREATED (no "From X" attribution).
 2. Tap **Remove Event** and confirm.
 
 **Expected**
 - The event disappears from the user's calendar and the user is navigated away from the detail page.
 - Only the caller's own row is deleted: anyone it was shared with keeps their own row (verify with the second test account if the event was shared onward). Followers' rows keep their field values and simply stop following (their `from_event_id` clears).
+- Received events never show Remove Event — they show **Archive** instead (see E-118). The one exception: a received event whose sender deleted their whole account (attribution gone) shows Remove Event — accepted corner, owner call 2026-09-01.
 
 ---
 
@@ -402,6 +403,29 @@ The event detail screen has an "Add to calendar" row (label left, two icon butto
 - Step 4: an all-day event in both formats (Google `dates=YYYYMMDD/next-day`; `.ics` `DTSTART;VALUE=DATE`).
 - An untitled event exports as "Untitled event"; an event with no description/URL exports with no details body.
 - The row uses secondary styling (never the accent), both targets are at least 44pt, and both carry accessibility labels ("Add to Google Calendar" / "Add to Apple, Outlook, or another calendar").
+
+---
+
+### E-119 Archive received events (reversible removal)
+**Steps**
+1. As account A, share an event dated today to account B. As B, open the received event's detail.
+2. Confirm the destructive slot shows **Archive** (neutral styling, not red) and there is no Remove Event.
+3. Tap **Archive** — no confirm dialog. The event is upcoming and unanswered, so the say-No prompt appears ("Taken off your calendar. Let A know you're not in?"). Tap **Not now**.
+4. Back on B's calendar: the event is gone from its day, and an **Archived** link sits at the foot of the screen (below the day's list). Tap it.
+5. On the Archived screen: the event is listed with its "From A" attribution. Tap **Restore**.
+6. Back on the calendar, the event is back on its date; the Archived link is gone (assuming nothing else is archived).
+7. Archive the event again, and this time tap **Tell A no** in the prompt.
+8. As A, open the event and check "Shared with".
+9. As B, navigate directly to the archived event's URL (`/event/<B's row id>`).
+10. Share a second event to B dated in the PAST; as B, open it and tap **Archive**.
+
+**Expected**
+- Step 3: no confirm dialog; the prompt appears only because the event is upcoming and the answer is NULL (it would also appear for a Yes answer, with the copy "A still has you down as coming — change it to No?").
+- Step 4-6: archive is confirm-less and fully reversible; the drawer orders upcoming nearest-first, then past most-recent-first; the link renders only while the archive is non-empty.
+- Step 7-8: the asker's "Shared with" shows B's No (and A gets a push when the answer changed, per Who's Coming rules). The archive stands regardless of the answer write.
+- Step 9: the archived event loads by id and its action slot shows **Restore** (push/deep links keep working).
+- Step 10: no say-No prompt for a past event — it archives silently.
+- Throughout: no notifications fire on archive or restore themselves, and A sees no change other than the answer.
 
 ---
 
