@@ -368,4 +368,52 @@ describe('app/(app)/edit-event', () => {
     resolveEvents({ data: eventRow, error: null });
     await screen.findByText('Save');
   });
+
+  it('shows no Remove Event on a received event (KI-015: Archive lives on the detail screen)', async () => {
+    mockEventsSingle.mockResolvedValue({
+      data: { ...eventRow, from_event_id: 'e-sender', from_user_id: 'u-sender' },
+      error: null,
+    });
+
+    const screen = render(<EditEventScreen />);
+    const titleInput = await screen.findByPlaceholderText('Event title');
+    expect(screen.queryByText('Remove Event')).toBeNull();
+
+    // Editing stays available — a field-changing save forks via save_event.
+    fireEvent.changeText(titleInput, 'My version');
+    fireEvent.press(screen.getByText('Save'));
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'save_event',
+        expect.objectContaining({ p_id: 'e-1', p_title: 'My version' })
+      );
+    });
+    expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-1');
+  });
+
+  it('shows no Remove Event on a preview-seeded received row, from first paint', async () => {
+    // The preview carries from_user_id and a seeded form never refetches, so
+    // the destructive slot classifies correctly with no fetch at all.
+    rememberEventPreview({
+      event_id: 'e-1',
+      title: 'Old Title',
+      description: null,
+      image_url: null,
+      location: null,
+      url: null,
+      event_date: '2026-05-01',
+      event_time: null,
+      from_user_id: 'u-sender',
+    });
+
+    const screen = render(<EditEventScreen />);
+    await screen.findByPlaceholderText('Event title');
+    expect(screen.queryByText('Remove Event')).toBeNull();
+    expect(mockEventsSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps Remove Event on a self-created event', async () => {
+    const screen = render(<EditEventScreen />);
+    await screen.findByText('Remove Event');
+  });
 });

@@ -403,43 +403,6 @@ flag that.
   (`@expo/vector-icons`, tinted by `theme.textPrimary`) instead of the
   library's tinted-PNG arrows, or pass custom `renderArrow`.
 
-### KI-015 — Edit screen offers permanent Remove Event on received events, bypassing the Archive grammar
-
-- Severity: major (spec violation — an irreversible action where the shipped
-  grammar promises reversible-only; mitigated: behind a confirm dialog, and
-  only the caller's own row is deleted)
-- Status: open — queued for a fixer agent (owner dispatch 2026-09-01)
-- Found: 2026-09-01 UX pattern audit (UX-20,
-  `manual-tests/ux_pattern_audit_2026-09-01.md`).
-- Expected: per FEATURES.md → Archive Received Events (owner-approved
-  2026-09-01): "There is no delete path for received events." Received
-  events (`from_user_id IS NOT NULL`) get Archive (neutral, reversible, no
-  confirm); only self-created events get Remove Event (red, confirmed,
-  permanent).
-- Actual: `app/(app)/edit-event.tsx` renders the destructive Remove Event
-  button unconditionally and `handleDelete` issues a real `delete()` on the
-  caller's row. Path: received event → detail → Edit → Remove Event →
-  confirm → the received copy is hard-deleted, with no Archive/Restore
-  safety net. The confirm copy ("everyone you shared it with keeps their
-  own copy") also reads wrong for a received event — the recipient didn't
-  share it with anyone.
-- Repro: sign in as an account with a received event on its calendar → open
-  the event → Edit → Remove Event → confirm → the event is permanently gone
-  (it never enters the Archived drawer).
-- Root cause: the Archive feature pinned the detail screen's Archive/Remove
-  split (Jest + e2e + preview provenance) but the edit screen's destructive
-  button was never gated on `from_user_id`. The spec's coordination note
-  ("the UI never renders Remove Event on a received row") is false for this
-  screen.
-- Fix brief (for the fixer agent): gate the edit screen's Remove Event on
-  `from_user_id === null` (self-created only) — received rows simply show
-  no destructive action there, since Archive already lives on the detail
-  screen. Cover with a Jest assertion and an e2e path (received event →
-  edit form renders no Remove Event). Do not weaken the existing
-  self-created coverage. Note the event detail screen's Edit button stays
-  available for received events (editing your own copy is fine — it forks
-  via `save_event`'s frozen rule); only the delete path is gated.
-
 ## Deleted bug classes (do not re-flag, do not reintroduce)
 
 - **KI-002 (global dedup drops description/image) — deleted 2026-08-24 by the

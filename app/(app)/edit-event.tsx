@@ -481,14 +481,20 @@ export default function EditEventScreen() {
             )}
           </>
         )}
-        <TouchableOpacity
-          style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
-          onPress={handleDelete}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
-        </TouchableOpacity>
+        {event.from_user_id === null && (
+          // Received rows have no delete path (Archive Received Events,
+          // KI-015): Archive lives on the detail screen. save_event sets
+          // frozen but never clears from_user_id, so an edited received
+          // row stays received.
+          <TouchableOpacity
+            style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
+            onPress={handleDelete}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
+          </TouchableOpacity>
+        )}
         </View>
         )}
       </ScrollView>

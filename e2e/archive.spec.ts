@@ -16,7 +16,8 @@ import {
 const PERSON_A_NAME = 'E2E Account A';
 
 // Archive Received Events end to end: B's received copy shows Archive (never
-// Remove Event); archiving needs no confirm and is reversible through the
+// Remove Event — on the detail screen or the edit form, KI-015); archiving
+// needs no confirm and is reversible through the
 // Archived drawer; the conditional say-No prompt rides the archive moment —
 // "Not now" archives silently, "Tell X no" records No and pings the asker;
 // a deep link to an archived row opens its detail with Restore.
@@ -92,6 +93,20 @@ test('received events archive and restore; the say-No prompt rides the archive',
     ).toBeVisible({ timeout: 15000 });
     const bRowId = new URL(pageB.url()).pathname.split('/event/')[1];
     expect(bRowId).toBeTruthy();
+
+    // --- KI-015: the edit form offers no Remove Event on a received row
+    // either — Archive (here on the detail screen) is the only removal path.
+    // Editing itself stays available. Cancel returns to the still-mounted
+    // detail screen with the reply widget already loaded.
+    await pageB.getByRole('button', { name: 'Edit' }).filter({ visible: true }).click();
+    await expect(pageB.getByPlaceholder('Event title')).toHaveValue(title);
+    await expect(
+      pageB.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
+    ).toHaveCount(0);
+    await pageB.getByRole('button', { name: 'Cancel' }).filter({ visible: true }).click();
+    await expect(
+      pageB.getByRole('button', { name: 'Archive' }).filter({ visible: true })
+    ).toBeVisible({ timeout: 15000 });
 
     // --- Archive with "Not now": the prompt fires once, no answer is
     // written, and the event leaves the calendar.
