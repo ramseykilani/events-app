@@ -186,7 +186,7 @@ For each executed scenario:
 **Expected**
 - The event disappears from the user's calendar and the user is navigated away from the detail page.
 - Only the caller's own row is deleted: anyone it was shared with keeps their own row (verify with the second test account if the event was shared onward). Followers' rows keep their field values and simply stop following (their `from_event_id` clears).
-- Received events never show Remove Event — they show **Archive** instead (see E-118). The one exception: a received event whose sender deleted their whole account (attribution gone) shows Remove Event — accepted corner, owner call 2026-09-01.
+- Received events never show Remove Event — they show **Archive** instead (see E-119). The one exception: a received event whose sender deleted their whole account (attribution gone) shows Remove Event — accepted corner, owner call 2026-09-01.
 
 ---
 
