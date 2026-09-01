@@ -1,4 +1,4 @@
-import { buildGoogleUrl, buildIcs } from '../../lib/calendarLinks';
+import { buildGoogleUrl, buildIcs, buildNativeDetails } from '../../lib/calendarLinks';
 
 // Add to Other Calendars (FEATURES.md): the two pure builders behind the
 // event-detail export buttons. The receipt page carries an inline port of
@@ -156,5 +156,37 @@ describe('buildIcs', () => {
       expect(Buffer.byteLength(line, 'utf8')).toBeLessThanOrEqual(75);
     }
     expect(ics.replace(/\r\n /g, '')).toContain(`DESCRIPTION:${description}\r\n`);
+  });
+});
+
+describe('buildNativeDetails', () => {
+  it('maps a timed event to a local 1-hour block', () => {
+    const d = buildNativeDetails(base);
+    expect(d.title).toBe('Board Game Night');
+    expect(d.allDay).toBe(false);
+    // Local components — the device zone interprets them (floating time).
+    expect(d.startDate.getFullYear()).toBe(2026);
+    expect(d.startDate.getMonth()).toBe(8);
+    expect(d.startDate.getDate()).toBe(5);
+    expect(d.startDate.getHours()).toBe(19);
+    expect(d.startDate.getMinutes()).toBe(0);
+    expect(d.endDate.getTime() - d.startDate.getTime()).toBe(60 * 60 * 1000);
+    expect(d.notes).toBe('Bring a game.\n\nhttps://example.com/tickets');
+  });
+
+  it('maps a time-less event to an all-day range ending the next day', () => {
+    const d = buildNativeDetails({ ...base, event_time: null });
+    expect(d.allDay).toBe(true);
+    expect(d.startDate.getHours()).toBe(0);
+    expect(d.endDate.getDate()).toBe(6);
+  });
+
+  it('omits notes when there is no description and no url', () => {
+    const d = buildNativeDetails({ ...base, description: null, url: null });
+    expect('notes' in d).toBe(false);
+  });
+
+  it('falls back to "Untitled event"', () => {
+    expect(buildNativeDetails({ ...base, title: null }).title).toBe('Untitled event');
   });
 });

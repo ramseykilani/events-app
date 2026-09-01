@@ -62,6 +62,41 @@ function buildDetails(event: CalendarFields): string {
   return [event.description, event.url].filter(Boolean).join('\n\n');
 }
 
+// The pre-fill shape for the native compose UIs (iOS createEventInCalendarAsync,
+// Android ACTION_INSERT) — same field mapping as the URL/ICS builders: timed →
+// 1-hour block, no time → all-day, local Date components = floating local time.
+export type NativeEventDetails = {
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  allDay: boolean;
+  notes?: string;
+};
+
+export function buildNativeDetails(event: CalendarFields): NativeEventDetails {
+  const [y, m, d] = parseDate(event.event_date);
+  const details = buildDetails(event);
+  const base = {
+    title: event.title ?? UNTITLED,
+    ...(details ? { notes: details } : {}),
+  };
+  if (event.event_time) {
+    const [h, min] = parseTime(event.event_time);
+    return {
+      ...base,
+      startDate: new Date(y, m - 1, d, h, min),
+      endDate: new Date(y, m - 1, d, h + 1, min),
+      allDay: false,
+    };
+  }
+  return {
+    ...base,
+    startDate: new Date(y, m - 1, d),
+    endDate: new Date(y, m - 1, d + 1),
+    allDay: true,
+  };
+}
+
 export function buildGoogleUrl(event: CalendarFields): string {
   const [y, m, d] = parseDate(event.event_date);
   let dates: string;
