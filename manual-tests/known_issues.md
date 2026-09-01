@@ -39,27 +39,47 @@ never added: a blocker must be fixed, not accepted.
 ### KI-005 — Android 3-button navigation bar covers the bottom of the screen
 
 - Severity: minor
-- Status: open
+- Status: fixed in code 2026-09-01 — pending owner on-device confirmation
+  (same pattern as KI-009). Every screen whose content can reach the window
+  bottom now pads the bottom safe-area inset, and `test:conventions`
+  requires any file that spends `insets.top` to also spend `insets.bottom`,
+  so the class cannot regress. Remove this entry once a device smoke
+  confirms.
 - Found: 2026-08-15 owner device smoke on Samsung with 3-button navigation
   (not gesture nav), `manual-tests/manual_test_report_2026-08-15-device.md`
   N-009 (People / Delete account). Still present 2026-08-17 on the Events
-  calendar.
+  calendar. Re-surfaced for the owner on the My People list 2026-09-01.
 - Expected: in-app content sits fully on screen, clear of the system
   navigation bar.
 - Actual: with the Samsung / 3-button navigation bar on, the bar covers a
   strip along the bottom of the app.
-- Where it shows up (native Android, 3-button nav):
-  - People (`app/(app)/people.tsx`) — first report: the bar covered the
-    Delete account button in the account footer.
-  - Events / calendar (`components/Calendar.tsx`, title "Events") — the bar
-    covers the bottom of an event in the selected-day list.
-  - Likely the bottom of the window in general, not those two screens only.
-    Other screens have not been exhaustively re-checked on a 3-button-nav
-    device.
-- Repro: Android device, 3-button (Samsung) navigation bar enabled. Open
-  People and look at the footer, or open Events with at least one event on
-  the selected day. Not reported under gesture navigation. Web has no
-  3-button nav (do not flag there).
+- Root cause (pinned 2026-09-01): Expo SDK 54 targets Android 15+ (API 35),
+  where the OS enforces edge-to-edge — `android.edgeToEdgeEnabled: false` in
+  `app.config.js` is inert there, so the window draws behind the 3-button
+  nav bar and only explicit `insets.bottom` padding lifts content clear of
+  it. The 2026-08-15 "footer safe-area" fix covered only the People account
+  footer (the Delete account button from N-009); every other bottom edge —
+  the People list itself, the calendar's selected-day list, the add/edit
+  event forms, the share screen, the contacts picker — had no bottom
+  padding. The padded footer then moved into the gear-opened Settings sheet
+  on 2026-09-01 (Hide Confirmation & People Settings Sheet), which is why
+  the main People screen read as "broken again": its one padded element had
+  left the screen.
+- Fix (2026-09-01): bottom-inset padding on every screen/sheet whose content
+  can reach the window bottom — calendar selected-day list
+  (`components/Calendar.tsx`, regression-pinned in
+  `__tests__/components/Calendar.test.tsx`), People list + circle-editor
+  list (`app/(app)/people.tsx`), add/edit event forms, share screen
+  container, contacts picker (`components/PeoplePicker.tsx`). Already safe
+  before this pass: event detail + Archived (`SafeAreaView`, all edges),
+  sign-in / onboarding / the three permission explainers (explicit bottom
+  padding), People Settings sheet (the 2026-08-15 fix). Audited and
+  deliberately unpadded: verify (centered short form) and manual add-person
+  (top-pinned short form — `conventions-ok`). Web is unaffected
+  (`insets.bottom` is 0 there and there is no 3-button nav — do not flag).
+- Repro (pre-fix): Android device, 3-button (Samsung) navigation bar
+  enabled. Open People and scroll the list, or open Events with at least one
+  event on the selected day. Not reported under gesture navigation.
 - Owner ruling 2026-08-15: not a tester blocker (testers expected to use
   gesture nav). Recorded here so release review and device smoke do not
   re-flag the same overlap.
