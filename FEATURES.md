@@ -28,7 +28,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
-| [Permission Explainer Clarity](#permission-explainer-clarity) | Planned | Notification + contacts pre-asks: Continue is opaque, and on Android the sheet doesn't read as a pop-up. |
+| [Permission Explainer Clarity](#permission-explainer-clarity) | In progress | Notification + contacts pre-asks: Continue is opaque, and on Android the sheet doesn't read as a pop-up. |
 | [Circles UX](#circles-ux) | Planned | Current circles are hard to use, poorly explained, and not intuitive. Not designed — do not implement from this section. |
 | [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). Broader Android Back: [KI-012](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
@@ -1208,7 +1208,7 @@ The send also settled the checkmark collision on the sheet (shared vocabulary wi
 
 ## Permission Explainer Clarity
 
-**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-20 from owner feedback (notifications); expanded 2026-08-31 with the same Continue problem on contacts and the Android sheet presentation. **Not designed; do not implement from this section.** This is a feature, not a known-issue ledger entry: testers should still notice if it gets worse, and a later pass should redesign it. Related: [Notification Permission Explainer](#notification-permission-explainer), [Contacts Permission Explainer](#contacts-permission-explainer) (the shipped pre-asks; the notification screen was cloned from the contacts one).
+**Status:** In progress — polish, not a tester blocker. Recorded 2026-08-20 from owner feedback (notifications); expanded 2026-08-31 with the same Continue problem on contacts and the Android sheet presentation. This is a feature, not a known-issue ledger entry: testers should still notice if it gets worse, and a later pass should redesign it. Related: [Notification Permission Explainer](#notification-permission-explainer), [Contacts Permission Explainer](#contacts-permission-explainer) (the shipped pre-asks; the notification screen was cloned from the contacts one).
 
 Previously titled "Notification Explainer Clarity."
 
