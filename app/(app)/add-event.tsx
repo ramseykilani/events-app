@@ -21,6 +21,7 @@ import { showAlert } from '../../lib/dialogs';
 import { useSession } from '../_context/SessionContext';
 import { useTheme } from '../../hooks/useTheme';
 import { isAbortError, withFetchTimeout, withWriteTimeout } from '../../lib/timeoutSignal';
+import { AppHeader } from '../../components/AppHeader';
 
 export default function AddEventScreen() {
   const { session } = useSession();
@@ -212,42 +213,22 @@ export default function AddEventScreen() {
         { backgroundColor: theme.background, paddingTop: insets.top + 12 },
       ]}
     >
+      <AppHeader
+        title="Add event"
+        left={{ kind: 'cancel' }}
+        onLeft={() => router.back()}
+        right={{
+          label: 'Save',
+          onPress: handleCreate,
+          disabled: loading || (!title.trim() && !url.trim()),
+        }}
+      />
       <ScrollView
         keyboardShouldPersistTaps="handled"
         // KI-005: keep the form's end clear of the Android 3-button nav bar
         // (edge-to-edge is OS-enforced on Android 15+; 0 on web).
         contentContainerStyle={{ paddingBottom: insets.bottom }}
       >
-        <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          // hitSlop (not padding): this screen has a pixel-diff baseline.
-          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-        >
-          <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Add event</Text>
-        <TouchableOpacity
-          onPress={handleCreate}
-          disabled={loading || (!title.trim() && !url.trim())}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: loading || (!title.trim() && !url.trim()) }}
-          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-        >
-          <Text
-            style={[
-              styles.save,
-              { color: theme.textPrimary },
-              (loading || (!title.trim() && !url.trim())) && { color: theme.textTertiary },
-            ]}
-          >
-            Save
-          </Text>
-        </TouchableOpacity>
-      </View>
       <View style={styles.form}>
         <Text style={[styles.label, { color: theme.textSecondary }]}>URL (optional)</Text>
         <View style={styles.urlRow}>
@@ -356,25 +337,6 @@ export default function AddEventScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  cancel: {
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  save: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   form: {
     padding: 20,

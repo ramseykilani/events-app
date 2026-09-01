@@ -30,6 +30,8 @@ import {
   withRetries,
   withWriteTimeout,
 } from '../../lib/timeoutSignal';
+import { AppHeader } from '../../components/AppHeader';
+import { TextAction } from '../../components/TextAction';
 
 function firstParam(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -315,27 +317,23 @@ export default function EditEventScreen() {
 
   if (loadError && !event) {
     return (
-      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
-        <Text style={[styles.loadErrorText, { color: theme.textSecondary }]}>
-          Could not load this event.
-        </Text>
-        <TouchableOpacity
-          onPress={() => void load()}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-        >
-          <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
-        </TouchableOpacity>
-        {/* conventions-ok: migrates to AppHeader in Design System Consolidation Phase 2 */}
-        <TouchableOpacity
-          onPress={() => router.back()}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-        >
-          <Text style={[styles.retry, { color: theme.textSecondary }]}>Back</Text>
-        </TouchableOpacity>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            paddingTop: insets.top + 12,
+            paddingBottom: insets.bottom,
+          },
+        ]}
+      >
+        <AppHeader left={{ kind: 'back', label: 'Events' }} onLeft={() => router.back()} />
+        <View style={[styles.centered, { flex: 1 }]}>
+          <Text style={[styles.loadErrorText, { color: theme.textSecondary }]}>
+            Could not load this event.
+          </Text>
+          <TextAction label="Retry" tone="link" onPress={() => void load()} />
+        </View>
       </View>
     );
   }
@@ -348,42 +346,22 @@ export default function EditEventScreen() {
         { backgroundColor: theme.background, paddingTop: insets.top + 12 },
       ]}
     >
+      <AppHeader
+        title="Edit event"
+        left={{ kind: 'cancel' }}
+        onLeft={() => router.back()}
+        right={{
+          label: 'Save',
+          onPress: handleSave,
+          disabled: loading || !event || (!title.trim() && !url.trim()),
+        }}
+      />
       <ScrollView
         keyboardShouldPersistTaps="handled"
         // KI-005: keep Remove Event clear of the Android 3-button nav bar
         // (edge-to-edge is OS-enforced on Android 15+; 0 on web).
         contentContainerStyle={{ paddingBottom: insets.bottom }}
       >
-        <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          // hitSlop (not padding): pairs with the baselined add-event form.
-          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-        >
-          <Text style={[styles.cancel, { color: theme.textSecondary }]}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.textPrimary }]}>Edit event</Text>
-        <TouchableOpacity
-          onPress={handleSave}
-          disabled={loading || !event || (!title.trim() && !url.trim())}
-          activeOpacity={0.6}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: loading || !event || (!title.trim() && !url.trim()) }}
-          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
-        >
-          <Text
-            style={[
-              styles.save,
-              { color: theme.textPrimary },
-              (loading || !event || (!title.trim() && !url.trim())) && { color: theme.textTertiary },
-            ]}
-          >
-            Save
-          </Text>
-        </TouchableOpacity>
-        </View>
         {!event ? (
           <View style={[styles.centered, { paddingTop: 48 }]}>
             <ActivityIndicator color={theme.textPrimary} />
@@ -486,15 +464,14 @@ export default function EditEventScreen() {
           // Received rows have no delete path (Archive Received Events,
           // KI-015): Archive lives on the detail screen. save_event sets
           // frozen but never clears from_user_id, so an edited received
-          // row stays received.
-          <TouchableOpacity
-            style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
+          // row stays received. Destructive actions are quiet text links
+          // (the QuietDestructiveLink tier), not filled blocks.
+          <TextAction
+            label="Remove Event"
+            tone="destructive"
             onPress={handleDelete}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
-          </TouchableOpacity>
+            style={styles.removeAction}
+          />
         )}
         </View>
         )}
@@ -515,31 +492,6 @@ const styles = StyleSheet.create({
   loadErrorText: {
     fontSize: 16,
   },
-  retry: {
-    fontSize: 16,
-    fontWeight: '600',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  cancel: {
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  save: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
   form: {
     padding: 20,
   },
@@ -558,15 +510,8 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 80,
   },
-  deleteButton: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 32,
+  removeAction: {
+    marginTop: 24,
     marginBottom: 32,
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

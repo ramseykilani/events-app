@@ -349,7 +349,7 @@ describe('app/(app)/edit-event', () => {
 
     await screen.findByText('Could not load this event.');
     expect(screen.getByText('Retry')).toBeTruthy();
-    expect(screen.getByText('Back')).toBeTruthy();
+    expect(screen.getByLabelText('Back to Events')).toBeTruthy();
   });
 
   it('keeps Cancel available while the event is still loading', async () => {
