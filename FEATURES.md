@@ -47,7 +47,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
-| [Archive Received Events](#archive-received-events) | In progress | Reversible removal for received events; Delete stays for self-created. Spec owner-approved 2026-09-01. |
+| [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
 
 ## Using and testing
 
@@ -1658,7 +1658,7 @@ Fetch the visible grid's full date range (Sunday on/before the 1st through Satur
 
 ## Archive Received Events
 
-**Status:** In progress — spec owner-approved in discussion 2026-09-01. Supersedes the reverted Remove Event Confirm & Restore (`f6d83fa`, reverted `3d77c2f`, 2026-08-31): instead of confirming an irreversible delete and unlocking re-share, removal of a received event becomes reversible.
+**Status:** Implemented 2026-09-01 — spec owner-approved in discussion 2026-09-01. Supersedes the reverted Remove Event Confirm & Restore (`f6d83fa`, reverted `3d77c2f`, 2026-08-31): instead of confirming an irreversible delete and unlocking re-share, removal of a received event becomes reversible.
 
 ### Problem
 
@@ -1689,17 +1689,20 @@ Make removal of a received event reversible — **Archive** — and keep true **
 
 ### Acceptance Criteria
 
-- [ ] Received event detail shows Archive (neutral styling); tapping removes the event from the calendar with no confirm dialog
-- [ ] Self-created event detail keeps Delete (red, confirmed, permanent); self-created events never appear in the archive
-- [ ] A received event whose sender deleted their row still shows Archive; an account-deletion orphan shows Delete
-- [ ] "Archived" link shows at the foot of the calendar only when the archive is non-empty, and opens the Archived screen
-- [ ] Archived screen orders upcoming nearest-first, then past most-recent-first; Restore returns the event to its date and removes it from the drawer
-- [ ] Archiving an upcoming received event with answer NULL/Yes shows the say-No prompt; "Tell X no" records No (asker notified per Who's Coming rules) and completes the archive; "Not now" archives silently
-- [ ] No prompt for past events or an existing No answer; widget No never archives
-- [ ] Archived rows keep following (sender edits still land); no notifications on archive/restore; the asker sees no change
-- [ ] Push/deep link to an archived event opens its detail screen with Restore
-- [ ] Works on web (dialogs via `lib/dialogs.ts`) and native; fast checks + a Playwright spec per the verify bar
+- [x] Received event detail shows Archive (neutral styling); tapping removes the event from the calendar with no confirm dialog
+- [x] Self-created event detail keeps Delete (red, confirmed, permanent); self-created events never appear in the archive (enforced server-side: `set_event_archived` rejects `from_user_id IS NULL` rows)
+- [x] A received event whose sender deleted their row still shows Archive; an account-deletion orphan shows Delete
+- [x] "Archived" link shows at the foot of the calendar only when the archive is non-empty, and opens the Archived screen
+- [x] Archived screen orders upcoming nearest-first, then past most-recent-first; Restore returns the event to its date and removes it from the drawer
+- [x] Archiving an upcoming received event with answer NULL/Yes shows the say-No prompt; "Tell X no" records No (asker notified per Who's Coming rules) and completes the archive; "Not now" archives silently
+- [x] No prompt for past events or an existing No answer; widget No never archives
+- [x] Archived rows keep following (sender edits still land); no notifications on archive/restore; the asker sees no change
+- [x] Push/deep link to an archived event opens its detail screen with Restore
+- [x] Works on web (dialogs via `lib/dialogs.ts`) and native; fast checks + a Playwright spec per the verify bar
+
+Implementation notes (2026-09-01): the say-No prompt resolves the answer slot fresh at archive time (gated on `from_user_id`, which calendar previews carry), so a fast tap off the calendar can never skip it. The no-delete path for received events is delivered by the UI per the Technical Notes; the RLS delete-policy hardening was tried, restored on live, and deliberately dropped (see Coordination Notes — `20260901000003` reverts it in the migration chain so scratch DBs match the shipped reality).
 
 ### Coordination Notes
 
 - **2026-09-01 (delete-policy hardening went live early; restored).** The branch's migrations `20260901000001_archive_received_events` and `20260901000002_archive_delete_hardening` were applied to the live project before the client shipped. The hardening (`events_delete_own` gaining `AND from_user_id IS NULL`) immediately bound every client — including the production app, where received events still show **Remove Event** — so recipients' removes silently no-opped (204, zero rows) and `e2e/share.spec.ts` went red. The live policy was restored to the repo state (`USING (owner_id = auth.uid())`); the `archived_at` column and `set_event_archived` RPC remain live (additive, harmless to the shipped client). Backend and client must move together (AGENTS.md runbook): when this feature merges, if the RLS hardening is still wanted as defense-in-depth alongside the UI change, re-apply it as a **new** migration — the already-recorded `20260901000002` will not re-apply. The approved Technical Notes deliver "no delete path for received events" via the UI (Archive replaces Remove Event); the policy hardening is optional belt-and-braces, not load-bearing.
+- **2026-09-01 (hardening deliberately dropped at merge).** With the production-breakage window demonstrated above and the ship-it protocol carrying no migration-timing step, the RLS hardening is not worth its coordination cost: the UI never renders Remove Event on a received row (pinned by Jest, e2e, and preview provenance), and `set_event_archived` itself rejects self-created rows server-side. `20260901000003_archive_delete_policy_restore` re-creates `events_delete_own` as owner-only in the migration chain, so local scratch DBs and any future fresh project match the live policy instead of silently drifting (the local-vs-live gap called out above).
