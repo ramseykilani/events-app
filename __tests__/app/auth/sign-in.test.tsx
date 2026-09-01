@@ -135,7 +135,9 @@ describe('app/(auth)/sign-in', () => {
     const screen = render(<SignInScreen />);
     fireEvent.changeText(screen.getByPlaceholderText('+1 (555) 123-4567'), '4165551234');
     fireEvent.press(screen.getByText('Send code'));
-    fireEvent.press(screen.getByText('Sending...'));
+    // The working phase swaps the label for a spinner (design-language §6) —
+    // the second tap lands on the same control, now disabled mid-flight.
+    fireEvent.press(screen.getByRole('button'));
 
     expect(mockSignInWithOtp).toHaveBeenCalledTimes(1);
 

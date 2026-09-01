@@ -1,5 +1,5 @@
 import { expect, newExtraContext, test } from './fixtures';
-import { ACCOUNT_B } from './helpers';
+import { ACCOUNT_A, ACCOUNT_B } from './helpers';
 
 // Signed-out auth flows (M-001, M-002) run in a fresh context with no stored
 // session. None of these complete a successful OTP verify — the setup project
@@ -84,6 +84,37 @@ test('verify screen starts the resend cooldown and rejects a wrong code (M-002)'
 
     // Form recovers: user can retry immediately.
     await expect(page.getByTestId('verify-button')).toBeEnabled();
+  } finally {
+    await context.close();
+  }
+});
+
+test('verify screen offers a wrong-number exit (UX-04)', async ({
+  browser,
+}, testInfo) => {
+  // Account A: M-002's wrong-code run above already spent B's OTP send inside
+  // Auth's max-frequency window — a second send to the same number would be
+  // rate-limited and the screen would never leave sign-in.
+  const context = await newExtraContext(browser, testInfo);
+  try {
+    const page = await context.newPage();
+    await page.goto('/');
+    await page.getByLabel('Phone number').fill(ACCOUNT_A.phone);
+    await page.getByRole('button', { name: 'Send code' }).click();
+
+    // The subtitle renders the number formatted, never raw E.164 (UX-27).
+    // Derive the expectation from the account — the pool pair varies per run.
+    const digits = ACCOUNT_A.phone.replace(/\D/g, '').slice(-10);
+    const formatted = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    await expect(page.getByLabel('Verification code')).toBeVisible();
+    await expect(page.getByText(formatted)).toBeVisible();
+
+    // Sign-in router.replace()s to verify, so the exit is an explicit action.
+    await page.getByRole('button', { name: 'Wrong number?' }).click();
+    await expect(page.getByLabel('Phone number')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Send code' })
+    ).toBeVisible();
   } finally {
     await context.close();
   }

@@ -144,4 +144,15 @@ describe('app/(auth)/verify', () => {
     });
     await waitFor(() => expect(screen.getByText('Resend code in 59s')).toBeTruthy());
   });
+
+  it('offers a wrong-number exit back to sign-in (UX-04)', () => {
+    useLocalSearchParamsMock.mockReturnValue({ phone: '+14165550001' });
+
+    const screen = render(<VerifyScreen />);
+    // The subtitle renders the number formatted, never raw E.164 (UX-27).
+    expect(screen.getByText(/\(416\) 555-0001/)).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Wrong number?'));
+    expect(router.replace).toHaveBeenCalledWith('/(auth)/sign-in');
+  });
 });

@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
 import { useTheme } from '../../hooks/useTheme';
+import { PrimaryButton } from '../../components/PrimaryButton';
 
 const PRIVACY_POLICY_URL = 'https://shared-events.pages.dev/privacy.html';
 
@@ -129,17 +130,7 @@ export default function SignInScreen() {
             editable={!loading}
             accessibilityLabel="Phone number"
           />
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.primaryButtonBg }, loading && styles.buttonDisabled]}
-            onPress={handleSignIn}
-            disabled={loading}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: loading }}
-          >
-            <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
-              {loading ? 'Sending...' : 'Send code'}
-            </Text>
-          </TouchableOpacity>
+          <PrimaryButton label="Send code" onPress={handleSignIn} loading={loading} />
           <TouchableOpacity
             onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
             activeOpacity={0.6}
@@ -189,20 +180,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
-    fontSize: 18,
+    // One input grammar (audit UX-26): 16px text, radius 12 — every form.
+    fontSize: 16,
     marginBottom: 16,
-  },
-  button: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: '600',
   },
   privacyLink: {
     alignSelf: 'center',

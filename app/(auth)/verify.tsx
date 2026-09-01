@@ -13,7 +13,10 @@ import { getAuthUserMessage } from '../../lib/authErrors';
 import { supabase } from '../../lib/supabase';
 import { showAlert } from '../../lib/dialogs';
 import { showError } from '../../lib/showError';
+import { formatPhoneDisplay } from '../../lib/format';
 import { useTheme } from '../../hooks/useTheme';
+import { PrimaryButton } from '../../components/PrimaryButton';
+import { TextAction } from '../../components/TextAction';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -139,7 +142,7 @@ export default function VerifyScreen() {
           Verify
         </Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Enter the 6-digit code sent to {phone}
+          Enter the 6-digit code sent to {formatPhoneDisplay(phone)}
         </Text>
         <TextInput
           style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
@@ -152,18 +155,12 @@ export default function VerifyScreen() {
           editable={!loading}
           accessibilityLabel="Verification code"
         />
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.primaryButtonBg }, loading && styles.buttonDisabled]}
+        <PrimaryButton
+          label="Verify"
           onPress={handleVerify}
-          disabled={loading}
+          loading={loading}
           testID="verify-button"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: loading }}
-        >
-          <Text style={[styles.buttonText, { color: theme.primaryButtonText }]}>
-            {loading ? 'Verifying...' : 'Verify'}
-          </Text>
-        </TouchableOpacity>
+        />
         <TouchableOpacity
           style={[
             styles.resendButton,
@@ -182,6 +179,12 @@ export default function VerifyScreen() {
                 : "Didn't receive it? Try again"}
           </Text>
         </TouchableOpacity>
+        {/* UX-04: sign-in router.replace()s here, so a mistyped number has no
+            way back without an explicit exit. */}
+        <TextAction
+          label="Wrong number?"
+          onPress={() => router.replace('/(auth)/sign-in')}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -207,28 +210,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
-    // conventions-ok: off-scale 24px OTP tier — migrates to the §4 scale in
-    // Design System Consolidation Phase 3 (audit UX-06).
-    fontSize: 24,
+    // The OTP digit field sits on the §4 display rung (was an off-scale 24px
+    // tier, audit UX-06).
+    fontSize: 28,
     letterSpacing: 8,
     textAlign: 'center',
     marginBottom: 16,
   },
-  button: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
   resendButton: {
     marginTop: 16,
-    padding: 12,
+    // Real 44pt visible target (audit UX-10).
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
     alignItems: 'center',
   },
   resendButtonDisabled: {
