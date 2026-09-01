@@ -65,14 +65,20 @@ export const Colors: Record<'paper' | 'evening', ThemePalette> = {
     primaryButtonBg: '#1a1815',
     primaryButtonText: '#faf7f0',
     destructiveBg: '#f7e3dd',
-    destructiveText: '#c2482f',
-    destructiveLink: '#c2482f',
+    // 4.58:1 on destructiveBg, 5.29:1 on background (was #c2482f at 3.99:1 on
+    // destructiveBg — under the doc §3 ≥4.5:1 floor; UX audit 2026-09-01).
+    destructiveText: '#b4402a',
+    destructiveLink: '#b4402a',
     // 5.40:1 on background (was #a3691a at 4.27:1, under the doc's ≥4.5:1 floor).
     linkText: '#8f5a10',
-    calendarSelected: '#c8871e',
+    // 4.58:1 on background as text, and calendarSelectedText (white) on it is
+    // 4.91:1 (was #c8871e at 2.83:1 as text / 3.03:1 under white — both under
+    // the doc §3 ≥4.5:1 floor; UX audit 2026-09-01). One value carries the
+    // selected day, the dots, today's number, and the accent text moments.
+    calendarSelected: '#96680a',
     calendarSelectedText: '#ffffff',
-    calendarTodayText: '#c8871e',
-    accent: '#c8871e',
+    calendarTodayText: '#96680a',
+    accent: '#96680a',
     accentSoft: '#f0e2c4',
     shadow: '#1a1815',
     titleFontFamily: paperTitleFont,

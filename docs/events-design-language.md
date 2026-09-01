@@ -29,7 +29,7 @@ The daytime register. A picnic, a journal, a well-printed planner. Warm paper gr
 
 - **Mood:** calm, human, analog, unhurried.
 - **Voice:** serif display type for titles; clean body type.
-- **Accent:** warm ochre `#c8871e`.
+- **Accent:** warm ochre `#96680a`.
 
 ### Evening
 
@@ -65,23 +65,25 @@ A user should be able to read the state of the app from color alone, precisely b
 | `selectedBg` | `#f3ecda` | `#2e2a3a` | selected-row highlight |
 | `textPrimary` | `#1a1815` | `#ece7df` | primary text |
 | `textSecondary` | `#6b6357` | `#a49fb0` | secondary text |
-| `textTertiary` | `#a39a8b` | `#6e6879` | hints, placeholders |
+| `textTertiary` | `#756c5d` | `#8b85a0` | hints, placeholders |
 | `border` | `#e3dcc9` | `#37334a` | hairline boundaries |
 | `borderLight` | `#efe9da` | `#282435` | lighter boundaries |
 | `primaryButtonBg` | `#1a1815` | `#d9a05b` | primary action fill |
 | `primaryButtonText` | `#faf7f0` | `#2a1d10` | primary action text |
 | `destructiveBg` | `#f7e3dd` | `#38222a` | destructive surface |
-| `destructiveText` | `#c2482f` | `#e08a7a` | destructive text |
-| `destructiveLink` | `#c2482f` | `#e08a7a` | destructive inline action |
-| `linkText` | `#a3691a` | `#d9a05b` | links, inline actions |
-| `calendarSelected` | `#c8871e` | `#d9a05b` | selected day |
+| `destructiveText` | `#b4402a` | `#e08a7a` | destructive text |
+| `destructiveLink` | `#b4402a` | `#e08a7a` | destructive inline action |
+| `linkText` | `#8f5a10` | `#d9a05b` | links, inline actions |
+| `calendarSelected` | `#96680a` | `#d9a05b` | selected day |
 | `calendarSelectedText` | `#ffffff` | `#2a1d10` | selected-day number |
-| `calendarTodayText` | `#c8871e` | `#d9a05b` | today's number |
-| `accent` | `#c8871e` | `#d9a05b` | the treat (see law) |
+| `calendarTodayText` | `#96680a` | `#d9a05b` | today's number |
+| `accent` | `#96680a` | `#d9a05b` | the treat (see law) |
 | `accentSoft` | `#f0e2c4` | `#3a2f23` | gentle accent tint |
 | `shadow` | `#1a1815` | `#000000` | shadow color |
 
 All text-role pairs are expected to meet WCAG ≥ 4.5:1 against their surfaces for normal text. The accent is used for fills and large marks; where it carries small text, use it at a weight/size that stays legible.
+
+*Value syncs are enforcement, not redesign.* When a measured pair falls under the floor, the value moves and the table catches up — the law above is the language, the hex is the record. Paper moves so far: `textTertiary` and `linkText` (release review), then `accent`/`calendarSelected`/`calendarTodayText` and `destructiveText`/`destructiveLink` (2026-09-01 UX audit — accent-as-text measured 2.83:1 and white-on-ochre 3.03:1; one deepening of the ochre fixed both, since a fill dark enough for 4.5:1 text-on-paper also carries white text at ≥4.5:1).
 
 ---
 

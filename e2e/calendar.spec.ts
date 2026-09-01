@@ -80,10 +80,10 @@ test('event on an adjacent-month overflow day shows the accent dot', async ({
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expectCalendar(page);
 
-  // Paper accent #c8871e — the same dot in-month days get.
+  // Paper accent #96680a — the same dot in-month days get.
   await expect
     .poll(() => readDot(page, dateString), { timeout: 15000 })
-    .toEqual({ opacity: '1', backgroundColor: 'rgb(200, 135, 30)' });
+    .toEqual({ opacity: '1', backgroundColor: 'rgb(150, 104, 10)' });
 
   // Tapping the overflow day flips the month and lists the event.
   await page.getByTestId(`calendar.day_${dateString}`).click();
