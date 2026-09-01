@@ -28,7 +28,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
-| [Permission Explainer Clarity](#permission-explainer-clarity) | In progress | Notification + contacts pre-asks: Continue is opaque, and on Android the sheet doesn't read as a pop-up. |
+| [Permission Explainer Clarity](#permission-explainer-clarity) | Implemented | Pre-ask buttons now name the action (was: opaque Continue). Android sheet look split into [Android Sheet Presentation](#android-sheet-presentation). |
+| [Android Sheet Presentation](#android-sheet-presentation) | Planned | Every Modal is a full-screen takeover on Android (`pageSheet` is iOS-only); sheets should read as sheets. Not designed. |
 | [Circles UX](#circles-ux) | Planned | Current circles are hard to use, poorly explained, and not intuitive. Not designed — do not implement from this section. |
 | [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). Broader Android Back: [KI-012](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
@@ -503,17 +504,17 @@ On native, the contacts ask was a `showConfirm` dialog, and denying it skipped r
 
 A real explainer screen, then the system prompt. New users see this on **first Share** (or opening People with an empty list) — not at sign-up, not in the walkthrough.
 
-1. **Explainer:** “Events uses your contacts so you can pick who to text when you share.” Continue fires the OS prompt. Not now dismisses without calling the OS (so iOS hasn't used up its one ask).
+1. **Explainer:** “Events uses your contacts so you can pick who to text when you share.” Allow contacts access fires the OS prompt. Not now dismisses without calling the OS (so iOS hasn't used up its one ask).
 2. **OS prompt:** Allow → contact picker. Don’t Allow → recovery.
 3. **Recovery:** “Contacts are off,” same why, **Open Settings** as the primary action, “Add a number instead” as a quiet hatch. Returning from Settings with permission granted opens the picker. Manual add is an escape hatch, not a path we sell.
 
-Already granted → picker, no explainer. Already denied and the OS will not ask again → recovery. Android `canAskAgain` after a deny still shows the explainer so Continue can fire the OS prompt one more time.
+Already granted → picker, no explainer. Already denied and the OS will not ask again → recovery. Android `canAskAgain` after a deny still shows the explainer so Allow contacts access can fire the OS prompt one more time.
 
 Web is unchanged (no contacts API → manual form). [Inline add-by-phone](#inline-add-by-phone-in-share-sheet) on the share sheet is a separate planned convenience — first share already works without it.
 
 ### Technical Notes
 
-- [`lib/contacts.ts`](lib/contacts.ts): `getContactsPermission()` returns `{ status, canAskAgain }`. `getContactsWithPhones` never calls `requestPermissionsAsync` — the explainer's Continue is the only request site.
+- [`lib/contacts.ts`](lib/contacts.ts): `getContactsPermission()` returns `{ status, canAskAgain }`. `getContactsWithPhones` never calls `requestPermissionsAsync` — the explainer's Allow contacts access is the only request site.
 - Flow owner: [`components/ContactsPermissionFlow.tsx`](components/ContactsPermissionFlow.tsx), used by Share and People. AppState `active` while recovery is showing re-checks permission.
 - [`app.config.js`](app.config.js) `NSContactsUsageDescription` matches the explainer why (ships in the next native binary).
 - Jest: [`__tests__/components/ContactsPermissionFlow.test.tsx`](__tests__/components/ContactsPermissionFlow.test.tsx). Playwright is web-only; native acceptance is N-002.
@@ -529,7 +530,7 @@ Web is unchanged (no contacts API → manual form). [Inline add-by-phone](#inlin
 
 ### Open Questions
 
-- None on the original spec. Follow-up: the explainer itself is unclear — same Continue / Android-sheet problems as notifications, recorded in [Permission Explainer Clarity](#permission-explainer-clarity).
+- None on the original spec. Follow-up shipped 2026-09-01: the opaque Continue became Allow contacts access ([Permission Explainer Clarity](#permission-explainer-clarity)); the Android sheet look is [Android Sheet Presentation](#android-sheet-presentation).
 
 ---
 
@@ -914,7 +915,7 @@ Investigate on a development build before changing anything. Likely suspects: th
 
 ### Problem
 
-On native, the only route to the manual name+phone form is: contacts explainer → Continue → **Deny** the OS prompt → recovery screen → "Add a number instead" (`components/ContactsPermissionFlow.tsx`). Choosing "Not now" on the explainer dismisses the flow with no manual-add offer, and once contacts permission is granted the People screen's Add goes straight to the contacts picker — there is no way to add someone whose number you know but who isn't in your contacts.
+On native, the only route to the manual name+phone form is: contacts explainer → Allow contacts access → **Deny** the OS prompt → recovery screen → "Add a number instead" (`components/ContactsPermissionFlow.tsx`). Choosing "Not now" on the explainer dismisses the flow with no manual-add offer, and once contacts permission is granted the People screen's Add goes straight to the contacts picker — there is no way to add someone whose number you know but who isn't in your contacts.
 
 ### Proposed Solution
 
@@ -964,7 +965,7 @@ On native, the first authenticated launch fired the OS notification prompt with 
 
 A real explainer, then the system prompt — shown once, on the first authenticated launch, after the calendar settles.
 
-1. **Explainer:** “Events notifies you when someone shares an event with you.” Continue fires the OS prompt. Not now dismisses without calling the OS (so iOS hasn’t used up its one ask) and is persisted (`notification_explainer_answered` in AsyncStorage) — the ask never reappears.
+1. **Explainer:** “Events notifies you when someone shares an event with you.” Turn on notifications fires the OS prompt. Not now dismisses without calling the OS (so iOS hasn’t used up its one ask) and is persisted (`notification_explainer_answered` in AsyncStorage) — the ask never reappears.
 2. **OS prompt:** Allow → the Expo push token registers as before. Don’t Allow → nothing; no recovery screen — SMS still reaches them.
 3. **Sequencing:** the explainer never stacks on the empty-calendar walkthrough. The calendar triggers the check only when the walkthrough isn’t taking over, so a brand-new user sees the walkthrough first and the explainer back on the calendar.
 
@@ -974,7 +975,7 @@ Copy decision (2026-08-17): the spec’s draft ended “— never anything else�
 
 ### Technical Notes
 
-- [`lib/pushNotifications.ts`](lib/pushNotifications.ts): `getNotificationPermission()` (`{ status, canAskAgain }`), `requestNotificationPermission()` (the explainer’s Continue is the only caller), `getExpoPushToken()` (never requests; web → null).
+- [`lib/pushNotifications.ts`](lib/pushNotifications.ts): `getNotificationPermission()` (`{ status, canAskAgain }`), `requestNotificationPermission()` (the explainer’s Turn on notifications is the only caller), `getExpoPushToken()` (never requests; web → null).
 - Flow owner: [`components/NotificationPermissionGate.tsx`](components/NotificationPermissionGate.tsx), rendered by the calendar screen with a `checkKey` bumped after fetches that don’t yield to the walkthrough. UI: [`components/NotificationExplainer.tsx`](components/NotificationExplainer.tsx), cloned from the contacts explainer.
 - [`app/_layout.tsx`](app/_layout.tsx) no longer calls `requestPermissionsAsync` — the launch effect only picks up the token when permission is already granted.
 - Jest: [`__tests__/components/NotificationPermissionGate.test.tsx`](__tests__/components/NotificationPermissionGate.test.tsx) + sequencing assertions in [`__tests__/app/app/index.test.tsx`](__tests__/app/app/index.test.tsx). Web no-op pin: [`e2e/notification-explainer.spec.ts`](e2e/notification-explainer.spec.ts). Native acceptance: N-010.
@@ -989,7 +990,7 @@ Copy decision (2026-08-17): the spec’s draft ended “— never anything else�
 
 ### Open Questions
 
-- None on the original spec (decided 2026-08-17: Not now persists forever with no later re-ask; no post-deny recovery screen — SMS covers it). Follow-up: the explainer itself is unclear — [Permission Explainer Clarity](#permission-explainer-clarity).
+- None on the original spec (decided 2026-08-17: Not now persists forever with no later re-ask; no post-deny recovery screen — SMS covers it). Follow-up shipped 2026-09-01: the opaque Continue became Turn on notifications ([Permission Explainer Clarity](#permission-explainer-clarity)); the Android sheet look is [Android Sheet Presentation](#android-sheet-presentation).
 
 ---
 
@@ -1208,36 +1209,57 @@ The send also settled the checkmark collision on the sheet (shared vocabulary wi
 
 ## Permission Explainer Clarity
 
-**Status:** In progress — polish, not a tester blocker. Recorded 2026-08-20 from owner feedback (notifications); expanded 2026-08-31 with the same Continue problem on contacts and the Android sheet presentation. This is a feature, not a known-issue ledger entry: testers should still notice if it gets worse, and a later pass should redesign it. Related: [Notification Permission Explainer](#notification-permission-explainer), [Contacts Permission Explainer](#contacts-permission-explainer) (the shipped pre-asks; the notification screen was cloned from the contacts one).
+**Status:** Implemented (2026-09-01) — copy pass. Recorded 2026-08-20 from owner feedback (notifications); expanded 2026-08-31 with the same Continue problem on contacts and the Android sheet presentation. The button-opacity problem shipped as a rename; the Android presentation split out into [Android Sheet Presentation](#android-sheet-presentation). Related: [Notification Permission Explainer](#notification-permission-explainer), [Contacts Permission Explainer](#contacts-permission-explainer) (the shipped pre-asks; the notification screen was cloned from the contacts one).
 
 Previously titled "Notification Explainer Clarity."
 
 ### Problem
 
-Both permission explainers fire as an in-app sheet *before* the OS prompt, and neither currently reads as "we are about to ask the system for permission."
+Both permission explainers fire as an in-app sheet *before* the OS prompt, and neither read as "we are about to ask the system for permission."
 
 **Notifications (first authenticated native launch, after the calendar settles).** You open the app, a sheet appears, and the only primary action is Continue. You don't know what Continue is going to do. The body is one sentence — “Events notifies you when someone shares an event with you.” — which states a product fact but never says *why this sheet is here* or that tapping Continue will bring up a system permission dialog. Continue then does fire the OS prompt, and that prompt works — but you don't really know what's going on.
 
 **Contacts (first Share, or People with an empty list).** Same pattern, same Continue: “Events uses your contacts so you can pick who to text when you share.” Continue fires the OS contacts prompt. Same opacity about what the button means.
 
-**Android presentation.** On Android the sheet covers most of the screen other than the notification bar at the top. It does not feel like a pop-up — it feels like the app just replaced itself with a full screen of unexplained copy. Both explainers are `Modal` with `presentationStyle="pageSheet"` (`components/NotificationExplainer.tsx`, `components/ContactsExplainer.tsx`); `pageSheet` is an iOS card that peeks the previous screen, and Android does not get that treatment, so the `flex: 1` body fills the window under the status bar.
+### Solution (as shipped, 2026-09-01)
 
-The screens never say a system dialog is next, or that Continue is the ask.
-
-### Proposed Solution
-
-Not designed. The need is: when either explainer appears, it should be obvious that a system permission prompt is about to happen, obvious what Continue does, and on Android the surface should read as a sheet/pop-up rather than a mysterious full-screen takeover. Copy, layout, button labels, and the Android presentation are all open.
+The standard pre-ask pattern: the benefit sentence stays, and the primary button names the action instead of the generic Continue — **Turn on notifications** on the notification explainer, **Allow contacts access** on the contacts explainer. The OS dialog then reads as the phone confirming that choice, not a second unexplained question. Owner rejected two drafts of an added "what happens next" sentence and a subject icon as unnecessary once the button carries the action. Body copy and Not now unchanged; the contacts body still matches `NSContactsUsageDescription` in `app.config.js`.
 
 ### Acceptance Criteria
 
-- [ ] On the notification permission explainer, it is clear that a system permission prompt is about to appear
-- [ ] On the contacts permission explainer, it is clear that a system permission prompt is about to appear
-- [ ] It is clear what Continue does (both screens)
-- [ ] On Android, the explainer reads as a pop-up / sheet, not a near-full-screen takeover under the notification bar
+- [x] On the notification permission explainer, it is clear what the primary button does ("Turn on notifications")
+- [x] On the contacts permission explainer, it is clear what the primary button does ("Allow contacts access")
+- [ ] On Android, the explainer reads as a pop-up / sheet, not a near-full-screen takeover under the notification bar — moved to [Android Sheet Presentation](#android-sheet-presentation)
 
 ### Open Questions
 
-- Copy, button labels, whether the screen itself changes, and how the Android sheet should present — none of that is decided.
+- None for the copy. The Android surface is the feature below.
+
+---
+
+## Android Sheet Presentation
+
+**Status:** Planned — recorded 2026-09-01, split out of [Permission Explainer Clarity](#permission-explainer-clarity) (the copy pass shipped; this is the surface pass). **Not designed; do not implement from this section.** Related: [Screen Transition Polish (Android)](#screen-transition-polish-android), [KI-012](manual-tests/known_issues.md) (Android system Back).
+
+### Problem
+
+On Android, every in-app sheet renders as a near-full-screen takeover under the status bar, not a pop-up — it feels like the app replaced itself with a full screen. All eight Modals in the app use `Modal` with `presentationStyle="pageSheet"`, an iOS card that peeks the previous screen; Android ignores it, so the `flex: 1` body fills the window. The eight: the two permission explainers (`components/NotificationExplainer.tsx`, `components/ContactsExplainer.tsx`), the contacts picker (`components/PeoplePicker.tsx`), the contacts denial recovery (`components/ContactsDeniedRecovery.tsx`), the manual add form (`components/ManualAddPersonModal.tsx`), and the three People-screen sheets (Notifications, Your name, circle editor in `app/(app)/people.tsx`).
+
+The contacts flow makes it sharpest: explainer → OS prompt → contacts picker arrive back-to-back, so whatever treatment the explainers get, the picker needs to match or one flow mixes two surfaces.
+
+### Proposed Solution
+
+Not designed. The need: on Android, a summoned sheet should read as a sheet/pop-up, not the app replacing itself. Direction discussed with the owner 2026-09-01: a bottom sheet — dimmed scrim, rounded top corners, content pinned to the bottom, the underlying screen peeking above (the Android analogue of what `pageSheet` does on iOS). Any treatment must keep `onRequestClose` on every Modal and safe-area bottom padding, and the design language favors surfaces that rest over floating cards with heavy elevation (`docs/events-design-language.md`). Whether this becomes one shared sheet component or per-screen treatments is open.
+
+### Acceptance Criteria
+
+- [ ] On Android, the permission explainers read as a pop-up / sheet, not a near-full-screen takeover under the notification bar
+- [ ] The contacts picker and the explainer it follows present consistently (same flow, back-to-back)
+- [ ] iOS presentation unchanged (`pageSheet` stays)
+
+### Open Questions
+
+- One shared sheet component vs. per-screen treatment; scrim/height/corner details; whether all eight Modals convert at once or the explainers + picker go first.
 
 ---
 

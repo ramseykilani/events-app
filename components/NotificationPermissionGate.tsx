@@ -9,8 +9,8 @@ import {
 } from '../lib/pushNotifications';
 import { supabase } from '../lib/supabase';
 
-// Stable storage key — once answered (Continue or Not now) the ask never
-// reappears; a rename would re-ask every user who already dismissed it.
+// Stable storage key — once answered (Turn on notifications or Not now) the
+// ask never reappears; a rename would re-ask every user who already dismissed it.
 const EXPLAINER_ANSWERED_KEY = 'notification_explainer_answered';
 
 type Props = {

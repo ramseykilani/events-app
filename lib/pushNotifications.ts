@@ -18,9 +18,10 @@ export async function getNotificationPermission(): Promise<NotificationPermissio
 }
 
 /**
- * Request notification permission. The explainer's Continue is the only
- * caller — nothing else may fire the OS prompt (iOS gives the app one ask,
- * and a cold ask burns it before the user knows what the ping is for).
+ * Request notification permission. The explainer's Turn on notifications is
+ * the only caller — nothing else may fire the OS prompt (iOS gives the app
+ * one ask, and a cold ask burns it before the user knows what the ping is
+ * for).
  */
 export async function requestNotificationPermission(): Promise<boolean> {
   const { status } = await Notifications.requestPermissionsAsync();

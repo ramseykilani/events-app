@@ -50,7 +50,7 @@ export function ContactsExplainer({ visible, continuing = false, onContinue, onN
             accessibilityState={{ disabled: continuing }}
           >
             <Text style={[styles.primaryText, { color: theme.primaryButtonText }]}>
-              {continuing ? 'Continue...' : 'Continue'}
+              {continuing ? 'Allow contacts access...' : 'Allow contacts access'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

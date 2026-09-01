@@ -108,7 +108,7 @@ describe('ContactsPermissionFlow', () => {
     expect(requestContactsPermissionMock).not.toHaveBeenCalled();
   });
 
-  it('Continue requests permission and opens the picker when granted', async () => {
+  it('Allow contacts access requests permission and opens the picker when granted', async () => {
     getContactsPermissionMock.mockResolvedValue({
       status: 'undetermined',
       canAskAgain: true,
@@ -116,14 +116,14 @@ describe('ContactsPermissionFlow', () => {
     requestContactsPermissionMock.mockResolvedValue(true);
 
     const { getByText } = renderFlow();
-    await waitFor(() => expect(getByText('Continue')).toBeTruthy());
-    fireEvent.press(getByText('Continue'));
+    await waitFor(() => expect(getByText('Allow contacts access')).toBeTruthy());
+    fireEvent.press(getByText('Allow contacts access'));
 
     await waitFor(() => expect(requestContactsPermissionMock).toHaveBeenCalledTimes(1));
     expect(getByText('Pick Alice')).toBeTruthy();
   });
 
-  it('Continue requests permission and shows recovery when denied', async () => {
+  it('Allow contacts access requests permission and shows recovery when denied', async () => {
     getContactsPermissionMock.mockResolvedValue({
       status: 'undetermined',
       canAskAgain: true,
@@ -131,8 +131,8 @@ describe('ContactsPermissionFlow', () => {
     requestContactsPermissionMock.mockResolvedValue(false);
 
     const { getByText } = renderFlow();
-    await waitFor(() => expect(getByText('Continue')).toBeTruthy());
-    fireEvent.press(getByText('Continue'));
+    await waitFor(() => expect(getByText('Allow contacts access')).toBeTruthy());
+    fireEvent.press(getByText('Allow contacts access'));
 
     await waitFor(() => expect(getByText('Contacts are off')).toBeTruthy());
     expect(getByText('Open Settings')).toBeTruthy();
@@ -149,7 +149,7 @@ describe('ContactsPermissionFlow', () => {
     await waitFor(() => expect(getByText('Not now')).toBeTruthy());
     fireEvent.press(getByText('Not now'));
 
-    await waitFor(() => expect(queryByText('Continue')).toBeNull());
+    await waitFor(() => expect(queryByText('Allow contacts access')).toBeNull());
     expect(requestContactsPermissionMock).not.toHaveBeenCalled();
   });
 
@@ -161,7 +161,7 @@ describe('ContactsPermissionFlow', () => {
 
     const { getByText, queryByText } = renderFlow();
     await waitFor(() => expect(getByText('Pick Alice')).toBeTruthy());
-    expect(queryByText('Continue')).toBeNull();
+    expect(queryByText('Allow contacts access')).toBeNull();
     expect(requestContactsPermissionMock).not.toHaveBeenCalled();
   });
 
@@ -172,7 +172,7 @@ describe('ContactsPermissionFlow', () => {
     });
 
     const { getByText } = renderFlow();
-    await waitFor(() => expect(getByText('Continue')).toBeTruthy());
+    await waitFor(() => expect(getByText('Allow contacts access')).toBeTruthy());
   });
 
   it('shows recovery when denied and the OS will not ask again', async () => {
@@ -183,7 +183,7 @@ describe('ContactsPermissionFlow', () => {
 
     const { getByText, queryByText } = renderFlow();
     await waitFor(() => expect(getByText('Contacts are off')).toBeTruthy());
-    expect(queryByText('Continue')).toBeNull();
+    expect(queryByText('Allow contacts access')).toBeNull();
     expect(requestContactsPermissionMock).not.toHaveBeenCalled();
   });
 
@@ -247,7 +247,7 @@ describe('ContactsPermissionFlow', () => {
       restartKey: 0,
     });
 
-    expect(queryByText('Continue')).toBeNull();
+    expect(queryByText('Allow contacts access')).toBeNull();
 
     rerender(
       <ContactsPermissionFlow
@@ -260,7 +260,7 @@ describe('ContactsPermissionFlow', () => {
       />
     );
 
-    await waitFor(() => expect(getByText('Continue')).toBeTruthy());
+    await waitFor(() => expect(getByText('Allow contacts access')).toBeTruthy());
   });
 
   it('does not auto-start on web', async () => {
@@ -272,7 +272,7 @@ describe('ContactsPermissionFlow', () => {
 
     const { queryByText } = renderFlow();
     await waitFor(() => expect(getContactsPermissionMock).not.toHaveBeenCalled());
-    expect(queryByText('Continue')).toBeNull();
+    expect(queryByText('Allow contacts access')).toBeNull();
   });
 
   it('upserts selected contacts and notifies the parent', async () => {

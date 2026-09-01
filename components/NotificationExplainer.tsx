@@ -50,7 +50,7 @@ export function NotificationExplainer({ visible, continuing = false, onContinue,
             accessibilityState={{ disabled: continuing }}
           >
             <Text style={[styles.primaryText, { color: theme.primaryButtonText }]}>
-              {continuing ? 'Continue...' : 'Continue'}
+              {continuing ? 'Turn on notifications...' : 'Turn on notifications'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

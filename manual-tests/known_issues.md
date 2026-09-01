@@ -181,8 +181,8 @@ never added: a blocker must be fixed, not accepted.
 - Repro: deny (or Not now) the OS prompt → People → Notifications → Push
   still shows on (default true) and can be flipped.
 - Fix (separate task): when permission is not granted, render Push as off;
-  an on-flip reopens the explainer (Continue → OS ask; Not now leaves it
-  off). SMS stays independent.
+  an on-flip reopens the explainer (Turn on notifications → OS ask; Not now
+  leaves it off). SMS stays independent.
 
 ### KI-011 — Each person row on the People screen is too tall
 

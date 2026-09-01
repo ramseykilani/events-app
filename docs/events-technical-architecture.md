@@ -295,7 +295,7 @@ There is no event garbage collector. Every events row has exactly one owner, so 
 
 The `send-notification` Edge Function sends a push notification and/or SMS to each recipient when an event is shared with them.
 
-**Registration (push):** On authenticated app launch, the app upserts the Expo push token to `users.expo_push_token` when notification permission is already granted — launch never asks. The OS prompt fires only from the notification explainer's Continue (`components/NotificationPermissionGate.tsx`, shown once on the first native launch after the calendar settles, never stacked on the walkthrough); Not now is persisted (`notification_explainer_answered` in AsyncStorage) and never re-asks, and a denied OS prompt gets no recovery screen (SMS still reaches them). Web never requests notification permission.
+**Registration (push):** On authenticated app launch, the app upserts the Expo push token to `users.expo_push_token` when notification permission is already granted — launch never asks. The OS prompt fires only from the notification explainer's Turn on notifications (`components/NotificationPermissionGate.tsx`, shown once on the first native launch after the calendar settles, never stacked on the walkthrough); Not now is persisted (`notification_explainer_answered` in AsyncStorage) and never re-asks, and a denied OS prompt gets no recovery screen (SMS still reaches them). Web never requests notification permission.
 
 **Sending flow:**
 1. `share.tsx` calls the Edge Function fire-and-forget after the sends are recorded, passing `{ eventId, personIds }` — `eventId` is the *sender's* own row id

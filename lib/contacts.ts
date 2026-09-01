@@ -14,8 +14,8 @@ export type ContactsPermission = {
 };
 
 /**
- * Request contacts permission. The explainer's Continue is the only caller —
- * fetching contacts must never prompt on its own.
+ * Request contacts permission. The explainer's Allow contacts access is the
+ * only caller — fetching contacts must never prompt on its own.
  */
 export async function requestContactsPermission(): Promise<boolean> {
   const { status } = await Contacts.requestPermissionsAsync();

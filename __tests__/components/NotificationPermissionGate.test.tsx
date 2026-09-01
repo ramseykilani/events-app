@@ -86,7 +86,7 @@ describe('NotificationPermissionGate', () => {
     expect(getPermissionMock).not.toHaveBeenCalled();
   });
 
-  it('Continue requests permission and registers the token when granted', async () => {
+  it('Turn on notifications requests permission and registers the token when granted', async () => {
     getPermissionMock.mockResolvedValue({
       status: 'undetermined',
       canAskAgain: true,
@@ -96,8 +96,8 @@ describe('NotificationPermissionGate', () => {
 
     const screen = renderGate();
     screen.bump(1);
-    await waitFor(() => expect(screen.getByText('Continue')).toBeTruthy());
-    fireEvent.press(screen.getByText('Continue'));
+    await waitFor(() => expect(screen.getByText('Turn on notifications')).toBeTruthy());
+    fireEvent.press(screen.getByText('Turn on notifications'));
 
     await waitFor(() => expect(requestPermissionMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>
@@ -110,7 +110,7 @@ describe('NotificationPermissionGate', () => {
     await waitFor(() => expect(screen.queryByText(EXPLAINER_TEXT)).toBeNull());
   });
 
-  it('Continue on OS deny records the answer without registering a token', async () => {
+  it('Turn on notifications on OS deny records the answer without registering a token', async () => {
     getPermissionMock.mockResolvedValue({
       status: 'undetermined',
       canAskAgain: true,
@@ -119,8 +119,8 @@ describe('NotificationPermissionGate', () => {
 
     const screen = renderGate();
     screen.bump(1);
-    await waitFor(() => expect(screen.getByText('Continue')).toBeTruthy());
-    fireEvent.press(screen.getByText('Continue'));
+    await waitFor(() => expect(screen.getByText('Turn on notifications')).toBeTruthy());
+    fireEvent.press(screen.getByText('Turn on notifications'));
 
     await waitFor(() => expect(setItemMock).toHaveBeenCalledWith(ANSWERED_KEY, 'true'));
     expect(getTokenMock).not.toHaveBeenCalled();

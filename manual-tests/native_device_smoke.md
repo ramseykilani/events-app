@@ -22,11 +22,11 @@ pass / fail + note.
 1. Fresh account, empty people list: create an event → Share. The contacts
    explainer appears before the OS prompt (no extra tap on People). Same if
    you open People with nobody added.
-2. Continue → grant permission → the picker lists device contacts → select
+2. Allow contacts access → grant permission → the picker lists device contacts → select
    2–3 → they appear (on Share, ready to send; on People, in My People) with
    names from your contacts.
-3. Fresh install (or second device/account) → Share or People → Continue →
-   **deny** the OS prompt → the denial recovery screen appears with Open
+3. Fresh install (or second device/account) → Share or People → Allow contacts
+   access → **deny** the OS prompt → the denial recovery screen appears with Open
    Settings as the primary action and a quiet “Add a number instead” hatch
    (not a bare dialog). Not now on the explainer must not show the OS prompt.
 
@@ -97,10 +97,10 @@ the ask is one-shot and persisted (`notification_explainer_answered`).
    appears after it's dismissed — never stacked on top of it.
 2. Not now → no OS prompt fires. Kill and relaunch → the explainer does not
    reappear.
-3. (Fresh install again) Continue → the OS prompt fires → Allow → the N-005
+3. (Fresh install again) Turn on notifications → the OS prompt fires → Allow → the N-005
    push path still works end-to-end (share to this device, push arrives, tap
    opens the event).
-4. (Fresh install again) Continue → Don't Allow → no recovery screen and no
+4. (Fresh install again) Turn on notifications → Don't Allow → no recovery screen and no
    re-ask on relaunch; a share to this device still arrives by SMS.
 
 ## Known acceptable rough edges (don't report)
