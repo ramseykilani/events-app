@@ -10,6 +10,7 @@ export default function AppLayout() {
       <Stack.Screen name="event/[id]" />
       <Stack.Screen name="edit-event" />
       <Stack.Screen name="people" />
+      <Stack.Screen name="archived" />
     </Stack>
   );
 }

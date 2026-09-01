@@ -16,6 +16,7 @@ export default function CalendarScreen() {
   const { session } = useSession();
   const theme = useTheme();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [hasArchived, setHasArchived] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [notifCheckKey, setNotifCheckKey] = useState(0);
@@ -65,7 +66,7 @@ export default function CalendarScreen() {
       const seq = ++fetchSeq.current;
 
       try {
-        const data = await withRetries(async (signal) => {
+        const { rows, anyArchived } = await withRetries(async (signal) => {
           const { data, error } = await supabase
             .rpc('get_calendar_events', {
               p_user_id: session.user.id,
@@ -74,13 +75,22 @@ export default function CalendarScreen() {
             })
             .abortSignal(signal);
           if (error) throw error;
-          return data ?? [];
+          // The "Archived" footer link renders only when the drawer is
+          // non-empty. Owner-only RLS makes this one-row probe safe.
+          const { data: archived, error: archivedError } = await supabase
+            .from('events')
+            .select('id')
+            .not('archived_at', 'is', null)
+            .limit(1)
+            .abortSignal(signal);
+          if (archivedError) throw archivedError;
+          return { rows: data ?? [], anyArchived: (archived ?? []).length > 0 };
         });
 
         if (seq !== fetchSeq.current) return;
 
         setFetchError(null);
-        const mapped: CalendarEvent[] = data.map(
+        const mapped: CalendarEvent[] = rows.map(
           (row: Record<string, unknown>) => ({
             id: row.id as string,
             title: row.title as string | null,
@@ -92,9 +102,11 @@ export default function CalendarScreen() {
             sharer_contact_name: row.sharer_contact_name as string | null,
             sharer_person_id: row.sharer_person_id as string | null,
             sharer_user_id: row.sharer_user_id as string,
+            from_user_id: row.from_user_id as string | null,
           })
         );
         setEvents(mapped);
+        setHasArchived(anyArchived);
 
         if (!onboardCheckedRef.current) {
           onboardCheckedRef.current = true;
@@ -156,6 +168,7 @@ export default function CalendarScreen() {
         onMonthChange={handleMonthChange}
         refreshing={refreshing}
         onRefresh={handleRefresh}
+        hasArchived={hasArchived}
       />
       {session?.user?.id ? (
         <NotificationPermissionGate

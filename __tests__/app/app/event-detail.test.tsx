@@ -77,6 +77,7 @@ const eventRow = {
   from_event_id: null,
   from_user_id: null,
   frozen: false,
+  archived_at: null,
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
 };
@@ -633,5 +634,189 @@ describe('app/(app)/event/[id]', () => {
     // Alice answered yes; Bob hasn't said — exactly one status label renders.
     expect(screen.getByText('Yes')).toBeTruthy();
     expect(screen.queryByText('No')).toBeNull();
+  });
+
+  // ===== Archive Received Events =====
+
+  const upcomingReceivedRow = { ...receivedRow, event_date: '2099-10-10' };
+
+  const alertButtons = () =>
+    (Alert.alert as jest.Mock).mock.calls[0][2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+
+  it('shows Archive (not Remove Event) on a received event and archives with no confirm dialog', async () => {
+    // Past date + nothing to answer → no say-No prompt either.
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+
+    const screen = render(<EventDetailScreen />);
+    const archiveButton = await screen.findByText('Archive');
+    expect(screen.queryByText('Remove Event')).toBeNull();
+
+    fireEvent.press(archiveButton);
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('set_event_archived', {
+        p_event_id: 'e1',
+        p_archived: true,
+      });
+    });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('offers to tell the asker no when archiving an upcoming unanswered event', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: upcomingReceivedRow, error: null });
+    mockReplyState(null, true);
+
+    const screen = render(<EventDetailScreen />);
+    fireEvent.press(await screen.findByText('Archive'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Taken off your calendar.',
+        "Let Alice know you're not in?",
+        expect.any(Array)
+      );
+    });
+    const tellNo = alertButtons().find((b) => b.text === 'Tell Alice no');
+    tellNo?.onPress?.();
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('respond_to_send', {
+        p_event_id: 'e1',
+        p_response: 'no',
+      });
+    });
+    await waitFor(() => {
+      expect(mockFunctionsInvoke).toHaveBeenCalledWith('send-response-notification', {
+        body: { eventId: 'e1' },
+      });
+    });
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('uses the Yes-variant prompt copy when the current answer is yes', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: upcomingReceivedRow, error: null });
+    mockReplyState('yes', true);
+
+    const screen = render(<EventDetailScreen />);
+    fireEvent.press(await screen.findByText('Archive'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Taken off your calendar.',
+        'Alice still has you down as coming — change it to No?',
+        expect.any(Array)
+      );
+    });
+  });
+
+  it('"Not now" archives silently without answering', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: upcomingReceivedRow, error: null });
+    mockReplyState(null, true);
+
+    const screen = render(<EventDetailScreen />);
+    fireEvent.press(await screen.findByText('Archive'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+    const notNow = alertButtons().find((b) => b.text === 'Not now');
+    notNow?.onPress?.();
+
+    expect(mockRpc).not.toHaveBeenCalledWith('respond_to_send', expect.anything());
+    expect(mockFunctionsInvoke).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('archives silently when the answer is already No', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: upcomingReceivedRow, error: null });
+    mockReplyState('no');
+
+    const screen = render(<EventDetailScreen />);
+    fireEvent.press(await screen.findByText('Archive'));
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('set_event_archived', {
+        p_event_id: 'e1',
+        p_archived: true,
+      });
+    });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('archives silently for a past event even when unanswered', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockReplyState(null);
+
+    const screen = render(<EventDetailScreen />);
+    fireEvent.press(await screen.findByText('Archive'));
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('set_event_archived', {
+        p_event_id: 'e1',
+        p_archived: true,
+      });
+    });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('shows Restore on an archived received event and restores it', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({
+      data: { ...receivedRow, archived_at: '2026-09-01T00:00:00.000Z' },
+      error: null,
+    });
+
+    const screen = render(<EventDetailScreen />);
+    const restoreButton = await screen.findByText('Restore');
+    expect(screen.queryByText('Archive')).toBeNull();
+    expect(screen.queryByText('Remove Event')).toBeNull();
+
+    fireEvent.press(restoreButton);
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('set_event_archived', {
+        p_event_id: 'e1',
+        p_archived: false,
+      });
+    });
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('keeps Remove Event on an account-deletion orphan (from_user_id scrubbed)', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({
+      data: { ...eventRow, from_event_id: 'e-sender', from_user_id: null },
+      error: null,
+    });
+
+    const screen = render(<EventDetailScreen />);
+
+    await screen.findByText('Remove Event');
+    expect(screen.queryByText('Archive')).toBeNull();
+  });
+
+  it('shows a short alert and stays put when the archive write fails', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({ data: receivedRow, error: null });
+    mockRpc.mockImplementation((name: string) => {
+      if (name === 'set_event_archived') {
+        return abortablePromise(
+          Promise.resolve({ data: null, error: { message: 'write failed' } })
+        );
+      }
+      return abortablePromise(Promise.resolve({ data: [], error: null }));
+    });
+
+    const screen = render(<EventDetailScreen />);
+    fireEvent.press(await screen.findByText('Archive'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Could not archive',
+        'Something went wrong. Try again.'
+      );
+    });
+    expect(router.back).not.toHaveBeenCalled();
   });
 });

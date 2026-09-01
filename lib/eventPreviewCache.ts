@@ -12,6 +12,11 @@ export type EventPreview = {
   event_time: string | null;
   sharer_person_id?: string | null;
   sharer_contact_name?: string | null;
+  // Carried so a preview-seeded detail screen classifies Archive vs Delete
+  // (received vs self-created) and Archive vs Restore before the fetch
+  // lands — a received event must never show a working Remove button.
+  from_user_id?: string | null;
+  archived_at?: string | null;
 };
 
 const cache = new Map<string, EventPreview>();
@@ -39,6 +44,7 @@ export function previewFromCalendarEvent(event: CalendarEvent): EventPreview {
     event_time: event.event_time,
     sharer_person_id: event.sharer_person_id,
     sharer_contact_name: event.sharer_contact_name,
+    from_user_id: event.from_user_id,
   };
 }
 
@@ -65,8 +71,9 @@ export function eventFromPreview(preview: EventPreview): Event {
     event_date: preview.event_date,
     event_time: preview.event_time,
     from_event_id: null,
-    from_user_id: null,
+    from_user_id: preview.from_user_id ?? null,
     frozen: false,
+    archived_at: preview.archived_at ?? null,
     created_at: '',
     updated_at: '',
   };

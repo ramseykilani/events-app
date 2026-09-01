@@ -57,6 +57,11 @@ export interface Event {
   from_user_id: string | null;
   // The owner edited this copy; it no longer follows from_event_id.
   frozen: boolean;
+  // Archive Received Events: set when the owner archived this (received)
+  // row — off the calendar, restorable from the Archived screen. NULL = on
+  // the calendar. Written only by the set_event_archived RPC, never by
+  // save_event (archiving is not an edit and never ends following).
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -98,6 +103,17 @@ export interface CalendarEvent {
   sharer_contact_name: string | null;
   sharer_person_id: string | null;
   sharer_user_id: string;
+  // Raw provenance (sharer_user_id is COALESCEd and cannot classify). The
+  // detail screen's Archive-vs-Delete choice reads this from the calendar
+  // preview, before its own fetch lands.
+  from_user_id: string | null;
+}
+
+// A row in the Archived drawer (get_archived_events): the calendar shape
+// plus provenance and when it was archived. Rows here are received by
+// construction — the client never offers Archive on a self-created event.
+export interface ArchivedEvent extends CalendarEvent {
+  archived_at: string;
 }
 
 export interface HiddenPerson {

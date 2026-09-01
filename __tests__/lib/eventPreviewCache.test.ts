@@ -25,6 +25,7 @@ describe('lib/eventPreviewCache', () => {
       sharer_contact_name: 'Alice',
       sharer_person_id: 'mp-1',
       sharer_user_id: 'u-2',
+      from_user_id: 'u-2',
     };
 
     rememberEventPreview(previewFromCalendarEvent(calendarEvent));
@@ -47,6 +48,7 @@ describe('lib/eventPreviewCache', () => {
       from_event_id: null,
       from_user_id: null,
       frozen: false,
+      archived_at: null,
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
     };

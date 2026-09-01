@@ -17,6 +17,7 @@ describe('components/EventCard', () => {
       sharer_contact_name: null,
       sharer_person_id: null,
       sharer_user_id: 'u-1',
+      from_user_id: null,
     };
 
     const screen = render(<EventCard event={event} onPress={onPress} />);
@@ -38,6 +39,7 @@ describe('components/EventCard', () => {
       sharer_contact_name: 'Alice',
       sharer_person_id: 'mp-1',
       sharer_user_id: 'u-2',
+      from_user_id: 'u-2',
     };
 
     const screen = render(<EventCard event={event} onPress={jest.fn()} />);
@@ -58,6 +60,7 @@ describe('components/EventCard', () => {
       sharer_contact_name: null,
       sharer_person_id: null,
       sharer_user_id: 'u-1',
+      from_user_id: null,
     };
 
     const screen = render(<EventCard event={event} onPress={jest.fn()} />);

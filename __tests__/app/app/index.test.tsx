@@ -6,6 +6,10 @@ import { abortablePromise } from '../../helpers/abortable';
 import CalendarScreen from '../../../app/(app)/index';
 
 const mockRpc = jest.fn();
+const mockEventsLimit = jest.fn();
+const mockEventsNot = jest.fn();
+const mockEventsSelect = jest.fn();
+const mockFrom = jest.fn();
 
 jest.mock('../../../app/_context/SessionContext', () => ({
   useSession: () => ({
@@ -18,6 +22,7 @@ jest.mock('../../../app/_context/SessionContext', () => ({
 jest.mock('../../../lib/supabase', () => ({
   supabase: {
     rpc: (...args: unknown[]) => mockRpc(...args),
+    from: (...args: unknown[]) => mockFrom(...args),
   },
 }));
 
@@ -30,14 +35,17 @@ jest.mock('../../../components/Calendar', () => {
       events,
       onMonthChange,
       onRefresh,
+      hasArchived,
     }: {
       events: { title: string | null }[];
       onMonthChange: (start: string, end: string) => void;
       onRefresh?: () => void;
+      hasArchived?: boolean;
     }) => (
       <View>
         <Text testID="events-count">{events.length}</Text>
         {events[0]?.title ? <Text>{events[0].title}</Text> : null}
+        {hasArchived ? <Text testID="archived-link-on">Archived</Text> : null}
         <TouchableOpacity
           testID="trigger-month"
           onPress={() => onMonthChange('2026-04-01', '2026-04-30')}
@@ -79,6 +87,13 @@ describe('app/(app)/index', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue('true');
+    // The archive non-emptiness probe: empty by default (no footer link).
+    mockEventsLimit.mockReturnValue(
+      abortablePromise(Promise.resolve({ data: [], error: null }))
+    );
+    mockEventsNot.mockReturnValue({ limit: mockEventsLimit });
+    mockEventsSelect.mockReturnValue({ not: mockEventsNot });
+    mockFrom.mockReturnValue({ select: mockEventsSelect });
   });
 
   it('fetches events for selected month via a single RPC and refreshes using last range', async () => {
@@ -169,6 +184,21 @@ describe('app/(app)/index', () => {
     expect(mockRpc).toHaveBeenCalledTimes(1);
     // Events on screen, no walkthrough — the notification gate gets its check.
     await waitFor(() => expect(gateCheckKeys()).toContain(1));
+  });
+
+  it('passes hasArchived to the calendar only when an archived row exists', async () => {
+    mockRpc.mockImplementation(() =>
+      abortablePromise(Promise.resolve({ data: [sampleRow], error: null }))
+    );
+    mockEventsLimit.mockReturnValue(
+      abortablePromise(Promise.resolve({ data: [{ id: 'e-archived' }], error: null }))
+    );
+
+    const screen = render(<CalendarScreen />);
+    fireEvent.press(screen.getByTestId('trigger-month'));
+
+    await waitFor(() => expect(screen.getByTestId('archived-link-on')).toBeTruthy());
+    expect(mockEventsNot).toHaveBeenCalledWith('archived_at', 'is', null);
   });
 
   it('shows an error banner on RPC failure and retries on tap', async () => {

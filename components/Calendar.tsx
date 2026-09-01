@@ -25,6 +25,10 @@ type Props = {
   onMonthChange: (startDate: string, endDate: string) => void;
   refreshing?: boolean;
   onRefresh?: () => void;
+  // Renders the plain-words "Archived" footer link — the drawer's only
+  // entry point. No badge, no count (design doc §9); the link appearing
+  // after an archive is the confirmation feedback (§6).
+  hasArchived?: boolean;
 };
 
 function toLocalDateString(date: Date) {
@@ -55,6 +59,7 @@ export function Calendar({
   onMonthChange,
   refreshing = false,
   onRefresh,
+  hasArchived = false,
 }: Props) {
   const theme = useTheme();
   const { themeName, setTheme } = useThemePreference();
@@ -256,6 +261,17 @@ export function Calendar({
             }}
           />
         ))}
+        {hasArchived ? (
+          <TouchableOpacity
+            style={styles.archivedLink}
+            onPress={() => router.push('/(app)/archived')}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityLabel="Archived events"
+          >
+            <Text style={[styles.archivedLinkText, { color: theme.linkText }]}>Archived</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -356,5 +372,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     paddingVertical: 8,
     paddingHorizontal: 16,
+  },
+  archivedLink: {
+    alignSelf: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  archivedLinkText: {
+    fontSize: 16,
   },
 });

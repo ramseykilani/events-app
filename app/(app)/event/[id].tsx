@@ -17,7 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { showAlert, showConfirm } from '../../../lib/dialogs';
 import { addToGoogle, addToOtherCalendar } from '../../../lib/addToCalendar';
-import { formatEventDate, formatPhoneDisplay } from '../../../lib/format';
+import { formatEventDate, formatPhoneDisplay, localDateString } from '../../../lib/format';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
 import { useTheme } from '../../../hooks/useTheme';
@@ -341,6 +341,135 @@ export default function EventDetailScreen() {
         },
       }
     );
+  };
+
+  // Archive Received Events: removing a RECEIVED event is reversible, so
+  // there is no confirm dialog — the "Archived" link appearing at the foot
+  // of the calendar is the confirmation (design doc §6, structural).
+  const handleArchive = () => {
+    if (!event) return;
+    if (writeInFlightRef.current) return;
+    const rowId = event.id;
+    const rowDate = event.event_date;
+    const reply = replyTo;
+    const name = reply?.sharerName ?? sharerName;
+    writeInFlightRef.current = true;
+    setLoading(true);
+    void (async () => {
+      try {
+        await withWriteTimeout(async (signal) => {
+          const { error } = await supabase
+            .rpc('set_event_archived', { p_event_id: rowId, p_archived: true })
+            .abortSignal(signal);
+          if (error) throw error;
+        });
+      } catch (err) {
+        console.error('Failed to archive event:', err);
+        showAlert(
+          'Could not archive',
+          isAbortError(err)
+            ? 'That took too long. Check your connection and try again.'
+            : 'Something went wrong. Try again.'
+        );
+        return;
+      } finally {
+        writeInFlightRef.current = false;
+        setLoading(false);
+      }
+
+      const navBack = () => {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/(app)/');
+        }
+      };
+
+      // Conditional say-No prompt (owner, 2026-09-01): "get this off my
+      // calendar" users never return to the event screen, so the answer
+      // rides the archive moment or it never happens. Only an upcoming
+      // event with a live send and a NULL/Yes answer asks; past events and
+      // an existing No archive silently. The archive stands even if the No
+      // write fails — no rollback.
+      const canSayNo = reply !== null && rowDate >= localDateString(new Date()) && reply.response !== 'no';
+      if (!canSayNo) {
+        navBack();
+        return;
+      }
+      const who = name ?? 'them';
+      showConfirm(
+        'Taken off your calendar.',
+        reply.response === 'yes'
+          ? name
+            ? `${name} still has you down as coming — change it to No?`
+            : 'They still have you down as coming — change it to No?'
+          : `Let ${who} know you're not in?`,
+        {
+          confirmText: `Tell ${who} no`,
+          cancelText: 'Not now',
+          onConfirm: async () => {
+            try {
+              const changed = await withWriteTimeout(async (signal) => {
+                const { data, error } = await supabase
+                  .rpc('respond_to_send', { p_event_id: rowId, p_response: 'no' })
+                  .abortSignal(signal);
+                if (error) throw error;
+                return data as boolean;
+              });
+              // Same freshness rules as the widget: the asker is pushed
+              // only when the answer actually changed.
+              if (changed) {
+                supabase.functions
+                  .invoke('send-response-notification', { body: { eventId: rowId } })
+                  .catch((err) => console.error('send-response-notification error:', err));
+              }
+            } catch (err) {
+              console.error('Failed to save answer:', err);
+              showAlert(
+                'Could not save',
+                isAbortError(err)
+                  ? 'That took too long. Check your connection and try again.'
+                  : 'Something went wrong. Try again.'
+              );
+            } finally {
+              navBack();
+            }
+          },
+          onCancel: navBack,
+        }
+      );
+    })();
+  };
+
+  const handleRestore = async () => {
+    if (!event) return;
+    if (writeInFlightRef.current) return;
+    writeInFlightRef.current = true;
+    setLoading(true);
+    try {
+      await withWriteTimeout(async (signal) => {
+        const { error } = await supabase
+          .rpc('set_event_archived', { p_event_id: event.id, p_archived: false })
+          .abortSignal(signal);
+        if (error) throw error;
+      });
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(app)/');
+      }
+    } catch (err) {
+      console.error('Failed to restore event:', err);
+      showAlert(
+        'Could not restore',
+        isAbortError(err)
+          ? 'That took too long. Check your connection and try again.'
+          : 'Something went wrong. Try again.'
+      );
+    } finally {
+      writeInFlightRef.current = false;
+      setLoading(false);
+    }
   };
 
   const handleToggleHide = async () => {
@@ -685,14 +814,41 @@ export default function EventDetailScreen() {
             >
               <Text style={[styles.editButtonText, { color: theme.textPrimary }]}>Edit</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
-              onPress={handleDelete}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
-            </TouchableOpacity>
+            {event.from_user_id === null ? (
+              // Self-created (or an account-deletion orphan): true delete —
+              // red, confirmed, permanent. Self-created events never enter
+              // the archive.
+              <TouchableOpacity
+                style={[styles.deleteButton, { backgroundColor: theme.destructiveBg }]}
+                onPress={handleDelete}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.deleteButtonText, { color: theme.destructiveText }]}>Remove Event</Text>
+              </TouchableOpacity>
+            ) : event.archived_at === null ? (
+              // Received: reversible Archive. Neutral styling (nothing
+              // irreversible happens here) and no confirm dialog.
+              <TouchableOpacity
+                style={[styles.deleteButton, { backgroundColor: theme.surfaceSecondary }]}
+                onPress={handleArchive}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.deleteButtonText, { color: theme.textPrimary }]}>Archive</Text>
+              </TouchableOpacity>
+            ) : (
+              // An archived row still loads by id (push deep links keep
+              // working); Restore puts it back on its date.
+              <TouchableOpacity
+                style={[styles.deleteButton, { backgroundColor: theme.surfaceSecondary }]}
+                onPress={handleRestore}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.deleteButtonText, { color: theme.textPrimary }]}>Restore</Text>
+              </TouchableOpacity>
+            )}
             {sharedByPersonId && (
               <TouchableOpacity
                 style={[styles.hideButton, { backgroundColor: theme.surfaceSecondary }]}

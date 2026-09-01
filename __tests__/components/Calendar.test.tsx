@@ -61,6 +61,7 @@ describe('components/Calendar', () => {
       sharer_contact_name: 'Alice',
       sharer_person_id: 'mp-1',
       sharer_user_id: 'u-2',
+      from_user_id: 'u-2',
     },
     {
       id: 'ce-2',
@@ -73,6 +74,7 @@ describe('components/Calendar', () => {
       sharer_contact_name: null,
       sharer_person_id: null,
       sharer_user_id: 'u-3',
+      from_user_id: null,
     },
   ];
 
@@ -121,6 +123,7 @@ describe('components/Calendar', () => {
         sharer_contact_name: null,
         sharer_person_id: null,
         sharer_user_id: 'u-4',
+        from_user_id: null,
       },
     ];
 
@@ -192,5 +195,22 @@ describe('components/Calendar', () => {
     );
     // Once in Evening, the swatch offers Paper again.
     expect(screen.getByLabelText('Switch to Paper theme')).toBeTruthy();
+  });
+
+  it('hides the Archived link when the drawer is empty', () => {
+    const onMonthChange = jest.fn();
+    const screen = render(<Calendar events={events} onMonthChange={onMonthChange} />);
+
+    expect(screen.queryByLabelText('Archived events')).toBeNull();
+  });
+
+  it('shows the Archived link when the drawer is non-empty and opens it', () => {
+    const onMonthChange = jest.fn();
+    const screen = render(
+      <Calendar events={events} onMonthChange={onMonthChange} hasArchived />
+    );
+
+    fireEvent.press(screen.getByLabelText('Archived events'));
+    expect(router.push).toHaveBeenCalledWith('/(app)/archived');
   });
 });
