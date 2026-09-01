@@ -10,7 +10,9 @@ import { expect, test } from './fixtures';
 // expectations) and the inert-GET rule (loading the page never writes).
 
 const RECEIPT_URL = process.env.E2E_RECEIPT_URL ?? 'http://localhost:8082';
-const TOKEN = '123e4567-e89b-42d3-a456-426614174000';
+// Obviously-fake fixture UUID (SQL-suite style) — secret scanners flag
+// real-looking UUIDs assigned to TOKEN, and this one never leaves the mock.
+const TOKEN = 'ffffffff-0000-0000-0000-000000000001';
 
 const STATE = {
   askerName: 'Alice',
