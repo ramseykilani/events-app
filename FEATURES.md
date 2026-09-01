@@ -1832,15 +1832,15 @@ Rationale for the gear living on the People screen and not the calendar header: 
 
 ### Acceptance Criteria
 
-- [ ] Tapping "Hide {name}" shows the confirm dialog before any write; Cancel changes nothing and stays on the event
-- [ ] Confirm copy names the consequence (no events from them, no share notifications), the silence (they aren't told), and the undo path (unhide from My People)
-- [ ] The confirm button is not destructive-red; Unhide has no dialog
-- [ ] Confirming hides exactly as today: their events leave the calendar, their shares don't notify, and the app navigates back
-- [ ] People header shows a gear; the footer (Notifications / Your name / Sign out / Delete account) is gone
-- [ ] The gear opens a Settings sheet holding Your name, Notifications (push/SMS switches), Hidden people, Sign out, Delete account — each behaving exactly as its footer predecessor
-- [ ] The Hidden section is visible in the sheet whether or not anyone is hidden (quiet empty state when none); Unhide works from there
-- [ ] The people list no longer renders the Hidden section at its foot
-- [ ] Works on web (dialogs via `lib/dialogs.ts`) and native; fast checks + Playwright per the verify bar
+- [x] Tapping "Hide {name}" shows the confirm dialog before any write; Cancel changes nothing and stays on the event
+- [x] Confirm copy names the consequence (no events from them, no share notifications), the silence (they aren't told), and the undo path (unhide from My People)
+- [x] The confirm button is not destructive-red; Unhide has no dialog
+- [x] Confirming hides exactly as today: their events leave the calendar, their shares don't notify, and the app navigates back
+- [x] People header shows a gear; the footer (Notifications / Your name / Sign out / Delete account) is gone
+- [x] The gear opens a Settings sheet holding Your name, Notifications (push/SMS switches), Hidden people, Sign out, Delete account — each behaving exactly as its footer predecessor
+- [x] The Hidden section is visible in the sheet whether or not anyone is hidden (quiet empty state when none); Unhide works from there
+- [x] The people list no longer renders the Hidden section at its foot
+- [x] Works on web (dialogs via `lib/dialogs.ts`) and native; fast checks + Playwright per the verify bar
 
 ### Open Questions
 

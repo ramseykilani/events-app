@@ -130,8 +130,8 @@ export default function PeopleScreen() {
             };
           }),
           members: membersData,
-          // The name/prefs read only feeds the footer — its failure must not
-          // fail the load. undefined = read failed, keep the previous value.
+          // The name/prefs read only feeds the Settings sheet — its failure
+          // must not fail the load. undefined = read failed, keep previous.
           displayName: userRes.error
             ? undefined
             : (userRes.data?.display_name ?? null),
@@ -874,7 +874,8 @@ const styles = StyleSheet.create({
   peopleSection: {
     flex: 1,
     // Never let the pinned chrome shrink the list to nothing — a collapsed
-    // viewport spills rows under the footer (they stay visible and eat taps).
+    // viewport spills rows past the visible area (they stay visible and eat
+    // taps).
     minHeight: 140,
     paddingHorizontal: 20,
   },
