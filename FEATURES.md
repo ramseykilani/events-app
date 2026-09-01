@@ -1095,24 +1095,57 @@ Support US phone numbers end-to-end (add person, sign-in, share SMS). Look into 
 
 ## Add to Other Calendars
 
-**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing.
+**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Scoped with the owner 2026-09-01 — every decision below is owner-approved. Related: [Who's Coming](#whos-coming) (the receipt page is the second surface).
 
 ### Problem
 
 Events live only on the in-app calendar. Event detail can open the listing URL; there is no way to add the event to Google Calendar, Apple Calendar, or other calendar apps.
 
-### Proposed Solution
+### Proposed Solution (scoped 2026-09-01)
 
-Let the user add an event to Google Calendar and other calendar apps.
+One-shot **export**, never subscribe/sync. The owner explicitly rejected subscribe-to-calendar feeds: they would need a hosted per-calendar `.ics` endpoint with token URLs and calendar-app-controlled refresh lag, and they would fight Copy + Follow (the app already has its own silent edit cascade). The export is a **snapshot**: once the event lands in someone's Google/Apple calendar, later in-app edits do not reach it. That is the accepted price of no-subscribe — the same trade every "Add to Calendar" button on the internet makes — and it is part of this feature's description, not a bug to be fixed later.
+
+Two mechanisms cover every calendar app; there is no per-brand list:
+
+1. **Google Calendar template link** — `https://calendar.google.com/calendar/render?action=TEMPLATE&text=…&dates=…&details=…`, opened via `Linking.openURL`. No auth, no SDK.
+2. **An `.ics` file** (iCalendar) generated in JS — covers Apple Calendar, Outlook desktop/mobile, Yahoo, and the long tail. Labeled "Apple / Outlook / Other". More brands (Outlook.com / Yahoo template URLs are ~5 lines each) only on actual user complaints.
+
+Field mapping (the `events` row has no location, end time, or timezone — `lib/types.ts`):
+
+- Timed event → **1-hour block** (both formats need an end; 1h is the convention).
+- No `event_time` → **all-day event** (`.ics` `DTSTART;VALUE=DATE`; Google `dates=YYYYMMDD/YYYYMMDD+1`).
+- **Floating local time**: no `Z`, no `TZID`, no `ctz` — the recipient's calendar interprets it in their own zone, matching the app's local-date semantics (`lib/format.ts`).
+- **Full `description` + the listing `url`** go into the event body. Untitled events use the existing "Untitled event" fallback.
+- The `.ics` gets a **stable UID** derived from the event row id (`<event-id>@shared-events`) so apps that dedupe by UID update rather than duplicate on re-add. Google's template ignores UIDs — re-adding there always creates a new event; acceptable, standard.
+
+**UI (event detail, `app/(app)/event/[id].tsx`):** a small **"Add to calendar"** row label (same treatment as the "Shared with" section title) with two icon buttons — no words on the buttons, no chooser modal (the design-language lesson from the theme swatch: don't build a chooser for a third option that may never exist; if complaints ever add a third calendar, revisit). Glyphs come from `@expo/vector-icons` (already a dependency), tinted by role tokens — never brand colors, hard-coded hex is banned: `google` for the link; **paired `apple` + `microsoft-outlook`** for the `.ics` (fallback: the generic `calendar-plus` if the pair renders cramped inside a 44pt target). Icon-only buttons carry `accessibilityLabel` ("Add to Google Calendar" / "Add to Apple, Outlook, or another calendar") — which also gives web its `aria-label`. Secondary treatment (`surfaceSecondary`), never accent.
+
+**Platforms:**
+
+- **Web (dev/CI surface):** the Google link opens in a new tab; the `.ics` downloads via Blob + `URL.createObjectURL`. Fully e2e-coverable.
+- **Native (the product):** platform-native pre-filled compose UIs, both **permission-free** — iOS `expo-calendar` `createEventInCalendarAsync` (Apple's own New Event sheet; EventKit UI is user-in-the-loop, so no prompt), Android `expo-intent-launcher` `ACTION_INSERT` (Google Calendar's new-event screen). Two new native modules ⇒ the next EAS build carries them (builds are metered — no speculative builds). The rejected alternative (uniform link + `.ics` via `expo-file-system`/`expo-sharing`) also costs two modules and a rebuild but hands off through the share sheet — strictly worse UX at equal cost. The URL/`.ics` builders stay shared pure functions; only the ~20-line hand-off differs per platform. Native paths can't be exercised by web e2e — verify on device.
+
+**Receipt page (`receipt/index.html`) — same two links** for recipients without the app, arguably the audience that needs them most. Pure client JS on the static page (Google `<a href>` + in-page `.ics` Blob download); stays within the inert-GET rule (calendar links never POST). Requires extending the `send-response` GET select with `description, url` — one line, read-only, and no privacy expansion: the share SMS already discloses a 90-char description excerpt and the full listing URL to that same recipient (`_shared/smsBody.ts`). Return the **full** description, not the SMS excerpt. Both docstrings currently say the page shows "who asked, the event, and Yes / No — nothing else" (`send-response/index.ts`, `receipt/index.html`) — update them: calendar links are event content, not promo.
+
+### Technical Notes
+
+- New pure module `lib/calendarLinks.ts`: `buildGoogleUrl(event)` + `buildIcs(event)`. The only real care points are RFC 5545 text escaping (newlines, commas, semicolons; 75-octet line folding) and the all-day/timed branches. Jest-covered directly.
+- Verify bar: Jest for the builders + a new Playwright spec for the web actions (assert the Google href and the downloaded `.ics` content), desktop Chrome locally per AGENTS.md.
+- No migrations, no RLS, no new RPCs. The only backend change is the `send-response` GET select extension above.
 
 ### Acceptance Criteria
 
-- [ ] From an event, the user can add it to Google Calendar
-- [ ] Other calendar apps are supported too (Apple Calendar and the usual phone calendars)
+- [ ] Event detail shows an "Add to calendar" row with two icon buttons (Google; paired Apple/Outlook) — secondary styling, accessibilityLabels, 44pt targets
+- [ ] The Google button opens the template link pre-filled: title, timed (1h) or all-day dates, full description + listing URL in details
+- [ ] The `.ics` button delivers a valid iCalendar file with the same fields, a stable `<event-id>@shared-events` UID, floating local time
+- [ ] iOS presents the pre-filled native New Event sheet and Android the calendar insert screen — no permission prompt on either
+- [ ] The receipt page renders the same two links; `send-response` GET returns full `description` + `url` and remains inert (no writes)
+- [ ] Jest coverage for the builders (escaping, all-day, no-time, no-description, untitled) and a Playwright spec for both web actions
+- [ ] Snapshot semantics (later edits don't propagate) stated in this section — accepted behavior, not a bug
 
 ### Open Questions
 
-- Which calendars in the first slice, and whether this is an export the user triggers vs a sync.
+- Pixel-level calls at implementation: exact row-label copy, icon sizes, whether the paired glyphs beat `calendar-plus` in practice.
 
 ---
 
