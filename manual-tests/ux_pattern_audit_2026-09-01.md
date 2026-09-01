@@ -606,3 +606,31 @@ Full inventory — each action, its guard, and its rationale:
 10. **FEATURES.md relationship** — the new Design System Consolidation
     entry vs the existing Planned "Button Size & Clickability": absorb
     (recommended — this entry is the structural superset) or keep both.
+
+---
+
+## Addendum — owner rulings (2026-09-01)
+
+- **UX-14 / UX-15 / UX-16 (contrast cluster): RESOLVED.** Owner ruling:
+  "just use whatever the design language says." §3's contrast sentence is
+  the law, so the failing Paper values moved — `accent` /
+  `calendarSelected` / `calendarTodayText` `#c8871e → #96680a` (4.58:1 as
+  text on background; white-on-fill 4.91:1 — one move fixes both the
+  accent-text uses and the selected-day/answer text) and
+  `destructiveText` / `destructiveLink` `#c2482f → #b4402a` (4.58:1 on
+  `destructiveBg`, 5.29:1 on background). Evening untouched (already
+  passing). The §3 token table was synced in the same change, closing
+  **UX-19**. The e2e dot-color pin (`e2e/calendar.spec.ts`) moved to the
+  new value — the intent changed, the pin follows.
+- **Scope call: approved.** "Make the entire app coherent" — Design
+  System Consolidation absorbs Button Size & Clickability (now
+  Superseded), and the event-detail measure (UX-11) collapses to the
+  app-wide full-width grammar. The centered ceremonial title stays
+  owner-reserved.
+- **UX-20: saved as [KI-015](known_issues.md)** — a standalone fixer task
+  for another agent (owner dispatch), not part of the consolidation.
+- **UX-13 (location-row color): pending.** Explained to the owner
+  2026-09-01; awaiting the restyle-vs-amend ruling. Note the ruling's
+  stakes shifted with the contrast fix: Paper accent (`#96680a`) and
+  `linkText` (`#8f5a10`) are now near-neighbors, so the visual cost of
+  restyling to `linkText` is smaller than when this was written.

@@ -35,7 +35,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Circles UX](#circles-ux) | Planned | Current circles are hard to use, poorly explained, and not intuitive. Not designed — do not implement from this section. |
 | [Notification On/Off](#notification-onoff) | Implemented | Separate push and SMS toggles. Follow-ups: [KI-008](manual-tests/known_issues.md), [KI-009](manual-tests/known_issues.md), [KI-010](manual-tests/known_issues.md). Broader Android Back: [KI-012](manual-tests/known_issues.md). |
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
-| [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
+| [Button Size & Clickability](#button-size--clickability) | Superseded | Absorbed into [Design System Consolidation](#design-system-consolidation) (owner call 2026-09-01). |
 | [Share Delivery Status](#share-delivery-status) | Implemented | One-word per-person status on the share sheet — "✓ Shared" for everyone; only failures differ (✕). |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
 | [Add to Other Calendars](#add-to-other-calendars) | Implemented | One-shot export: Google template link + .ics (Apple/Outlook/Other), in-app and on the receipt page. Native sheets land with the next EAS build. |
@@ -1254,7 +1254,7 @@ Two layout notes from the ship: the switches live in a modal rather than inline 
 
 ## Button Size & Clickability
 
-**Status:** Planned — polish, not a tester blocker. Recorded 2026-08-18 from owner device smoke of preview `a7ce79c8`. Related: [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass), [KI-008](manual-tests/known_issues.md) (Notifications switches).
+**Status:** Superseded 2026-09-01 — absorbed into [Design System Consolidation](#design-system-consolidation) (owner call: "make the entire app coherent"). The native feel pass it asked for rides that feature's phases; KI-008's switch sizing lands in its Phase 3. Recorded 2026-08-18 from owner device smoke of preview `a7ce79c8`. Related: [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass), [KI-008](manual-tests/known_issues.md) (Notifications switches).
 
 ### Problem
 
@@ -1851,7 +1851,7 @@ Rationale for the gear living on the People screen and not the calendar header: 
 
 ## Design System Consolidation
 
-**Status:** Planned. Recorded 2026-09-01 from the app-wide UX pattern audit — [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md) (per-screen inventories, severity-ranked findings UX-01…UX-27, each marked DERIVED/JUDGMENT with its basis cite). Related: [Button Size & Clickability](#button-size--clickability) (Planned — the native feel pass; this entry is the structural superset and may absorb it — owner call), [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass, which covered one screen), [KI-008](manual-tests/known_issues.md) (switch sizing rides Phase 3). **Sequencing: the form-grammar work (Phase 2) must land before [Richer Link Autofill](#richer-link-autofill) starts** — that feature rebuilds the add/edit forms, and building it on today's drifted form grammar would bake the drift in.
+**Status:** Planned. Recorded 2026-09-01 from the app-wide UX pattern audit — [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md) (per-screen inventories, severity-ranked findings UX-01…UX-27, each marked DERIVED/JUDGMENT with its basis cite). Owner rulings 2026-09-01: **scope approved — "make the entire app coherent"**; this entry **absorbs** [Button Size & Clickability](#button-size--clickability) (now Superseded; its native feel pass rides these phases, KI-008 in Phase 3); the event-detail measure collapses to the app-wide full-width grammar (the centered ceremonial title stays — owner-reserved); the Paper contrast cluster (UX-14/15/16) is **resolved** — token values moved to satisfy §3's ≥4.5:1 sentence (see Technical Notes); UX-20 was split out as [KI-015](manual-tests/known_issues.md) for a separate fixer agent; UX-13 (location-row color) is pending the owner's ruling. Related: [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass, which covered one screen). **Sequencing: the form-grammar work (Phase 2) must land before [Richer Link Autofill](#richer-link-autofill) starts** — that feature rebuilds the add/edit forms, and building it on today's drifted form grammar would bake the drift in.
 
 ### Problem
 
@@ -1882,7 +1882,7 @@ Named `IconButton` (44×44, r10) and `Chip`/`Pill` (fully rounded) components co
 **3. Phased adoption, worst-first.**
 
 - **Phase 1 — event detail** (`app/(app)/event/[id].tsx`): AppHeader, tiered action stack, one content measure, and the location-row restyle to `linkText` once the owner rules on audit UX-13 (the audit's recommendation: restyle, don't amend §3 — it fixes the role-law violation and the 2.83:1 contrast in one move and is invisible in Evening). Plus the two grammar-D modal headers (PeoplePicker, ManualAddPersonModal) — the worst targets in the app.
-- **Phase 2 — add/edit forms**: AppHeader + one input grammar (16px text, r12 everywhere). Lands before Richer Link Autofill starts. Includes gating edit-event's Remove Event to self-created rows (audit UX-20 — the shipped Archive spec promises no delete path for received events).
+- **Phase 2 — add/edit forms**: AppHeader + one input grammar (16px text, r12 everywhere). Lands before Richer Link Autofill starts. (The edit screen's Remove-on-received-events bug is NOT part of this phase — it's [KI-015](manual-tests/known_issues.md), a standalone fixer task; if it ships first, this phase inherits the gate.)
 - **Phase 3 — people, share, archived, verify**: AppHeader everywhere, retry/error grammar unified (one layout, one color — audit UX-17/UX-23), verify gains a wrong-number exit (UX-04), ThemedSwitch sizing (KI-008).
 - **Phase 4 — calendar header**: protected chrome (swatch / `?` / People / `+`) stays; target and grammar normalization only.
 
@@ -1899,7 +1899,7 @@ Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar
 
   > **Holistic screen review (per task).** Before pushing, re-open every screen your change touched and check it against the UX checklist dimensions: header/back grammar, button tiers, ≥44pt visible targets, one content measure, §3 color roles, consequential-action confirms, target count. Fix holistic regressions your change introduced, in scope. If the screen already violates a dimension beyond your scope, flag it in FEATURES.md — never ship the local win at the screen's expense. `npm run test:conventions` is the floor, not the ceiling.
 
-- **Palette-level findings are not in this feature's scope.** The Paper contrast cluster (accent-as-text 2.83:1, selected-day text 3.03:1, destructive-on-destructiveBg 3.99:1 — audit UX-14/15/16) is owner territory; the component set must not hard-code around it. §3's stale token table (UX-19) is a docs sync for the owner to bless.
+- **Palette-level findings are resolved, not in this feature's scope.** The Paper contrast cluster (accent-as-text 2.83:1, selected-day text 3.03:1, destructive-on-destructiveBg 3.99:1 — audit UX-14/15/16) was fixed 2026-09-01 per the owner ruling "use whatever the design language says": §3's ≥4.5:1 sentence is the law, so the Paper values moved (`accent`/`calendarSelected`/`calendarTodayText` `#c8871e → #96680a`, `destructiveText`/`destructiveLink` `#c2482f → #b4402a`; Evening untouched — it already passed) and the §3 table was re-synced (closing UX-19 as well). The component set must still not hard-code around color.
 - **Tests:** Jest coverage for the new components; the existing e2e suite drives the same flows through the new chrome (selectors may need updating — strengthening assertions is fine, weakening is not); visual baselines regenerated per phase via CI.
 - **Verify bar:** fast checks + a new or updated Playwright spec per phase, desktop Chrome locally, per AGENTS.md.
 
@@ -1916,7 +1916,8 @@ Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar
 
 ### Open Questions
 
-- Does this absorb Button Size & Clickability (recommended — this is the structural superset; KI-008's switch sizing rides Phase 3 either way)?
-- The event-detail content measure: collapse the 600/400/centered mix to the app-wide full-width grammar, or keep a centered ceremonial column (owner — audit UX-11)? The centered title itself is not in question.
+- ~~Does this absorb Button Size & Clickability~~ — resolved 2026-09-01: yes, absorbed (owner: "make the entire app coherent").
+- ~~The event-detail content measure~~ — resolved 2026-09-01: the 600/400/centered mix collapses to the app-wide full-width grammar; the centered ceremonial title stays (owner-reserved).
+- UX-13 location-row color: restyle to `linkText` (the audit's recommendation) or amend §3 to bless accent — pending the owner's ruling.
 - Exact pill heuristic for the radius lint (style-local `2 × radius` match vs an explicit allowlist).
 - Whether the selection-glyph rule graduates from code review to lint.
