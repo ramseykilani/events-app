@@ -8,11 +8,14 @@
 
 ALTER TABLE public.events ADD COLUMN location text;
 
--- save_event: gains p_location after p_image_url (listing-field order).
--- DROP (not OR REPLACE) because the parameter list changes — leaving the
--- old signature would make every 7-arg call ambiguous.
-DROP FUNCTION public.save_event(uuid, text, text, text, text, date, time);
-
+-- save_event: gains p_location after p_image_url (listing-field order). The
+-- new 8-arg signature is ADDED alongside the old one — no DROP: installed
+-- pre-Location builds (TestFlight 9 / Play v7) and the live web app call the
+-- 7-arg shape, and with no defaults on the new parameter a 7-arg call still
+-- resolves unambiguously to the old signature. The old body is replaced with
+-- a delegating wrapper (p_location = NULL) so there is exactly one copy of
+-- the frozen/cascade logic. The wrapper can drop in a later cleanup once
+-- every shipped client is past the cutover.
 CREATE FUNCTION public.save_event(
   p_id uuid,
   p_url text,
@@ -96,6 +99,28 @@ BEGIN
   WHERE e.id = d.id AND NOT e.frozen;
 
   RETURN p_id;
+END;
+$$;
+
+-- Pre-Location clients call the 7-arg shape; delegate with no location.
+CREATE OR REPLACE FUNCTION public.save_event(
+  p_id uuid,
+  p_url text,
+  p_title text,
+  p_description text,
+  p_image_url text,
+  p_event_date date,
+  p_event_time time
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN public.save_event(
+    p_id, p_url, p_title, p_description, p_image_url, NULL, p_event_date, p_event_time
+  );
 END;
 $$;
 
@@ -289,6 +314,10 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.save_event(uuid, text, text, text, text, text, date, time) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.save_event(uuid, text, text, text, text, text, date, time) FROM anon;
 GRANT EXECUTE ON FUNCTION public.save_event(uuid, text, text, text, text, text, date, time) TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.save_event(uuid, text, text, text, text, date, time) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.save_event(uuid, text, text, text, text, date, time) FROM anon;
+GRANT EXECUTE ON FUNCTION public.save_event(uuid, text, text, text, text, date, time) TO authenticated;
 
 REVOKE EXECUTE ON FUNCTION public.share_event(uuid, uuid[]) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.share_event(uuid, uuid[]) FROM anon;

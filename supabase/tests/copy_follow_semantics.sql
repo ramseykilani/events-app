@@ -725,4 +725,20 @@ BEGIN
   RAISE NOTICE 'PASS T12: create retry with the same id is a no-op';
 END $$;
 
+-- ===== T13: the pre-Location 7-arg signature still works — installed
+-- builds (TestFlight 9 / Play v7) call it; it delegates with NULL location.
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
+SELECT public.save_event('eeeeeeee-0000-0000-0000-00000000000a', null, 'Old Client', null, null, '2026-12-07', null);
+COMMIT;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.events WHERE id = 'eeeeeeee-0000-0000-0000-00000000000a'
+                 AND title = 'Old Client' AND location IS NULL) THEN
+    RAISE EXCEPTION 'FAIL T13: 7-arg save_event did not create a location-less row';
+  END IF;
+  RAISE NOTICE 'PASS T13: 7-arg save_event wrapper keeps working (location NULL)';
+END $$;
+
 DO $$ BEGIN RAISE NOTICE 'ALL COPY+FOLLOW TESTS PASSED'; END $$;
