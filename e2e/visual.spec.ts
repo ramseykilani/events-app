@@ -120,6 +120,10 @@ test('add-event form matches baseline', async ({ page }) => {
 });
 
 test('event detail matches baseline', async ({ page }) => {
+  // The residue loop + pinned create + screenshot + cleanup need more than
+  // the shared 90s on CI's software-rendered runners (a retry with residue
+  // hit the budget mid-click).
+  test.setTimeout(180000);
   await page.clock.install({ time: new Date('2026-06-15T12:00:00') });
   await page.goto('/');
   await expectCalendar(page);
@@ -145,6 +149,7 @@ test('event detail matches baseline', async ({ page }) => {
 });
 
 test('edit-event form matches baseline', async ({ page }) => {
+  test.setTimeout(180000);
   await page.clock.install({ time: new Date('2026-06-15T12:00:00') });
   await page.goto('/');
   await expectCalendar(page);
