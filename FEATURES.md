@@ -26,6 +26,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
 | [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
+| [New Architecture Migration (React Native)](#new-architecture-migration-react-native) | In progress | Flip `newArchEnabled` with react-native-screens ~4.23.0; may moot the transition flash. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
 | [Permission Explainer Clarity](#permission-explainer-clarity) | Implemented | Pre-ask buttons now name the action (was: opaque Continue). Android sheet look split into [Android Sheet Presentation](#android-sheet-presentation). |
@@ -907,6 +908,27 @@ Investigate on a development build before changing anything. Likely suspects: th
 ### Acceptance Criteria
 
 - [ ] No white flash at the screen edge during push/pop transitions on Android, in either theme
+
+---
+
+## New Architecture Migration (React Native)
+
+**Status:** In progress — probe building 2026-09-01 on a local experiment branch (owner-approved; nothing lands on `staging` until the device test passes). Unblocked 2026-09-01: the `react-native-screens` crash that forced `newArchEnabled: false` (`ScreenStack.getChildDrawingOrder()` off-by-one, upstream #3096) was fixed in ≥4.17.1. Supersedes the re-enable note in SETUP.md → Required for native builds. May make [Screen Transition Polish (Android)](#screen-transition-polish-android) moot.
+
+### Problem
+
+The app runs React Native's frozen old renderer (`newArchEnabled: false` in `app.config.js`) because `react-native-screens ~4.16.0` (the SDK 54 default pin from `bundledNativeModules.json`) crashed instantly on Android new-arch builds — the calendar's pull-to-refresh plus view transitions triggers it. Old arch is deprecated upstream; fixes land only on the new one.
+
+### Proposed Solution
+
+Bump `react-native-screens` to `~4.23.0` — the highest release that still compiles on SDK 54 (4.24 renames an internal class expo-router imports; 4.25+ requires RN 0.82; per upstream #4099, which also credits 4.23.0 with fixing an iOS 26 touch-dispatch freeze) — with an `expo.install.exclude` entry in `package.json` so `expo install --check` keeps the override. Set `newArchEnabled: true`. The automated suite is blind to this flag (Jest is JS-only, Playwright is web-only — the original crash shipped from a full-suite-green commit, `d7f9433`): the gate is an EAS preview build → owner device smoke, with a development build as the crash-log fallback (SETUP.md → Getting crash logs without ADB). Builds are metered; batch verification. Re-check modal/back behavior against KI-009/KI-012 (Fabric replaces Paper's `RCTModalHostView`) and re-verify the white flash in both themes.
+
+### Acceptance Criteria
+
+- [ ] Android new-arch preview build launches and passes an owner device smoke, including calendar pull-to-refresh (the original crash trigger)
+- [ ] iOS build smokes clean via TestFlight
+- [ ] Screen Transition Polish re-verified on the new-arch build — close it if moot
+- [ ] SETUP.md "Required for native builds" table updated to reflect the re-enablement
 
 ---
 
