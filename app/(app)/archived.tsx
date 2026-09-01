@@ -133,6 +133,7 @@ export default function ArchivedScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.navRow}>
+        {/* conventions-ok: migrates to AppHeader in Design System Consolidation Phase 3 */}
         <TouchableOpacity
           onPress={() => router.back()}
           activeOpacity={0.6}

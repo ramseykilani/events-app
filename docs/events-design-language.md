@@ -105,8 +105,11 @@ The typeface is the clearest signal of each theme's register, but both share one
 | Body | 15–16 | regular | |
 | Label / meta | 13–14 | medium | secondary ink |
 | Caption / hint | 12–13 | regular | tertiary ink |
+| Button label | 16 | semibold | the button tiers own this rung |
 
 Line-height aligns to the 4px spacing grid.
+
+**Button labels are the Body rung at semibold.** Every button in the app — primary, secondary, quiet text action — sets its label at 16/600; the tiers (`components/PrimaryButton.tsx`, `SecondaryButton.tsx`, `TextAction.tsx`) accept no fontSize or radius overrides. This rung exists because its absence invited drift: screens invented 15/16/18/20px button text and radii from 8 to 16 until the consolidation assigned the rung (UX audit 2026-09-01, UX-06). A button that "needs" a different size is a design-language question, not a local override.
 
 ---
 

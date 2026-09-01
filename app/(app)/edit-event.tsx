@@ -327,6 +327,7 @@ export default function EditEventScreen() {
         >
           <Text style={[styles.retry, { color: theme.linkText }]}>Retry</Text>
         </TouchableOpacity>
+        {/* conventions-ok: migrates to AppHeader in Design System Consolidation Phase 2 */}
         <TouchableOpacity
           onPress={() => router.back()}
           activeOpacity={0.6}

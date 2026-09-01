@@ -463,6 +463,7 @@ export default function PeopleScreen() {
       ]}
     >
       <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
+        {/* conventions-ok: migrates to AppHeader in Design System Consolidation Phase 3 */}
         <TouchableOpacity style={styles.textAction} onPress={() => router.back()} activeOpacity={0.6} accessibilityRole="button">
           <Text style={[styles.back, { color: theme.textSecondary }]}>Back</Text>
         </TouchableOpacity>
@@ -1003,6 +1004,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyTitle: {
+    // conventions-ok: off-scale 20px — migrates to the §4 scale in Design
+    // System Consolidation Phase 3 (audit UX-06).
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 8,

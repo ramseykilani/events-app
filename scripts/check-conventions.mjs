@@ -39,6 +39,15 @@
 //      window bottom sits under the 3-button nav bar and only explicit bottom
 //      padding lifts content clear (KI-005). Short top-pinned forms that
 //      never reach the window bottom opt out with conventions-ok.
+//  10. fontSize stays inside the design-language §4 scale bands (12–18 and
+//      28–32) — the 20px/24px drift class (audit UX-06) came from §4 having
+//      no button-label rung; the button tiers own button text now.
+//  11. borderRadius stays inside the §5 spectrum (4–12) unless the same
+//      style object proves a pill: width/height/minWidth/minHeight of
+//      2 × radius (chips, FAB, help button, theme swatch).
+//  12. No bare "Back" text buttons outside components/AppHeader.tsx — the
+//      one header grammar is chevron + destination label (audit UX-02/03).
+//      Programmatic router.back() after an action is unaffected.
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -58,6 +67,7 @@ const SHOWERROR_ALLOWED = (relPath) =>
   relPath.startsWith('app/(auth)/') ||
   relPath === 'app/_context/SessionContext.tsx' ||
   relPath.startsWith('lib/');
+const APP_HEADER_FILE = 'components/AppHeader.tsx';
 
 function* walk(dir) {
   for (const entry of readdirSync(dir)) {
@@ -258,6 +268,81 @@ function checkRawSwitchImport(path, source) {
   visit(source);
 }
 
+function checkVisualTokens(path, source, text) {
+  const relPath = rel(path);
+  const lines = text.split('\n');
+  const visit = (node) => {
+    if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name)) {
+      const prop = node.name.text;
+      if (
+        (prop === 'fontSize' || prop === 'borderRadius') &&
+        ts.isNumericLiteral(node.initializer)
+      ) {
+        const value = Number(node.initializer.text);
+        const line = lineOf(source, node.getStart());
+        if (prop === 'fontSize') {
+          const inScale = (value >= 12 && value <= 18) || (value >= 28 && value <= 32);
+          if (!inScale && !hasAllowComment(lines, line)) {
+            violations.push(
+              `${relPath}:${line} — fontSize ${value} is off the design-language §4 scale (12–18, 28–32); the button tiers own button text — use a component or a scale rung`
+            );
+          }
+        } else if (value < 4 || value > 12) {
+          // Pill heuristic: a fully-rounded shape proves itself in the same
+          // style object with a dimension of 2 × radius (chips, FAB, swatch).
+          const obj = node.parent;
+          const pill =
+            ts.isObjectLiteralExpression(obj) &&
+            obj.properties.some(
+              (p) =>
+                ts.isPropertyAssignment(p) &&
+                ts.isIdentifier(p.name) &&
+                ['width', 'height', 'minWidth', 'minHeight'].includes(p.name.text) &&
+                ts.isNumericLiteral(p.initializer) &&
+                Number(p.initializer.text) === 2 * value
+            );
+          if (!pill && !hasAllowComment(lines, line)) {
+            violations.push(
+              `${relPath}:${line} — borderRadius ${value} is outside the §5 spectrum (4–12); chips/pills prove the shape with width/height/minWidth/minHeight of 2 × radius in the same style object`
+            );
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+function checkBareBackButtons(path, source, text) {
+  const relPath = rel(path);
+  if (relPath === APP_HEADER_FILE) return;
+  const lines = text.split('\n');
+  const visit = (node) => {
+    if (
+      ts.isJsxElement(node) &&
+      ts.isIdentifier(node.openingElement.tagName) &&
+      (node.openingElement.tagName.text === 'TouchableOpacity' ||
+        node.openingElement.tagName.text === 'Pressable')
+    ) {
+      let hasBackText = false;
+      const findBack = (n) => {
+        if (ts.isJsxText(n) && n.getText(source).trim() === 'Back') hasBackText = true;
+        ts.forEachChild(n, findBack);
+      };
+      ts.forEachChild(node, findBack);
+      const line = lineOf(source, node.getStart());
+      if (hasBackText && !hasAllowComment(lines, line)) {
+        violations.push(
+          `${relPath}:${line} — bare "Back" text button; the one header grammar is AppHeader's chevron + destination label (audit UX-02/03)`
+        );
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
 function checkRegexRules(path, text, source) {
   const lines = text.split('\n');
   const relPath = rel(path);
@@ -315,6 +400,8 @@ for (const dir of SCAN_DIRS) {
     checkRawSwitchImport(path, source);
     checkModalRequestClose(path, source, text);
     checkBottomInset(path, text);
+    checkVisualTokens(path, source, text);
+    checkBareBackButtons(path, source, text);
   }
 }
 

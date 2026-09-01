@@ -207,6 +207,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
+    // conventions-ok: off-scale 24px OTP tier — migrates to the §4 scale in
+    // Design System Consolidation Phase 3 (audit UX-06).
     fontSize: 24,
     letterSpacing: 8,
     textAlign: 'center',
