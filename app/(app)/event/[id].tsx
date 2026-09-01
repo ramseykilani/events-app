@@ -718,6 +718,23 @@ export default function EventDetailScreen() {
             {formatEventDate(event.event_date)}
             {timeStr ? ` · ${timeStr}` : ''}
           </Text>
+          {event.location ? (
+            <TouchableOpacity
+              style={styles.locationRow}
+              onPress={() =>
+                Linking.openURL(
+                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location!)}`
+                )
+              }
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${event.location} in Maps`}
+              hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
+            >
+              <MaterialCommunityIcons name="map-marker-outline" size={20} color={theme.accent} />
+              <Text style={[styles.locationText, { color: theme.accent }]}>{event.location}</Text>
+            </TouchableOpacity>
+          ) : null}
           {event.description ? (
             <Text style={[styles.description, { color: theme.textPrimary }]}>{event.description}</Text>
           ) : null}
@@ -971,6 +988,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 24,
     textAlign: 'center',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 24,
+  },
+  locationText: {
+    fontSize: 18,
   },
   description: {
     fontSize: 18,

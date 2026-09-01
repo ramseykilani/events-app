@@ -68,6 +68,13 @@
     color: var(--text-secondary);
     margin: 0 0 24px;
   }
+  /* Location: the where snugs up under the when (same negative-margin pull
+     as .calendar-links), in the accent like the in-app detail row. */
+  .location {
+    font-size: 16px;
+    color: var(--accent);
+    margin: -16px 0 24px;
+  }
   /* Add to Other Calendars: secondary text links under the event details. */
   .calendar-links {
     display: flex;
@@ -154,6 +161,7 @@
       <p class="asker" id="asker"></p>
       <h1 class="title" id="title"></h1>
       <p class="meta" id="meta"></p>
+      <p class="location" id="location" hidden></p>
       <div class="calendar-links">
         <a id="cal-google" href="#" target="_blank" rel="noopener">Add to Google Calendar</a>
         <button type="button" id="cal-ics">Apple / Outlook / Other (.ics)</button>
@@ -181,6 +189,7 @@
   var askerEl = document.getElementById('asker');
   var titleEl = document.getElementById('title');
   var metaEl = document.getElementById('meta');
+  var locationEl = document.getElementById('location');
   var hintEl = document.getElementById('hint');
   var yesBtn = document.getElementById('yes');
   var noBtn = document.getElementById('no');
@@ -194,8 +203,9 @@
 
   // --- Add to Other Calendars: inline port of lib/calendarLinks.ts (this
   // static page has no build step and cannot import it). One-shot snapshot
-  // export: timed → a floating 1-hour block, no time → all-day, full
-  // description + listing url in the body. The .ics UID derives from the
+  // export: timed → a floating 1-hour block, no time → all-day, free-text
+  // location → the location field, full description + listing url in the
+  // body. The .ics UID derives from the
   // send's token (the GET deliberately exposes no event id), so re-adding
   // from this same link updates rather than duplicates in UID-deduping apps.
   // e2e/receipt.spec.ts pins this port against the app's Jest-pinned builders.
@@ -224,6 +234,7 @@
       encodeURIComponent(state.title == null ? 'Untitled event' : state.title) + '&dates=' + dates;
     var details = eventDetails(state);
     if (details) url += '&details=' + encodeURIComponent(details);
+    if (state.location) url += '&location=' + encodeURIComponent(state.location);
     return url;
   }
 
@@ -288,6 +299,7 @@
       'SUMMARY:' + escapeIcsText(state.title == null ? 'Untitled event' : state.title)
     ];
     if (details) lines.push('DESCRIPTION:' + escapeIcsText(details));
+    if (state.location) lines.push('LOCATION:' + escapeIcsText(state.location));
     lines.push('END:VEVENT', 'END:VCALENDAR');
     return lines.map(foldLine).join('\r\n') + '\r\n';
   }
@@ -345,6 +357,12 @@
     askerEl.textContent = askerName + ' asked';
     titleEl.textContent = state.title || 'an event';
     metaEl.textContent = formatDate(state.date) + (state.time ? ' · ' + formatTime(state.time) : '');
+    if (state.location) {
+      locationEl.textContent = state.location;
+      locationEl.hidden = false;
+    } else {
+      locationEl.hidden = true;
+    }
     googleLink.href = buildGoogleUrl(state);
     yesBtn.setAttribute('aria-pressed', String(current === 'yes'));
     noBtn.setAttribute('aria-pressed', String(current === 'no'));

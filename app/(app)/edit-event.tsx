@@ -40,19 +40,21 @@ type IntendedEventFields = {
   description: string | null;
   url: string | null;
   imageUrl: string | null;
+  location: string | null;
   eventDate: string;
   eventTime: string | null;
 };
 
 // Every field participates in the compare: a subset match can false-confirm
-// (KI-002's lesson), and save_event's server-side no-op rule compares all six
-// the same way. Server time may carry fractional seconds.
+// (KI-002's lesson), and save_event's server-side no-op rule compares all
+// seven the same way. Server time may carry fractional seconds.
 function eventMatchesIntended(e: Event, intended: IntendedEventFields): boolean {
   return (
     (e.title ?? '') === (intended.title ?? '') &&
     (e.description ?? '') === (intended.description ?? '') &&
     (e.url ?? '') === (intended.url ?? '') &&
     (e.image_url ?? '') === (intended.imageUrl ?? '') &&
+    (e.location ?? '') === (intended.location ?? '') &&
     e.event_date === intended.eventDate &&
     (e.event_time ? e.event_time.slice(0, 8) : null) === intended.eventTime
   );
@@ -65,6 +67,7 @@ function fieldsFromEvent(e: Event) {
     description: e.description ?? '',
     url: e.url ?? '',
     imageUrl: e.image_url ?? '',
+    location: e.location ?? '',
     eventDate: new Date(y, m - 1, d),
     eventTime: e.event_time ? new Date(`1970-01-01T${e.event_time}`) : null,
   };
@@ -84,6 +87,7 @@ export default function EditEventScreen() {
   const [description, setDescription] = useState(seededFields?.description ?? '');
   const [url, setUrl] = useState(seededFields?.url ?? '');
   const [imageUrl, setImageUrl] = useState(seededFields?.imageUrl ?? '');
+  const [location, setLocation] = useState(seededFields?.location ?? '');
   const [eventDate, setEventDate] = useState(seededFields?.eventDate ?? new Date());
   const [eventTime, setEventTime] = useState<Date | null>(seededFields?.eventTime ?? null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -105,6 +109,7 @@ export default function EditEventScreen() {
     setDescription(fields.description);
     setUrl(fields.url);
     setImageUrl(fields.imageUrl);
+    setLocation(fields.location);
     setEventDate(fields.eventDate);
     setEventTime(fields.eventTime);
     rememberEventPreview(previewFromEvent(e));
@@ -204,6 +209,7 @@ export default function EditEventScreen() {
       description: description.trim() || null,
       url: url.trim() || null,
       imageUrl: imageUrl.trim() || null,
+      location: location.trim() || null,
       eventDate: localDate,
       eventTime: timeStr,
     };
@@ -226,6 +232,7 @@ export default function EditEventScreen() {
             p_title: intended.title,
             p_description: intended.description,
             p_image_url: intended.imageUrl,
+            p_location: intended.location,
             p_event_date: intended.eventDate,
             p_event_time: intended.eventTime,
           })
@@ -242,6 +249,7 @@ export default function EditEventScreen() {
           description: intended.description,
           url: intended.url,
           image_url: intended.imageUrl,
+          location: intended.location,
           event_date: intended.eventDate,
           event_time: intended.eventTime,
           frozen: true,
@@ -402,6 +410,14 @@ export default function EditEventScreen() {
           value={description}
           onChangeText={setDescription}
           multiline
+        />
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Location (optional)</Text>
+        <TextInput
+          style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
+          placeholder="Venue or address"
+          placeholderTextColor={theme.textTertiary}
+          value={location}
+          onChangeText={setLocation}
         />
         <Text style={[styles.label, { color: theme.textSecondary }]}>Date</Text>
         {Platform.OS === 'web' ? (

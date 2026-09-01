@@ -34,8 +34,8 @@ END $$;
 -- A creates E and S via save_event (client-generated ids, as the client does)
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'da000000-0000-0000-0000-00000000000a', true);
-SELECT public.save_event('daeeeeee-0000-0000-0000-000000000001', null, 'Album Release', null, null, '2026-09-20', null);
-SELECT public.save_event('daeeeeee-0000-0000-0000-000000000002', null, 'Solo Hike', null, null, '2026-09-21', null);
+SELECT public.save_event('daeeeeee-0000-0000-0000-000000000001', null, 'Album Release', null, null, null, '2026-09-20', null);
+SELECT public.save_event('daeeeeee-0000-0000-0000-000000000002', null, 'Solo Hike', null, null, null, '2026-09-21', null);
 COMMIT;
 
 -- ===== T1: A shares E with B (app user) and a pending contact =====
@@ -164,7 +164,7 @@ END $$;
 -- B creates E2 and shares it to A's phone, which is a pending contact again.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'da000000-0000-0000-0000-00000000000b', true);
-SELECT public.save_event('daeeeeee-0000-0000-0000-000000000003', null, 'Gallery Opening', null, null, '2026-10-05', null);
+SELECT public.save_event('daeeeeee-0000-0000-0000-000000000003', null, 'Gallery Opening', null, null, null, '2026-10-05', null);
 SELECT public.share_event(
   'daeeeeee-0000-0000-0000-000000000003',
   ARRAY['da111111-0000-0000-0000-000000000002']::uuid[]

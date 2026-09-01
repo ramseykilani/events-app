@@ -52,12 +52,13 @@ async function stubGoogleCalendar(page: Page): Promise<void> {
 async function createEventFromCalendar(
   page: Page,
   title: string,
-  opts: { time?: string } = {}
+  opts: { time?: string; location?: string } = {}
 ): Promise<void> {
   await page.getByRole('button', { name: 'Add event' }).click();
   await page.getByPlaceholder('Event title').fill(title);
   await page.getByPlaceholder('https://...').fill('https://example.com/listing');
   await page.getByPlaceholder('Description').fill('Export me, please.');
+  if (opts.location) await page.getByPlaceholder('Venue or address').fill(opts.location);
   if (opts.time) await page.getByLabel('Time (optional)').fill(opts.time);
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Share with')).toBeVisible();
@@ -72,7 +73,10 @@ test('timed event: Google template link and .ics download carry the snapshot', a
 
   await page.goto('/');
   await expectCalendar(page);
-  await createEventFromCalendar(page, title, { time: '18:30' });
+  await createEventFromCalendar(page, title, {
+    time: '18:30',
+    location: 'Signal, 175 Morgan Ave',
+  });
   await openEventFromCalendar(page, title);
 
   // --- Google button → template link in a new tab.
@@ -95,6 +99,8 @@ test('timed event: Google template link and .ics download carry the snapshot', a
   expect(googleUrl).toContain(
     `details=${encodeURIComponent('Export me, please.\n\nhttps://example.com/listing')}`
   );
+  // Location feature: the free-text venue rides the template link.
+  expect(googleUrl).toContain(`location=${encodeURIComponent('Signal, 175 Morgan Ave')}`);
 
   // --- Apple / Outlook / Other button → .ics download.
   const downloadPromise = page.waitForEvent('download');
@@ -113,6 +119,7 @@ test('timed event: Google template link and .ics download carry the snapshot', a
   expect(ics).not.toContain('TZID');
   expect(ics).toContain(`SUMMARY:${title}`);
   expect(ics).toContain('DESCRIPTION:Export me\\, please.\\n\\nhttps://example.com/listing');
+  expect(ics).toContain('LOCATION:Signal\\, 175 Morgan Ave');
 
   await removeOpenEvent(page);
 });
@@ -137,6 +144,8 @@ test('all-day event: no time exports as a whole-day entry in both formats', asyn
   await popup.waitForLoadState('domcontentloaded');
   // Google's all-day form: YYYYMMDD / exclusive next day.
   expect(popup.url()).toContain(`dates=${todayYmd()}/${tomorrowYmd()}`);
+  // No location was entered — no stray param (Location).
+  expect(popup.url()).not.toContain('location=');
   await popup.close();
 
   const downloadPromise = page.waitForEvent('download');
@@ -147,6 +156,7 @@ test('all-day event: no time exports as a whole-day entry in both formats', asyn
   const ics = await downloadText(await downloadPromise);
   expect(ics).toContain(`DTSTART;VALUE=DATE:${todayYmd()}`);
   expect(ics).toContain(`DTEND;VALUE=DATE:${tomorrowYmd()}`);
+  expect(ics).not.toContain('LOCATION');
 
   await removeOpenEvent(page);
 });

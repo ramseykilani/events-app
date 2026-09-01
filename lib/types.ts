@@ -47,6 +47,10 @@ export interface Event {
   title: string | null;
   description: string | null;
   image_url: string | null;
+  // Free-text venue/address ("Sarah's place") — no Places autocomplete.
+  // Renders as a tappable Maps search row on the detail screen; feeds
+  // calendar exports and the share SMS venue line.
+  location: string | null;
   event_date: string;
   event_time: string | null;
   // Where this copy came from. NULL = the owner created it (or the link was
@@ -97,6 +101,7 @@ export interface CalendarEvent {
   title: string | null;
   description: string | null;
   image_url: string | null;
+  location: string | null;
   url: string | null;
   event_date: string;
   event_time: string | null;

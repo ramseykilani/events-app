@@ -19,6 +19,7 @@ describe('lib/eventPreviewCache', () => {
       title: 'Picnic',
       description: 'Park',
       image_url: null,
+      location: 'Prospect Park',
       url: null,
       event_date: '2026-08-13',
       event_time: null,
@@ -33,6 +34,9 @@ describe('lib/eventPreviewCache', () => {
     expect(preview?.title).toBe('Picnic');
     expect(preview?.sharer_contact_name).toBe('Alice');
     expect(eventFromPreview(preview!).id).toBe('e-1');
+    // Location rides the preview so the detail row renders before the fetch lands.
+    expect(preview?.location).toBe('Prospect Park');
+    expect(eventFromPreview(preview!).location).toBe('Prospect Park');
   });
 
   it('remembers a loaded event row', () => {
@@ -43,6 +47,7 @@ describe('lib/eventPreviewCache', () => {
       title: 'Show',
       description: null,
       image_url: null,
+      location: null,
       event_date: '2026-08-14',
       event_time: '19:00:00',
       from_event_id: null,
@@ -68,6 +73,7 @@ describe('lib/eventPreviewCache', () => {
       title: 'Forwarded Show',
       description: null,
       image_url: null,
+      location: null,
       event_date: '2026-08-15',
       event_time: null,
       from_event_id: 'e-sender',

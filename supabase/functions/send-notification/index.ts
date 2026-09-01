@@ -202,7 +202,7 @@ serve(async (req) => {
     // Load the sender's row and verify the caller owns it.
     const { data: event, error: evErr } = await db
       .from('events')
-      .select('owner_id, title, event_date, event_time, url, description')
+      .select('owner_id, title, event_date, event_time, url, description, location')
       .eq('id', eventId)
       .single();
 
@@ -301,6 +301,9 @@ serve(async (req) => {
     const timeStr = event.event_time ? `, ${formatTime(event.event_time)}` : '';
     const dateLine = `${dateStr}${timeStr}`;
     const descriptionLine = event.description ? excerpt(event.description, 90) : null;
+    // Location feature: the venue line sits between the when and the what,
+    // truncated on the same GSM-7 budget as title/description.
+    const locationLine = event.location ? `Where: ${excerpt(event.location, 90)}` : null;
 
     // Body assembly lives in _shared/smsBody.ts (unit-tested directly —
     // reserved 555 numbers never reach Twilio, so no e2e observes a real
@@ -349,6 +352,7 @@ serve(async (req) => {
             buildSmsBody({
               eventTitle,
               dateLine,
+              locationLine,
               descriptionLine,
               eventUrl,
               sharerName: sharerDisplayName ?? sharerPhone,
@@ -452,6 +456,7 @@ serve(async (req) => {
             buildSmsBody({
               eventTitle,
               dateLine,
+              locationLine,
               descriptionLine,
               eventUrl,
               sharerName: displayName,

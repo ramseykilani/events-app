@@ -8,13 +8,16 @@ import type { Event } from './types';
 // - buildGoogleUrl: Google's template link (no auth, no SDK).
 // - buildIcs: an RFC 5545 .ics file for Apple / Outlook / the long tail.
 //
-// Field mapping (the events row has no location, end time, or timezone):
+// Field mapping (the events row has no end time or timezone):
 // - timed event → a 1-hour block (both formats need an end; 1h is the
 //   convention);
 // - no event_time → an all-day event (DTEND is the exclusive next day);
 // - floating local time everywhere: no Z, no TZID, no ctz — the recipient's
 //   calendar interprets it in their own zone, matching the app's
 //   local-date semantics (lib/format.ts);
+// - free-text location → Google's location= param, the .ics LOCATION line,
+//   and the native compose UIs' location field; omitted everywhere when
+//   empty;
 // - full description + the listing url go into the event body;
 // - the .ics UID is stable (<event-id>@shared-events) so apps that dedupe
 //   by UID update rather than duplicate on re-add. Google's template
@@ -26,7 +29,7 @@ import type { Event } from './types';
 
 type CalendarFields = Pick<
   Event,
-  'title' | 'description' | 'url' | 'event_date' | 'event_time'
+  'title' | 'description' | 'location' | 'url' | 'event_date' | 'event_time'
 >;
 
 const UNTITLED = 'Untitled event';
@@ -70,6 +73,7 @@ export type NativeEventDetails = {
   startDate: Date;
   endDate: Date;
   allDay: boolean;
+  location?: string;
   notes?: string;
 };
 
@@ -78,6 +82,7 @@ export function buildNativeDetails(event: CalendarFields): NativeEventDetails {
   const details = buildDetails(event);
   const base = {
     title: event.title ?? UNTITLED,
+    ...(event.location ? { location: event.location } : {}),
     ...(details ? { notes: details } : {}),
   };
   if (event.event_time) {
@@ -121,6 +126,7 @@ export function buildGoogleUrl(event: CalendarFields): string {
   )}&dates=${dates}`;
   const details = buildDetails(event);
   if (details) url += `&details=${encodeURIComponent(details)}`;
+  if (event.location) url += `&location=${encodeURIComponent(event.location)}`;
   return url;
 }
 
@@ -205,6 +211,7 @@ export function buildIcs(event: CalendarFields & Pick<Event, 'id'>): string {
     endLine,
     `SUMMARY:${escapeIcsText(event.title ?? UNTITLED)}`,
     ...(details ? [`DESCRIPTION:${escapeIcsText(details)}`] : []),
+    ...(event.location ? [`LOCATION:${escapeIcsText(event.location)}`] : []),
     'END:VEVENT',
     'END:VCALENDAR',
   ];

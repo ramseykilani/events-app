@@ -16,6 +16,7 @@ const SIGNUP_INVITE_LINE =
 export interface SmsBodyParams {
   eventTitle: string | null;
   dateLine: string;
+  locationLine: string | null;
   descriptionLine: string | null;
   eventUrl: string | null;
   sharerName: string;
@@ -48,6 +49,7 @@ export interface SmsBodyParams {
 export function buildSmsBody({
   eventTitle,
   dateLine,
+  locationLine,
   descriptionLine,
   eventUrl,
   sharerName,
@@ -60,6 +62,9 @@ export function buildSmsBody({
       : `${sharerName} wants to go to an event with you`,
     dateLine,
   ];
+  // Location feature: the venue line goes right after the when, before the
+  // what — null (empty location) leaves no trace.
+  if (locationLine) lines.push(locationLine);
   if (descriptionLine) lines.push(descriptionLine);
   if (eventUrl) lines.push(eventUrl);
   if (responseLink) lines.push('', `Coming? ${responseLink}`);

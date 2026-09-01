@@ -7,6 +7,7 @@ export type EventPreview = {
   title: string | null;
   description: string | null;
   image_url: string | null;
+  location: string | null;
   url: string | null;
   event_date: string;
   event_time: string | null;
@@ -39,6 +40,7 @@ export function previewFromCalendarEvent(event: CalendarEvent): EventPreview {
     title: event.title,
     description: event.description,
     image_url: event.image_url,
+    location: event.location,
     url: event.url,
     event_date: event.event_date,
     event_time: event.event_time,
@@ -54,6 +56,7 @@ export function previewFromEvent(event: Event): EventPreview {
     title: event.title,
     description: event.description,
     image_url: event.image_url,
+    location: event.location,
     url: event.url,
     event_date: event.event_date,
     event_time: event.event_time,
@@ -74,6 +77,7 @@ export function eventFromPreview(preview: EventPreview): Event {
     title: preview.title,
     description: preview.description,
     image_url: preview.image_url,
+    location: preview.location,
     event_date: preview.event_date,
     event_time: preview.event_time,
     from_event_id: null,

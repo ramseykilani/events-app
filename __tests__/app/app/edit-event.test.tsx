@@ -57,6 +57,7 @@ const eventRow = {
   title: 'Old Title',
   description: null,
   image_url: null,
+  location: null,
   event_date: '2026-05-01',
   event_time: null,
   from_event_id: null,
@@ -72,6 +73,7 @@ const seedPreview = () =>
     title: 'Old Title',
     description: null,
     image_url: null,
+    location: null,
     url: null,
     event_date: '2026-05-01',
     event_time: null,
@@ -124,11 +126,28 @@ describe('app/(app)/edit-event', () => {
         p_title: 'Old Title edited',
         p_description: null,
         p_image_url: null,
+        p_location: null,
         p_event_date: '2026-05-01',
         p_event_time: null,
       });
     });
     expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-1');
+  });
+
+  it('saves a location-only edit (location is a field-changing save)', async () => {
+    const screen = render(<EditEventScreen />);
+    const save = await screen.findByText('Save');
+
+    fireEvent.changeText(await screen.findByPlaceholderText('Venue or address'), 'Signal, 175 Morgan Ave');
+    fireEvent.press(save);
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'save_event',
+        expect.objectContaining({ p_location: 'Signal, 175 Morgan Ave' })
+      );
+    });
     expect(router.replace).toHaveBeenCalledWith('/(app)/event/e-1');
   });
 

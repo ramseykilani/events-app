@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { expect, newExtraContext, test } from './fixtures';
 import { expectCalendar } from './helpers';
 
@@ -20,13 +21,49 @@ import { expectCalendar } from './helpers';
 //   events in), so the grid and selected day never drift with the calendar.
 // - The month grid itself is masked: dot placement depends on shared test
 //   data, and nobody needs pixel police on stub data.
-// - The event-detail shot uses a pinned event title and removes the event
-//   after. Rows are per-user now (no global dedup), so a failed run can
-//   leave residue behind: the detail test first removes any leftover
-//   "Baseline event" rows, or the next run's strict-mode locator would
-//   match two cards.
+// - The event-detail and edit-event shots use pinned event titles and remove
+//   the events after. Rows are per-user now (no global dedup), so a failed
+//   run can leave residue behind: those tests first remove any leftover
+//   "Baseline ..." rows, or the next run's strict-mode locator would match
+//   two cards.
 
 const SHOT = { maxDiffPixelRatio: 0.02, animations: 'disabled' as const };
+
+// Residue guard for the pinned-title tests. The cap is a loop-safety bound,
+// not a residue budget: shared accounts accumulate one row per failed run
+// across every branch and CI job, so it must exceed the worst accumulation,
+// not the expected case.
+async function removeLeftoverEvents(page: Page, title: string): Promise<void> {
+  for (let i = 0; i < 30; i++) {
+    const leftover = page
+      .getByText(title, { exact: true })
+      .filter({ visible: true })
+      .first();
+    if (!(await leftover.isVisible().catch(() => false))) break;
+    await leftover.click();
+    await expect(
+      page.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
+    ).toBeVisible({ timeout: 15000 });
+    page.once('dialog', (dialog) => dialog.accept());
+    await page
+      .getByRole('button', { name: 'Remove Event' })
+      .filter({ visible: true })
+      .click();
+    await expectCalendar(page);
+  }
+}
+
+// Pinned baseline event: same title (+ location when given) every run,
+// created on the frozen clock's today, removed by the test after the shot.
+async function createPinnedEvent(page: Page, title: string, location?: string): Promise<void> {
+  await page.getByRole('button', { name: 'Add event' }).click();
+  await page.getByPlaceholder('Event title').fill(title);
+  if (location) await page.getByPlaceholder('Venue or address').fill(location);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Share with')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expectCalendar(page);
+}
 
 test('sign-in screen matches baseline', async ({ browser }, testInfo) => {
   const context = await newExtraContext(browser, testInfo);
@@ -83,37 +120,10 @@ test('event detail matches baseline', async ({ page }) => {
   await page.goto('/');
   await expectCalendar(page);
 
-  // Residue from a failed earlier run would break the strict-mode locator
-  // below (two cards with the pinned title) — remove leftovers first. Rows
-  // are per-user now, so nothing dedups them away. The cap is a loop-safety
-  // bound, not a residue budget: shared accounts accumulate one row per
-  // failed run across every branch and CI job, so it must exceed the worst
-  // accumulation, not the expected case.
-  for (let i = 0; i < 30; i++) {
-    const leftover = page
-      .getByText('Baseline event', { exact: true })
-      .filter({ visible: true })
-      .first();
-    if (!(await leftover.isVisible().catch(() => false))) break;
-    await leftover.click();
-    await expect(
-      page.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
-    ).toBeVisible({ timeout: 15000 });
-    page.once('dialog', (dialog) => dialog.accept());
-    await page
-      .getByRole('button', { name: 'Remove Event' })
-      .filter({ visible: true })
-      .click();
-    await expectCalendar(page);
-  }
+  await removeLeftoverEvents(page, 'Baseline event');
 
-  // Pinned baseline event: same title+date+time every run, removed after.
-  await page.getByRole('button', { name: 'Add event' }).click();
-  await page.getByPlaceholder('Event title').fill('Baseline event');
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('Share with')).toBeVisible();
-  await page.getByRole('button', { name: 'Cancel' }).click();
-  await expectCalendar(page);
+  // The pinned location renders the tappable Maps row (Location feature).
+  await createPinnedEvent(page, 'Baseline event', 'Baseline Hall, 1 Main St');
 
   await page.getByText('Baseline event', { exact: true }).click();
   await expect(
@@ -122,6 +132,32 @@ test('event detail matches baseline', async ({ page }) => {
   await expect(page).toHaveScreenshot('event-detail.png', SHOT);
 
   // Cleanup: the calendar's day list stays deterministically empty next run.
+  page.once('dialog', (dialog) => dialog.accept());
+  await page
+    .getByRole('button', { name: 'Remove Event' })
+    .filter({ visible: true })
+    .click();
+  await expectCalendar(page);
+});
+
+test('edit-event form matches baseline', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-06-15T12:00:00') });
+  await page.goto('/');
+  await expectCalendar(page);
+
+  await removeLeftoverEvents(page, 'Baseline edit event');
+  await createPinnedEvent(page, 'Baseline edit event', 'Baseline Hall, 1 Main St');
+
+  await page.getByText('Baseline edit event', { exact: true }).click();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  await expect(page.getByPlaceholder('Event title')).toHaveValue('Baseline edit event');
+  await expect(page).toHaveScreenshot('edit-event.png', SHOT);
+
+  // Cleanup: back to the detail, then remove the pinned event.
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Remove Event' }).filter({ visible: true })
+  ).toBeVisible({ timeout: 15000 });
   page.once('dialog', (dialog) => dialog.accept());
   await page
     .getByRole('button', { name: 'Remove Event' })

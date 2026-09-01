@@ -8,6 +8,7 @@ const base = {
   id: 'evt-123',
   title: 'Board Game Night',
   description: 'Bring a game.',
+  location: 'Signal, 175 Morgan Ave',
   url: 'https://example.com/tickets',
   event_date: '2026-09-05',
   event_time: '19:00',
@@ -63,6 +64,16 @@ describe('buildGoogleUrl', () => {
   it('omits details when there is no description and no url', () => {
     const url = buildGoogleUrl({ ...base, description: null, url: null });
     expect(url).not.toContain('details=');
+  });
+
+  it('carries the free-text location as the location param', () => {
+    const url = buildGoogleUrl(base);
+    expect(url).toContain(`location=${encodeURIComponent('Signal, 175 Morgan Ave')}`);
+  });
+
+  it('omits the location param when there is no location', () => {
+    const url = buildGoogleUrl({ ...base, location: null });
+    expect(url).not.toContain('location=');
   });
 
   it('falls back to "Untitled event"', () => {
@@ -130,6 +141,16 @@ describe('buildIcs', () => {
     expect(ics).not.toContain('DESCRIPTION');
   });
 
+  it('writes LOCATION with RFC 5545 text escaping', () => {
+    const ics = buildIcs(base);
+    expect(ics).toContain('LOCATION:Signal\\, 175 Morgan Ave\r\n');
+  });
+
+  it('omits LOCATION when there is no location', () => {
+    const ics = buildIcs({ ...base, location: null });
+    expect(ics).not.toContain('LOCATION');
+  });
+
   it('falls back to "Untitled event"', () => {
     expect(buildIcs({ ...base, title: null })).toContain('SUMMARY:Untitled event\r\n');
   });
@@ -184,6 +205,15 @@ describe('buildNativeDetails', () => {
   it('omits notes when there is no description and no url', () => {
     const d = buildNativeDetails({ ...base, description: null, url: null });
     expect('notes' in d).toBe(false);
+  });
+
+  it('carries location for the native compose UIs', () => {
+    expect(buildNativeDetails(base).location).toBe('Signal, 175 Morgan Ave');
+  });
+
+  it('omits location when there is none', () => {
+    const d = buildNativeDetails({ ...base, location: null });
+    expect('location' in d).toBe(false);
   });
 
   it('falls back to "Untitled event"', () => {

@@ -58,7 +58,7 @@ BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
 SELECT public.save_event(
   'eeeeeeee-0000-0000-0000-000000000001',
-  'https://example.com/bgn', 'Board Game Night', null, null, '2026-09-15', '19:00'
+  'https://example.com/bgn', 'Board Game Night', null, null, 'Signal, 175 Morgan Ave', '2026-09-15', '19:00'
 ) AS t0_created;
 COMMIT;
 
@@ -95,6 +95,9 @@ BEGIN
   END IF;
   IF v_copy.title IS DISTINCT FROM 'Board Game Night' OR v_copy.event_time IS DISTINCT FROM '19:00'::time THEN
     RAISE EXCEPTION 'FAIL T1: B copy fields do not match the sender row';
+  END IF;
+  IF v_copy.location IS DISTINCT FROM 'Signal, 175 Morgan Ave' THEN
+    RAISE EXCEPTION 'FAIL T1: B copy did not carry the sender''s location, got %', v_copy.location;
   END IF;
   IF EXISTS (SELECT 1 FROM public.events WHERE owner_id = 'dddddddd-0000-0000-0000-000000000004') THEN
     RAISE EXCEPTION 'FAIL T1: D got a copy before signup';
@@ -156,12 +159,13 @@ BEGIN
   RAISE NOTICE 'PASS T2: re-share copies the re-sharer''s row; C follows B, not A';
 END $$;
 
--- ===== T3: edit cascade depth >= 2 — A edits; B's and C's rows update =====
+-- ===== T3: edit cascade depth >= 2 — A edits (time AND location); B's and
+-- C's rows update =====
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
 SELECT public.save_event(
   'eeeeeeee-0000-0000-0000-000000000001',
-  'https://example.com/bgn', 'Board Game Night', null, null, '2026-09-15', '20:30'
+  'https://example.com/bgn', 'Board Game Night', null, null, 'Signal, back room', '2026-09-15', '20:30'
 );
 COMMIT;
 
@@ -173,6 +177,13 @@ BEGIN
   END IF;
   IF (SELECT event_time FROM public.events WHERE owner_id = 'cccccccc-0000-0000-0000-000000000003') IS DISTINCT FROM '20:30'::time THEN
     RAISE EXCEPTION 'FAIL T3: C''s row did not receive A''s edit through B';
+  END IF;
+  IF (SELECT location FROM public.events WHERE owner_id = 'bbbbbbbb-0000-0000-0000-000000000002'
+      AND from_event_id = 'eeeeeeee-0000-0000-0000-000000000001') IS DISTINCT FROM 'Signal, back room' THEN
+    RAISE EXCEPTION 'FAIL T3: cascade did not carry the new location to B';
+  END IF;
+  IF (SELECT location FROM public.events WHERE owner_id = 'cccccccc-0000-0000-0000-000000000003') IS DISTINCT FROM 'Signal, back room' THEN
+    RAISE EXCEPTION 'FAIL T3: cascade did not carry the new location to C through B';
   END IF;
   IF (SELECT frozen FROM public.events WHERE owner_id = 'bbbbbbbb-0000-0000-0000-000000000002'
       AND from_event_id = 'eeeeeeee-0000-0000-0000-000000000001') THEN
@@ -208,7 +219,7 @@ BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
 SELECT public.save_event(
   'eeeeeeee-0000-0000-0000-000000000001',
-  'https://example.com/bgn', 'Board Game Night', 'updated details', null, '2026-09-15', '20:30'
+  'https://example.com/bgn', 'Board Game Night', 'updated details', null, 'Signal, back room', '2026-09-15', '20:30'
 );
 COMMIT;
 
@@ -233,6 +244,9 @@ BEGIN
   IF v IS NULL THEN RAISE EXCEPTION 'FAIL T6c: event did not reappear after unhide'; END IF;
   IF v.description IS DISTINCT FROM 'updated details' THEN
     RAISE EXCEPTION 'FAIL T6c: unhidden row should carry the cascaded correction, got %', v.description;
+  END IF;
+  IF v.location IS DISTINCT FROM 'Signal, back room' THEN
+    RAISE EXCEPTION 'FAIL T6c: calendar RPC should return the cascaded location, got %', v.location;
   END IF;
   IF v.sharer_contact_name IS DISTINCT FROM 'Ay' THEN
     RAISE EXCEPTION 'FAIL T6c: B attribution expected Ay, got %', v.sharer_contact_name;
@@ -280,7 +294,7 @@ SELECT set_config('request.jwt.claim.sub', 'bbbbbbbb-0000-0000-0000-000000000002
 SELECT public.save_event(
   (SELECT id FROM public.events WHERE owner_id = 'bbbbbbbb-0000-0000-0000-000000000002'
    AND from_event_id = 'eeeeeeee-0000-0000-0000-000000000001'),
-  'https://example.com/bgn', 'Board Game Night (B''s edition)', 'updated details', null, '2026-09-15', '20:30'
+  'https://example.com/bgn', 'Board Game Night (B''s edition)', 'updated details', null, 'Signal, back room', '2026-09-15', '20:30'
 );
 COMMIT;
 
@@ -300,7 +314,7 @@ BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
 SELECT public.save_event(
   'eeeeeeee-0000-0000-0000-000000000001',
-  'https://example.com/bgn', 'Board Game Night', 'updated details', null, '2026-09-15', '21:00'
+  'https://example.com/bgn', 'Board Game Night', 'updated details', null, 'Signal, back room', '2026-09-15', '21:00'
 );
 COMMIT;
 
@@ -374,12 +388,12 @@ END $$;
 -- sender (no cross-sender dedup; no global dedup either) =====
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000004', null, 'Lunch', null, null, '2026-10-02', '12:30');
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000004', null, 'Lunch', null, null, null, '2026-10-02', '12:30');
 COMMIT;
 
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'bbbbbbbb-0000-0000-0000-000000000002', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000005', null, 'Lunch', null, null, '2026-10-02', '12:30');
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000005', null, 'Lunch', null, null, null, '2026-10-02', '12:30');
 COMMIT;
 
 DO $$
@@ -422,7 +436,7 @@ END $$;
 -- Each copy follows only its own sender: A's edit reaches C's A-copy only.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000004', null, 'Lunch', null, null, '2026-10-02', '13:00');
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000004', null, 'Lunch', null, null, null, '2026-10-02', '13:00');
 COMMIT;
 
 DO $$
@@ -442,7 +456,7 @@ END $$;
 -- (share to a non-account, edit after sharing, then sign up) =====
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'bbbbbbbb-0000-0000-0000-000000000002', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000002', null, 'Picnic', null, null, '2026-10-01', null);
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000002', null, 'Picnic', null, null, 'Prospect Park', '2026-10-01', null);
 SELECT public.share_event('eeeeeeee-0000-0000-0000-000000000002', ARRAY['22222222-0000-0000-0000-000000000007']::uuid[]);
 COMMIT;
 
@@ -460,7 +474,7 @@ END $$;
 -- B edits after sharing (pre-sign-up): the edit is simply included.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'bbbbbbbb-0000-0000-0000-000000000002', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000002', null, 'Picnic (moved indoors)', null, null, '2026-10-01', '18:00');
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000002', null, 'Picnic (moved indoors)', null, null, 'Picnic House, 123 Grand St', '2026-10-01', '18:00');
 COMMIT;
 
 INSERT INTO auth.users (id, phone) VALUES ('eeeeeeee-1000-0000-0000-000000000005', '+15555550104');
@@ -474,6 +488,9 @@ BEGIN
   END IF;
   IF v_copy.title IS DISTINCT FROM 'Picnic (moved indoors)' OR v_copy.event_time IS DISTINCT FROM '18:00'::time THEN
     RAISE EXCEPTION 'FAIL T8: pending copy should carry the post-edit values, got % / %', v_copy.title, v_copy.event_time;
+  END IF;
+  IF v_copy.location IS DISTINCT FROM 'Picnic House, 123 Grand St' THEN
+    RAISE EXCEPTION 'FAIL T8: pending copy should carry the post-edit location, got %', v_copy.location;
   END IF;
   IF v_copy.from_event_id IS DISTINCT FROM 'eeeeeeee-0000-0000-0000-000000000002'::uuid
      OR v_copy.from_user_id IS DISTINCT FROM 'bbbbbbbb-0000-0000-0000-000000000002'::uuid THEN
@@ -519,7 +536,7 @@ BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'cccccccc-0000-0000-0000-000000000003', true);
 DO $$
 BEGIN
-  PERFORM public.save_event('eeeeeeee-0000-0000-0000-000000000005', null, 'Hijacked', null, null, '2026-10-02', '12:30');
+  PERFORM public.save_event('eeeeeeee-0000-0000-0000-000000000005', null, 'Hijacked', null, null, null, '2026-10-02', '12:30');
   RAISE EXCEPTION 'FAIL T9b: C saved over B''s row';
 EXCEPTION WHEN OTHERS THEN
   IF SQLERRM LIKE 'FAIL%' THEN RAISE; END IF;
@@ -571,7 +588,7 @@ COMMIT;
 -- T9f: unauthenticated calls are rejected.
 DO $$
 BEGIN
-  PERFORM public.save_event('eeeeeeee-0000-0000-0000-0000000000aa', null, 'Anon', null, null, '2026-11-01', null);
+  PERFORM public.save_event('eeeeeeee-0000-0000-0000-0000000000aa', null, 'Anon', null, null, null, '2026-11-01', null);
   RAISE EXCEPTION 'FAIL T9f: unauthenticated save_event succeeded';
 EXCEPTION WHEN OTHERS THEN
   IF SQLERRM LIKE 'FAIL%' THEN RAISE; END IF;
@@ -582,7 +599,7 @@ END $$;
 -- -> a later sender edit still lands) =====
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000003', null, 'Museum', null, null, '2026-11-20', '14:00');
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000003', null, 'Museum', null, null, 'The Met', '2026-11-20', '14:00');
 SELECT public.share_event('eeeeeeee-0000-0000-0000-000000000003', ARRAY['11111111-0000-0000-0000-000000000008']::uuid[]);
 COMMIT;
 
@@ -593,7 +610,7 @@ SELECT set_config('request.jwt.claim.sub', 'cccccccc-0000-0000-0000-000000000003
 SELECT public.save_event(
   (SELECT id FROM public.events WHERE owner_id = 'cccccccc-0000-0000-0000-000000000003'
    AND from_event_id = 'eeeeeeee-0000-0000-0000-000000000003'),
-  null, 'Museum', null, null, '2026-11-20', '14:00'
+  null, 'Museum', null, null, 'The Met', '2026-11-20', '14:00'
 );
 COMMIT;
 
@@ -608,7 +625,7 @@ END $$;
 
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000003', null, 'Museum', null, null, '2026-11-20', '15:00');
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000003', null, 'Museum', null, null, 'The Met', '2026-11-20', '15:00');
 COMMIT;
 
 DO $$
@@ -618,6 +635,25 @@ BEGIN
     RAISE EXCEPTION 'FAIL T10b: A''s edit did not reach C after C''s no-op save';
   END IF;
   RAISE NOTICE 'PASS T10b: a later sender edit still lands after a no-op save';
+END $$;
+
+-- T10c: a location-ONLY change is a field-changing save — it cascades on its
+-- own (location is a full peer of the other listing fields, not a rider).
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000003', null, 'Museum', null, null, 'The Met, Roof Garden', '2026-11-20', '15:00');
+COMMIT;
+
+DO $$
+BEGIN
+  IF (SELECT location FROM public.events WHERE owner_id = 'cccccccc-0000-0000-0000-000000000003'
+      AND from_event_id = 'eeeeeeee-0000-0000-0000-000000000003') IS DISTINCT FROM 'The Met, Roof Garden' THEN
+    RAISE EXCEPTION 'FAIL T10c: a location-only edit did not cascade to C';
+  END IF;
+  IF NOT (SELECT frozen FROM public.events WHERE id = 'eeeeeeee-0000-0000-0000-000000000003') THEN
+    RAISE EXCEPTION 'FAIL T10c: a location-only edit should freeze the sender''s row';
+  END IF;
+  RAISE NOTICE 'PASS T10c: a location-only edit freezes and cascades';
 END $$;
 
 -- ===== T11: cycle safety — a hand-crafted follow loop terminates and each
@@ -646,7 +682,7 @@ CREATE TRIGGER _count_updates
 
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000006', null, 'Loop (edited)', null, null, '2026-12-01', '10:00');
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000006', null, 'Loop (edited)', null, null, null, '2026-12-01', '10:00');
 COMMIT;
 
 DROP TRIGGER _count_updates ON public.events;
@@ -672,9 +708,10 @@ END $$;
 -- ===== T12: save_event create-retry is side-effect-free (idempotency) =====
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000009', null, 'Retry Me', null, null, '2026-12-05', null);
--- A retry of the same aborted create finds the row and no-ops.
-SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000009', null, 'Retry Me', null, null, '2026-12-05', null);
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000009', null, 'Retry Me', null, null, 'Someplace', '2026-12-05', null);
+-- A retry of the same aborted create finds the row and no-ops (location
+-- included in the no-op compare).
+SELECT public.save_event('eeeeeeee-0000-0000-0000-000000000009', null, 'Retry Me', null, null, 'Someplace', '2026-12-05', null);
 COMMIT;
 
 DO $$

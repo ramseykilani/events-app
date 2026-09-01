@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { abortable, abortablePromise } from '../../helpers/abortable';
@@ -72,6 +72,7 @@ const eventRow = {
   title: 'Board Game Night',
   description: null,
   image_url: null,
+  location: null,
   event_date: '2026-05-10',
   event_time: null,
   from_event_id: null,
@@ -393,12 +394,39 @@ describe('app/(app)/event/[id]', () => {
     expect(screen.getByText('Board Game Night')).toBeTruthy();
   });
 
+  it('renders the location as a tappable Maps search row (Location feature)', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    try {
+      mockEventsMaybeSingle.mockResolvedValue({
+        data: { ...eventRow, location: 'Signal, 175 Morgan Ave' },
+        error: null,
+      });
+
+      const screen = render(<EventDetailScreen />);
+      await screen.findByText('Signal, 175 Morgan Ave');
+      fireEvent.press(screen.getByLabelText('Open Signal, 175 Morgan Ave in Maps'));
+
+      expect(openURL).toHaveBeenCalledWith(
+        'https://www.google.com/maps/search/?api=1&query=Signal%2C%20175%20Morgan%20Ave'
+      );
+    } finally {
+      openURL.mockRestore();
+    }
+  });
+
+  it('renders no location row when the event has no location', async () => {
+    const screen = render(<EventDetailScreen />);
+    await screen.findByText('Board Game Night');
+    expect(screen.queryByLabelText(/in Maps$/)).toBeNull();
+  });
+
   it('shows Share/Edit/Remove immediately from a calendar preview without waiting on fetch', async () => {
     rememberEventPreview({
       event_id: 'e1',
       title: 'Board Game Night',
       description: null,
       image_url: null,
+      location: null,
       url: null,
       event_date: '2026-05-10',
       event_time: null,
@@ -429,6 +457,7 @@ describe('app/(app)/event/[id]', () => {
       title: 'Board Game Night',
       description: null,
       image_url: null,
+      location: null,
       url: null,
       event_date: '2026-05-10',
       event_time: null,
@@ -460,6 +489,7 @@ describe('app/(app)/event/[id]', () => {
       title: 'Board Game Night',
       description: null,
       image_url: null,
+      location: null,
       url: null,
       event_date: '2099-10-10',
       event_time: null,

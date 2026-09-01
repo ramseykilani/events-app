@@ -45,7 +45,7 @@ BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'cc000000-0000-0000-0000-00000000000a', true);
 SELECT public.save_event(
   'cc000000-0000-0000-0000-0000000000e1',
-  null, 'Who Is Coming Test', null, null, '2026-10-01', '20:00'
+  null, 'Who Is Coming Test', null, null, null, '2026-10-01', '20:00'
 );
 SELECT public.share_event(
   'cc000000-0000-0000-0000-0000000000e1',

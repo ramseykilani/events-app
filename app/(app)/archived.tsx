@@ -62,6 +62,7 @@ export default function ArchivedScreen() {
           title: row.title as string | null,
           description: row.description as string | null,
           image_url: row.image_url as string | null,
+          location: row.location as string | null,
           url: row.url as string | null,
           event_date: row.event_date as string,
           event_time: row.event_time as string | null,

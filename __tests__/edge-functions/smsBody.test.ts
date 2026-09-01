@@ -10,6 +10,7 @@ const LINK = 'https://events-reply.pages.dev/?t=token-123';
 const baseParams = {
   eventTitle: 'Karaoke Night',
   dateLine: 'Fri, Sep 4, 8:00 PM',
+  locationLine: null as string | null,
   descriptionLine: 'Bring your own songbook',
   eventUrl: 'https://example.com/karaoke',
   sharerName: 'Ramsey',
@@ -68,6 +69,7 @@ describe('buildSmsBody', () => {
     const body = buildSmsBody({
       eventTitle: null,
       dateLine: 'Sat, Sep 5',
+      locationLine: null,
       descriptionLine: null,
       eventUrl: null,
       sharerName: '+15555550100',
@@ -82,5 +84,30 @@ describe('buildSmsBody', () => {
         '\n' +
         'Reply STOP to unsubscribe.',
     );
+  });
+
+  it('carries the venue line between the date and the description (Location feature)', () => {
+    const body = buildSmsBody({
+      ...baseParams,
+      locationLine: 'Where: Signal, 175 Morgan Ave',
+      signupInvite: false,
+      responseLink: LINK,
+    });
+    expect(body).toBe(
+      'Ramsey wants to go to "Karaoke Night" with you\n' +
+        'Fri, Sep 4, 8:00 PM\n' +
+        'Where: Signal, 175 Morgan Ave\n' +
+        'Bring your own songbook\n' +
+        'https://example.com/karaoke\n' +
+        '\n' +
+        `Coming? ${LINK}\n` +
+        '\n' +
+        'Reply STOP to unsubscribe.',
+    );
+  });
+
+  it('omits the venue line when the event has no location', () => {
+    const body = buildSmsBody({ ...baseParams, signupInvite: false, responseLink: LINK });
+    expect(body).not.toContain('Where:');
   });
 });

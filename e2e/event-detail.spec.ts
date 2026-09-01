@@ -40,6 +40,8 @@ test('event detail: share sheet, edit in place, formatted date, remove', async (
   await expect(visibleText(page, title)).toBeVisible();
   // Display dates come from lib/format.ts (e.g. "Sun, Aug 9"), never raw ISO.
   await expect(page.getByText(/\d{4}-\d{2}-\d{2}/)).not.toBeVisible();
+  // No location was entered — the Maps row renders nothing (Location).
+  await expect(page.getByRole('button', { name: /in Maps$/ })).toHaveCount(0);
 
   // Share from detail routes to the same sheet and back.
   await page.getByRole('button', { name: 'Share', exact: true }).click();
@@ -55,6 +57,7 @@ test('event detail: share sheet, edit in place, formatted date, remove', async (
   // the date edit is proven by where the event lands afterwards).
   const editedUrl = 'https://example.com/e2e-edited';
   const editedDescription = `${title} details updated`;
+  const editedLocation = 'Signal, 175 Morgan Ave';
   const now = new Date();
   const newDay = now.getDate() === 15 ? 16 : 15;
   const editedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(newDay).padStart(2, '0')}`;
@@ -75,6 +78,7 @@ test('event detail: share sheet, edit in place, formatted date, remove', async (
   await page.getByPlaceholder('https://...').fill(editedUrl);
   await titleInput.fill(editedTitle);
   await page.getByPlaceholder('Description').fill(editedDescription);
+  await page.getByPlaceholder('Venue or address').fill(editedLocation);
   await page.getByLabel('Date', { exact: true }).fill(editedDate);
   await page.getByLabel('Time (optional)').fill('18:30');
   await page.getByRole('button', { name: 'Save' }).click();
@@ -91,6 +95,25 @@ test('event detail: share sheet, edit in place, formatted date, remove', async (
   await expect(
     page.getByRole('button', { name: 'Open link' }).filter({ visible: true })
   ).toBeVisible();
+
+  // The location row links out to a Google Maps search for the free text
+  // (Location) — route-stubbed so no external request leaves the runner.
+  const mapsRow = page
+    .getByRole('button', { name: `Open ${editedLocation} in Maps` })
+    .filter({ visible: true });
+  await expect(mapsRow).toBeVisible();
+  await page
+    .context()
+    .route('**/www.google.com/maps/**', (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<html><body>stub</body></html>' })
+    );
+  const mapsPopupPromise = page.context().waitForEvent('page');
+  await mapsRow.click();
+  const mapsPopup = await mapsPopupPromise;
+  await mapsPopup.waitForLoadState('domcontentloaded');
+  expect(mapsPopup.url()).toContain('https://www.google.com/maps/search/?api=1&query=');
+  expect(mapsPopup.url()).toContain(`query=${encodeURIComponent(editedLocation)}`);
+  await mapsPopup.close();
 
   // Back out (past the pre-edit detail the replace left underneath), select
   // the new day on the calendar, and the edited event is listed there.

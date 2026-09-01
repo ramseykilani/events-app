@@ -75,6 +75,7 @@ const sampleRow = {
   title: 'Spring Concert',
   description: null,
   image_url: null,
+  location: null,
   url: null,
   event_date: '2026-04-20',
   event_time: null,

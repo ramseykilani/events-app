@@ -30,6 +30,7 @@ export default function AddEventScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [location, setLocation] = useState('');
   const [eventDate, setEventDate] = useState(new Date());
   const [eventTime, setEventTime] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -175,6 +176,7 @@ export default function AddEventScreen() {
             p_title: title.trim() || null,
             p_description: description.trim() || null,
             p_image_url: imageUrl.trim() || null,
+            p_location: location.trim() || null,
             p_event_date: localDate,
             p_event_time: timeStr,
           })
@@ -274,6 +276,14 @@ export default function AddEventScreen() {
           value={description}
           onChangeText={setDescription}
           multiline
+        />
+        <Text style={[styles.label, { color: theme.textSecondary }]}>Location (optional)</Text>
+        <TextInput
+          style={[styles.input, { borderColor: theme.border, color: theme.textPrimary }]}
+          placeholder="Venue or address"
+          placeholderTextColor={theme.textTertiary}
+          value={location}
+          onChangeText={setLocation}
         />
         <Text style={[styles.label, { color: theme.textSecondary }]}>Date</Text>
         {Platform.OS === 'web' ? (

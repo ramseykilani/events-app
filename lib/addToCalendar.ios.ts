@@ -14,5 +14,7 @@ export async function addToGoogle(event: CalendarExportEvent): Promise<void> {
 }
 
 export async function addToOtherCalendar(event: CalendarExportEvent): Promise<void> {
+  // buildNativeDetails carries the free-text location through — EventKit's
+  // pre-filled sheet takes it as-is (no Places lookup).
   await Calendar.createEventInCalendarAsync(buildNativeDetails(event));
 }

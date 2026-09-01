@@ -28,6 +28,7 @@ const archivedRow = {
   title: 'Rooftop Drinks',
   description: null,
   image_url: null,
+  location: null,
   url: null,
   event_date: '2099-10-12',
   event_time: null,

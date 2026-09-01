@@ -34,7 +34,7 @@ BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'de000000-0000-0000-0000-00000000000a', true);
 SELECT public.save_event(
   'de000000-0000-0000-0000-0000000000e1',
-  null, 'Delivery Status Test', null, null, '2026-09-20', '19:00'
+  null, 'Delivery Status Test', null, null, null, '2026-09-20', '19:00'
 );
 SELECT public.share_event(
   'de000000-0000-0000-0000-0000000000e1',

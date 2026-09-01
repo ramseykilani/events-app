@@ -26,6 +26,7 @@ on:
           - onboarding
           - calendar
           - add-event
+          - edit-event
           - event-detail
           - all
       project:
@@ -97,6 +98,7 @@ jobs:
             onboarding)   TITLE='onboarding page matches baseline' ;;
             calendar)     TITLE='calendar shell matches baseline' ;;
             add-event)    TITLE='add-event form matches baseline' ;;
+            edit-event)   TITLE='edit-event form matches baseline' ;;
             event-detail) TITLE='event detail matches baseline' ;;
             all)          TITLE='' ;;
             *) echo "::error::Unknown screen input"; exit 1 ;;

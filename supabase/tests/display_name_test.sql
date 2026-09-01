@@ -70,7 +70,7 @@ END $$;
 -- A shares E to B. B has NO my_people row for A.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'dd000000-0000-0000-0000-00000000000a', true);
-SELECT public.save_event('dd0eeeee-0000-0000-0000-000000000001', null, 'Rooftop Cinema', null, null, '2026-09-25', null);
+SELECT public.save_event('dd0eeeee-0000-0000-0000-000000000001', null, 'Rooftop Cinema', null, null, null, '2026-09-25', null);
 COMMIT;
 
 INSERT INTO public.my_people (id, owner_id, phone_number, contact_name) VALUES
@@ -143,7 +143,7 @@ COMMIT;
 -- C (no name) shares E2 to B. B has no contact row for C.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'dd000000-0000-0000-0000-00000000000c', true);
-SELECT public.save_event('dd0eeeee-0000-0000-0000-000000000002', null, 'Garage Sale', null, null, '2026-09-26', null);
+SELECT public.save_event('dd0eeeee-0000-0000-0000-000000000002', null, 'Garage Sale', null, null, null, '2026-09-26', null);
 COMMIT;
 
 INSERT INTO public.my_people (id, owner_id, phone_number, contact_name) VALUES

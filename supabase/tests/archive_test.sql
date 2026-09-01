@@ -36,10 +36,10 @@ GRANT SELECT, DELETE ON public.events TO authenticated;
 -- A creates four events and shares them all to B.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'ae000000-0000-0000-0000-00000000000a', true);
-SELECT public.save_event('ae000000-0000-0000-0000-0000000000e1', null, 'Archive E1', null, null, '2026-10-12', null);
-SELECT public.save_event('ae000000-0000-0000-0000-0000000000e2', null, 'Archive E2', null, null, '2026-10-15', null);
-SELECT public.save_event('ae000000-0000-0000-0000-0000000000e3', null, 'Archive E3', null, null, '2026-10-08', null);
-SELECT public.save_event('ae000000-0000-0000-0000-0000000000e4', null, 'Archive E4', null, null, '2026-10-05', null);
+SELECT public.save_event('ae000000-0000-0000-0000-0000000000e1', null, 'Archive E1', null, null, null, '2026-10-12', null);
+SELECT public.save_event('ae000000-0000-0000-0000-0000000000e2', null, 'Archive E2', null, null, null, '2026-10-15', null);
+SELECT public.save_event('ae000000-0000-0000-0000-0000000000e3', null, 'Archive E3', null, null, null, '2026-10-08', null);
+SELECT public.save_event('ae000000-0000-0000-0000-0000000000e4', null, 'Archive E4', null, null, null, '2026-10-05', null);
 SELECT public.share_event(
   'ae000000-0000-0000-0000-0000000000e1', ARRAY['ae000000-0000-0000-0000-0000000000c1']::uuid[]);
 SELECT public.share_event(
@@ -204,7 +204,7 @@ COMMIT;
 -- ===== T5: an archived row keeps following — the sender's edit lands =====
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'ae000000-0000-0000-0000-00000000000a', true);
-SELECT public.save_event('ae000000-0000-0000-0000-0000000000e1', null, 'Archive E1 edited', null, null, '2026-10-12', null);
+SELECT public.save_event('ae000000-0000-0000-0000-0000000000e1', null, 'Archive E1 edited', null, null, null, '2026-10-12', null);
 COMMIT;
 
 DO $$

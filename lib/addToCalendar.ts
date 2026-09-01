@@ -9,7 +9,7 @@ import type { Event } from './types';
 
 export type CalendarExportEvent = Pick<
   Event,
-  'id' | 'title' | 'description' | 'url' | 'event_date' | 'event_time'
+  'id' | 'title' | 'description' | 'location' | 'url' | 'event_date' | 'event_time'
 >;
 
 // Google Calendar's template link — no auth, no SDK. Linking routes it to a

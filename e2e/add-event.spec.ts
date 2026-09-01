@@ -36,6 +36,7 @@ test('add event via web inputs, then remove it', async ({
   const dd = String(now.getDate()).padStart(2, '0');
   await dateInput.fill(`${yyyy}-${mm}-${dd}`);
   await page.getByLabel('Time (optional)').fill('18:30');
+  await page.getByPlaceholder('Venue or address').fill('Signal, 175 Morgan Ave');
 
   await save.click();
 
@@ -47,6 +48,12 @@ test('add event via web inputs, then remove it', async ({
   await expectCalendar(page);
   await expect(page.getByText(title, { exact: true })).toBeVisible();
   await openEventFromCalendar(page, title);
+  // The location renders as the tappable Maps row on the detail (Location).
+  await expect(
+    page
+      .getByRole('button', { name: 'Open Signal, 175 Morgan Ave in Maps' })
+      .filter({ visible: true })
+  ).toBeVisible();
   await removeOpenEvent(page);
   await expect(page.getByText(title, { exact: true })).not.toBeVisible();
 });
