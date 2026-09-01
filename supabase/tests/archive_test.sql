@@ -398,22 +398,24 @@ BEGIN
 END $$;
 COMMIT;
 
--- ===== T14: RLS — no delete path for received rows; self-created still delete =====
+-- ===== T14: owner deletes remain owner-only (the shipped policy) =====
+-- The delete-policy hardening (received rows undeletable) was applied live
+-- ahead of the client, restored, and deliberately dropped — see FEATURES.md
+-- → Archive Received Events → Coordination Notes. What stays pinned here:
+-- the owner-only boundary itself (B cannot delete A's row) and that a
+-- self-created row deletes fine.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'ae000000-0000-0000-0000-00000000000b', true);
 SET LOCAL ROLE authenticated;
 DO $$
 DECLARE v_count integer;
 BEGIN
-  -- B's archived copy of E2 is received (from_user_id = A): delete blocked.
-  DELETE FROM public.events
-    WHERE owner_id = 'ae000000-0000-0000-0000-00000000000b'
-      AND from_event_id = 'ae000000-0000-0000-0000-0000000000e2';
+  DELETE FROM public.events WHERE id = 'ae000000-0000-0000-0000-0000000000e3';
   GET DIAGNOSTICS v_count = ROW_COUNT;
   IF v_count <> 0 THEN
-    RAISE EXCEPTION 'FAIL T14: B deleted a received row';
+    RAISE EXCEPTION 'FAIL T14: B deleted A''s row';
   END IF;
-  RAISE NOTICE 'PASS T14a: received rows cannot be deleted';
+  RAISE NOTICE 'PASS T14a: cannot delete another user''s row';
 END $$;
 COMMIT;
 

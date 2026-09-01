@@ -387,10 +387,11 @@ BEGIN
 END $$;
 
 -- ===== T11: archiving the copy keeps the answer (not inferred from presence) =====
--- Archive Received Events (2026-09-01): recipients archive — the RLS delete
--- policy covers self-created rows only, so there is no delete path for a
--- received row. The semantics this test pins are unchanged: the answer
--- lives on the send, not on calendar presence.
+-- Archive Received Events (2026-09-01): the client archives received copies
+-- (Archive replaces Remove Event — the UI is the no-delete path; the RLS
+-- delete hardening was tried and deliberately dropped, see FEATURES.md →
+-- Coordination Notes). The semantics this test pins are unchanged: the
+-- answer lives on the send, not on calendar presence.
 BEGIN;
 SELECT set_config('request.jwt.claim.sub', 'cc000000-0000-0000-0000-00000000000b', true);
 DO $$
