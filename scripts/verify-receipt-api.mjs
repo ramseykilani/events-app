@@ -72,9 +72,9 @@ function check(label, cond) {
 try {
   await rpc('save_event', {
     p_id: eventId,
-    p_url: null,
+    p_url: 'https://example.com/receipt-verify',
     p_title: 'Receipt API verification',
-    p_description: null,
+    p_description: 'Receipt API verification details.',
     p_image_url: null,
     p_event_date: '2026-09-05',
     p_event_time: '19:00',
@@ -109,6 +109,11 @@ try {
   const g1 = await (await fetch(`${API}?t=${send.response_token}`)).json();
   check('GET returns asker/title/date with null answer',
     g1.askerName && g1.title === 'Receipt API verification' && g1.date === '2026-09-05' && g1.response === null);
+  // Add to Other Calendars: the receipt page's calendar links need the full
+  // description + listing url (the share SMS already discloses both to this
+  // same token holder — no privacy expansion).
+  check('GET returns full description + url for the calendar links',
+    g1.description === 'Receipt API verification details.' && g1.url === 'https://example.com/receipt-verify');
   check('GET exposes no internal ids or other people',
     !('event_id' in g1) && !('person_id' in g1) && !('owner_id' in g1) && !('response_token' in g1));
 

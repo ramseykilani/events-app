@@ -16,9 +16,13 @@ import { notifyAskerOfResponse } from '../_shared/responseNotify.ts';
 // answer later, and it keeps working across re-shares because share_event
 // never rewrites an existing sends row.
 //
-// The page shows who asked, the title, and the date — nothing else: no
-// other people, no comments, no install CTA. The write already happened;
-// the receipt stops there.
+// The page shows who asked and the event (title, date, full description,
+// listing url — the last two feed its Add to Other Calendars links, which
+// are event content, not promo) — nothing else: no other people, no
+// comments, no install CTA. The write already happened; the receipt stops
+// there. Returning the full description is no privacy expansion: the share
+// SMS already discloses a 90-char excerpt and the full listing URL to this
+// same token holder (_shared/smsBody.ts).
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -59,7 +63,7 @@ serve(async (req) => {
       }
       const { data: send, error } = await db
         .from('sends')
-        .select('id, response, events(title, event_date, event_time, owner_id)')
+        .select('id, response, events(title, event_date, event_time, description, url, owner_id)')
         .eq('response_token', token)
         .maybeSingle();
       if (error) {
@@ -75,6 +79,8 @@ serve(async (req) => {
         title: string | null;
         event_date: string;
         event_time: string | null;
+        description: string | null;
+        url: string | null;
         owner_id: string;
       } | null;
       if (!event) {
@@ -90,6 +96,8 @@ serve(async (req) => {
         title: event.title,
         date: event.event_date,
         time: event.event_time,
+        description: event.description,
+        url: event.url,
         response: send.response,
       });
     }
