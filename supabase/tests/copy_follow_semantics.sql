@@ -741,4 +741,26 @@ BEGIN
   RAISE NOTICE 'PASS T13: 7-arg save_event wrapper keeps working (location NULL)';
 END $$;
 
+-- T13b: a 7-arg EDIT on a located row must NOT wipe the location — the
+-- wrapper passes the row's current location through (20260901000005).
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
+SELECT public.save_event('eeeeeeee-0000-0000-0000-00000000000b', null, 'Located', null, null, 'The Venue', '2026-12-08', null);
+COMMIT;
+
+BEGIN;
+SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
+-- 7-arg call (no p_location): an old client renaming the event.
+SELECT public.save_event('eeeeeeee-0000-0000-0000-00000000000b', null, 'Located (renamed)', null, null, '2026-12-08', null);
+COMMIT;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.events WHERE id = 'eeeeeeee-0000-0000-0000-00000000000b'
+                 AND title = 'Located (renamed)' AND location = 'The Venue' AND frozen) THEN
+    RAISE EXCEPTION 'FAIL T13b: 7-arg edit wiped the location (or did not save)';
+  END IF;
+  RAISE NOTICE 'PASS T13b: 7-arg edit preserves the existing location';
+END $$;
+
 DO $$ BEGIN RAISE NOTICE 'ALL COPY+FOLLOW TESTS PASSED'; END $$;
