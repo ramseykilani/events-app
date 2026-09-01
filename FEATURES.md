@@ -36,7 +36,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Button Size & Clickability](#button-size--clickability) | Planned | Revisit control size across the app. |
 | [Share Delivery Status](#share-delivery-status) | Implemented | One-word per-person status on the share sheet — "✓ Shared" for everyone; only failures differ (✕). |
 | [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
-| [Add to Other Calendars](#add-to-other-calendars) | Planned | Events live only on the in-app calendar. |
+| [Add to Other Calendars](#add-to-other-calendars) | In progress | Events live only on the in-app calendar. |
 | [Share Sent Confirmation](#share-sent-confirmation) | Implemented | Persistent "✓ Sent to N people" on the sheet after a send; selection is circles now, ✓ means done. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Implemented | Storage rewrite + silent edit propagation. Spec: [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Shipped 2026-08-24. |
@@ -1095,7 +1095,7 @@ Support US phone numbers end-to-end (add person, sign-in, share SMS). Look into 
 
 ## Add to Other Calendars
 
-**Status:** Planned — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Scoped with the owner 2026-09-01 — every decision below is owner-approved. Related: [Who's Coming](#whos-coming) (the receipt page is the second surface).
+**Status:** In progress — upgrade, not a blocker. Recorded 2026-08-16 from internal testing. Scoped with the owner 2026-09-01 — every decision below is owner-approved. Related: [Who's Coming](#whos-coming) (the receipt page is the second surface).
 
 ### Problem
 
