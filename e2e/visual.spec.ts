@@ -34,6 +34,10 @@ const SHOT = { maxDiffPixelRatio: 0.02, animations: 'disabled' as const };
 // across every branch and CI job, so it must exceed the worst accumulation,
 // not the expected case.
 async function removeLeftoverEvents(page: Page, title: string): Promise<void> {
+  // The day list fills asynchronously after the shell renders — without
+  // waiting for the events fetch, the scan below can run against a
+  // not-yet-loaded list and conclude there is no residue while rows exist.
+  await page.waitForLoadState('networkidle');
   for (let i = 0; i < 30; i++) {
     const leftover = page
       .getByText(title, { exact: true })
