@@ -9,10 +9,13 @@
   Who's Coming receipt page (FEATURES.md → Who's Coming). One capability URL
   per send, texted to recipients who don't have the app. It shows who asked,
   the event, and Yes / No — nothing else: no other people, no comments, no
-  install CTA. The page is inert until the visitor chooses an answer: state
-  loads over GET (which never writes, so SMS/iMessage prefetch can't answer
-  for them) and the write fires only on an explicit tap. Last write wins —
-  the same link changes the answer later.
+  install CTA. The two Add to Other Calendars links under the event are
+  event content, not promo (FEATURES.md → Add to Other Calendars): a Google
+  template link and an in-page .ics download, both built client-side from
+  the GET's fields. The page is inert until the visitor chooses an answer:
+  state loads over GET (which never writes, so SMS/iMessage prefetch can't
+  answer for them) and the write fires only on an explicit tap. Last write
+  wins — the same link changes the answer later.
 -->
 <style>
   :root {
@@ -64,6 +67,24 @@
     font-size: 16px;
     color: var(--text-secondary);
     margin: 0 0 24px;
+  }
+  /* Add to Other Calendars: secondary text links under the event details. */
+  .calendar-links {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    font-size: 14px;
+    margin: -12px 0 24px;
+  }
+  .calendar-links a,
+  .calendar-links button {
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    padding: 8px 0;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
   }
   .question {
     font-size: 18px;
@@ -133,6 +154,10 @@
       <p class="asker" id="asker"></p>
       <h1 class="title" id="title"></h1>
       <p class="meta" id="meta"></p>
+      <div class="calendar-links">
+        <a id="cal-google" href="#" target="_blank" rel="noopener">Add to Google Calendar</a>
+        <button type="button" id="cal-ics">Apple / Outlook / Other (.ics)</button>
+      </div>
       <p class="question">Are you in?</p>
       <div class="answers">
         <button type="button" id="yes" aria-pressed="false">Yes</button>
@@ -159,10 +184,130 @@
   var hintEl = document.getElementById('hint');
   var yesBtn = document.getElementById('yes');
   var noBtn = document.getElementById('no');
+  var googleLink = document.getElementById('cal-google');
+  var icsBtn = document.getElementById('cal-ics');
   var current = null;
+  var currentState = null;
   var askerName = '';
   var saving = false;
   var savedThisVisit = false;
+
+  // --- Add to Other Calendars: inline port of lib/calendarLinks.ts (this
+  // static page has no build step and cannot import it). One-shot snapshot
+  // export: timed → a floating 1-hour block, no time → all-day, full
+  // description + listing url in the body. The .ics UID derives from the
+  // send's token (the GET deliberately exposes no event id), so re-adding
+  // from this same link updates rather than duplicates in UID-deduping apps.
+  // e2e/receipt.spec.ts pins this port against the app's Jest-pinned builders.
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function ymd(y, m, d) { return '' + y + pad2(m) + pad2(d); }
+  function ymdHms(y, m, d, h, min) { return ymd(y, m, d) + 'T' + pad2(h) + pad2(min) + '00'; }
+
+  function eventDetails(state) {
+    return [state.description, state.url].filter(Boolean).join('\n\n');
+  }
+
+  function buildGoogleUrl(state) {
+    var parts = state.date.split('-').map(Number);
+    var y = parts[0], m = parts[1], d = parts[2];
+    var dates;
+    if (state.time) {
+      var tp = state.time.split(':').map(Number);
+      var end = new Date(y, m - 1, d, tp[0] + 1, tp[1]);
+      dates = ymdHms(y, m, d, tp[0], tp[1]) + '/' +
+        ymdHms(end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes());
+    } else {
+      var next = new Date(y, m - 1, d + 1);
+      dates = ymd(y, m, d) + '/' + ymd(next.getFullYear(), next.getMonth() + 1, next.getDate());
+    }
+    var url = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' +
+      encodeURIComponent(state.title || 'Untitled event') + '&dates=' + dates;
+    var details = eventDetails(state);
+    if (details) url += '&details=' + encodeURIComponent(details);
+    return url;
+  }
+
+  function escapeIcsText(text) {
+    return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,')
+      .replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '\\n');
+  }
+
+  function utf8Bytes(ch) {
+    var cp = ch.codePointAt(0) || 0;
+    return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+  }
+
+  // RFC 5545 §3.1: 75-octet lines, folded with CRLF + one space, never
+  // splitting a multi-byte character.
+  function foldLine(line) {
+    var chunks = [];
+    var current = '';
+    var currentBytes = 0;
+    var limit = 75;
+    for (var ch of line) {
+      var bytes = utf8Bytes(ch);
+      if (currentBytes + bytes > limit) {
+        chunks.push(current);
+        current = '';
+        currentBytes = 0;
+        limit = 74;
+      }
+      current += ch;
+      currentBytes += bytes;
+    }
+    chunks.push(current);
+    return chunks.join('\r\n ');
+  }
+
+  function buildIcs(state) {
+    var parts = state.date.split('-').map(Number);
+    var y = parts[0], m = parts[1], d = parts[2];
+    var startLine, endLine;
+    if (state.time) {
+      var tp = state.time.split(':').map(Number);
+      var end = new Date(y, m - 1, d, tp[0] + 1, tp[1]);
+      startLine = 'DTSTART:' + ymdHms(y, m, d, tp[0], tp[1]);
+      endLine = 'DTEND:' +
+        ymdHms(end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes());
+    } else {
+      var next = new Date(y, m - 1, d + 1);
+      startLine = 'DTSTART;VALUE=DATE:' + ymd(y, m, d);
+      endLine = 'DTEND;VALUE=DATE:' + ymd(next.getFullYear(), next.getMonth() + 1, next.getDate());
+    }
+    var details = eventDetails(state);
+    var lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//shared-events//events-app//EN',
+      'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      'UID:' + token + '@shared-events',
+      'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''),
+      startLine,
+      endLine,
+      'SUMMARY:' + escapeIcsText(state.title || 'Untitled event')
+    ];
+    if (details) lines.push('DESCRIPTION:' + escapeIcsText(details));
+    lines.push('END:VEVENT', 'END:VCALENDAR');
+    return lines.map(foldLine).join('\r\n') + '\r\n';
+  }
+
+  function slug(title) {
+    return (title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  icsBtn.addEventListener('click', function () {
+    if (!currentState) return;
+    var blob = new Blob([buildIcs(currentState)], { type: 'text/calendar' });
+    var objectUrl = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = (slug(currentState.title) || 'event') + '.ics';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  });
 
   function formatDate(dateStr) {
     var parts = dateStr.split('-').map(Number);
@@ -195,10 +340,12 @@
 
   function render(state) {
     current = state.response;
+    currentState = state;
     askerName = state.askerName;
     askerEl.textContent = askerName + ' asked';
     titleEl.textContent = state.title || 'an event';
     metaEl.textContent = formatDate(state.date) + (state.time ? ' · ' + formatTime(state.time) : '');
+    googleLink.href = buildGoogleUrl(state);
     yesBtn.setAttribute('aria-pressed', String(current === 'yes'));
     noBtn.setAttribute('aria-pressed', String(current === 'no'));
     renderHint();

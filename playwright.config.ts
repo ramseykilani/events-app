@@ -22,6 +22,12 @@ if (existsSync('.env')) {
 //   E2E_BASE_URL=https://staging.shared-events.pages.dev npm run test:e2e
 const PORT = Number(process.env.E2E_PORT ?? 8081);
 const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
+// The Who's Coming receipt page (receipt/) is a separate static site with no
+// build step; e2e/receipt.spec.ts serves it locally and route-mocks its API,
+// so it never touches the live deployment. Override with E2E_RECEIPT_URL to
+// run that spec against the deployed page instead.
+const RECEIPT_PORT = Number(process.env.E2E_RECEIPT_PORT ?? 8082);
+const receiptURL = process.env.E2E_RECEIPT_URL ?? `http://localhost:${RECEIPT_PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -37,14 +43,28 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  webServer: process.env.E2E_BASE_URL
-    ? undefined
-    : {
-        command: `npx serve -s dist -l ${PORT}`,
-        url: baseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 30_000,
-      },
+  webServer: [
+    ...(process.env.E2E_BASE_URL
+      ? []
+      : [
+          {
+            command: `npx serve -s dist -l ${PORT}`,
+            url: baseURL,
+            reuseExistingServer: !process.env.CI,
+            timeout: 30_000,
+          },
+        ]),
+    ...(process.env.E2E_RECEIPT_URL
+      ? []
+      : [
+          {
+            command: `npx serve -s receipt -l ${RECEIPT_PORT}`,
+            url: receiptURL,
+            reuseExistingServer: !process.env.CI,
+            timeout: 30_000,
+          },
+        ]),
+  ],
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
     {
