@@ -51,8 +51,8 @@ Color is assigned **by role, never by value**. Every visual decision traces to a
 
 - **Accent** = a small moment of warmth: the selected day, the dots marking days that have events, the primary action, and the quiet "From X" attribution. The selected answer in the Who's Coming reply widget uses the same selected-state fill as the selected day (`calendarSelected`) — a chosen answer is a selection, and the two creams (`surfaceSecondary` vs `selectedBg`) proved too close to read as feedback (owner call, 2026-08-28). That is the entire job for the accent as a *role*. The accent is never used for badges, unread counts, or anything that asks for attention.
 - **`linkText` shares the accent's value in both themes** — one warm color per mood, so the themes can never disagree about what reads as warm (owner ruling, 2026-09-01: the accent/linkText relationship must be identical across themes — same in both or different in both, never mixed). It remains its own role: a link is an action, not a moment, and a future theme may part the values again.
-- **Destructive** = red, and red alone signals consequence (remove, delete). The accent never does this job, and destructive never decorates.
-- **Everything else** — surfaces, inks, boundaries — is structurally neutral.
+- **Destructive** = red, and red alone signals consequence (remove, delete). The accent never does this job, and destructive never decorates. The verbs are fixed (UX audit 2026-09-01, UX-22): **Delete** destroys data (a circle, the account), **Remove** takes something off a list (a person, an event), **Archive** is reversible. Delete and Remove wear red; Archive never does. Error and retry lines are information, not consequence — they wear `linkText`, never red.
+- **Everything else** — surfaces, inks, boundaries — is structurally neutral. Links wear `linkText`, with one deliberate exception: the sign-in privacy-policy footer stays `textTertiary` — a legal link earns no warmth (owner-blessed 2026-09-01, UX-18).
 
 A user should be able to read the state of the app from color alone, precisely because color is spent on so little.
 

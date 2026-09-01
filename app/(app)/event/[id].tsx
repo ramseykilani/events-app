@@ -675,7 +675,7 @@ export default function EventDetailScreen() {
           activeOpacity={0.6}
           accessibilityRole="button"
         >
-          <Text style={[styles.refreshBannerText, { color: theme.textPrimary }]}>
+          <Text style={[styles.refreshBannerText, { color: theme.linkText }]}>
             Could not refresh. Retry
           </Text>
         </TouchableOpacity>
