@@ -25,8 +25,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. Related: [KI-011](manual-tests/known_issues.md) (person rows too tall). |
 | [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
-| [Screen Transition Polish (Android)](#screen-transition-polish-android) | Planned | White bar flashes on the right edge during screen swipes. |
-| [New Architecture Migration (React Native)](#new-architecture-migration-react-native) | In progress | Flip `newArchEnabled` with react-native-screens ~4.23.0; may moot the transition flash. |
+| [Screen Transition Polish (Android)](#screen-transition-polish-android) | Implemented | White bar flashes on the right edge during screen swipes. Fixed by the new-arch migration. |
+| [New Architecture Migration (React Native)](#new-architecture-migration-react-native) | In progress | Landed + Android-verified 2026-09-01; iOS TestFlight smoke still open. Mooted the transition flash. |
 | [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) | Planned | "Not now" on the contacts explainer is a dead end; manual add hides behind Deny. |
 | [Notification Permission Explainer](#notification-permission-explainer) | Implemented | |
 | [Permission Explainer Clarity](#permission-explainer-clarity) | Implemented | Pre-ask buttons now name the action (was: opaque Continue). Android sheet look split into [Android Sheet Presentation](#android-sheet-presentation). |
@@ -895,7 +895,7 @@ Standing constraints from `docs/distribution-strategy.md` (2026-08-09) held: the
 
 ## Screen Transition Polish (Android)
 
-**Status:** Planned — polish; not a tester blocker. Found in the 2026-08-15 owner device smoke.
+**Status:** Implemented 2026-09-01 — closed as moot: the [New Architecture Migration](#new-architecture-migration-react-native) removed the flash (owner-verified on the new-arch preview build, both themes). Found in the 2026-08-15 owner device smoke.
 
 ### Problem
 
@@ -907,13 +907,13 @@ Investigate on a development build before changing anything. Likely suspects: th
 
 ### Acceptance Criteria
 
-- [ ] No white flash at the screen edge during push/pop transitions on Android, in either theme
+- [x] No white flash at the screen edge during push/pop transitions on Android, in either theme — owner-verified 2026-09-01 on the new-arch preview build (EAS build `78e23b64`)
 
 ---
 
 ## New Architecture Migration (React Native)
 
-**Status:** In progress — probe building 2026-09-01 on a local experiment branch (owner-approved; nothing lands on `staging` until the device test passes). Unblocked 2026-09-01: the `react-native-screens` crash that forced `newArchEnabled: false` (`ScreenStack.getChildDrawingOrder()` off-by-one, upstream #3096) was fixed in ≥4.17.1. Supersedes the re-enable note in SETUP.md → Required for native builds. May make [Screen Transition Polish (Android)](#screen-transition-polish-android) moot.
+**Status:** In progress — landed on `staging` and Android-verified 2026-09-01 (owner device smoke on preview build `78e23b64`: launches clean, pull-to-refresh fine, and the transition flash is gone). Remaining: iOS smoke on the next TestFlight build. Unblocked 2026-09-01: the `react-native-screens` crash that forced `newArchEnabled: false` (`ScreenStack.getChildDrawingOrder()` off-by-one, upstream #3096) was fixed in ≥4.17.1. Supersedes the re-enable note in SETUP.md → Required for native builds. Made [Screen Transition Polish (Android)](#screen-transition-polish-android) moot.
 
 ### Problem
 
@@ -925,10 +925,10 @@ Bump `react-native-screens` to `~4.23.0` — the highest release that still comp
 
 ### Acceptance Criteria
 
-- [ ] Android new-arch preview build launches and passes an owner device smoke, including calendar pull-to-refresh (the original crash trigger)
-- [ ] iOS build smokes clean via TestFlight
-- [ ] Screen Transition Polish re-verified on the new-arch build — close it if moot
-- [ ] SETUP.md "Required for native builds" table updated to reflect the re-enablement
+- [x] Android new-arch preview build launches and passes an owner device smoke, including calendar pull-to-refresh (the original crash trigger) — owner-verified 2026-09-01 (EAS build `78e23b64`)
+- [ ] iOS build smokes clean via TestFlight — open; gates on the next iOS build (builds are metered, none cut speculatively)
+- [x] Screen Transition Polish re-verified on the new-arch build — closed as moot 2026-09-01
+- [x] SETUP.md "Required for native builds" table updated to reflect the re-enablement
 
 ---
 

@@ -335,8 +335,12 @@ by "go back" are not one Android-style event:
    (defaults `false` → `modalInPresentation = YES`). iOS will not
    interactively dismiss the sheet. A drag that UIKit treats as an
    attempted dismiss calls `presentationControllerDidAttemptToDismiss`;
-   Paper RN (this app, `newArchEnabled: false`, `RCTModalHostView.m`)
-   then fires `onRequestClose` only if JS provided it.
+   Paper RN (`RCTModalHostView.m`)
+   then fires `onRequestClose` only if JS provided it. **Dated
+   analysis:** the app moved to the New Architecture on 2026-09-01
+   (FEATURES.md → New Architecture Migration); Fabric replaces
+   `RCTModalHostView`, so re-observe sheet/back behavior on a new-arch
+   build before leaning on this layer of the analysis.
 
    - The four sheets missing `onRequestClose` (Notifications, Your name,
      circle editor, contacts picker): swipe-down rubber-bands and the
