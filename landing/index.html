@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="paper">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#faf7f0" />
+<meta name="color-scheme" content="light" />
+<title>Events</title>
+<link rel="icon" type="image/png" href="./favicon.png" />
+<!--
+  Beta landing page (FEATURES.md → Beta Landing Page). One static page —
+  "Events" — in the app's design language, on its own Cloudflare Pages
+  project (receipt/ precedent). The only CTA is a prefilled mailto for beta
+  access; the address and template also render as copyable text. No form,
+  no backend, no analytics, no links into the web app, no custom-scheme
+  URLs. noindex while in beta; the launch-page transition (indexed, store
+  badges, deep links) is a later change with its own review.
+
+  Role tokens are ported 1:1 from constants/Colors.ts (2026-09-02) — the
+  receipt page's stale accent is the cautionary tale (UX-25), so if
+  Colors.ts moves, move these. The theme swatch behaves exactly as in the
+  app (design doc §7): two-tone disc previewing the other mood, Paper by
+  default, persisted in localStorage, OS color scheme never read.
+
+  PLAY LINK: the "Already testing?" Android href must be the standing Play
+  internal-track opt-in URL (Play Console → Testing → Internal testing →
+  Testers → Copy link). The exact URL is not in the repo — the owner
+  confirms it at the first-deploy gate before this page ships to production.
+-->
+<script>
+(function () {
+  // Runs before first paint so a returning Evening visitor never sees a
+  // Paper flash. Values ported from constants/Colors.ts; the CSS variables
+  // below carry the full palettes — this map exists so browser chrome
+  // (theme-color / color-scheme) can follow the mood, the static-page
+  // equivalent of lib/applyWebBrowserChrome.ts.
+  var themes = {
+    paper:   { label: 'Paper',   background: '#faf7f0', accent: '#96680a', colorScheme: 'light' },
+    evening: { label: 'Evening', background: '#17151a', accent: '#d9a05b', colorScheme: 'dark' }
+  };
+  window.__eventsThemes = themes;
+  var t = null;
+  try { t = localStorage.getItem('theme_preference'); } catch (e) {}
+  if (t !== 'paper' && t !== 'evening') t = 'paper';
+  var p = themes[t];
+  var root = document.documentElement;
+  root.dataset.theme = t;
+  root.style.backgroundColor = p.background;
+  var themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) themeColor.content = p.background;
+  var colorScheme = document.querySelector('meta[name="color-scheme"]');
+  if (colorScheme) colorScheme.content = p.colorScheme;
+})();
+</script>
+<style>
+  /* Role tokens ported 1:1 from constants/Colors.ts (2026-09-02). Token
+     names match the app; values are the record, docs/events-design-language.md
+     §3 is the law. */
+  :root {
+    --background: #faf7f0;
+    --surface: #ffffff;
+    --surface-secondary: #f1ece0;
+    --selected-bg: #f3ecda;
+    --text-primary: #1a1815;
+    --text-secondary: #6b6357;
+    --text-tertiary: #756c5d;
+    --border: #e3dcc9;
+    --border-light: #efe9da;
+    --primary-button-bg: #1a1815;
+    --primary-button-text: #faf7f0;
+    --destructive-bg: #f7e3dd;
+    --destructive-text: #b4402a;
+    --destructive-link: #b4402a;
+    --link-text: #96680a;
+    --calendar-selected: #96680a;
+    --calendar-selected-text: #ffffff;
+    --calendar-today-text: #96680a;
+    --accent: #96680a;
+    --accent-soft: #f0e2c4;
+    --shadow: #1a1815;
+    /* §4: Paper titles in a serif face, regular weight. */
+    --title-font: Georgia, "Times New Roman", serif;
+    --title-weight: 400;
+    color-scheme: light;
+    /* The swatch previews the OTHER mood (§7): Paper is active, so the
+       disc wears Evening's ground and accent. */
+    --swatch-ground: #17151a;
+    --swatch-accent: #d9a05b;
+  }
+  html[data-theme='evening'] {
+    --background: #17151a;
+    --surface: #211d24;
+    --surface-secondary: #2a2635;
+    --selected-bg: #2e2a3a;
+    --text-primary: #ece7df;
+    --text-secondary: #a49fb0;
+    --text-tertiary: #8b85a0;
+    --border: #37334a;
+    --border-light: #282435;
+    --primary-button-bg: #d9a05b;
+    --primary-button-text: #2a1d10;
+    --destructive-bg: #38222a;
+    --destructive-text: #e08a7a;
+    --destructive-link: #e08a7a;
+    --link-text: #d9a05b;
+    --calendar-selected: #d9a05b;
+    --calendar-selected-text: #2a1d10;
+    --calendar-today-text: #d9a05b;
+    --accent: #d9a05b;
+    --accent-soft: #3a2f23;
+    --shadow: #000000;
+    /* §4: Evening titles in a clean sans, light weight. */
+    --title-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --title-weight: 300;
+    color-scheme: dark;
+    --swatch-ground: #faf7f0;
+    --swatch-accent: #96680a;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--background); }
+  body {
+    margin: 0;
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    padding:
+      calc(20px + env(safe-area-inset-top))
+      calc(20px + env(safe-area-inset-right))
+      calc(32px + env(safe-area-inset-bottom))
+      calc(20px + env(safe-area-inset-left));
+  }
+  /* Safari 26+ ignores theme-color and tints the island area from fixed
+     edge elements — the same sampler applyWebBrowserChrome maintains. */
+  #safari-chrome {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: var(--background);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .measure {
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0 28px;
+  }
+  .monogram {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--title-font);
+    font-weight: var(--title-weight);
+    font-size: 30px;
+    line-height: 1.2;
+  }
+  /* The theme swatch, ported from components/Calendar.tsx: a 44px target
+     holding a 26px two-tone disc (other mood's ground, current border) with
+     a 10px core (other mood's accent). Never a sun/moon icon. */
+  #theme-swatch {
+    margin-left: auto;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  #theme-swatch .disc {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--swatch-ground);
+    display: grid;
+    place-items: center;
+  }
+  #theme-swatch .core {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--swatch-accent);
+  }
+  .lede {
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0 0 20px;
+  }
+  main p { margin: 0 0 20px; }
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 36px 0 12px;
+  }
+  .guidance { color: var(--text-secondary); }
+  /* The one CTA wears the primary-button roles (§3 accent discipline). */
+  .cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    margin: 24px 0 20px;
+    border-radius: 12px;
+    background: var(--primary-button-bg);
+    color: var(--primary-button-text);
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 12%, transparent);
+  }
+  .fallback {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+  .fallback p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 12px;
+  }
+  .fallback .address { color: var(--text-primary); font-weight: 500; }
+  .template div {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-light);
+  }
+  .already-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+  }
+  .already-line {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+  }
+  .already-line a { color: var(--link-text); }
+  .privacy { margin: 24px 0 0; font-size: 13px; }
+  /* A legal link earns no warmth (§3): the privacy link stays tertiary. */
+  .privacy a { color: var(--text-tertiary); }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
+<noscript><style>#theme-swatch { display: none; }</style></noscript>
+</head>
+<body>
+<div id="safari-chrome" aria-hidden="true"></div>
+<div class="measure">
+  <header>
+    <img class="monogram" src="./icon.png" alt="" width="40" height="40" />
+    <h1>Events</h1>
+    <button type="button" id="theme-swatch" aria-label="Switch to Evening theme">
+      <span class="disc" aria-hidden="true"><span class="core"></span></span>
+    </button>
+  </header>
+  <main>
+    <p class="lede">A calendar of events your people share with you.</p>
+    <p>You open the app. You see a calendar. On it are events your people have shared with you, on the days they're happening — each with a link to the public listing where you can buy a ticket or sign up. Want to pass one along to your own people? Tap share. Want to coordinate? You already have their number — text them.</p>
+    <p>There is no feed. There is nothing to scroll. No likes, no comments, no read receipts, no engagement metrics. The only notification the app ever sends is triggered by another person, never by the app itself.</p>
+    <h2>Get in during beta</h2>
+    <p>Events is in beta on iPhone and Android, and invites are personal while the group is small. The button below starts an email with everything we need to add you — send it and you're in the queue.</p>
+    <p class="guidance">On iPhone, Apple sends two emails; accept the first. On Android, we add your Gmail to the tester list, and your Play testing link starts working.</p>
+    <a class="cta" href="mailto:kilani.ramsey@gmail.com?subject=Events%20beta%20%E2%80%94%20add%20me&amp;body=First%20and%20last%20name%3A%0AWho%20told%20you%20about%20Events%3A%0AiPhone%20or%20Android%3A%0AIf%20iPhone%2C%20the%20email%20your%20Apple%20ID%20is%20under%3A%0AIf%20Android%2C%20the%20Gmail%20your%20Play%20Store%20uses%3A%0A">Ask for an invite</a>
+    <div class="fallback">
+      <p>No mail app? Write to <span class="address">kilani.ramsey@gmail.com</span> with the subject "Events beta — add me" and these five lines:</p>
+      <div class="template">
+        <div>First and last name:</div>
+        <div>Who told you about Events:</div>
+        <div>iPhone or Android:</div>
+        <div>If iPhone, the email your Apple ID is under:</div>
+        <div>If Android, the Gmail your Play Store uses:</div>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <p class="already-title">Already testing?</p>
+    <p class="already-line">Android: <a href="https://play.google.com/apps/internaltest/">open your Play testing link</a> — it works once we've added your Gmail to the tester list.</p>
+    <p class="already-line">iPhone: accept the invite email, then open TestFlight and install Events.</p>
+    <p class="privacy"><a href="https://shared-events.pages.dev/privacy.html">Privacy policy</a></p>
+  </footer>
+</div>
+<script>
+(function () {
+  // Swatch toggle: flips the mood, persists it, and syncs browser chrome.
+  // The disc's preview colors are pure CSS (--swatch-ground/--swatch-accent
+  // follow data-theme), so this only owns state and the accessibility label.
+  var themes = window.__eventsThemes;
+  var root = document.documentElement;
+  var btn = document.getElementById('theme-swatch');
+  function current() { return root.dataset.theme === 'evening' ? 'evening' : 'paper'; }
+  function render() {
+    var nextName = current() === 'paper' ? 'evening' : 'paper';
+    btn.setAttribute('aria-label', 'Switch to ' + themes[nextName].label + ' theme');
+  }
+  btn.addEventListener('click', function () {
+    var name = current() === 'paper' ? 'evening' : 'paper';
+    var p = themes[name];
+    root.dataset.theme = name;
+    try { localStorage.setItem('theme_preference', name); } catch (e) {}
+    root.style.backgroundColor = p.background;
+    document.querySelector('meta[name="theme-color"]').content = p.background;
+    document.querySelector('meta[name="color-scheme"]').content = p.colorScheme;
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
