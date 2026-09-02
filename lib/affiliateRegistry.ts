@@ -37,6 +37,9 @@ export async function getAffiliateRegistry(): Promise<AffiliateRegistry> {
           supabase
             .from('affiliate_programs')
             .select('id, domains, url_template, enabled')
+            // Deterministic order so an overlapping pair of programs tags
+            // identically on every surface (first match wins).
+            .order('id')
             .abortSignal(signal),
         ]);
         if (configResult.error) throw configResult.error;

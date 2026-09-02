@@ -83,18 +83,21 @@ BEGIN
   RAISE NOTICE 'PASS T6: RLS enabled on both registry tables';
 END $$;
 
--- ===== T7: read-only from clients — a SELECT policy exists and no write
--- policy does (writes go through the service role, which bypasses RLS) =====
+-- ===== T7: read-only from clients — a world-readable SELECT policy exists
+-- and no write policy does (writes go through the service role, which
+-- bypasses RLS) =====
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'affiliate_programs' AND cmd = 'SELECT'
+    WHERE schemaname = 'public' AND tablename = 'affiliate_programs'
+      AND cmd = 'SELECT' AND qual = 'true'
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'affiliate_config' AND cmd = 'SELECT'
+    WHERE schemaname = 'public' AND tablename = 'affiliate_config'
+      AND cmd = 'SELECT' AND qual = 'true'
   ) THEN
-    RAISE EXCEPTION 'FAIL T7: missing SELECT policy on a registry table';
+    RAISE EXCEPTION 'FAIL T7: missing world-readable SELECT policy on a registry table';
   END IF;
   IF EXISTS (
     SELECT 1 FROM pg_policies
@@ -105,6 +108,62 @@ BEGIN
     RAISE EXCEPTION 'FAIL T7: a client write policy exists on a registry table';
   END IF;
   RAISE NOTICE 'PASS T7: registry is client-read-only';
+END $$;
+
+-- ===== T8: RLS for real — clients read, never write =====
+-- The scratch DB has no Supabase default privileges; grant what the real
+-- project grants so these checks exercise RLS, not missing grants (the
+-- archive_test.sql pattern).
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.affiliate_programs TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.affiliate_config TO anon, authenticated;
+
+-- T8a: authenticated reads both tables (world-readable config).
+BEGIN;
+SET LOCAL ROLE authenticated;
+DO $$
+DECLARE v_programs integer; v_config boolean;
+BEGIN
+  SELECT count(*) INTO v_programs FROM public.affiliate_programs;
+  SELECT enabled INTO v_config FROM public.affiliate_config WHERE id = true;
+  IF v_programs < 1 OR v_config IS NULL THEN
+    RAISE EXCEPTION 'FAIL T8a: authenticated cannot read the registry';
+  END IF;
+  RAISE NOTICE 'PASS T8a: authenticated reads the registry';
+END $$;
+COMMIT;
+
+-- T8b: INSERT is denied (RLS enabled, no write policy → default deny).
+BEGIN;
+SET LOCAL ROLE authenticated;
+DO $$
+BEGIN
+  INSERT INTO public.affiliate_programs (id, domains, url_template) VALUES
+    ('rogue', '{rogue.example}', 'https://rogue.test/?u={url}');
+  RAISE EXCEPTION 'FAIL T8b: authenticated inserted a program row';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'PASS T8b: authenticated INSERT denied';
+END $$;
+COMMIT;
+
+-- T8c: anon UPDATE/DELETE silently affect nothing (default deny) — the
+-- T3 row stays disabled and the config row survives.
+BEGIN;
+SET LOCAL ROLE anon;
+UPDATE public.affiliate_programs SET enabled = true WHERE id = 'ticketmaster';
+DELETE FROM public.affiliate_config WHERE id = true;
+COMMIT;
+
+DO $$
+DECLARE v record;
+BEGIN
+  SELECT enabled INTO v FROM public.affiliate_programs WHERE id = 'ticketmaster';
+  IF v.enabled IS NOT false THEN
+    RAISE EXCEPTION 'FAIL T8c: anon UPDATE modified a program';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.affiliate_config WHERE id = true) THEN
+    RAISE EXCEPTION 'FAIL T8c: anon DELETE removed the config row';
+  END IF;
+  RAISE NOTICE 'PASS T8c: anon writes affect nothing';
 END $$;
 
 DO $$ BEGIN RAISE NOTICE 'ALL AFFILIATE-PROGRAMS TESTS PASSED'; END $$;

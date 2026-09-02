@@ -110,7 +110,9 @@ serve(async (req) => {
         try {
           const [configResult, programsResult] = await Promise.all([
             db.from('affiliate_config').select('enabled').eq('id', true).maybeSingle(),
-            db.from('affiliate_programs').select('id, domains, url_template, enabled'),
+            // Deterministic order: first matching program wins, identically
+            // on every surface.
+            db.from('affiliate_programs').select('id, domains, url_template, enabled').order('id'),
           ]);
           if (configResult.error) throw configResult.error;
           if (programsResult.error) throw programsResult.error;

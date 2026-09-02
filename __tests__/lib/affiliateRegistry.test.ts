@@ -3,6 +3,7 @@ import { abortable, abortablePromise } from '../helpers/abortable';
 const mockConfigMaybeSingle = jest.fn();
 const mockConfigEq = jest.fn();
 const mockConfigSelect = jest.fn();
+const mockProgramsOrder = jest.fn();
 const mockProgramsSelect = jest.fn();
 const mockFrom = jest.fn();
 
@@ -37,9 +38,10 @@ describe('getAffiliateRegistry', () => {
     mockConfigEq.mockReturnValue(abortable({ maybeSingle: mockConfigMaybeSingle }));
     mockConfigSelect.mockReturnValue({ eq: mockConfigEq });
 
-    mockProgramsSelect.mockReturnValue(
+    mockProgramsOrder.mockReturnValue(
       abortablePromise(Promise.resolve({ data: [TM_ROW], error: null }))
     );
+    mockProgramsSelect.mockReturnValue({ order: mockProgramsOrder });
 
     mockFrom.mockImplementation((table: string) => {
       if (table === 'affiliate_config') return { select: mockConfigSelect };

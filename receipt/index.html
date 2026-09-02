@@ -434,7 +434,9 @@
     } else {
       descriptionEl.hidden = true;
     }
-    if (state.url) {
+    // http(s) only: the URL is sharer-controlled, so a javascript: link
+    // never becomes clickable here.
+    if (state.url && /^https?:\/\//i.test(state.url)) {
       listingUrlEl.href = state.url;
       listingLinkEl.hidden = false;
     } else {

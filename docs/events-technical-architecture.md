@@ -145,6 +145,25 @@ Hiding is one-way: it affects only the owner's calendar and notifications. The h
 
 RLS: owner-only (users can only CRUD their own hidden_people rows).
 
+**affiliate_programs** (Affiliate Link Tagging — FEATURES.md)
+| Column | Type | Notes |
+|--------|------|-------|
+| id | text (PK) | Program slug, e.g. `ticketmaster` |
+| domains | text[] | Registered domains the program covers (regional TLDs listed explicitly); matching is host-equals-or-subdomain |
+| url_template | text | The network's tracking-link format; `{url}` is replaced with the percent-encoded destination |
+| enabled | boolean | Per-program switch, default false |
+| created_at | timestamptz | |
+
+**affiliate_config**
+| Column | Type | Notes |
+|--------|------|-------|
+| id | boolean (PK, CHECK id) | Single-row table |
+| enabled | boolean | The global on/off switch, default false |
+
+The machine-readable on/off registry for outbound listing-link tagging. Ships dark (global off, no program rows); activation is a service-role SQL update — no deploy, no app release (runbook: docs/affiliate-programs.md → The switch). Read by the app (lib/affiliateRegistry.ts, cached, fail-open untagged) and by send-response (server-side, per request). Never consulted for SMS.
+
+RLS: world-readable SELECT (config, not user data); no write policies — service role only.
+
 ### Indexes
 
 Add indexes on the following columns to prevent the calendar query from degrading as data grows:
@@ -369,6 +388,7 @@ Supabase RLS policies ensure users can only access data they should see. Key pol
 - **events:** Owner-only, period — users can SELECT and DELETE their own rows; there are no client INSERT/UPDATE policies at all. Creates and edits go through `save_event` (SECURITY DEFINER, ownership verified) so the frozen/cascade logic cannot be bypassed, recipient copies are written only by `share_event` / `deliver_pending_shares` (definer), and `archived_at` is written only by `set_event_archived` (definer, owner-only). All cross-user writes happen inside those functions.
 - **sends:** Readable by the owner of the event they hang off (for ✓ Shared and "Shared with"). Written only by the definer functions.
 - **hidden_people:** Owner-only CRUD.
+- **affiliate_programs / affiliate_config:** World-readable SELECT (world-readable configuration, not user data — the events ban on `USING (true)` does not apply). No client write policies; activation is service-role SQL.
 - **auth.users:** No client access. Account deletion goes through `delete_my_account()` (SECURITY DEFINER, `authenticated` only), which deletes exactly the caller's row.
 - **legacy_events / legacy_user_events / legacy_event_shares:** the pre-cutover tables, renamed (not dropped) for a 30-day soak window and revoked from `anon`/`authenticated` so no client path can read stale data. A follow-up migration drops them (and `owns_user_event`) after the soak.
 
