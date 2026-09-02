@@ -410,9 +410,10 @@ flag that.
 
 ### KI-016 — CI visual-spec renders a "Hide this person" action on a self-created event
 
-- Severity: minor (test-harness anomaly; user impact unverified — never
-  reproduced outside CI).
-- Status: open — recorded 2026-09-02; needs a dedicated investigation.
+- Severity: minor (test-harness anomaly; **no user impact — confirmed
+  2026-09-02** the app render is correct).
+- Status: open — investigated 2026-09-02 (see below). Root cause is a
+  CI-runner rendering artifact, not app code; not reproducible off CI.
 - Found: 2026-09-02, Design System Consolidation baseline regeneration
   (run 33575687270). Also present in the Location-era baseline
   (`1ea009a`, generated 2026-09-01) — predates the consolidation. The
@@ -423,24 +424,41 @@ flag that.
 - Actual: in CI renders of `e2e/visual.spec.ts` "event detail matches
   baseline" (all three projects, both attempts, deterministic), the action
   stack includes a quiet "Hide this person" line (the `sharerName ?? 'this
-  person'` fallback, so the param was truthy but matched no `my_people`
-  row). CI was green on the old baseline carrying it for 7+ runs, so the
-  trigger is stable in CI, not flaky.
-- Evidence against a product bug: the deployed `get_calendar_events`
-  returns `sharer_person_id: null, from_user_id: null` for the pinned
-  rows (queried directly as account A); the trace's frameUrls are clean
-  (no query param); the trace's DOM snapshots never contain "Hide" (nor do
-  the error-context aria snapshots) while the screencast JPEGs and the
-  screenshot actuals show it; the full local suite on the same standing
-  account with the same build does NOT reproduce it (three attempts,
-  including the exact CI flow).
-- Repro: unknown outside CI. Locally: none found.
-- Note for fixer: start from the screenshot-vs-DOM-snapshot disagreement —
-  either the element exists only at screenshot-polling time (a transient
-  the action-bound DOM snapshots miss), or the render comes from a layer
-  the snapshotter doesn't cover. The visual baselines regenerated
-  2026-09-02 carry the anomaly; if a fix lands, regenerate the
-  event-detail baselines again.
+  person'` fallback). It is under the 2% pixel-diff threshold, so the suite
+  stays green whether or not it renders — it only ever got *baked into the
+  baseline* during regeneration runs.
+- **Investigation (2026-09-02) — it is NOT a product bug.** From the run
+  33575687270 trace: the DOM snapshots never contain "Hide" (0 occurrences
+  anywhere in the trace) while "Baseline event"/"Remove Event" are captured
+  normally; the error-context aria snapshot lists exactly Share / Edit /
+  Remove Event; the network log shows no `my_people`-by-id or
+  `hidden_people` fetch (the `sharedByPersonId` branch in `load()` never
+  runs); the frameUrl has no query param. So the live component renders
+  correctly and the phantom exists **only as pixels**. It appears on every
+  event-detail screen from the first painted frame, is pixel-identical
+  across attempts, and shows in both Chromium and WebKit. No spec in the
+  suite ever renders the "Hide this person" fallback (a received event's
+  `sharer_contact_name` always resolves via the mandatory display_name), so
+  there is no in-run content source either — pointing to a
+  software-rendering/compositor artifact specific to the CI runners, not a
+  reproducible app or test-logic state.
+- Ruled out: the frozen clock. Replacing `page.clock.install({ time })`
+  with a Date-only freeze (native rAF/timers) left CI's event-detail render
+  **byte-identical** to the phantom baseline (a threshold-0 probe run went
+  green), so rAF/timer faking is not the cause. `freezeOnBlur` is a no-op
+  on web (web `ScreenStack` is a plain `View`), and there is no web stack
+  transition animation to leave a stale layer.
+- Repro: none outside CI. Locally not reproduced (default, forced software
+  GL, frozen clock, full preceding suite in one worker, CPU load).
+- Guard added: `e2e/event-detail.spec.ts` now asserts a self-created event
+  has **no** Hide/Unhide action at the DOM level, so the correct behavior
+  is verified independently of the haunted pixels.
+- Handling: cosmetic and non-failing, so it is safe to leave. If a
+  pixel-clean baseline is wanted, the path is a CI-render fix (e.g. forcing
+  a full re-raster before the screenshot) followed by regenerating the
+  event-detail baselines via the **Regenerate visual baselines** workflow —
+  note the regen re-takes whatever CI renders, so it only helps once the
+  render itself is clean.
 
 ## Deleted bug classes (do not re-flag, do not reintroduce)
 
