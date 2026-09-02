@@ -29,35 +29,6 @@ import { expectCalendar } from './helpers';
 
 const SHOT = { maxDiffPixelRatio: 0.02, animations: 'disabled' as const };
 
-// The frozen calendar date for every baseline (a month no test creates
-// events in), so the grid and selected day never drift with the calendar.
-const FROZEN_DATE = new Date('2026-06-15T12:00:00');
-
-// Freeze the calendar's "today" WITHOUT faking timers or rAF.
-// page.clock.install({ time }) fakes requestAnimationFrame and the timer
-// functions along with Date, and a from-boot frozen rAF is the suspected
-// trigger for KI-016: on CI's software-rendered runners the event-detail
-// screenshot painted a phantom "Hide this person" that never existed in the
-// DOM, the a11y tree, or any network request (a paint-only artifact — the app
-// render is correct). Only the date needs to be stable, so override Date
-// alone and leave the scheduler native.
-async function freezeCalendarDate(page: Page): Promise<void> {
-  const frozenMs = FROZEN_DATE.getTime();
-  await page.addInitScript((frozen: number) => {
-    const RealDate = window.Date;
-    // Reflect.construct delegates every arg form to the real Date; only the
-    // no-arg "now" is pinned. setPrototypeOf inherits the statics (parse/UTC)
-    // libraries rely on, and sharing the prototype keeps instanceof working.
-    function FrozenDate(this: unknown, ...args: unknown[]) {
-      return Reflect.construct(RealDate, args.length === 0 ? [frozen] : args);
-    }
-    Object.setPrototypeOf(FrozenDate, RealDate);
-    FrozenDate.prototype = RealDate.prototype;
-    (FrozenDate as unknown as { now: () => number }).now = () => frozen;
-    window.Date = FrozenDate as unknown as DateConstructor;
-  }, frozenMs);
-}
-
 // Residue guard for the pinned-title tests. The cap is a loop-safety bound,
 // not a residue budget: shared accounts accumulate one row per failed run
 // across every branch and CI job, so it must exceed the worst accumulation,
@@ -123,10 +94,10 @@ test('onboarding page matches baseline', async ({ page }) => {
   await expect(page).toHaveScreenshot('onboarding.png', SHOT);
 });
 
-test('calendar shell matches baseline (frozen date)', async ({ page }) => {
+test('calendar shell matches baseline (frozen clock)', async ({ page }) => {
   // Freeze the date (and ONLY the date — faking timers would stall RN-web's
   // scheduler) before the app boots so the calendar renders June 2026.
-  await freezeCalendarDate(page);
+  await page.clock.install({ time: new Date('2026-06-15T12:00:00') });
   await page.goto('/');
   await expectCalendar(page);
   await expect(page).toHaveScreenshot('calendar.png', {
@@ -138,9 +109,9 @@ test('calendar shell matches baseline (frozen date)', async ({ page }) => {
 });
 
 test('add-event form matches baseline', async ({ page }) => {
-  // Frozen date too: the date input would otherwise embed the live date and
+  // Frozen clock too: the date input would otherwise embed the live date and
   // the baseline would diff every day.
-  await freezeCalendarDate(page);
+  await page.clock.install({ time: new Date('2026-06-15T12:00:00') });
   await page.goto('/');
   await expectCalendar(page);
   await page.getByRole('button', { name: 'Add event' }).click();
@@ -153,7 +124,7 @@ test('event detail matches baseline', async ({ page }) => {
   // the shared 90s on CI's software-rendered runners (a retry with residue
   // hit the budget mid-click).
   test.setTimeout(180000);
-  await freezeCalendarDate(page);
+  await page.clock.install({ time: new Date('2026-06-15T12:00:00') });
   await page.goto('/');
   await expectCalendar(page);
 
@@ -166,11 +137,7 @@ test('event detail matches baseline', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Remove Event' })
   ).toBeVisible({ timeout: 15000 });
-  // KI-016 DIAGNOSTIC (temporary): threshold 0 forces a failure — and a
-  // report upload with CI's actual render — iff the render differs from the
-  // phantom-carrying baseline, i.e. iff the Date-only freeze removed the
-  // phantom "Hide this person". Revert after reading the actual.
-  await expect(page).toHaveScreenshot('event-detail.png', { ...SHOT, maxDiffPixelRatio: 0 });
+  await expect(page).toHaveScreenshot('event-detail.png', SHOT);
 
   // Cleanup: the calendar's day list stays deterministically empty next run.
   page.once('dialog', (dialog) => dialog.accept());
@@ -183,7 +150,7 @@ test('event detail matches baseline', async ({ page }) => {
 
 test('edit-event form matches baseline', async ({ page }) => {
   test.setTimeout(180000);
-  await freezeCalendarDate(page);
+  await page.clock.install({ time: new Date('2026-06-15T12:00:00') });
   await page.goto('/');
   await expectCalendar(page);
 
