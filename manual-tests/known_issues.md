@@ -39,50 +39,53 @@ never added: a blocker must be fixed, not accepted.
 ### KI-005 — Android 3-button navigation bar covers the bottom of the screen
 
 - Severity: minor
-- Status: fixed in code 2026-09-01 — pending owner on-device confirmation
-  (same pattern as KI-009). Every screen whose content can reach the window
-  bottom now pads the bottom safe-area inset, and `test:conventions`
-  requires any file that spends `insets.top` to also spend `insets.bottom`,
-  so the class cannot regress. Remove this entry once a device smoke
-  confirms.
+- Status: open — 2026-09-01 padding pass did **not** clear it on My People.
+  Owner re-confirmed 2026-09-02 on preview APK `209792d2` (promoted
+  `23ca55f`): people's names sit under the 3-button nav bar on the My
+  People list. Still not a tester blocker (gesture nav is the expected
+  tester setup).
 - Found: 2026-08-15 owner device smoke on Samsung with 3-button navigation
   (not gesture nav), `manual-tests/manual_test_report_2026-08-15-device.md`
   N-009 (People / Delete account). Still present 2026-08-17 on the Events
-  calendar. Re-surfaced for the owner on the My People list 2026-09-01.
+  calendar. Re-surfaced on the My People list 2026-09-01 (the padded
+  footer had moved into the Settings sheet). Owner 2026-09-02 smoke:
+  still names-under-the-bar on My People
+  (`manual-tests/manual_test_report_2026-09-02-device.md`).
 - Expected: in-app content sits fully on screen, clear of the system
-  navigation bar.
+  navigation bar. On My People, every visible name is above the 3-button
+  bar, including while browsing the list (not only at end-of-scroll).
 - Actual: with the Samsung / 3-button navigation bar on, the bar covers a
-  strip along the bottom of the app.
-- Root cause (pinned 2026-09-01): Expo SDK 54 targets Android 15+ (API 35),
-  where the OS enforces edge-to-edge — `android.edgeToEdgeEnabled: false` in
-  `app.config.js` is inert there, so the window draws behind the 3-button
-  nav bar and only explicit `insets.bottom` padding lifts content clear of
-  it. The 2026-08-15 "footer safe-area" fix covered only the People account
-  footer (the Delete account button from N-009); every other bottom edge —
-  the People list itself, the calendar's selected-day list, the add/edit
-  event forms, the share screen, the contacts picker — had no bottom
-  padding. The padded footer then moved into the gear-opened Settings sheet
-  on 2026-09-01 (Hide Confirmation & People Settings Sheet), which is why
-  the main People screen read as "broken again": its one padded element had
-  left the screen.
-- Fix (2026-09-01): bottom-inset padding on every screen/sheet whose content
-  can reach the window bottom — calendar selected-day list
-  (`components/Calendar.tsx`, regression-pinned in
-  `__tests__/components/Calendar.test.tsx`), People list + circle-editor
-  list (`app/(app)/people.tsx`), add/edit event forms, share screen
-  container, contacts picker (`components/PeoplePicker.tsx`). Already safe
-  before this pass: event detail + Archived (`SafeAreaView`, all edges),
-  sign-in / onboarding / the three permission explainers (explicit bottom
-  padding), People Settings sheet (the 2026-08-15 fix). Audited and
-  deliberately unpadded: verify (centered short form) and manual add-person
-  (top-pinned short form — `conventions-ok`). Web is unaffected
-  (`insets.bottom` is 0 there and there is no 3-button nav — do not flag).
-- Repro (pre-fix): Android device, 3-button (Samsung) navigation bar
-  enabled. Open People and scroll the list, or open Events with at least one
-  event on the selected day. Not reported under gesture navigation.
-- Owner ruling 2026-08-15: not a tester blocker (testers expected to use
-  gesture nav). Recorded here so release review and device smoke do not
-  re-flag the same overlap.
+  strip along the bottom of the app. On My People the covered strip is
+  people's names — owner: "just kind of gross."
+- Root cause (pinned 2026-09-01, still the class): Expo SDK 54 targets
+  Android 15+ (API 35), where the OS enforces edge-to-edge —
+  `android.edgeToEdgeEnabled: false` in `app.config.js` is inert there, so
+  the window draws behind the 3-button nav bar and only a shrunk viewport
+  (padding/margin on the list itself) lifts content clear of it.
+- Why the 2026-09-01 pass missed My People: `app/(app)/people.tsx` pads
+  `contentContainerStyle={{ paddingBottom: insets.bottom }}` on the people
+  `FlatList`. That only inserts space *after the last row*, so the last
+  item is clear at end-of-scroll. Rows that sit at the **viewport** bottom
+  while browsing still paint behind the bar. Next fixer: put the inset on
+  the list/`peopleSection` (`style` / `marginBottom`), not only on
+  `contentContainerStyle`. Same trap exists anywhere else that used
+  content-padding instead of viewport-padding
+  (`components/Calendar.tsx` selected-day list is the other likely hit).
+  `test:conventions` still requires any file that spends `insets.top` to
+  also spend `insets.bottom` — that rule did not catch this shape.
+- Already safer surfaces (do not re-audit unless newly worse): event
+  detail + Archived (`SafeAreaView`, all edges), sign-in / onboarding /
+  the three permission explainers (explicit bottom padding), People
+  Settings sheet (the 2026-08-15 footer pad, now in the gear sheet).
+  Audited and deliberately unpadded: verify (centered short form) and
+  manual add-person (top-pinned short form — `conventions-ok`). Web is
+  unaffected (`insets.bottom` is 0 there and there is no 3-button nav —
+  do not flag).
+- Repro: Android device, 3-button (Samsung) navigation bar enabled. Open
+  My People with enough people that names reach the bottom of the screen.
+  Not reported under gesture navigation.
+- Owner ruling 2026-08-15, restated 2026-09-02: not a tester blocker
+  (testers expected to use gesture nav). Do not re-flag the same overlap.
 
 ### KI-006 — Android hangs on a spinner after installing an updated APK until force-quit
 
@@ -463,6 +466,31 @@ flag that.
   event-detail baselines via the **Regenerate visual baselines** workflow —
   note the regen re-takes whatever CI renders, so it only helps once the
   render itself is clean.
+
+### KI-017 — My People gear sits too close to Add
+
+- Severity: minor
+- Status: open
+- Found: 2026-09-02 owner device smoke of preview APK `209792d2`
+  (promoted `23ca55f`),
+  `manual-tests/manual_test_report_2026-09-02-device.md`. Owner ruling:
+  not a tester blocker.
+- Expected: the Settings gear and Add in the My People header
+  (`app/(app)/people.tsx` via `AppHeader` `rightAccessory` + `right`)
+  have comfortable space between them — two distinct 44pt targets, not
+  one clustered pair.
+- Actual: the gear is too close to Add.
+- Why: `components/AppHeader.tsx` `rightCluster` is a row with no `gap`
+  (and `settingsButton` / `action` have no horizontal margin). The gear
+  is 44×44 and Add is a 44pt text action, so the two hit areas abut.
+- Repro: open My People (native). Look at the header, right of the
+  title: gear then Add. Web can show the same layout; native is the
+  product.
+- Fix (separate task): add a gap in `rightCluster` (or padding on the
+  accessory) so the two controls read as separate. Do not shrink either
+  target below 44pt. Visual baselines include the People header — a
+  pixel change there needs the **Regenerate visual baselines** workflow
+  (People screen), not a locally regenerated mobile-safari shot.
 
 ## Deleted bug classes (do not re-flag, do not reintroduce)
 

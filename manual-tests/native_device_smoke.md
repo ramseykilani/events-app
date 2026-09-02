@@ -111,10 +111,13 @@ the ask is one-shot and persisted (`notification_explainer_answered`).
 - The web app is not a supported user surface; anything web-specific goes
   through `manual-tests/cloud_manual_regression.md` instead.
 - **KI-005** — with the Samsung / 3-button navigation bar on, the system bar
-  covers a strip at the bottom of the screen (People Delete account; the
-  bottom of an event on Events). Do not re-flag unless it is materially
-  worse than that (e.g. covering a whole control that was previously only
-  clipped). Gesture nav is the expected tester setup.
+  covers a strip at the bottom of the screen. Owner 2026-09-02: people's
+  names on My People still sit under the bar (the 2026-09-01 padding pass
+  did not clear it). Do not re-flag unless it is materially worse (e.g.
+  covering a whole control that was previously only clipped). Gesture nav
+  is the expected tester setup.
+- **KI-017** — My People header gear sits too close to Add. Do not re-flag
+  the same crowding.
 - **KI-006** — first open after installing an updated APK can hang on a
   spinner until you swipe the app away and reopen. Subsequent opens of the
   same binary are fine.
@@ -124,10 +127,10 @@ the ask is one-shot and persisted (`notification_explainer_answered`).
 - **KI-008 / KI-010 / KI-011** — Notifications modal: switches feel
   small, Push can be on without OS permission. People person rows are too
   tall (density).
-- **KI-009 / KI-012 — fix landed 2026-08-28, verify on this smoke.**
-  System Back (3-button and gesture-nav) should now dismiss the
-  Notifications / Your name / circle editor / contacts-picker sheets,
-  same as their Close/Cancel; on iOS, a swipe-down attempt on those
+- **KI-009 / KI-012 — fix landed 2026-08-28; owner 2026-09-02 pass did not
+  re-flag.** Still verify on the next native smoke: system Back should
+  dismiss the Notifications / Your name / circle editor / contacts-picker
+  sheets, same as their Close/Cancel; on iOS, a swipe-down attempt on those
   sheets should close them. Flag any sheet where Back / swipe-down still
   does nothing. Then, with every sheet closed, check Back on a pushed
   screen (event detail, People, add-event) and on the calendar — iOS
