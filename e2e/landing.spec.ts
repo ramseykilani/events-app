@@ -6,9 +6,12 @@ import { expect, test } from './fixtures';
 // bar from FEATURES.md → Beta Landing Page: swatch toggle + persistence +
 // no first-paint flash, the mailto CTA and its copyable fallback, the
 // "Already testing?" footer (Android link, iOS instruction-only), noindex,
-// and the link audit (no web-app links, no custom schemes, no analytics).
+// and the link audit (no web-app links, no custom schemes, no analytics) —
+// plus the product-shot mock calendar (current month, dots, From X rows).
 
 const LANDING_URL = process.env.E2E_LANDING_URL ?? 'http://localhost:8083';
+
+const PLAY_OPT_IN_URL = 'https://play.google.com/apps/internaltest/4701427612732216042';
 
 const TEMPLATE_LINES = [
   'First and last name:',
@@ -18,7 +21,9 @@ const TEMPLATE_LINES = [
   'If Android, the Gmail your Play Store uses:',
 ];
 
-test('renders Paper by default with the mailto CTA, fallback, and footer', async ({ page }) => {
+test('renders Paper by default with the mock, mailto CTA, fallback, and footer', async ({
+  page,
+}) => {
   await page.goto(LANDING_URL);
 
   // Paper is the default mood, with browser chrome to match.
@@ -26,10 +31,22 @@ test('renders Paper by default with the mailto CTA, fallback, and footer', async
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(250, 247, 240)');
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#faf7f0');
 
-  // The display title wears Paper's serif voice (design doc §4).
-  const title = page.getByRole('heading', { name: 'Events', level: 1 });
-  await expect(title).toBeVisible();
-  expect(await title.evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Georgia');
+  // The hero headline is the display element and wears Paper's serif voice
+  // (design doc §4).
+  const hero = page.getByRole('heading', { level: 1 });
+  await expect(hero).toHaveText('A calendar of events your people share with you.');
+  expect(await hero.evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Georgia');
+
+  // The product shot: a static mock of the app's calendar — current month,
+  // two dotted event days, and the "From X" attribution rows.
+  const mock = page.locator('#mock');
+  await expect(mock).toBeVisible();
+  const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  await expect(mock.locator('#mock-month')).toHaveText(monthLabel);
+  await expect(mock.locator('.mock-event')).toHaveCount(2);
+  await expect(mock.locator('.mock-event .f').first()).toHaveText('From Alice');
+  await expect(mock.locator('.mock-grid .sel')).toHaveCount(1);
+  await expect(mock.locator('.mock-grid .dot')).toHaveCount(2);
 
   // The CTA is a prefilled mailto with the subject and five-line template.
   const cta = page.getByRole('link', { name: 'Ask for an invite' });
@@ -47,15 +64,13 @@ test('renders Paper by default with the mailto CTA, fallback, and footer', async
   await expect(fallback).toContainText('kilani.ramsey@gmail.com');
   for (const line of TEMPLATE_LINES) await expect(fallback).toContainText(line);
 
-  // "Already testing?" footer: Android carries the Play internal opt-in
-  // link; the iPhone line is instruction-only (internal TestFlight has no
-  // per-app URL).
+  // "Already testing?" footer: Android carries the standing Play internal
+  // opt-in link; the iPhone line is instruction-only (internal TestFlight
+  // has no per-app URL).
   await expect(page.getByText('Already testing?')).toBeVisible();
   const androidLink = page.getByRole('link', { name: 'open your Play testing link' });
   await expect(androidLink).toBeVisible();
-  expect(await androidLink.getAttribute('href')).toContain(
-    'https://play.google.com/apps/internaltest'
-  );
+  expect(await androidLink.getAttribute('href')).toBe(PLAY_OPT_IN_URL);
   const iphoneLine = page.locator('p', { hasText: 'iPhone: accept the invite email' });
   await expect(iphoneLine).toBeVisible();
   await expect(iphoneLine.locator('a')).toHaveCount(0);
@@ -75,7 +90,7 @@ test('renders Paper by default with the mailto CTA, fallback, and footer', async
     expect(
       a.startsWith('mailto:') ||
         a === 'https://shared-events.pages.dev/privacy.html' ||
-        a.startsWith('https://play.google.com/apps/internaltest')
+        a === PLAY_OPT_IN_URL
     ).toBe(true);
     expect(a).not.toContain('events-app://');
   }
@@ -97,7 +112,9 @@ test('swatch toggles to Evening, persists across reload, no first-paint flash', 
   await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute('content', 'dark');
   await expect(page.getByRole('button', { name: 'Switch to Paper theme' })).toBeVisible();
   expect(
-    await page.getByRole('heading', { name: 'Events', level: 1 }).evaluate((el) => getComputedStyle(el).fontFamily)
+    await page
+      .getByRole('heading', { level: 1 })
+      .evaluate((el) => getComputedStyle(el).fontFamily)
   ).toContain('system-ui');
   expect(await page.evaluate(() => localStorage.getItem('theme_preference'))).toBe('evening');
 
