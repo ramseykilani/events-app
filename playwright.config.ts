@@ -28,6 +28,11 @@ const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 // run that spec against the deployed page instead.
 const RECEIPT_PORT = Number(process.env.E2E_RECEIPT_PORT ?? 8082);
 const receiptURL = process.env.E2E_RECEIPT_URL ?? `http://localhost:${RECEIPT_PORT}`;
+// The beta landing page (landing/) is likewise a standalone static site;
+// e2e/landing.spec.ts serves it locally the same way. E2E_LANDING_URL
+// overrides for running that spec against a deployed preview.
+const LANDING_PORT = Number(process.env.E2E_LANDING_PORT ?? 8083);
+const landingURL = process.env.E2E_LANDING_URL ?? `http://localhost:${LANDING_PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -60,6 +65,16 @@ export default defineConfig({
           {
             command: `npx serve -s receipt -l ${RECEIPT_PORT}`,
             url: receiptURL,
+            reuseExistingServer: !process.env.CI,
+            timeout: 30_000,
+          },
+        ]),
+    ...(process.env.E2E_LANDING_URL
+      ? []
+      : [
+          {
+            command: `npx serve -s landing -l ${LANDING_PORT}`,
+            url: landingURL,
             reuseExistingServer: !process.env.CI,
             timeout: 30_000,
           },
