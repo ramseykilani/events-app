@@ -1,6 +1,6 @@
 # Link Autofill Provider Matrix
 
-Which event providers a pasted link can actually be autofilled from, and how. This is the evidence base for [Richer Link Autofill](../FEATURES.md#richer-link-autofill) — the feature spec lives in FEATURES.md; this doc is the provider-by-provider record plus the runbook for keeping it current.
+Which event providers a pasted link can actually be autofilled from, and how. This is the evidence base for [Richer Link Autofill](../FEATURES.md#richer-link-autofill) — the feature spec lives in FEATURES.md; this doc is the provider-by-provider record plus the runbook for keeping it current. The monetization side of these same providers — which have affiliate programs, setup status, and tagging rules — lives in [docs/affiliate-programs.md](affiliate-programs.md); hostname coverage there derives from this matrix.
 
 **Snapshot:** 2026-09-01 — every row verified by fetching a live event page from a datacenter IP (this repo's cloud-agent VM) with the same request shape `og-metadata` uses. See [How to re-verify](#how-to-re-verify).
 

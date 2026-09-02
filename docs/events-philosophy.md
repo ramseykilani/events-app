@@ -34,7 +34,7 @@ The assumption is that the target user — someone already living in abundance, 
 
 Events is a tool for people in a network, not a platform trying to boost a founder's ego or climb an app store hierarchy. We are not trying to be the top of any hierarchy. We are not trying to own anyone's attention.
 
-It is a sustainable cash-cow, not a startup: when a charge exists, it is an annual subscription to *share*, so the people who get the value-add cover SMS and keep the tool alive. Surplus leaves the company rather than funding growth, new monetization, or an empire. Receive stays free. Details and refusals: `docs/events-monetization.md`. That document is not a license to build a paywall — timing is an open owner question.
+It is a sustainable cash-cow, not a startup. The first funding layer asks nothing of users: outbound ticket links carry a passive affiliate tag, so the platforms that sell the tickets help pay for the texts — the product itself changes nothing. If that doesn't cover the carrier bill, the charge is an annual subscription to *share*, so the people who get the value-add keep the tool alive. Surplus leaves the company rather than funding growth, new monetization, or an empire. Receive stays free. Details and refusals: `docs/events-monetization.md`. Neither layer is a license to build — timing is an open owner question.
 
 The tools of the new age need to be exactly that — tools. Things that reduce friction between people, that serve the user rather than extract from them. Events exists to make one specific thing in your life slightly easier, and that is the entire ambition.
 

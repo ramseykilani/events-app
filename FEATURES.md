@@ -44,7 +44,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Implemented | Storage rewrite + silent edit propagation. Spec: [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Shipped 2026-08-24. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
-| [Share Subscription](#share-subscription) | Planned | Annual sub to share; receive stays free. Model decided 2026-09-02; **do not implement** — timing is an open owner question. Spec: [docs/events-monetization.md](docs/events-monetization.md). |
+| [Share Subscription](#share-subscription) | Planned | Annual sub to share; receive stays free. The fallback, deferred until the affiliate experiment concludes; **do not implement**. Spec: [docs/events-monetization.md](docs/events-monetization.md). |
+| [Affiliate Link Tagging](#affiliate-link-tagging) | Planned | Passive same-provider affiliate tags on outbound listing taps (app + receipt page); SMS never tagged. The first funding layer. Setup: [docs/affiliate-programs.md](docs/affiliate-programs.md). |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
@@ -1415,7 +1416,7 @@ Not designed. The need is: the sign-out pop-up should not feel lacking, especial
 
 ## Share Subscription
 
-**Status:** Planned — model decided 2026-09-02; **do not implement.** Timing is an open owner question. Internal testers should meet the product, not a paywall. Source of truth: [docs/events-monetization.md](docs/events-monetization.md). This section is a pointer so the idea isn’t rebuilt from memory; it is not a build spec.
+**Status:** Planned — model decided 2026-09-02; **do not implement.** This is the *fallback* funding layer, deferred until the affiliate experiment ([Affiliate Link Tagging](#affiliate-link-tagging)) concludes; it ships only if that doesn't cover the SMS bill, priced to fill the measured gap. Not during internal testing either way — testers should meet the product, not a paywall, and if it ever ships, internal testers are grandfathered free (owner call 2026-09-02). Source of truth: [docs/events-monetization.md](docs/events-monetization.md). This section is a pointer so the idea isn’t rebuilt from memory; it is not a build spec.
 
 ### What was decided
 
@@ -1425,11 +1426,43 @@ Not designed. The need is: the sign-out pop-up should not feel lacking, especial
 - Annual, not month-to-month (monthly, if it ever exists, is a worse-value option).
 - Receive, answering, and the SMS receipt page stay free.
 
-Rejected (do not “just try” these): postage billing, ads, paying to raise the 50-cap, paywalling receive, ticket affiliate / take-rate, a venue product inside this app. SMS cost-cutting (skip SMS when push landed, shorter bodies, cheaper CPaaS) is later maintenance, not this feature.
+Rejected (do not “just try” these): postage billing, ads, paying to raise the 50-cap, paywalling receive, a ticket take-rate, a venue product inside this app. SMS cost-cutting (skip SMS when push landed, shorter bodies, cheaper CPaaS) is later maintenance, not this feature.
 
 ### Decision
 
-Do not build. Revisit only when the owner names a when. Price, IAP, and gate UX are undesigned.
+Do not build. Revisit only when the affiliate experiment concludes short and the owner names a when. Price, IAP, and gate UX are undesigned. One hedge, recorded so it's cheap later: IAP + store review has its own lead time, so if the verdict is "needed," the build should start from this spec immediately rather than after external testing has opened the cost tap.
+
+---
+
+## Affiliate Link Tagging
+
+**Status:** Planned — model decided 2026-09-02 (second monetization discussion); docs landed same day, **implementation not started** (owner: docs first). The first funding layer: [docs/events-monetization.md](docs/events-monetization.md) → The funding order. Provider programs, setup status, and the "what's next" runbook: [docs/affiliate-programs.md](docs/affiliate-programs.md).
+
+### Problem
+
+Every share fires A2P SMS (~$0.03 each, often 2–4 segments) — that is the entire P&L, and the owner's subsidy budget is bounded (~$1,000 total). Ticket platforms already fund referral traffic through open affiliate programs, and this app's outbound listing taps are exactly that traffic. Leaving them untagged leaves the cheapest available funding uncollected.
+
+### Solution
+
+When a user taps an event's listing link — on the event detail screen, or on the Who's Coming receipt page — rewrite the URL to the provider's affiliate/deep-link form for providers with a **live** program (the status table in `docs/affiliate-programs.md`). Same provider, same destination page; the tag only adds attribution. Providers without a live program pass through byte-identical. The share SMS is never touched. No surface changes, no ranking, nothing promoted.
+
+### Technical Notes
+
+- `lib/affiliateLinks.ts` — a pure builder (hostname → tagged URL), following the `lib/calendarLinks.ts` pattern. Provider coverage derives from the hostnames in `docs/link-autofill-provider-matrix.md`; one program can cover several hostnames (Ticketmaster's program covers `livenation.com` + `admission.com`).
+- Wire into the event-detail listing tap; the receipt page gets an inline-JS port fed by the same `send-response` GET fields (precedent: the calendarLinks port).
+- Tag formats are per-program, captured in `docs/affiliate-programs.md` at approval time. Owner-only prerequisite: the Impact account + program applications (tax/payout details) — an agent can prep, never submit.
+- No client-side analytics. Measurement is network dashboards (clicks, revenue, EPC) against Twilio spend; `sends` rows already count SMS volume server-side.
+- Boundaries (permanent, also in the monetization doc): same-provider only — never substitute a higher-paying provider; never in SMS; never double-wrap an aggregator's existing affiliate hop; disclosure line in `public/privacy.html` ships with the feature.
+- Verify bar: a new Playwright spec covering the web tap behavior (covered provider → tagged URL; uncovered provider → untouched URL), run on desktop Chrome before push, per AGENTS.md.
+
+### Acceptance Criteria
+
+- [ ] Tapping the listing link on an event whose host has a live program opens that provider's page with our affiliate tag applied
+- [ ] Providers without a live program open the original URL byte-identical
+- [ ] The receipt page's listing link behaves the same
+- [ ] Share SMS bodies are unchanged (the `smsBody` tests stay green)
+- [ ] `public/privacy.html` discloses that outbound ticket links may earn a commission
+- [ ] `docs/affiliate-programs.md` status table reflects what's live
 
 ---
 
