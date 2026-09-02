@@ -45,7 +45,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [Share Subscription](#share-subscription) | Planned | Annual sub to share; receive stays free. The fallback, deferred until the affiliate experiment concludes; **do not implement**. Spec: [docs/events-monetization.md](docs/events-monetization.md). |
-| [Affiliate Link Tagging](#affiliate-link-tagging) | Planned | Passive same-provider affiliate tags on outbound listing taps (app + receipt page); SMS never tagged. The first funding layer. Setup: [docs/affiliate-programs.md](docs/affiliate-programs.md). |
+| [Affiliate Link Tagging](#affiliate-link-tagging) | In progress | Passive same-provider affiliate tags on outbound listing taps (app + receipt page); SMS never tagged. The first funding layer. Setup: [docs/affiliate-programs.md](docs/affiliate-programs.md). |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
@@ -1436,7 +1436,7 @@ Do not build. Revisit only when the affiliate experiment concludes short and the
 
 ## Affiliate Link Tagging
 
-**Status:** Planned — model decided 2026-09-02 (second monetization discussion); docs landed same day, **implementation not started** (owner: docs first). The first funding layer: [docs/events-monetization.md](docs/events-monetization.md) → The funding order. Provider programs, setup status, and the "what's next" runbook: [docs/affiliate-programs.md](docs/affiliate-programs.md).
+**Status:** In progress — model decided 2026-09-02 (second monetization discussion); build approved same day (ships dark with an all-off registry). The first funding layer: [docs/events-monetization.md](docs/events-monetization.md) → The funding order. Provider programs, setup status, and the "what's next" runbook: [docs/affiliate-programs.md](docs/affiliate-programs.md).
 
 ### Problem
 
