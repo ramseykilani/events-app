@@ -51,7 +51,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Provider Matrix Drift Check](#provider-matrix-drift-check) | Considering | Scheduled CI re-check of the autofill provider matrix. Owner deferred 2026-09-01 — manual agent sweeps suffice. |
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
-| [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. |
+| [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. Owner 2026-09-02: gear/Add crowding is [KI-017](manual-tests/known_issues.md). |
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
 | [Beta Landing Page](#beta-landing-page) | Planned | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. |
 
