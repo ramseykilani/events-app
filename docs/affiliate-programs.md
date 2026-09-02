@@ -1,6 +1,6 @@
 # Affiliate Programs — Provider Record & Setup Runbook
 
-Decided 2026-09-02 (second monetization discussion, same day as `docs/events-monetization.md`). This doc is the monetization-side record for event providers: which have affiliate programs, what they pay, what's been set up, and what's left. The parsing/autofill side of the same providers lives in `docs/link-autofill-provider-matrix.md` — hostname coverage here derives from that matrix. The business model this serves (and its refusal list) lives in `docs/events-monetization.md`; the build spec is `FEATURES.md` → Affiliate Link Tagging (**Planned, not yet built**).
+Decided 2026-09-02 (second monetization discussion, same day as `docs/events-monetization.md`). This doc is the monetization-side record for event providers: which have affiliate programs, what they pay, what's been set up, and what's left. The parsing/autofill side of the same providers lives in `docs/link-autofill-provider-matrix.md` — hostname coverage here derives from that matrix. The business model this serves (and its refusal list) lives in `docs/events-monetization.md`; the build spec is `FEATURES.md` → Affiliate Link Tagging (**Implemented 2026-09-02, shipped dark** — the registry is empty and the global switch is off until programs are approved; see [The switch](#the-switch)).
 
 **If the owner asks "what's next for affiliate setup?"** — read the [status table](#provider-status). The topmost row that is `research needed` or `not applied` in priority order is the answer. Agent-doable and owner-only steps are marked in the [setup process](#setup-process).
 
@@ -25,10 +25,30 @@ These are the rules that keep the money from becoming a stake. They are part of 
 | 0. Impact publisher account | **Owner only** | Sign up at impact.com as a publisher. Requires legal name, tax form (W-9), and payout details — an agent cannot do this. One account hosts most programs below. |
 | 1. Program applications | Owner-submitted, agent-prepped | Apply to programs in priority order (table below). Applications ask about the app and audience; an agent can draft the answers (one honest paragraph: personal event-sharing app, beta, outbound listing taps) — the owner reviews and submits, because applications carry legal attestations. A pre-launch app may need to explain itself; the landing page plus that paragraph usually suffices. Approval takes days to weeks. |
 | 2. Record + capture tag format | Agent | On approval, flip the status table row to `approved` and record the program's exact deep-link/tag URL format (Impact exposes per-program tracking-link builders; the format differs per program). |
-| 3. Build the tagging feature | Agent, when dispatched | `FEATURES.md` → Affiliate Link Tagging. Do not start without the owner naming a when (2026-09-02: docs first). |
-| 4. Measure | Agent | Coverage ratio = network-reported revenue ÷ Twilio spend, both from dashboards — no client-side analytics, ever. See [Measurement](#measurement). |
+| 3. Build the tagging feature | Agent | **Done 2026-09-02** — `FEATURES.md` → Affiliate Link Tagging. Shipped dark: everything passes through untouched until a program row is activated. |
+| 4. Activate a program | Agent | One SQL insert + the global flip — see [The switch](#the-switch). Then flip the status table row to `live`. |
+| 5. Measure | Agent | Coverage ratio = network-reported revenue ÷ Twilio spend, both from dashboards — no client-side analytics, ever. See [Measurement](#measurement). |
 
 Optional later: FlexOffers or Skimlinks accounts for programs Impact doesn't carry (Skimlinks approves once for many merchants — useful for the long tail). Same owner-only account step applies.
+
+## The switch
+
+The tagging feature is live in the code but dark: two registry tables (migration `20260902000001_affiliate_programs`) decide what gets tagged, and both ship inert. They are world-readable (the app and the `send-response` function read them) and writable only via the service role.
+
+- `affiliate_config` — the single-row global switch. `enabled = false` means every URL on every surface passes through byte-identical, no matter what the program rows say. This is the strip lever: one update turns the whole feature off everywhere.
+- `affiliate_programs` — one row per program: `id` (a slug), `domains` (the registered domains the program covers — list regional TLDs explicitly, e.g. `ticketmaster.co.uk`; matching is host-equals-or-subdomain), `url_template` (the network's tracking-link format with `{url}` where the percent-encoded destination goes — covers both redirect-wrap and query-param formats), `enabled`.
+
+**Activating a program is one SQL statement** (run against the project with the service role, e.g. via the SQL editor or `psql`):
+
+```sql
+INSERT INTO public.affiliate_programs (id, domains, url_template, enabled) VALUES
+  ('ticketmaster', '{ticketmaster.com,ticketmaster.co.uk,livenation.com,admission.com}',
+   'https://<network-tracking-host>/click?u={url}', true);
+-- and on the first activation only, flip the global switch:
+UPDATE public.affiliate_config SET enabled = true WHERE id = true;
+```
+
+No deploy, no app release: the `send-response` function reads the registry per request, and the app's registry cache is stale after five minutes. Turning a single program off is `UPDATE affiliate_programs SET enabled = false WHERE id = '...'`; turning everything off is the global flip. The `url_template` comes from the network's per-program link builder at approval time (setup step 2) — paste it with `{url}` in place of the destination. Whenever a row changes, update the [status table](#provider-status) to match: the tables are the machine-readable truth, the table below is the human record.
 
 ## Provider status
 

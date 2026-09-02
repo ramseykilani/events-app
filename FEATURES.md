@@ -45,7 +45,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [Share Subscription](#share-subscription) | Planned | Annual sub to share; receive stays free. The fallback, deferred until the affiliate experiment concludes; **do not implement**. Spec: [docs/events-monetization.md](docs/events-monetization.md). |
-| [Affiliate Link Tagging](#affiliate-link-tagging) | In progress | Passive same-provider affiliate tags on outbound listing taps (app + receipt page); SMS never tagged. The first funding layer. Setup: [docs/affiliate-programs.md](docs/affiliate-programs.md). |
+| [Affiliate Link Tagging](#affiliate-link-tagging) | Implemented | Passive same-provider affiliate tags on outbound listing taps (app + receipt page); SMS never tagged. Shipped dark 2026-09-02 — activation is one SQL update per program. Setup: [docs/affiliate-programs.md](docs/affiliate-programs.md). |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
@@ -1436,7 +1436,7 @@ Do not build. Revisit only when the affiliate experiment concludes short and the
 
 ## Affiliate Link Tagging
 
-**Status:** In progress — model decided 2026-09-02 (second monetization discussion); build approved same day (ships dark with an all-off registry). The first funding layer: [docs/events-monetization.md](docs/events-monetization.md) → The funding order. Provider programs, setup status, and the "what's next" runbook: [docs/affiliate-programs.md](docs/affiliate-programs.md).
+**Status:** Implemented — model decided and build approved 2026-09-02 (second monetization discussion). Shipped dark: the registry is empty and the global switch is off, so every URL passes through untouched until a program is approved and activated by SQL (no deploy). The first funding layer: [docs/events-monetization.md](docs/events-monetization.md) → The funding order. Provider programs, setup status, the activation runbook: [docs/affiliate-programs.md](docs/affiliate-programs.md).
 
 ### Problem
 
@@ -1444,25 +1444,27 @@ Every share fires A2P SMS (~$0.03 each, often 2–4 segments) — that is the en
 
 ### Solution
 
-When a user taps an event's listing link — on the event detail screen, or on the Who's Coming receipt page — rewrite the URL to the provider's affiliate/deep-link form for providers with a **live** program (the status table in `docs/affiliate-programs.md`). Same provider, same destination page; the tag only adds attribution. Providers without a live program pass through byte-identical. The share SMS is never touched. No surface changes, no ranking, nothing promoted.
+When a user taps an event's listing link — on the event detail screen, or on the Who's Coming receipt page — rewrite the URL to the provider's affiliate/deep-link form for providers with a **live** program (enabled in the `affiliate_programs` registry table; the status table in `docs/affiliate-programs.md` is the human record). Same provider, same destination page; the tag only adds attribution. Providers without a live program pass through byte-identical. The share SMS is never touched. No surface changes, no ranking, nothing promoted.
 
 ### Technical Notes
 
-- `lib/affiliateLinks.ts` — a pure builder (hostname → tagged URL), following the `lib/calendarLinks.ts` pattern. Provider coverage derives from the hostnames in `docs/link-autofill-provider-matrix.md`; one program can cover several hostnames (Ticketmaster's program covers `livenation.com` + `admission.com`).
-- Wire into the event-detail listing tap; the receipt page gets an inline-JS port fed by the same `send-response` GET fields (precedent: the calendarLinks port).
-- Tag formats are per-program, captured in `docs/affiliate-programs.md` at approval time. Owner-only prerequisite: the Impact account + program applications (tax/payout details) — an agent can prep, never submit.
+- The on/off registry lives in Supabase (migration `20260902000001`): `affiliate_programs` (one row per program — registered `domains`, `url_template` with a `{url}` placeholder, per-program `enabled`) plus a single-row `affiliate_config` global switch. World-readable SELECT, no client write policies — activation is one service-role SQL update, never a deploy or an app release (runbook: `docs/affiliate-programs.md` → The switch). Shipped dark: global off, no program rows.
+- One pure builder, `supabase/functions/_shared/affiliateTag.ts` (the `smsBody.ts` pattern — Jest-pinned, no Deno/globals), re-exported for the app as `lib/affiliateLinks.ts` so both taggable surfaces tag byte-identically. Matching is host-equals-or-subdomain against the configured registered domains (regional TLDs listed explicitly — no public-suffix machinery); the tag is the template with `{url}` replaced by the percent-encoded original URL. Global off / program disabled / unknown host / unparseable → byte-identical passthrough. Aggregators are simply never registered, and an already-wrapped hop's host is the network's domain, so double-wrapping can't happen. Provider coverage derives from the hostnames in `docs/link-autofill-provider-matrix.md`; one program can cover several (Ticketmaster's covers `livenation.com` + `admission.com`).
+- App: `lib/affiliateRegistry.ts` fetches the registry on the event-detail focus load (module cache, 5-minute staleness, fail-open to untagged — never the tap path, never a screen error). The tag applies at the "Open link" tap and to the Add-to-calendar export bodies (the caller substitutes the tagged URL; `lib/calendarLinks.ts` is unchanged).
+- Receipt page: the `send-response` GET tags server-side (service-role read, fail-open) and returns `image_url`; the page is a full mirror of the event detail screen (image, description, listing link) and carries no tagging logic of its own.
+- Owner decisions 2026-09-02: the tagged URL rides every outbound use of the listing URL, including the calendar-export bodies (link-rot risk in old exports accepted — programs likely keep redirects resolving, and the revenue outweighs the edge case); no per-surface sub-ids (not built, not documented); the privacy disclosure shipped with the feature while zero programs are live, so activation later is a pure config flip.
+- Boundaries (permanent, also in the monetization doc): same-provider only — never substitute a higher-paying provider; never in SMS; never double-wrap an aggregator's existing affiliate hop.
 - No client-side analytics. Measurement is network dashboards (clicks, revenue, EPC) against Twilio spend; `sends` rows already count SMS volume server-side.
-- Boundaries (permanent, also in the monetization doc): same-provider only — never substitute a higher-paying provider; never in SMS; never double-wrap an aggregator's existing affiliate hop; disclosure line in `public/privacy.html` ships with the feature.
-- Verify bar: a new Playwright spec covering the web tap behavior (covered provider → tagged URL; uncovered provider → untouched URL), run on desktop Chrome before push, per AGENTS.md.
+- Tag formats are per-program, captured in `docs/affiliate-programs.md` at approval time. Owner-only prerequisite: the Impact account + program applications (tax/payout details) — an agent can prep, never submit.
 
 ### Acceptance Criteria
 
-- [ ] Tapping the listing link on an event whose host has a live program opens that provider's page with our affiliate tag applied
-- [ ] Providers without a live program open the original URL byte-identical
-- [ ] The receipt page's listing link behaves the same
-- [ ] Share SMS bodies are unchanged (the `smsBody` tests stay green)
-- [ ] `public/privacy.html` discloses that outbound ticket links may earn a commission
-- [ ] `docs/affiliate-programs.md` status table reflects what's live
+- [x] Tapping the listing link on an event whose host has a live program opens that provider's page with our affiliate tag applied
+- [x] Providers without a live program open the original URL byte-identical
+- [x] The receipt page's listing link behaves the same
+- [x] Share SMS bodies are unchanged (the `smsBody` tests stay green)
+- [x] `public/privacy.html` discloses that outbound ticket links may earn a commission
+- [x] `docs/affiliate-programs.md` status table reflects what's live (all `not applied` — the registry ships empty)
 
 ---
 
