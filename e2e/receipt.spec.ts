@@ -22,8 +22,22 @@ const STATE = {
   description: 'Bring a game.',
   location: 'Signal, 175 Morgan Ave',
   url: 'https://example.com/tickets',
+  image_url: 'https://example.com/flyer.png',
   response: null,
 };
+
+// The card mirrors the in-app detail screen, so the image actually loads —
+// stub it (1x1 png) so no external request leaves the runner.
+const PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+async function stubImage(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/example.com/flyer.png', (route) =>
+    route.fulfill({ contentType: 'image/png', body: PIXEL })
+  );
+}
 
 async function downloadText(download: Download): Promise<string> {
   const stream = await download.createReadStream();
@@ -48,10 +62,23 @@ test('receipt page renders the calendar links and stays inert on load', async ({
     }
   });
 
+  await stubImage(page);
   await page.goto(`${RECEIPT_URL}/?t=${TOKEN}`);
   await expect(page.getByText('Alice asked')).toBeVisible();
   // Location feature: the venue line renders between the when and the links.
   await expect(page.getByText('Signal, 175 Morgan Ave', { exact: true })).toBeVisible();
+
+  // Detail-screen mirror: the event image, the full description, and the
+  // listing link all render from the GET's fields.
+  const image = page.locator('#image');
+  await expect(image).toBeVisible();
+  expect(await image.getAttribute('src')).toBe(STATE.image_url);
+  await expect(page.locator('#description')).toHaveText('Bring a game.');
+  const listing = page.getByRole('link', { name: 'Open link' });
+  await expect(listing).toBeVisible();
+  // Affiliate Link Tagging: the page renders the GET's url as-is — tagging
+  // happened server-side in send-response.
+  expect(await listing.getAttribute('href')).toBe(STATE.url);
 
   // The Google link is a plain anchor pre-filled from the event.
   const google = page.getByRole('link', { name: 'Add to Google Calendar' });
@@ -95,13 +122,24 @@ test('receipt page exports an all-day event when there is no time', async ({ pag
   await page.route('**/functions/v1/send-response**', (route) =>
     route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ ...STATE, time: null, description: null, location: null, url: null }),
+      body: JSON.stringify({
+        ...STATE,
+        time: null,
+        description: null,
+        location: null,
+        url: null,
+        image_url: null,
+      }),
     })
   );
 
   await page.goto(`${RECEIPT_URL}/?t=${TOKEN}`);
   // No location — the venue line stays hidden (Location).
   await expect(page.locator('#location')).toBeHidden();
+  // No image, description, or listing URL — those rows stay hidden too.
+  await expect(page.locator('#image')).toBeHidden();
+  await expect(page.locator('#description')).toBeHidden();
+  await expect(page.locator('#listing-link')).toBeHidden();
   const google = page.getByRole('link', { name: 'Add to Google Calendar' });
   await expect(google).toBeVisible();
   const href = await google.getAttribute('href');
@@ -116,4 +154,35 @@ test('receipt page exports an all-day event when there is no time', async ({ pag
   expect(ics).toContain('DTEND;VALUE=DATE:20260906');
   expect(ics).not.toContain('DESCRIPTION');
   expect(ics).not.toContain('LOCATION');
+});
+
+// Affiliate Link Tagging: when send-response returns a pre-tagged listing
+// URL (a live program), the page uses it byte-identical for both the
+// listing link and the calendar-export bodies — no logic of its own.
+test('receipt page carries a pre-tagged listing URL untouched', async ({ page }) => {
+  const tagged = `https://affiliate.test/click?u=${encodeURIComponent(STATE.url)}`;
+  await page.route('**/functions/v1/send-response**', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ ...STATE, url: tagged, image_url: null }),
+    })
+  );
+
+  await page.goto(`${RECEIPT_URL}/?t=${TOKEN}`);
+  const listing = page.getByRole('link', { name: 'Open link' });
+  await expect(listing).toBeVisible();
+  expect(await listing.getAttribute('href')).toBe(tagged);
+
+  const google = page.getByRole('link', { name: 'Add to Google Calendar' });
+  const href = await google.getAttribute('href');
+  expect(href).toContain(
+    `details=${encodeURIComponent(`Bring a game.\n\n${tagged}`)}`
+  );
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Apple / Outlook / Other (.ics)' }).click();
+  const ics = await downloadText(await downloadPromise);
+  // Unfold first: the tagged URL pushes the DESCRIPTION line past the
+  // 75-octet fold (RFC 5545 continuation lines start with a space).
+  expect(ics.replace(/\r\n /g, '')).toContain(`DESCRIPTION:Bring a game.\\n\\n${tagged}`);
 });
