@@ -7,15 +7,21 @@
 <title>Are you in?</title>
 <!--
   Who's Coming receipt page (FEATURES.md → Who's Coming). One capability URL
-  per send, texted to recipients who don't have the app. It shows who asked,
-  the event, and Yes / No — nothing else: no other people, no comments, no
-  install CTA. The two Add to Other Calendars links under the event are
-  event content, not promo (FEATURES.md → Add to Other Calendars): a Google
-  template link and an in-page .ics download, both built client-side from
-  the GET's fields. The page is inert until the visitor chooses an answer:
-  state loads over GET (which never writes, so SMS/iMessage prefetch can't
-  answer for them) and the write fires only on an explicit tap. Last write
-  wins — the same link changes the answer later.
+  per send, texted to recipients who don't have the app. The event card is a
+  full mirror of the in-app event detail screen — image, title, when, where,
+  full description, and the listing link — plus Yes / No: nothing else, no
+  other people, no comments, no install CTA. The two Add to Other Calendars
+  links under the event are event content, not promo (FEATURES.md → Add to
+  Other Calendars): a Google template link and an in-page .ics download,
+  both built client-side from the GET's fields. The page is inert until the
+  visitor chooses an answer: state loads over GET (which never writes, so
+  SMS/iMessage prefetch can't answer for them) and the write fires only on
+  an explicit tap. Last write wins — the same link changes the answer later.
+
+  Affiliate Link Tagging: the GET returns the listing URL pre-tagged when
+  the provider's program is live (send-response reads the affiliate
+  registry server-side), so this page carries no tagging logic — the
+  listing link and the calendar-export bodies simply use the URL they get.
 -->
 <style>
   :root {
@@ -52,6 +58,15 @@
     padding: 28px 24px;
     text-align: center;
   }
+  /* The event image leads the card, mirroring the in-app detail screen. */
+  .image {
+    display: block;
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 12px;
+    margin: 0 0 20px;
+  }
   .asker {
     font-size: 14px;
     font-weight: 600;
@@ -74,6 +89,27 @@
     font-size: 16px;
     color: var(--accent);
     margin: -16px 0 24px;
+  }
+  /* Full description and the listing link: left-aligned body text, like the
+     in-app detail screen. The link wears the accent (the app's linkText
+     shares the accent's value in every theme). */
+  .description {
+    font-size: 16px;
+    line-height: 1.5;
+    text-align: left;
+    margin: 0 0 20px;
+    white-space: pre-line;
+  }
+  .listing-link {
+    text-align: left;
+    margin: 0 0 20px;
+  }
+  .listing-link a {
+    color: var(--accent);
+    font-size: 17px;
+    text-decoration: underline;
+    display: inline-block;
+    padding: 8px 0;
   }
   /* Add to Other Calendars: secondary text links under the event details. */
   .calendar-links {
@@ -158,10 +194,15 @@
   <div class="card" id="card">
     <p class="status" id="status">Loading…</p>
     <div id="content" hidden>
+      <img class="image" id="image" alt="" hidden />
       <p class="asker" id="asker"></p>
       <h1 class="title" id="title"></h1>
       <p class="meta" id="meta"></p>
       <p class="location" id="location" hidden></p>
+      <p class="description" id="description" hidden></p>
+      <p class="listing-link" id="listing-link" hidden>
+        <a id="listing-url" href="#" target="_blank" rel="noopener">Open link</a>
+      </p>
       <div class="calendar-links">
         <a id="cal-google" href="#" target="_blank" rel="noopener">Add to Google Calendar</a>
         <button type="button" id="cal-ics">Apple / Outlook / Other (.ics)</button>
@@ -190,6 +231,10 @@
   var titleEl = document.getElementById('title');
   var metaEl = document.getElementById('meta');
   var locationEl = document.getElementById('location');
+  var imageEl = document.getElementById('image');
+  var descriptionEl = document.getElementById('description');
+  var listingLinkEl = document.getElementById('listing-link');
+  var listingUrlEl = document.getElementById('listing-url');
   var hintEl = document.getElementById('hint');
   var yesBtn = document.getElementById('yes');
   var noBtn = document.getElementById('no');
@@ -362,6 +407,32 @@
       locationEl.hidden = false;
     } else {
       locationEl.hidden = true;
+    }
+    // The detail-screen mirror: image, full description, and the listing
+    // link. state.url arrives pre-tagged when the provider's affiliate
+    // program is live (send-response tags server-side); the calendar-export
+    // bodies below use the same URL, by owner decision (2026-09-02).
+    if (state.image_url) {
+      imageEl.src = state.image_url;
+      imageEl.alt = state.title ? state.title + ' image' : 'Event image';
+      imageEl.hidden = false;
+    } else {
+      imageEl.hidden = true;
+    }
+    imageEl.onerror = function () {
+      imageEl.hidden = true;
+    };
+    if (state.description) {
+      descriptionEl.textContent = state.description;
+      descriptionEl.hidden = false;
+    } else {
+      descriptionEl.hidden = true;
+    }
+    if (state.url) {
+      listingUrlEl.href = state.url;
+      listingLinkEl.hidden = false;
+    } else {
+      listingLinkEl.hidden = true;
     }
     googleLink.href = buildGoogleUrl(state);
     yesBtn.setAttribute('aria-pressed', String(current === 'yes'));
