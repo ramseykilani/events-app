@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { notifyAskerOfResponse } from '../_shared/responseNotify.ts';
+import { tagListingUrl } from '../_shared/affiliateTag.ts';
+import type { AffiliateProgram } from '../_shared/affiliateTag.ts';
 
 // Who's Coming receipt API — the backend for the tiny confirm page linked
 // from the share SMS (one capability URL per send; both SMS variants carry
@@ -16,14 +18,19 @@ import { notifyAskerOfResponse } from '../_shared/responseNotify.ts';
 // answer later, and it keeps working across re-shares because share_event
 // never rewrites an existing sends row.
 //
-// The page shows who asked and the event (title, date, location, full
-// description, listing url — the last three feed its Add to Other Calendars
-// links, which are event content, not promo) — nothing else: no other
-// people, no
+// The page mirrors the in-app event detail screen: who asked, the event
+// (image, title, date, location, full description, listing link), and its
+// Add to Other Calendars links — nothing else: no other people, no
 // comments, no install CTA. The write already happened; the receipt stops
-// there. Returning the full description is no privacy expansion: the share
-// SMS already discloses a 90-char excerpt and the full listing URL to this
-// same token holder (_shared/smsBody.ts).
+// there. Returning the full description (and the image) is no privacy
+// expansion: the share SMS already discloses a 90-char excerpt and the full
+// listing URL to this same token holder (_shared/smsBody.ts).
+//
+// Affiliate Link Tagging: the listing URL leaves this GET pre-tagged when
+// the provider's program is live in the affiliate registry — the page's
+// listing link and its calendar-export body both use it. The tagging read
+// fails open (untagged) and never fails the load. The share SMS is never
+// tagged: send-notification doesn't read the registry.
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -64,7 +71,7 @@ serve(async (req) => {
       }
       const { data: send, error } = await db
         .from('sends')
-        .select('id, response, events(title, event_date, event_time, description, location, url, owner_id)')
+        .select('id, response, events(title, event_date, event_time, description, location, url, image_url, owner_id)')
         .eq('response_token', token)
         .maybeSingle();
       if (error) {
@@ -83,6 +90,7 @@ serve(async (req) => {
         description: string | null;
         location: string | null;
         url: string | null;
+        image_url: string | null;
         owner_id: string;
       } | null;
       if (!event) {
@@ -93,6 +101,28 @@ serve(async (req) => {
         .select('display_name, phone_number')
         .eq('id', event.owner_id)
         .maybeSingle();
+
+      // Affiliate Link Tagging: tag the listing URL server-side so the
+      // receipt page needs no tagging logic of its own. Fail-open — a
+      // registry problem degrades to untagged, never to a failed load.
+      let listingUrl = event.url;
+      if (listingUrl) {
+        try {
+          const [configResult, programsResult] = await Promise.all([
+            db.from('affiliate_config').select('enabled').eq('id', true).maybeSingle(),
+            db.from('affiliate_programs').select('id, domains, url_template, enabled'),
+          ]);
+          if (configResult.error) throw configResult.error;
+          if (programsResult.error) throw programsResult.error;
+          listingUrl = tagListingUrl(listingUrl, {
+            enabled: (configResult.data as { enabled: boolean } | null)?.enabled === true,
+            programs: (programsResult.data ?? []) as AffiliateProgram[],
+          });
+        } catch (err) {
+          console.error('send-response: affiliate registry read failed', err);
+        }
+      }
+
       return jsonResponse({
         askerName: asker?.display_name ?? asker?.phone_number ?? 'Someone',
         title: event.title,
@@ -100,7 +130,8 @@ serve(async (req) => {
         time: event.event_time,
         description: event.description,
         location: event.location,
-        url: event.url,
+        url: listingUrl,
+        image_url: event.image_url,
         response: send.response,
       });
     }
