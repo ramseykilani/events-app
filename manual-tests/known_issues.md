@@ -401,6 +401,7 @@ flag that.
   chevrons flank the month title; clicking where they should be still
   navigates. Adjacent-month day taps also switch months.
 - Re-confirmed 2026-08-31 release review (`60e76eb`, web staging preview).
+- Re-confirmed 2026-09-02 release review (`ffd9eb4`, web staging preview).
 - Note for CI: the e2e pixel baselines mask the grid header
   (`mask: [page.getByRole('slider')]` in `e2e/visual.spec.ts`), so pixel
   diffs can't catch this.
