@@ -55,7 +55,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. Owner 2026-09-02: gear/Add crowding is [KI-017](manual-tests/known_issues.md). |
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
-| [Beta Landing Page](#beta-landing-page) | In progress | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. |
+| [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
 
 ## Using and testing
 
@@ -1982,7 +1982,7 @@ Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar
 
 ## Beta Landing Page
 
-**Status:** In progress — spec owner-approved 2026-09-02. The seed of the future launch page: built as its own Pages project now so launch is a domain attachment, not a migration. Tester fulfillment stays manual on both platforms (owner call 2026-09-02); the prefilled email is the automation — it kills the reply chains, which is where the real cost was.
+**Status:** Implemented (2026-09-02) — live at https://events-landing.pages.dev (Pages project `events-landing`, production branch `main`). Spec owner-approved 2026-09-02; final copy owner-approved same day. The seed of the future launch page: built as its own Pages project now so launch is a domain attachment, not a migration. Tester fulfillment stays manual on both platforms (owner call 2026-09-02); the prefilled email is the automation — it kills the reply chains, which is where the real cost was.
 
 ### Problem
 
@@ -1999,6 +1999,8 @@ The address and template also render as copyable text — `mailto:` is inert in 
 
 A quiet "Already testing?" footer serves the returning visitor (owner addition 2026-09-02). Android gets a Play link with works-once-you're-added copy (the internal-track listing is visible only to joined testers); iOS gets an instruction line, no link — open TestFlight once the invite is accepted, then the home-screen icon. At launch this footer is replaced by the real store badges and deep links (SMS Links at Launch).
 
+Shipped shape (2026-09-02, after two owner copy reviews): headline + one affirmative sub line, then a static mock of the app's own calendar screen as the product shot (current month rendered client-side, today in the accent, two dotted event days, From X rows), then the beta block and footer. Owner copy rulings, binding on the launch page too: lead with what it is, never what it isn't (the "no feed / no likes" opener was rejected); every sentence answers the question the reader has at that point and means one thing with zero shared context ("on iPhone and Android while the group is small" was rejected for yoking unrelated facts); no UI narration ("the button below starts an email"); no prose walls.
+
 ### Technical Notes
 
 - New top-level `landing/` directory: static HTML/CSS like `receipt/index.html`, plus its own Wrangler project and `npm run deploy:landing` (same Cloudflare secrets as `deploy:receipt`). Pages project names are globally unique (`events-app` was taken) — pick an available name at build time.
@@ -2014,13 +2016,13 @@ A quiet "Already testing?" footer serves the returning visitor (owner addition 2
 
 ### Acceptance Criteria
 
-- [ ] Page serves at its Pages URL and renders correctly at desktop and ~390px mobile widths in both moods, with tokens matching current `constants/Colors.ts`
-- [ ] Theme swatch toggles Paper/Evening, defaults to Paper, persists across reloads, and syncs browser chrome — no first-paint flash of the wrong mood
-- [ ] CTA opens a prefilled email with the subject and five-line template; address and template also shown as copyable text
-- [ ] Copy covers what it is, what it isn't, and how to get in during beta — owner approves final wording (same bar as SMS copy)
-- [ ] `noindex` present; no analytics or tracking; no links into the web app
-- [ ] "Already testing?" footer present: Android carries the Play link with works-once-you're-added copy; iOS is instruction-only (TestFlight / home-screen icon); no custom-scheme URLs
-- [ ] Deploys via its own `npm run deploy:landing`, independent of the web build
+- [x] Page serves at its Pages URL and renders correctly at desktop and ~390px mobile widths in both moods, with tokens matching current `constants/Colors.ts`
+- [x] Theme swatch toggles Paper/Evening, defaults to Paper, persists across reloads, and syncs browser chrome — no first-paint flash of the wrong mood
+- [x] CTA opens a prefilled email with the subject and five-line template; address and template also shown as copyable text
+- [x] Copy covers what it is, what it isn't, and how to get in during beta — owner approves final wording (same bar as SMS copy)
+- [x] `noindex` present; no analytics or tracking; no links into the web app
+- [x] "Already testing?" footer present: Android carries the Play link with works-once-you're-added copy; iOS is instruction-only (TestFlight / home-screen icon); no custom-scheme URLs
+- [x] Deploys via its own `npm run deploy:landing`, independent of the web build
 
 ### Open Questions
 
