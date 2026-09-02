@@ -1936,7 +1936,7 @@ There is no public explanation of the app and no structured way for an intereste
 
 ### Solution
 
-One static page — "Events" — in the Paper design language, on its own Cloudflare Pages project (receipt/ precedent). Copy adapted from `docs/events-product.md`: what it is (a calendar of events your people share with you), what it isn't (no feed, no likes, nothing to scroll), and how to get in during beta. The only CTA is a `mailto:` to the owner with a prefilled template containing everything fulfillment needs:
+One static page — "Events" — in the app's design language, on its own Cloudflare Pages project (receipt/ precedent). Copy adapted from `docs/events-product.md`: what it is (a calendar of events your people share with you), what it isn't (no feed, no likes, nothing to scroll), and how to get in during beta. The page carries the app's theme swatch (owner addition 2026-09-02): the same two-tone disc as the calendar header, previewing the other mood, cycling Paper and Evening — Paper by default, persisted across visits, OS color scheme never read. The only CTA is a `mailto:` to the owner with a prefilled template containing everything fulfillment needs:
 
 - Subject: `Events beta — add me`
 - Body prompts: first and last name (ASC invites require both) · who told you about Events (provenance — friend-of-a-friend vs random) · iPhone or Android · if iPhone, the email their Apple ID is under · if Android, the Gmail their Play Store uses.
@@ -1946,14 +1946,16 @@ The address and template also render as copyable text — `mailto:` is inert in 
 ### Technical Notes
 
 - New top-level `landing/` directory: static HTML/CSS like `receipt/index.html`, plus its own Wrangler project and `npm run deploy:landing` (same Cloudflare secrets as `deploy:receipt`). Pages project names are globally unique (`events-app` was taken) — pick an available name at build time.
-- Paper tokens copied from current `constants/Colors.ts` values — not from `receipt/index.html`, whose accent predates the 2026-09-01 contrast fixes. Serif display voice per design doc §4. The Paper E’s monogram from `assets/` heads the page and serves as favicon.
+- Both palettes (Paper and Evening) ported from current `constants/Colors.ts` values as CSS variables — not from `receipt/index.html`, whose accent predates the 2026-09-01 contrast fixes. Typeface voice follows the mood per design doc §4 (serif titles in Paper, clean sans in Evening). The Paper E’s monogram from `assets/` heads the page and serves as favicon.
+- The theme swatch behaves exactly as in the app (design doc §7): a small circular two-tone disc in the *other* mood's colors, the destination named in the accessibility label ("Switch to Evening theme"), never a sun/moon icon. Browser chrome follows the mood — `theme-color`, `color-scheme`, page background (the static-page equivalent of `applyWebBrowserChrome`). A tiny inline `<head>` script applies the saved mood before first paint, so a returning Evening visitor never sees a Paper flash.
 - mailto href with URL-encoded subject/body; guidance copy ("Apple sends two emails; accept the first…") lives on the page above the button so the body stays skeletal.
 - `<meta name="robots" content="noindex">`; no analytics, no tracking. Link the existing `/privacy.html`.
 - Tester fulfillment stays manual: Android via Play Console email-list paste (no tester-list API exists — Play's `edits.testers` manages Google Groups only); iOS via ASC invite (Marketing role, scoped to Shared Events) plus the group add after they accept. If iOS volume ever justifies scripting, the move to external TestFlight changes the process anyway — revisit then, not now.
 
 ### Acceptance Criteria
 
-- [ ] Page serves at its Pages URL and renders correctly at desktop and ~390px mobile widths, in the Paper language, with tokens matching current `constants/Colors.ts`
+- [ ] Page serves at its Pages URL and renders correctly at desktop and ~390px mobile widths in both moods, with tokens matching current `constants/Colors.ts`
+- [ ] Theme swatch toggles Paper/Evening, defaults to Paper, persists across reloads, and syncs browser chrome — no first-paint flash of the wrong mood
 - [ ] CTA opens a prefilled email with the subject and five-line template; address and template also shown as copyable text
 - [ ] Copy covers what it is, what it isn't, and how to get in during beta — owner approves final wording (same bar as SMS copy)
 - [ ] `noindex` present; no analytics or tracking; no links into the web app
