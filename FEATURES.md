@@ -52,7 +52,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Provider Matrix Drift Check](#provider-matrix-drift-check) | Considering | Scheduled CI re-check of the autofill provider matrix. Owner deferred 2026-09-01 — manual agent sweeps suffice. |
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. |
-| [Design System Consolidation](#design-system-consolidation) | In progress | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Worst-first from the event detail screen; form grammar lands before Richer Link Autofill. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). |
+| [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
 
 ## Using and testing
 
@@ -1851,7 +1851,7 @@ Rationale for the gear living on the People screen and not the calendar header: 
 
 ## Design System Consolidation
 
-**Status:** In progress (picked up 2026-09-01). Recorded 2026-09-01 from the app-wide UX pattern audit — [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md) (per-screen inventories, severity-ranked findings UX-01…UX-27, each marked DERIVED/JUDGMENT with its basis cite). Owner rulings 2026-09-01: **scope approved — "make the entire app coherent"**; this entry **absorbs** [Button Size & Clickability](#button-size--clickability) (now Superseded; its native feel pass rides these phases, KI-008 in Phase 3); the event-detail measure collapses to the app-wide full-width grammar (the centered ceremonial title stays — owner-reserved); the Paper contrast cluster (UX-14/15/16) is **resolved** — token values moved to satisfy §3's ≥4.5:1 sentence (see Technical Notes); UX-20 was split out as [KI-015](manual-tests/known_issues.md) for a separate fixer agent; UX-13 (location-row color) resolved — `linkText` shares the accent's value in both themes and the location row wears it. Related: [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass, which covered one screen). **Sequencing: the form-grammar work (Phase 2) must land before [Richer Link Autofill](#richer-link-autofill) starts** — that feature rebuilds the add/edit forms, and building it on today's drifted form grammar would bake the drift in.
+**Status:** Implemented 2026-09-02 (picked up 2026-09-01). All four phases landed: Phase 1 (event detail + the two grammar-D modal headers) and the conventions/holistic-review rules shipped 2026-09-01; Phases 2–3 (add/edit + auth form grammar, share/people/archived, verify's wrong-number exit, onboarding, one retry color) plus the baseline regeneration landed 2026-09-02; Phase 4 was verification-only — the calendar header already met the grammar (real 44pt targets throughout, §7-designed swatch/help/FAB shapes), so no pixels moved. One anomaly recorded as [KI-016](manual-tests/known_issues.md) (CI-only "Hide this person" in the event-detail render; predates this feature, never reproduced locally). Richer Link Autofill's form-grammar gate is now satisfied. Recorded 2026-09-01 from the app-wide UX pattern audit — [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md) (per-screen inventories, severity-ranked findings UX-01…UX-27, each marked DERIVED/JUDGMENT with its basis cite). Owner rulings 2026-09-01: **scope approved — "make the entire app coherent"**; this entry **absorbs** [Button Size & Clickability](#button-size--clickability) (now Superseded; its native feel pass rides these phases, KI-008 in Phase 3); the event-detail measure collapses to the app-wide full-width grammar (the centered ceremonial title stays — owner-reserved); the Paper contrast cluster (UX-14/15/16) is **resolved** — token values moved to satisfy §3's ≥4.5:1 sentence (see Technical Notes); UX-20 was split out as [KI-015](manual-tests/known_issues.md) for a separate fixer agent; UX-13 (location-row color) resolved — `linkText` shares the accent's value in both themes and the location row wears it. Related: [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) (the 2026-08-15 44pt pass, which covered one screen). **Sequencing: the form-grammar work (Phase 2) must land before [Richer Link Autofill](#richer-link-autofill) starts** — that feature rebuilds the add/edit forms, and building it on today's drifted form grammar would bake the drift in.
 
 ### Problem
 
@@ -1906,19 +1906,19 @@ Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar
 
 ### Acceptance Criteria
 
-- [ ] `components/AppHeader.tsx` exists; every pushed screen and sheet uses it; no bare "Back" text buttons remain (lint-enforced); verify has a wrong-number exit
-- [ ] The three-tier button set exists; event detail's action stack is primary Share + secondary Edit + quiet Archive/Remove; no 20px button text or r16 buttons remain (lint-enforced)
-- [ ] Every header/modal action has a real 44pt visible target without hitSlop (PeoplePicker and ManualAddPersonModal included)
-- [ ] Add/edit forms consolidated to one input grammar before Richer Link Autofill starts; edit-event no longer offers Remove Event on received rows
-- [ ] `check-conventions.mjs` gains the fontSize cap, borderRadius spectrum, and bare-Back rules; fast checks green
-- [ ] Location-row color resolved per the owner's UX-13 ruling
-- [ ] Visual baselines regenerated per touched screen via the CI workflow; full suite green on every phase
-- [ ] The holistic-screen-review convention text lands in AGENTS.md / project rules with Phase 1
+- [x] `components/AppHeader.tsx` exists; every pushed screen and sheet uses it; no bare "Back" text buttons remain (lint-enforced); verify has a wrong-number exit
+- [x] The three-tier button set exists; event detail's action stack is primary Share + secondary Edit + quiet Archive/Remove; no 20px button text or r16 buttons remain (lint-enforced)
+- [x] Every header/modal action has a real 44pt visible target without hitSlop (PeoplePicker and ManualAddPersonModal included)
+- [x] Add/edit forms consolidated to one input grammar before Richer Link Autofill starts; edit-event no longer offers Remove Event on received rows (KI-015, shipped 2026-09-01)
+- [x] `check-conventions.mjs` gains the fontSize cap, borderRadius spectrum, and bare-Back rules; fast checks green
+- [x] Location-row color resolved per the owner's UX-13 ruling
+- [x] Visual baselines regenerated per touched screen (CI-rendered actuals from run 33575687270 via the documented `visual.spec.ts` fallback — the workflow-dispatch path's equivalent); full suite green on every phase
+- [x] The holistic-screen-review convention text lands in AGENTS.md / project rules with Phase 1
 
 ### Open Questions
 
 - ~~Does this absorb Button Size & Clickability~~ — resolved 2026-09-01: yes, absorbed (owner: "make the entire app coherent").
 - ~~The event-detail content measure~~ — resolved 2026-09-01: the 600/400/centered mix collapses to the app-wide full-width grammar; the centered ceremonial title stays (owner-reserved).
 - ~~UX-13 location-row color~~ — resolved 2026-09-01 (owner): the accent/linkText relationship must be identical across themes, so `linkText` shares the accent's value in both themes and the location row wears `linkText` (a visual no-op under the merged values). §3 records the ruling.
-- Exact pill heuristic for the radius lint (style-local `2 × radius` match vs an explicit allowlist).
-- Whether the selection-glyph rule graduates from code review to lint.
+- ~~Exact pill heuristic for the radius lint~~ — resolved 2026-09-01: the style-local `2 × radius` match shipped in the conventions rule (chips, FAB, help button, swatch pass; everything else must sit in 4–12).
+- ~~Whether the selection-glyph rule graduates from code review to lint~~ — resolved 2026-09-02: stays a code-review rule; no clean lint heuristic emerged, and the two known violators (PeoplePicker, circle editor) now use the §6 circle.

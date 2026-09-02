@@ -149,13 +149,18 @@ never added: a blocker must be fixed, not accepted.
 ### KI-008 — Notifications modal switches are too small to tap comfortably
 
 - Severity: minor
-- Status: open
+- Status: open — fix landed 2026-09-02 (Design System Consolidation Phase
+  3); pending owner on-device confirmation (no Android device in a cloud
+  VM).
 - Found: 2026-08-18 owner smoke of preview APK `a7ce79c8`. Owner ruling:
   not a tester blocker.
 - Expected: Push and SMS switches are easy to hit (≥44pt).
 - Actual: the `ThemedSwitch` controls in the People → Notifications modal
   (`app/(app)/people.tsx`) feel too small on a phone. Broader button
   size/clickability is also a Planned feature in `FEATURES.md`.
+- Fix: the whole row is now the switch — one accessible control
+  (role=switch with checked state) wrapping a full-width 44pt+ target; the
+  visual `ThemedSwitch` is aria-hidden inside it.
 - Repro: People footer → Notifications → tap either switch. Native
   Android; not a web-review item.
 
@@ -402,6 +407,40 @@ flag that.
 - Fix (separate task): render the chevrons as vector icons
   (`@expo/vector-icons`, tinted by `theme.textPrimary`) instead of the
   library's tinted-PNG arrows, or pass custom `renderArrow`.
+
+### KI-016 — CI visual-spec renders a "Hide this person" action on a self-created event
+
+- Severity: minor (test-harness anomaly; user impact unverified — never
+  reproduced outside CI).
+- Status: open — recorded 2026-09-02; needs a dedicated investigation.
+- Found: 2026-09-02, Design System Consolidation baseline regeneration
+  (run 33575687270). Also present in the Location-era baseline
+  (`1ea009a`, generated 2026-09-01) — predates the consolidation. The
+  pre-Location baseline (`e8dbd24`) does NOT have it.
+- Expected: the event detail screen for a self-created event shows
+  Share / Edit / Remove Event — the Hide action is gated on the
+  `sharedByPersonId` nav param, which only received events carry.
+- Actual: in CI renders of `e2e/visual.spec.ts` "event detail matches
+  baseline" (all three projects, both attempts, deterministic), the action
+  stack includes a quiet "Hide this person" line (the `sharerName ?? 'this
+  person'` fallback, so the param was truthy but matched no `my_people`
+  row). CI was green on the old baseline carrying it for 7+ runs, so the
+  trigger is stable in CI, not flaky.
+- Evidence against a product bug: the deployed `get_calendar_events`
+  returns `sharer_person_id: null, from_user_id: null` for the pinned
+  rows (queried directly as account A); the trace's frameUrls are clean
+  (no query param); the trace's DOM snapshots never contain "Hide" (nor do
+  the error-context aria snapshots) while the screencast JPEGs and the
+  screenshot actuals show it; the full local suite on the same standing
+  account with the same build does NOT reproduce it (three attempts,
+  including the exact CI flow).
+- Repro: unknown outside CI. Locally: none found.
+- Note for fixer: start from the screenshot-vs-DOM-snapshot disagreement —
+  either the element exists only at screenshot-polling time (a transient
+  the action-bound DOM snapshots miss), or the render comes from a layer
+  the snapshotter doesn't cover. The visual baselines regenerated
+  2026-09-02 carry the anomaly; if a fix lands, regenerate the
+  event-detail baselines again.
 
 ## Deleted bug classes (do not re-flag, do not reintroduce)
 
