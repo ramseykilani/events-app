@@ -1943,6 +1943,8 @@ One static page — "Events" — in the app's design language, on its own Cloudf
 
 The address and template also render as copyable text — `mailto:` is inert in a browser with no mail handler. No form, no backend, no data collection, no phone-number field (owner call 2026-09-02). No links into the web app — the distribution strategy holds; this page is a destination the owner hands people, not a user flow. `noindex` while in beta (receipt precedent); removed at launch.
 
+A quiet "Already testing?" footer serves the returning visitor (owner addition 2026-09-02). Android gets a Play link with works-once-you're-added copy (the internal-track listing is visible only to joined testers); iOS gets an instruction line, no link — open TestFlight once the invite is accepted, then the home-screen icon. At launch this footer is replaced by the real store badges and deep links (SMS Links at Launch).
+
 ### Technical Notes
 
 - New top-level `landing/` directory: static HTML/CSS like `receipt/index.html`, plus its own Wrangler project and `npm run deploy:landing` (same Cloudflare secrets as `deploy:receipt`). Pages project names are globally unique (`events-app` was taken) — pick an available name at build time.
@@ -1952,6 +1954,7 @@ The address and template also render as copyable text — `mailto:` is inert in 
 - mailto href with URL-encoded subject/body; guidance copy ("Apple sends two emails; accept the first…") lives on the page above the button so the body stays skeletal.
 - `<meta name="robots" content="noindex">`; no analytics, no tracking. Link the existing `/privacy.html`.
 - Tester fulfillment stays manual: Android via Play Console email-list paste (no tester-list API exists — Play's `edits.testers` manages Google Groups only); iOS via ASC invite (Marketing role, scoped to Shared Events) plus the group add after they accept. If iOS volume ever justifies scripting, the move to external TestFlight changes the process anyway — revisit then, not now.
+- The "Already testing?" Android link targets the standing Play internal-track opt-in URL (the same link the `STATUS.md` tester flow uses — it joins new testers and lands joined testers on the listing with Open/Install); exact target and copy decided at build with the owner. iOS has no per-app URL to offer: internal TestFlight invites are per-person emails, public links are external-testing only, and universal links don't exist until SMS Links at Launch. No custom-scheme (`events-app://`) links anywhere — they don't linkify reliably and error for anyone without the app.
 
 ### Acceptance Criteria
 
@@ -1960,6 +1963,7 @@ The address and template also render as copyable text — `mailto:` is inert in 
 - [ ] CTA opens a prefilled email with the subject and five-line template; address and template also shown as copyable text
 - [ ] Copy covers what it is, what it isn't, and how to get in during beta — owner approves final wording (same bar as SMS copy)
 - [ ] `noindex` present; no analytics or tracking; no links into the web app
+- [ ] "Already testing?" footer present: Android carries the Play link with works-once-you're-added copy; iOS is instruction-only (TestFlight / home-screen icon); no custom-scheme URLs
 - [ ] Deploys via its own `npm run deploy:landing`, independent of the web build
 
 ### Open Questions
