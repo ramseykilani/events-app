@@ -44,6 +44,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Per-User Events (Copy + Follow)](#per-user-events-copy--follow) | Implemented | Storage rewrite + silent edit propagation. Spec: [docs/per-user-events-copy-follow-spec.md](docs/per-user-events-copy-follow-spec.md). Shipped 2026-08-24. |
 | [Creator-Linked Events (Edits Propagate)](#creator-linked-events-edits-propagate) | Superseded | Copy + Follow shipped the wanted half without the hosted-event model |
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
+| [Share Subscription](#share-subscription) | Planned | Annual sub to share; receive stays free. Model decided 2026-09-02; **do not implement** — timing is an open owner question. Spec: [docs/events-monetization.md](docs/events-monetization.md). |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
@@ -1409,6 +1410,26 @@ Not designed. The need is: the sign-out pop-up should not feel lacking, especial
 ### Open Questions
 
 - Copy, button labels, and the surface itself — none of that is decided.
+
+---
+
+## Share Subscription
+
+**Status:** Planned — model decided 2026-09-02; **do not implement.** Timing is an open owner question. Internal testers should meet the product, not a paywall. Source of truth: [docs/events-monetization.md](docs/events-monetization.md). This section is a pointer so the idea isn’t rebuilt from memory; it is not a build spec.
+
+### What was decided
+
+- Cash-cow / owner-distribution, not a startup. Surplus is taken out, not spent growing this app.
+- **Annual subscription to share.** No subscription → cannot share; can still use the app (calendar, receive, Who's Coming).
+- Flat rate, SMS included. No per-send / per-SMS meter. Light users subsidizing heavy users is fine; the 50-person cap bounds it.
+- Annual, not month-to-month (monthly, if it ever exists, is a worse-value option).
+- Receive, answering, and the SMS receipt page stay free.
+
+Rejected (do not “just try” these): postage billing, ads, paying to raise the 50-cap, paywalling receive, ticket affiliate / take-rate, a venue product inside this app. SMS cost-cutting (skip SMS when push landed, shorter bodies, cheaper CPaaS) is later maintenance, not this feature.
+
+### Decision
+
+Do not build. Revisit only when the owner names a when. Price, IAP, and gate UX are undesigned.
 
 ---
 
