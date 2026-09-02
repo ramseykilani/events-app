@@ -42,6 +42,12 @@ test('event detail: share sheet, edit in place, formatted date, remove', async (
   await expect(page.getByText(/\d{4}-\d{2}-\d{2}/)).not.toBeVisible();
   // No location was entered — the Maps row renders nothing (Location).
   await expect(page.getByRole('button', { name: /in Maps$/ })).toHaveCount(0);
+  // A self-created event has no Hide action — that rides the sharedByPersonId
+  // nav param, which only received events carry (KI-016: guards the DOM truth
+  // directly, independent of the haunted CI pixel render).
+  await expect(
+    page.getByRole('button', { name: /^(Hide|Unhide) / }).filter({ visible: true })
+  ).toHaveCount(0);
 
   // Share from detail routes to the same sheet and back.
   await page.getByRole('button', { name: 'Share', exact: true }).click();
