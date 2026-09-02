@@ -53,7 +53,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. Owner 2026-09-02: gear/Add crowding is [KI-017](manual-tests/known_issues.md). |
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
-| [Beta Landing Page](#beta-landing-page) | Planned | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. |
+| [Beta Landing Page](#beta-landing-page) | In progress | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. |
 
 ## Using and testing
 
@@ -1928,7 +1928,7 @@ Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar
 
 ## Beta Landing Page
 
-**Status:** Planned — spec owner-approved 2026-09-02. The seed of the future launch page: built as its own Pages project now so launch is a domain attachment, not a migration. Tester fulfillment stays manual on both platforms (owner call 2026-09-02); the prefilled email is the automation — it kills the reply chains, which is where the real cost was.
+**Status:** In progress — spec owner-approved 2026-09-02. The seed of the future launch page: built as its own Pages project now so launch is a domain attachment, not a migration. Tester fulfillment stays manual on both platforms (owner call 2026-09-02); the prefilled email is the automation — it kills the reply chains, which is where the real cost was.
 
 ### Problem
 
