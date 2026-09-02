@@ -413,8 +413,11 @@ flag that.
 
 - Severity: minor (test-harness anomaly; **no user impact — confirmed
   2026-09-02** the app render is correct).
-- Status: open — investigated 2026-09-02 (see below). Root cause is a
-  CI-runner rendering artifact, not app code; not reproducible off CI.
+- Status: accepted (owner-reviewed 2026-09-02) — investigated (see below) and
+  confirmed a benign CI-runner rendering artifact, not app code; not
+  reproducible off CI. Cosmetic and non-failing. Do not flag in release
+  review and do not re-investigate unless it starts failing tests or
+  reproduces outside CI.
 - Found: 2026-09-02, Design System Consolidation baseline regeneration
   (run 33575687270). Also present in the Location-era baseline
   (`1ea009a`, generated 2026-09-01) — predates the consolidation. The
