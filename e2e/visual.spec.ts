@@ -166,7 +166,11 @@ test('event detail matches baseline', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Remove Event' })
   ).toBeVisible({ timeout: 15000 });
-  await expect(page).toHaveScreenshot('event-detail.png', SHOT);
+  // KI-016 DIAGNOSTIC (temporary): threshold 0 forces a failure — and a
+  // report upload with CI's actual render — iff the render differs from the
+  // phantom-carrying baseline, i.e. iff the Date-only freeze removed the
+  // phantom "Hide this person". Revert after reading the actual.
+  await expect(page).toHaveScreenshot('event-detail.png', { ...SHOT, maxDiffPixelRatio: 0 });
 
   // Cleanup: the calendar's day list stays deterministically empty next run.
   page.once('dialog', (dialog) => dialog.accept());
