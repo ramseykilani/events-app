@@ -63,6 +63,7 @@ scripts/             Helper scripts (e.g. manual test preflight runner, generate
 supabase/migrations/ SQL migrations (schema, RLS, triggers, RPCs) — run in order
 supabase/functions/  Edge Functions (send-notification, og-metadata, cleanup-people, twilio-status, send-response-notification, send-response; shared helpers in _shared/)
 receipt/             Who's Coming receipt page (static, one page) — deployed to the events-reply Pages project via npm run deploy:receipt
+landing/             Beta landing page (static, one page) — its own Pages project via npm run deploy:landing (agent-run, no CI; first-deploy gate: FEATURES.md → Beta Landing Page)
 ```
 
 ## Data flow cheat sheet
