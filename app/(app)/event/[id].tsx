@@ -33,6 +33,9 @@ import {
   rememberEventPreview,
 } from '../../../lib/eventPreviewCache';
 import { isAbortError, withRetries, withWriteTimeout } from '../../../lib/timeoutSignal';
+import { EMPTY_REGISTRY, tagListingUrl } from '../../../lib/affiliateLinks';
+import type { AffiliateRegistry } from '../../../lib/affiliateLinks';
+import { getAffiliateRegistry } from '../../../lib/affiliateRegistry';
 
 type SharedWithPerson = {
   id: string;
@@ -52,6 +55,17 @@ type ReplyState = {
 
 function firstParam(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+// Affiliate Link Tagging: every outbound use of the listing URL on this
+// screen — the "Open link" tap and the Add-to-calendar export bodies —
+// carries the affiliate tag when the provider's program is live. The
+// registry rides the focus load (never the tap path) and fails open to
+// untagged. The share SMS is never tagged (send-notification doesn't read
+// the registry).
+function withTaggedListingUrl(event: Event, registry: AffiliateRegistry): Event {
+  if (!event.url) return event;
+  return { ...event, url: tagListingUrl(event.url, registry) };
 }
 
 // The answer-save confirmation (design-language §6 → Confirmation feedback):
@@ -113,9 +127,18 @@ export default function EventDetailScreen() {
   const loadSeq = useRef(0);
   const hasContentRef = useRef(!!seeded);
   const writeInFlightRef = useRef(false);
+  // The affiliate registry, refreshed on focus. A ref, not state: it never
+  // changes what renders, only where the listing link points.
+  const registryRef = useRef<AffiliateRegistry>(EMPTY_REGISTRY);
 
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;
+
+    // Fail-open by design (never throws, never joins the screen's error
+    // path): a tagging outage degrades to untagged links, not a banner.
+    void getAffiliateRegistry().then((registry) => {
+      registryRef.current = registry;
+    });
 
     if (!id || !session?.user?.id) {
       setAccessRevoked(false);
@@ -290,7 +313,7 @@ export default function EventDetailScreen() {
   const handleAddToGoogle = async () => {
     if (!event) return;
     try {
-      await addToGoogle(event);
+      await addToGoogle(withTaggedListingUrl(event, registryRef.current));
     } catch (err) {
       console.error('Failed to open Google Calendar:', err);
       showAlert('Could not open', 'Something went wrong. Try again.');
@@ -300,7 +323,7 @@ export default function EventDetailScreen() {
   const handleAddToOtherCalendar = async () => {
     if (!event) return;
     try {
-      await addToOtherCalendar(event);
+      await addToOtherCalendar(withTaggedListingUrl(event, registryRef.current));
     } catch (err) {
       console.error('Failed to add to calendar:', err);
       showAlert('Could not add to calendar', 'Something went wrong. Try again.');
@@ -728,7 +751,9 @@ export default function EventDetailScreen() {
           {event.url ? (
             <TouchableOpacity
               style={styles.link}
-              onPress={() => Linking.openURL(event.url!)}
+              onPress={() =>
+                Linking.openURL(tagListingUrl(event.url!, registryRef.current))
+              }
               activeOpacity={0.6}
               accessibilityRole="button"
             >

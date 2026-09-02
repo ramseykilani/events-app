@@ -8,6 +8,7 @@ import {
   rememberEventPreview,
 } from '../../../lib/eventPreviewCache';
 import { FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from '../../../lib/timeoutSignal';
+import { EMPTY_REGISTRY } from '../../../lib/affiliateLinks';
 import EventDetailScreen from '../../../app/(app)/event/[id]';
 
 const mockEventsMaybeSingle = jest.fn();
@@ -39,6 +40,7 @@ const mockRpc = jest.fn();
 const mockFunctionsInvoke = jest.fn();
 const mockAddToGoogle = jest.fn();
 const mockAddToOtherCalendar = jest.fn();
+const mockGetAffiliateRegistry = jest.fn();
 
 const mockSessionState: { session: { user: { id: string } } | null } = {
   session: { user: { id: 'u1' } },
@@ -63,6 +65,12 @@ jest.mock('../../../lib/supabase', () => ({
 jest.mock('../../../lib/addToCalendar', () => ({
   addToGoogle: (...args: unknown[]) => mockAddToGoogle(...args),
   addToOtherCalendar: (...args: unknown[]) => mockAddToOtherCalendar(...args),
+}));
+
+// Affiliate Link Tagging: the registry read is mocked; default empty (every
+// link untagged) unless a test sets a live program.
+jest.mock('../../../lib/affiliateRegistry', () => ({
+  getAffiliateRegistry: (...args: unknown[]) => mockGetAffiliateRegistry(...args),
 }));
 
 const eventRow = {
@@ -149,6 +157,7 @@ describe('app/(app)/event/[id]', () => {
       abortablePromise(Promise.resolve({ data: [], error: null }))
     );
     mockFunctionsInvoke.mockResolvedValue({ data: { sent: 1 }, error: null });
+    mockGetAffiliateRegistry.mockResolvedValue(EMPTY_REGISTRY);
   });
 
   afterEach(() => {
@@ -186,6 +195,102 @@ describe('app/(app)/event/[id]', () => {
 
     fireEvent.press(otherButton);
     await waitFor(() => expect(mockAddToOtherCalendar).toHaveBeenCalledWith(eventRow));
+  });
+
+  // Affiliate Link Tagging: a live program rewrites every outbound use of
+  // the listing URL on this screen; anything else passes through untouched.
+  const LIVE_TM_REGISTRY = {
+    enabled: true,
+    programs: [
+      {
+        id: 'ticketmaster',
+        domains: ['ticketmaster.com'],
+        url_template: 'https://network.test/click?u={url}',
+        enabled: true,
+      },
+    ],
+  };
+  const TM_URL = 'https://www.ticketmaster.com/event/abc123';
+  const TM_TAGGED = `https://network.test/click?u=${encodeURIComponent(TM_URL)}`;
+
+  it('opens the listing link with the affiliate tag when the program is live', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    try {
+      mockEventsMaybeSingle.mockResolvedValue({
+        data: { ...eventRow, url: TM_URL },
+        error: null,
+      });
+      mockGetAffiliateRegistry.mockResolvedValue(LIVE_TM_REGISTRY);
+
+      const screen = render(<EventDetailScreen />);
+      const link = await screen.findByText('Open link');
+      await act(async () => {}); // let the registry .then land
+      fireEvent.press(link);
+
+      expect(openURL).toHaveBeenCalledWith(TM_TAGGED);
+    } finally {
+      openURL.mockRestore();
+    }
+  });
+
+  it('opens the listing URL byte-identical when the global switch is off', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    try {
+      mockEventsMaybeSingle.mockResolvedValue({
+        data: { ...eventRow, url: TM_URL },
+        error: null,
+      });
+      mockGetAffiliateRegistry.mockResolvedValue({
+        ...LIVE_TM_REGISTRY,
+        enabled: false,
+      });
+
+      const screen = render(<EventDetailScreen />);
+      const link = await screen.findByText('Open link');
+      await act(async () => {});
+      fireEvent.press(link);
+
+      expect(openURL).toHaveBeenCalledWith(TM_URL);
+    } finally {
+      openURL.mockRestore();
+    }
+  });
+
+  it('opens an uncovered provider byte-identical even with a live program', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    try {
+      mockEventsMaybeSingle.mockResolvedValue({
+        data: { ...eventRow, url: 'https://example.com/listing' },
+        error: null,
+      });
+      mockGetAffiliateRegistry.mockResolvedValue(LIVE_TM_REGISTRY);
+
+      const screen = render(<EventDetailScreen />);
+      const link = await screen.findByText('Open link');
+      await act(async () => {});
+      fireEvent.press(link);
+
+      expect(openURL).toHaveBeenCalledWith('https://example.com/listing');
+    } finally {
+      openURL.mockRestore();
+    }
+  });
+
+  it('sends the tagged listing URL to the calendar exports', async () => {
+    mockEventsMaybeSingle.mockResolvedValue({
+      data: { ...eventRow, url: TM_URL },
+      error: null,
+    });
+    mockGetAffiliateRegistry.mockResolvedValue(LIVE_TM_REGISTRY);
+
+    const screen = render(<EventDetailScreen />);
+    const googleButton = await screen.findByLabelText('Add to Google Calendar');
+    await act(async () => {});
+    fireEvent.press(googleButton);
+
+    await waitFor(() =>
+      expect(mockAddToGoogle).toHaveBeenCalledWith({ ...eventRow, url: TM_TAGGED })
+    );
   });
 
   it('shows a short alert when the calendar export fails', async () => {
