@@ -101,13 +101,15 @@ test('renders Paper by default with the mock, mailto CTA, fallback, and footer',
   const howBox = await how.boundingBox();
   expect(howBox!.y).toBeGreaterThan(betaBox!.y + betaBox!.height);
 
-  // Below the hero, beta / How it works / footer share one 760px measure —
-  // same width, same left edge (desktop polish 2026-09-03).
+  // One 1080px measure for the whole page: hero, beta, How it works, and
+  // footer share the same width and left edge (owner call 2026-09-03 —
+  // narrower below-hero sections read ragged against the wide hero).
+  const heroBox = await page.locator('.hero').boundingBox();
   const footerBox = await page.locator('footer').boundingBox();
-  expect(betaBox!.width).toBe(howBox!.width);
-  expect(howBox!.width).toBe(footerBox!.width);
-  expect(betaBox!.x).toBe(howBox!.x);
-  expect(howBox!.x).toBe(footerBox!.x);
+  for (const box of [betaBox, howBox, footerBox]) {
+    expect(box!.width).toBe(heroBox!.width);
+    expect(box!.x).toBe(heroBox!.x);
+  }
 
   // "Already testing?" footer: Android carries the standing Play internal
   // opt-in link; the iPhone line is instruction-only (internal TestFlight

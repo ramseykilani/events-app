@@ -28,10 +28,10 @@
   works stays on the page ground, the CTA keeps its 12px radius.
 
   Desktop polish (owner-approved 2026-09-03): the mock grows to 480px so
-  the product shot carries the hero's right column, everything below the
-  hero shares one 760px measure (beta / How it works / footer align), and
-  the hero gets the candidate's 56/72px vertical rhythm. Mobile is
-  untouched — phone viewports never reach the mock cap.
+  the product shot carries the hero's right column, every section spans
+  the hero's 1080px measure (prose inside keeps a 65ch reading measure),
+  and the hero gets the candidate's 56/72px vertical rhythm. Mobile is
+  untouched — phone viewports never reach these caps.
 
   Role tokens are ported 1:1 from constants/Colors.ts (2026-09-02) — the
   receipt page's stale accent is the cautionary tale (UX-25), so if
@@ -160,8 +160,10 @@
     pointer-events: none;
     z-index: 0;
   }
-  /* Header and hero share the wide 1080px measure (the two-column hero
-     needs it); everything below the hero shares one 760px measure. */
+  /* One 1080px measure for the whole page — header, hero, and every
+     section below share the same edges (owner call 2026-09-03: narrower
+     below-hero sections read ragged against the wide hero). Prose inside
+     keeps a 65ch reading measure; boxes and hairlines span the grid. */
   header {
     max-width: 1080px;
     margin: 0 auto;
@@ -336,14 +338,16 @@
     font-weight: 600;
     margin: 0 0 8px;
   }
-  /* Below the hero everything shares one 760px measure — beta, How it
-     works, and the footer align on the same edges (desktop polish,
-     2026-09-03). */
   .beta {
-    max-width: 760px;
+    max-width: 1080px;
     margin: 0 auto;
   }
   .beta p { margin: 0 0 20px; }
+  /* Prose keeps a reading measure inside the full-width section. */
+  .beta > p,
+  .guidance {
+    max-width: 65ch;
+  }
   /* The one CTA wears the primary-button roles (§3 accent discipline). */
   .cta {
     display: flex;
@@ -374,6 +378,7 @@
     font-size: 14px;
     color: var(--text-secondary);
     margin: 0 0 12px;
+    max-width: 65ch;
   }
   .fallback .address { color: var(--text-primary); font-weight: 500; }
   .template div {
@@ -386,7 +391,7 @@
      (owner rulings 2026-09-03). Placed after the beta block: the CTA
      stays high. */
   .how {
-    max-width: 760px;
+    max-width: 1080px;
     margin: 64px auto 0;
   }
   .principle {
@@ -414,7 +419,7 @@
     max-width: 60ch;
   }
   footer {
-    max-width: 760px;
+    max-width: 1080px;
     margin: 48px auto 0;
     padding-top: 24px;
     border-top: 1px solid var(--border-light);
