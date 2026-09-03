@@ -39,6 +39,5 @@ Logged in `manual-tests/known_issues.md`:
 
 ## Summary
 
-- Overall result: **pass.** Play internal production EAS proceeds from
-  promoted `23ca55f`. TestFlight waits on a first iPhone tester.
+- Overall result: **pass.** Play internal production EAS **submitted** (versionCode **9**, build `1a20a583`). TestFlight waits on a first iPhone tester.
 - Known blockers: none.
