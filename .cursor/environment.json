@@ -1,4 +1,4 @@
 {
-  "install": "sudo apt-get update && sudo apt-get install -y postgresql && npm install",
+  "install": "sudo apt-get update && sudo apt-get install -y postgresql && npm install && npx playwright install --with-deps chromium webkit",
   "start": "sudo service postgresql start"
 }
