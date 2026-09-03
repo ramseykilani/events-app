@@ -163,6 +163,15 @@ BEGIN
 EXCEPTION WHEN unique_violation THEN
   RAISE NOTICE 'PASS T8b: duplicate play_email rejected';
 END $$;
+DO $$
+BEGIN
+  INSERT INTO public.beta_signups
+    (first_name, last_name, platform, play_email, phone, android_status)
+  VALUES ('Grace', 'Again', 'android', 'grace2@gmail.com', '+14165551234', 'pending');
+  RAISE EXCEPTION 'FAIL T8d: a duplicate phone was accepted';
+EXCEPTION WHEN unique_violation THEN
+  RAISE NOTICE 'PASS T8d: duplicate phone rejected';
+END $$;
 -- NULLs never collide: a second iOS-only row (phone NULL) inserts fine.
 INSERT INTO public.beta_signups
   (first_name, last_name, platform, apple_email, ios_status)

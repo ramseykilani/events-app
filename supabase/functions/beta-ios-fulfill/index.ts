@@ -12,10 +12,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 //              invite.
 //   invited  → GET /v1/users?filter[email]=… — the user row appears once
 //              the tester accepts (the one human-paced step) → accepted.
-//   accepted → POST /v1/betaGroups/{id}/relationships/betaTesters (the
-//              "Team (Expo)" internal group) → added. Apple emails the
-//              TestFlight invite. No completion message from us — Apple's
-//              two emails do the work.
+//   accepted → the beta-group add uses the betaTesters resource (never the
+//              users id): create-with-group-relationship for new testers,
+//              relationship POST for existing ones, and membership is proven
+//              by reading it back before the row is marked added. Apple
+//              emails the TestFlight invite. No completion message from us —
+//              Apple's two emails do the work.
 //
 // Errors: a 4xx from ASC (other than the already-done 409/422 self-heals)
 // is terminal for the row ('failed' + ios_error — e.g. a bad email will
@@ -311,10 +313,13 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Verify membership — the only honest success signal.
+        // Verify membership — the only honest success signal. The
+        // documented filter surface is the top-level betaTesters list
+        // (filter[email] + filter[betaGroups]); the group-nested listing
+        // does not document filter[email], so don't rely on it.
         const membership = await ascFetch(
           'GET',
-          `/betaGroups/${group.id}/betaTesters?filter[email]=${encodeURIComponent(row.apple_email)}`,
+          `/betaTesters?filter[email]=${encodeURIComponent(row.apple_email)}&filter[betaGroups]=${group.id}`,
           token,
         );
         if (membership.status === 200 && ((membership.body?.data ?? []) as unknown[]).length > 0) {
