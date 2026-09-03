@@ -1,19 +1,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Beta Signup Pipeline (FEATURES.md) — the iOS fulfillment poller. pg_cron
-// runs it every minute (the cleanup-people pattern: verify-jwt stays on at
-// the gateway, the job sends the apikey + x-cron-secret headers, and the
-// function fails closed when its secret is unset). It uses its own
-// BETA_CRON_SECRET rather than sharing CRON_SECRET: function secrets are
-// write-only, so reusing cleanup-people's would mean rotating it and
-// rescheduling a healthy job for no benefit.
+// runs it every minute. Deployed --no-verify-jwt like cleanup-people (the
+// de-facto cron posture on this project): the x-cron-secret header is the
+// auth, the function fails closed when its secret is unset, and the cron
+// command then carries only this single-purpose secret rather than a
+// service-role API key. It uses its own BETA_CRON_SECRET rather than
+// sharing CRON_SECRET: reusing cleanup-people's would mean rescheduling a
+// healthy job for no benefit.
 //
 // It advances beta_signups.ios_status through the App Store Connect API —
 // the whole iOS flow is API-driven, no browser agent:
 //   pending  → POST /v1/userInvitations (MARKETING, visibleApps = Shared
 //              Events only) → invited. Apple emails the tester the account
 //              invite.
-//   invited  → GET /v1/users?filter[email]=… — the user row appears once
+//   invited  → GET /v1/users?filter[username]=… — the user row appears once
 //              the tester accepts (the one human-paced step) → accepted.
 //   accepted → the beta-group add uses the betaTesters resource (never the
 //              users id): create-with-group-relationship for new testers,
@@ -193,6 +194,8 @@ Deno.serve(async (req) => {
     }
 
     // ── invited → accepted (the tester accepted Apple's account invite) ──
+    // /v1/users has no filter[email] — the email filter is filter[username]
+    // (a 400 here is what the first smoke run produced).
     const { data: invitedRows, error: invitedErr } = await db
       .from('beta_signups')
       .select('id, apple_email')
@@ -204,7 +207,7 @@ Deno.serve(async (req) => {
     for (const row of invitedRows ?? []) {
       const res = await ascFetch(
         'GET',
-        `/users?filter[email]=${encodeURIComponent(row.apple_email)}`,
+        `/users?filter[username]=${encodeURIComponent(row.apple_email)}`,
         token,
       );
       if (res.status !== 200) {
