@@ -58,7 +58,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
-| [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins) | Planned | Pull the candidate's hero layout + How-it-works section into the production landing page; seed artifacts stay behind. Direction owner-approved 2026-09-03. |
+| [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins) | In progress | Pull the candidate's hero layout + How-it-works section into the production landing page; seed artifacts stay behind. Direction owner-approved 2026-09-03. |
 
 ## Using and testing
 
@@ -2110,7 +2110,7 @@ Content strategy is inherited unchanged from the owner-approved beta page: the a
 
 ## Landing Page Polish (Three-One-Four Pull-Ins)
 
-**Status:** Planned — direction owner-approved 2026-09-03 ("I really like the header area… I also like the how it works section… I want to include it in the production version"). Not scheduled; pick up when the owner names a when. The candidate page (`landing-v2/`, live at https://events-landing-v2.pages.dev) stays live permanently as a design artifact (owner call 2026-09-03 — "it's fun and cool") and is the copy source for this work.
+**Status:** In progress (2026-09-03) — direction owner-approved 2026-09-03 ("I really like the header area… I also like the how it works section… I want to include it in the production version"). The candidate page (`landing-v2/`, live at https://events-landing-v2.pages.dev) stays live permanently as a design artifact (owner call 2026-09-03 — "it's fun and cool") and is the copy source for this work.
 
 ### Problem
 
