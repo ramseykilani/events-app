@@ -58,6 +58,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
+| [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins) | Planned | Pull the candidate's hero layout + How-it-works section into the production landing page; seed artifacts stay behind. Direction owner-approved 2026-09-03. |
 
 ## Using and testing
 
@@ -2103,4 +2104,51 @@ Content strategy is inherited unchanged from the owner-approved beta page: the a
 
 ### Open Questions
 
-- Which direction becomes the launch page (this, the beta page, or a merge) is the owner's call after comparing the two live.
+- Which direction becomes the launch page (this, the beta page, or a merge) is the owner's call after comparing the two live. Partially answered 2026-09-03: the hero layout and the How-it-works section pull into the production page — see [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins).
+
+---
+
+## Landing Page Polish (Three-One-Four Pull-Ins)
+
+**Status:** Planned — direction owner-approved 2026-09-03 ("I really like the header area… I also like the how it works section… I want to include it in the production version"). Not scheduled; pick up when the owner names a when. The candidate page (`landing-v2/`, live at https://events-landing-v2.pages.dev) stays live and undeleted until this ships — it is the side-by-side comparison surface and the copy source.
+
+### Problem
+
+The production landing page (`landing/` → https://events-landing.pages.dev) is a single centered column: headline, sub, mock calendar, beta block. The Three-One-Four exercise produced a stronger hero arrangement and a principles section that says what the product is better than the current page does. Those pieces should move to the production page; the seed-specific artifacts should not.
+
+### Pull in (owner-approved 2026-09-03)
+
+1. **The two-column hero.** Eyebrow + headline + sub on the left, the product visual on the right (desktop; stacked on mobile, visual after the text). Reference implementation: the `.hero` block in `landing-v2/index.html`. The headline text is unchanged — it is the owner-approved line ("A calendar of events your people share with you.").
+2. **The eyebrow and the italic accent phrase.** A small eyebrow above the H1 with an accent dot (candidate copy: "Person-to-person events" — new visible string, so it needs the owner copy bar), and the H1's key phrase ("your people") set italic in the accent. This is the one new place the accent is spent; everywhere else stays as-is.
+3. **The "How it works" section.** Three hairline-separated rows — mono numeral, serif title, one-or-two-sentence body — placed after the beta block (the CTA stays high). The exact body copy below is what the owner saw and liked on 2026-09-03:
+   - **01 Person to person** — "Everything on it comes from someone you know — added by you, or shared straight to your calendar. Nothing is posted, and nothing is public."
+   - **02 The share is the ask** — "Sharing an event asks who's coming. A yes or a no finds its way back to the asker — from the app, or straight from the text."
+   - **03 Quiet by design** — "You hear from Events when a person does something, and never otherwise."
+   **Renumber 01/02/03.** The candidate's 01/02/04 gap is a seed gag (the string produced no 3) and does not ship; the missing-03 footnote drops with it. With the page gaining sections, also pull the candidate's in-page header nav (anchors: Invite → `#beta`, How it works → `#how`).
+
+### Recommended by the build agent (owner to rule)
+
+4. **Hero visual: keep the mock calendar, not the letter grid.** The seed year-grid only reads as a calendar after the colophon explains it; to a first-time visitor it reads as a word-search. The mock is the app itself — show-don't-tell is the current page's strength. Recommendation: two-column hero with the existing mock on the right. If the owner wants the grid instead, adapt it — 12×6 day cells, six marked days including one two-day event, but blank or day-numbered cells (never the seed characters) and a new caption (owner copy bar; the "Seventy-two days" caption does not ship).
+5. **A second register (optional).** The candidate's dark band gives the page two moods. If wanted, the How-it-works section could wear the Evening tokens as a band. Skip if it fights the theme swatch.
+6. **Pill CTA (recommend against).** The candidate's fully-rounded invite button is friendlier, but the page should read as the same object as the app (owner ruling 2026-09-02) — keep the §5 12px radius.
+
+### Deliberately left behind (seed artifacts)
+
+- The 01/02/04 numbering and missing-03 footnote (renumber to 01/02/03).
+- The "The seed" colophon band and the raw seed string — the exercise's story, not product communication.
+- The raspberry hue-314 palette and blush ground — production stays on the role tokens ported from `constants/Colors.ts` ("same object as the app"). A landing page in its own register is a separate owner decision.
+- Zero-JavaScript — a nice property of the candidate, but the theme swatch (owner feature) needs JS; not a goal.
+
+### Technical Notes
+
+- Target: `landing/index.html`. Reference + copy source: `landing-v2/index.html`. Do not delete `landing-v2/` or its Pages project until this ships and the owner has compared.
+- Carry over untouched: the beta block (mailto CTA, guidance, copyable fallback), the Already-testing footer, `noindex`, the no-web-app-links / no-custom-scheme rules, and the theme swatch with its no-flash bootstrap.
+- Copy bar: every new visible string (eyebrow, nav labels, any caption) needs owner approval, same as SMS copy. The three principle bodies above are pre-approved (owner, 2026-09-03).
+- Verify bar: update `e2e/landing.spec.ts` — it pins the current single-column page; the hero/mock/CTA/fallback/footer/noindex/link-audit assertions stay, add the principles (01/02/03), the nav anchors, and the two-column layout. Green on desktop Chrome plus one mobile project; attach desktop + ~390px screenshots to the run summary.
+- Deploy protocol per AGENTS.md → beta landing page: fast checks + spec green locally, push to `staging`, `npm run deploy:landing` with `--branch=preview` for owner review, production deploy only on owner approval and a green staging push. First-deploy gate applies: owner approves final copy, spec green, agent click-through of the live preview (both themes, desktop + mobile) before production.
+
+### Open Questions
+
+- Hero visual: mock calendar (recommended) vs adapted year-grid — owner's call.
+- Does How it works wear a dark second register or stay on the page ground?
+- Eyebrow copy ("Person-to-person events" or something else — owner words).
