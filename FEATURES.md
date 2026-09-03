@@ -56,6 +56,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. Owner 2026-09-02: gear/Add crowding is [KI-017](manual-tests/known_issues.md). |
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
 | [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
+| [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 
 ## Using and testing
 
@@ -2030,3 +2031,31 @@ Shipped shape (2026-09-02, after two owner copy reviews): headline + one affirma
 
 - Pages project/hostname name — chosen at build time (global uniqueness).
 - Launch evolution (custom domain, store badges, indexing) is out of scope here; noted so the page is built to grow into it.
+
+---
+
+## Receipt Page Polish (App Mirror)
+
+**Status:** Planned — owner request 2026-09-03. Not scheduled; pick up when the owner names a when.
+
+### Problem
+
+The Who's Coming receipt page (`receipt/index.html` → events-reply.pages.dev) became a *content* mirror of the event detail screen with Affiliate Link Tagging (image, description, listing link), but not a *visual* one: its Add-to-calendar row is two underlined text links while the app uses the labeled icon-button row (Google glyph, Apple/Outlook pair), and small grammar differences like that accumulate into "the receipt looks different from the app." Recipients open this page straight from a text — for many it's their first impression of the product.
+
+### Solution
+
+A polish pass on the receipt page that brings its look closer to the event detail screen: the "Add to calendar" label + icon-button grammar for the calendar actions, and generally — wherever the receipt diverges from the detail screen's grammar without a reason, prefer the app's. The Yes/No block stays the one high-emphasis element (the app's button tiers apply in spirit).
+
+### Technical Notes
+
+- Scope is `receipt/index.html` plus `e2e/receipt.spec.ts` assertions. No edge-function changes — the `send-response` GET already returns everything the mirror needs (image, description, pre-tagged url).
+- The page stays dependency-free static HTML: inline the Google/Apple/Outlook glyphs as SVG (no icon font, no framework), keep the Paper palette tokens, keep `noindex`.
+- Named example from the owner discussion (2026-09-03): the Add-to-calendar row — text links vs the app's label + icon buttons.
+- Verify bar: updated `e2e/receipt.spec.ts` green on desktop Chrome, plus a mobile-viewport (~390px) screenshot review — recipients open the page on phones.
+
+### Acceptance Criteria
+
+- [ ] The Add-to-calendar row mirrors the app's label + icon-button grammar
+- [ ] Any other unmotivated divergence from the detail screen's grammar found during the pass is aligned (or recorded here with the reason it stays)
+- [ ] The page stays dependency-free (no icon font, no framework) and keeps its inert-GET / Yes-No-first behavior
+- [ ] `e2e/receipt.spec.ts` updated and green on desktop Chrome; mobile-viewport screenshots reviewed
