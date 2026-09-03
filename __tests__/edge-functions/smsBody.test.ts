@@ -42,7 +42,7 @@ describe('buildSmsBody', () => {
         '\n' +
         `Coming? ${LINK}\n` +
         '\n' +
-        'Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.\n' +
+        'Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup\n' +
         '\n' +
         'Reply STOP to unsubscribe.',
     );

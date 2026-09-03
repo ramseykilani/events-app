@@ -236,7 +236,7 @@ For each executed scenario:
 
 **Expected**
 - SMS body opens with `[Name] wants to go to "[title]" with you`, then the date/time line, then the event URL itself — the recipient can act without installing the app.
-- No app/web links anywhere in the message. While `RESPONSE_LINK_BASE_URL` is set, both variants carry the Who's Coming receipt line (`Coming? https://events-reply.pages.dev/?t=…`) ahead of the footer. The non-app recipient also sees the signup invite before the STOP footer: `Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.` (internal-testing phase). The message ends with `Reply STOP to unsubscribe.`
+- No app/web links anywhere in the message. While `RESPONSE_LINK_BASE_URL` is set, both variants carry the Who's Coming receipt line (`Coming? https://events-reply.pages.dev/?t=…`) ahead of the footer. The non-app recipient also sees the signup invite before the STOP footer: `Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup` (internal-testing phase; the one owner-approved link — an onboarding pointer, not a share link). The message ends with `Reply STOP to unsubscribe.`
 - SMS to *app* users (the E-111 path) carries the same `Coming?` line but no invite line.
 
 ---

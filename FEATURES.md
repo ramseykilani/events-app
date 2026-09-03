@@ -55,7 +55,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. Owner 2026-09-02: gear/Add crowding is [KI-017](manual-tests/known_issues.md). |
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
-| [Beta Signup Pipeline](#beta-signup-pipeline) | In progress | Self-serve beta signup form → automated TestFlight (ASC API) + agent-assisted Play fulfillment. Spec owner-approved 2026-09-03. |
+| [Beta Signup Pipeline](#beta-signup-pipeline) | Implemented | Self-serve beta signup form → automated TestFlight (ASC API) + agent-assisted Play fulfillment. Live: https://events-landing.pages.dev/signup |
 | [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
@@ -132,10 +132,10 @@ Push notifications only reach users who have installed the app. Non-app users (c
 
 When an event is shared, the `send-notification` Edge Function also sends an SMS via Twilio to every recipient:
 
-- **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, and the sharer's phone number as display identity. No app or web links — the SMS is the whole message. During internal testing it also carries a signup invite (`Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.`, added 2026-08-17) so an interested recipient can ask the owner for beta access.
+- **Non-app users:** SMS with event details (title, date, time), the event URL when one exists, and the sharer's phone number as display identity. No app or web links — the SMS is the whole message. During internal testing it also carries a signup invite (`Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup` — the self-serve form, [Beta Signup Pipeline](#beta-signup-pipeline); owner approved the link 2026-09-03, replacing the 2026-08-17 email-the-owner line) so an interested recipient can join the beta.
 - **App users:** the same link-free SMS in addition to their push notification (push is the tappable path into the event). A missing push token does not suppress the SMS.
 
-This means the only person who needs the app is the one sending events. Friends are informed by text; the only acquisition element in the message is the internal-testing signup invite (an email CTA, no links). (Revised 2026-08-09: SMS previously carried web/store/deep links; removed deliberately — see `docs/distribution-strategy.md`. Revised 2026-08-17: non-app SMS gained the signup-invite line for the internal-testing phase. At launch the two URLs return together as [SMS Links at Launch](#sms-links-at-launch): store link for non-users, event deep link for app users.)
+This means the only person who needs the app is the one sending events. Friends are informed by text; the only acquisition element in the message is the internal-testing signup invite (the one owner-approved link). (Revised 2026-08-09: SMS previously carried web/store/deep links; removed deliberately — see `docs/distribution-strategy.md`. Revised 2026-08-17: non-app SMS gained the signup-invite line for the internal-testing phase. Revised 2026-09-03: the invite points at the beta signup form. At launch the two URLs return together as [SMS Links at Launch](#sms-links-at-launch): store link for non-users, event deep link for app users.)
 
 ### Technical Notes
 
@@ -1480,11 +1480,11 @@ Previously titled "Open Event from SMS Link."
 
 ### Problem
 
-Share SMS is link-free today (2026-08-09): event details, the event's own listing URL when one exists, STOP, and — for people without an account — an email signup invite. That is correct for internal testing.
+Share SMS is link-free today (2026-08-09): event details, the event's own listing URL when one exists, STOP, and — for people without an account — a signup invite (the beta form link since 2026-09-03, the email CTA before that). That is correct for internal testing.
 
 Two gaps show up the moment the app is listed:
 
-1. **Non-app recipients** have no store path. The email invite is a beta hatch, not how people get the app.
+1. **Non-app recipients** have no store path. The signup invite is a beta hatch, not how people get the app.
 2. **App users** whose push is missed, muted, or never granted have only a plain-text SMS. Testers asked for a tap that opens that event — the same destination as the push.
 
 These are not two features. Both are the first app/store URLs in a cold share text since the links were stripped. They share A2P-campaign and carrier-filter risk, and the deep link's "app isn't on this phone" fallback *is* a store CTA — so shipping one without the other leaves a hole.
@@ -1495,7 +1495,7 @@ Who gets which extra URL:
 
 | Recipient | Extra SMS line | Must not be |
 |-----------|----------------|-------------|
-| Non-app (`my_people.user_id IS NULL`) | Store link(s) — App Store / Play — replacing the email signup invite | An event deep link, or any URL into the web build |
+| Non-app (`my_people.user_id IS NULL`) | Store link(s) — App Store / Play — replacing the signup invite | An event deep link, or any URL into the web build |
 | App user (`my_people.user_id IS NOT NULL`) | One https event deep link that opens the native app on that event (same as tapping the push) | A store link, a custom-scheme `events-app://` URL, or a web-app session |
 
 The event's own original listing URL stays in both variants when present — that is event content, not app promo. The Who's Coming `Coming?` receipt line is also not this pair (live on both variants since 2026-08-31).
@@ -1524,7 +1524,7 @@ At launch, in the same `send-notification` change:
 
 ### Acceptance Criteria
 
-- [ ] Non-app share SMS replaces the email signup invite with store link(s); still has event details, listing URL when present, and STOP
+- [ ] Non-app share SMS replaces the signup invite with store link(s); still has event details, listing URL when present, and STOP
 - [ ] App-user share SMS includes a tappable https link that opens the native app on that event when the app is installed
 - [ ] Non-app SMS never contains the event deep link; app-user SMS never contains the store CTA
 - [ ] Custom-scheme `events-app://` URLs are not used
@@ -1988,7 +1988,16 @@ Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar
 
 ## Beta Signup Pipeline
 
-**Status:** In progress (spec owner-approved 2026-09-03)
+**Status:** Implemented (2026-09-03; spec owner-approved same day). Live: the form is https://events-landing.pages.dev/signup.
+
+As-built amendments to the approved spec (all owner-decided or smoke-driven, 2026-09-03):
+
+- **The form lives in the landing project**, not a separate `beta/` site: `landing/signup.html`, served at `events-landing.pages.dev/signup` (Pages clean URL), deployed by the existing `npm run deploy:landing`. Owner call when planning surfaced the drift risk of two "get the beta" destinations. The landing page's mailto CTA was replaced by a link to the form only after the live form was verified end-to-end (owner constraint: the mailto stays up until the form is ready); the owner email stays as a quiet fallback line.
+- **The Bot learns by polling** (the spec's lean, confirmed): `GET /functions/v1/beta-signup/pending-android` with the `x-beta-bot-secret` header returns pending Android Gmail adds; `POST /fulfill-android` with the same header records fulfillment and sends the completion SMS. Both fail closed when `BETA_BOT_SECRET` is unset.
+- **Phone is not collected from iOS-only signups** (the spec's lean).
+- iOS poller details the smoke run pinned down: the acceptance watch is `GET /v1/users?filter[username]=…` (there is no `filter[email]` on `/v1/users` — a 400 in the first smoke run); the beta-group add goes through the `betaTesters` resource (create-with-group-relationship for new testers, relationship POST for existing ones — `users` ids are not `betaTesters` ids) and marks `added` only after a membership read-back (`/v1/betaTesters?filter[email]=…&filter[betaGroups]=…`), because Apple's 409/422 on those endpoints is ambiguous; the invite pins `allAppsVisible: false` + `provisioningAllowed: false` alongside `visibleApps`.
+- The poller is `--no-verify-jwt` gated by its own `BETA_CRON_SECRET` (the de-facto cron posture on this project — cleanup-people's job also sends only the shared secret), scheduled as pg_cron job `beta-ios-fulfill` (`* * * * *`). Deploy smoke also found `pg_net` was not installed — every cron job had been failing; created the extension.
+- Dedup is backed by unique indexes on `apple_email` / `play_email` / `phone` (a 23505 maps to the idempotent `existing` response); a fully-failed row is revived in place on resubmit instead of locking the person out.
 
 ### Problem
 
@@ -1998,42 +2007,42 @@ Beta access is owner-gated by hand. The share SMS tells interested people to ema
 
 A self-serve signup form, linked from the share SMS's signup line, feeding an automated fulfillment pipeline. The tester never talks to an agent; the confirmation screen and the stores' own emails carry the instructions.
 
-- **iOS — fully automatic, no browser agent.** The App Store Connect API does the whole flow: `POST /v1/userInvitations` (role MARKETING, `visibleApps` = Shared Events only) fires within a minute of submit → Apple emails the tester the account invite → once the tester accepts (the one human-paced step), a poller notices and `POST /v1/betaGroups/{id}/relationships/betaTesters` adds them to Team (Expo) → Apple emails the TestFlight invite. The owner's delay is removed from the loop entirely. Uses the existing ASC Admin Team Key already in secrets (`EXPO_ASC_*`).
+- **iOS — fully automatic, no browser agent.** The App Store Connect API does the whole flow: `POST /v1/userInvitations` (role MARKETING, `visibleApps` = Shared Events only) fires within a minute of submit → Apple emails the tester the account invite → once the tester accepts (the one human-paced step), a poller notices and adds them to Team (Expo) → Apple emails the TestFlight invite. The owner's delay is removed from the loop entirely. Uses the existing ASC Admin Team Key already in secrets (`EXPO_ASC_*`, mirrored to function secrets `ASC_*`).
 - **Android — agent-assisted, because Google left an API gap.** The Play Developer API's `edits.testers` resource manages Google Groups only — the Console UI's email lists have no API at any scale. A Grok Bot (xAI's persistent-cloud-computer agent, available via the owner's Cursor subscription) is taught the task once — "add this Gmail to the internal testing tester list in Play Console" — and runs it per signup, signed into a **dedicated least-privilege Google account** invited to Play Console with only tester-management permissions (never the owner's primary Google; Grok Bot's shared-computer model makes every login visible to every Bot). When the Bot records fulfillment through a shared-secret webhook, the pipeline sends the tester **one SMS from the app's Twilio number** carrying the `internaltest` opt-in link and the paste-in-Chrome instructions (owner approved a link in this SMS 2026-09-03 — a requested onboarding message, not a share notification; the no-links rule is untouched for shares).
 - **No completion message for iOS** — Apple's two emails do the work; the form's confirmation screen sets expectations per platform (iOS: two Apple emails are coming, accept the first; Android: a text with your link is coming).
 - **Abuse posture (owner call 2026-09-03):** no approval gate. Rate limiting on the submit endpoint + an SMS to the owner per signup. The audience is friends-of-friends arriving via the share SMS, the tracks cap at 100, and the web app is already reachable.
 
 ### Technical Notes
 
-- **Form:** new `beta/` one-page static site deployed like `receipt/` to its own Cloudflare Pages project (`npm run deploy:beta`) — never the web app. Fields: name, platform (iOS / Android / both), Apple ID email, Play Store Gmail, phone (required for Android — the completion SMS needs a number). Platform-specific confirmation copy is rendered client-side from the submitted platform.
-- **Table:** new `beta_signups` migration — service-role only (no client policies; anon/authenticated get nothing), with per-platform status state machines (`ios_status`: pending → invited → accepted → added; `android_status`: pending → added) plus error text for retry/diagnosis. SQL tests cover the RLS.
-- **Edge function `beta-signup`** (`--no-verify-jwt`, the `send-response` pattern): validates + normalizes input (E.164 phone via libphonenumber-js port, email syntax), rate-limits, inserts the row, SMSes the owner per signup via Twilio, and exposes the shared-secret fulfillment endpoint the Grok Bot calls after a Play list add — that flip is what sends the Android completion SMS. CORS headers per the edge-function gotcha in AGENTS.md.
-- **iOS fulfillment:** a `CRON_SECRET`-gated poller function (the `cleanup-people` pg_cron pattern) advances the iOS state machine — creates the ASC user invitation for pending rows, watches `GET /v1/users?filter[email]` for acceptances, adds accepted users to the Team (Expo) beta group. ASC key lives in function secrets (same `.p8` as EAS submit; Admin role required for `userInvitations`).
-- **SMS invite line:** `SIGNUP_INVITE_LINE` in `supabase/functions/_shared/smsBody.ts` points at the form URL instead of the owner's email; the Jest body-shape assertions update with it. [SMS Links at Launch](#sms-links-at-launch) is untouched — this replaces only the internal-testing email CTA.
-- **Deploys** follow the AGENTS.md runbook: migration via `npx supabase db push`, functions via `npx supabase functions deploy` (`beta-signup` with `--no-verify-jwt`), Pages project created once via Wrangler.
+- **Form:** `landing/signup.html` in the `events-landing` Pages project (as-built amendment above) — never the web app. Fields: first name, last name (ASC invites require both), platform (iPhone / Android / Both), Apple ID email (iOS), Play Store Gmail + phone (Android — the completion SMS needs a number). Platform-conditional fields, inline validation errors, platform-specific confirmation copy rendered client-side. Design language ported 1:1 from `constants/Colors.ts` with the theme swatch and no-flash bootstrap, same as the landing index.
+- **Table:** `beta_signups` (migration `20260903000001`) — service-role only (RLS enabled, zero client policies), per-platform status state machines (`ios_status`: pending → invited → accepted → added; `android_status`: pending → added; both can land on `failed` + error text for diagnosis), platform/field coherence CHECKs, unique indexes on the three identity fields. SQL tests: `supabase/tests/beta_signups_test.sql`.
+- **Edge function `beta-signup`** (`--no-verify-jwt`, the `send-response` pattern): validates + normalizes input (E.164 phone via a US-default port of `lib/contacts.ts` behavior in `_shared/betaSignup.ts` — Jest-pinned, isPossible-lenient so reserved 555 numbers normalize; email syntax), rate-limits (3 per identity per 24h, 50 global per 24h), dedups, inserts or revives the row, SMSes the owner per signup via Twilio (`BETA_OWNER_PHONE`), and exposes the Bot's two shared-secret routes. The Android completion SMS body is also built in `_shared/betaSignup.ts` (Jest-pinned, GSM-7-safe, STOP footer). CORS headers per the edge-function gotcha in AGENTS.md, plus `x-beta-bot-secret`.
+- **iOS fulfillment:** `beta-ios-fulfill` (pg_cron every minute, `x-cron-secret` = `BETA_CRON_SECRET`, fails closed) advances the iOS state machine through the ASC API — details in the as-built amendments above. The ES256 JWT is minted per run from the `.p8` in function secrets (`ASC_KEY_ID` / `ASC_ISSUER_ID` / `ASC_PRIVATE_KEY_P8` — the same Admin Team Key as EAS submit; Admin role required for `userInvitations`), 19-minute expiry. `sendSms`/`isReservedTestPhone` are extracted to `_shared/twilioSms.ts` (behavior-identical; send-notification imports it).
+- **SMS invite line:** `SIGNUP_INVITE_LINE` in `supabase/functions/_shared/smsBody.ts` points at the form URL (`Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup`); the Jest body-shape assertions updated with it. [SMS Links at Launch](#sms-links-at-launch) is untouched — this replaced only the internal-testing email CTA. Strip switch if carriers hate the link: revert the constant and redeploy send-notification.
+- **Deploys (as run 2026-09-03):** migration via `npx supabase db push` (needed the DB-password rotation from the AGENTS.md runbook for the cli_login_postgres bug); functions via `npx supabase functions deploy beta-signup --no-verify-jwt` and `… deploy beta-ios-fulfill send-notification --no-verify-jwt`-style per-function flags; secrets via `npx supabase secrets set`; the cron job via the Management API query endpoint; the form via `npm run deploy:landing`.
 - **Why not a browser agent for iOS too:** the ASC API is official, deterministic, and uses credentials already in the secret store; browser automation of App Store Connect would be flakier and would put an Apple ID session on the Bot's shared computer for zero benefit. The Bot exists solely for the Play email-list gap.
 - **External-tester future (>100, both stores hard-cap internal at 100):** the same form/table/pipeline carries over — iOS fulfillment becomes a gated TestFlight public link (external testing, Beta App Review per version), Android stays the Bot (closed tracks still use email lists / Google Groups; lists have no API, and consumer Groups have no add-member API without Workspace). Bonus: Play closed-track testing counts toward the personal-account 12-testers-for-14-days production-access rule; internal-track time explicitly does not.
 
 ### Acceptance Criteria
 
-- [ ] Form live on its Pages URL; invalid submissions get inline errors; confirmation shows platform-specific next steps (iOS: two Apple emails; Android: text incoming + Chrome instructions)
-- [ ] iOS: ASC invite fires within a minute of submit; after the tester accepts, they land in Team (Expo) within one poll cycle with no human step, and Apple's TestFlight email follows
-- [ ] Android: the Grok Bot skill adds the Gmail to the internal track list; its webhook call flips `android_status` and the completion SMS (opt-in link + Chrome instructions) arrives from the app's Twilio number
-- [ ] Owner receives an SMS per signup; rate limiting blocks scripted abuse; no approval gate
-- [ ] Share SMS invite line carries the form URL, not the owner's email; Jest body-shape tests updated
-- [ ] `beta_signups` RLS covered by SQL tests; fast checks green; STATUS.md tester section updated
+- [x] Form live on its Pages URL (`/signup` on events-landing); invalid submissions get inline errors; confirmation shows platform-specific next steps (iOS: two Apple emails; Android: text incoming + Chrome instructions) — e2e/beta.spec.ts, run against the live deployment too
+- [x] iOS: ASC invite fires within one poll cycle of submit (verified live with a smoke row — the invitation was created, then cancelled in cleanup); the accept→add path is wired and verified as far as a non-accepting email allows (honest 409 detail); first real iOS signup completes the proof
+- [x] Android: the webhook flips `android_status` and the completion SMS path fires (verified live: 555-number SMS skipped by design; idempotent retry sends nothing). The Grok Bot skill itself is owner-wired (see STATUS.md → Testers)
+- [x] Owner receives an SMS per signup (verified live during the smoke); rate limiting blocks scripted abuse (3/identity/24h, 50 global/24h); no approval gate
+- [x] Share SMS invite line carries the form URL, not the owner's email; Jest body-shape tests updated
+- [x] `beta_signups` RLS covered by SQL tests (19 assertions); fast checks green; STATUS.md tester section updated
 
 ### Open Questions
 
-- Pages project name / form URL (`events-beta.pages.dev`?) — decided at implementation time; the SMS invite line needs the final value.
-- How the Grok Bot learns about new Android signups: a Bot routine polling a fulfillment view (fully hands-off — current lean) vs. the owner forwarding the Gmail from the per-signup notification SMS.
-- Whether phone is collected from iOS-only signups (lean: no — nothing uses it).
+- ~~Pages project name / form URL~~ — resolved: `events-landing.pages.dev/signup` (form lives in the landing project).
+- ~~How the Grok Bot learns about new Android signups~~ — resolved: the Bot polls `pending-android` (fully hands-off).
+- ~~Whether phone is collected from iOS-only signups~~ — resolved: no.
 
 ---
 
 ## Beta Landing Page
 
-**Status:** Implemented (2026-09-02) — live at https://events-landing.pages.dev (Pages project `events-landing`, production branch `main`). Spec owner-approved 2026-09-02; final copy owner-approved same day. The seed of the future launch page: built as its own Pages project now so launch is a domain attachment, not a migration. Tester fulfillment stays manual on both platforms (owner call 2026-09-02); the prefilled email is the automation — it kills the reply chains, which is where the real cost was.
+**Status:** Implemented (2026-09-02) — live at https://events-landing.pages.dev (Pages project `events-landing`, production branch `main`). Spec owner-approved 2026-09-02; final copy owner-approved same day. The seed of the future launch page: built as its own Pages project now so launch is a domain attachment, not a migration. **Amended 2026-09-03 by [Beta Signup Pipeline](#beta-signup-pipeline):** the mailto CTA was replaced by a link to the self-serve signup form (`/signup`, same project) once the form was verified live; the owner email stays as a quiet fallback line. Tester fulfillment is automated by that pipeline.
 
 ### Problem
 

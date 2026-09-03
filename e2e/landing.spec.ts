@@ -4,27 +4,21 @@ import { expect, test } from './fixtures';
 // with no build step and no backend — served locally here so the spec never
 // touches the live deployment (receipt.spec.ts pattern). It pins the verify
 // bar from FEATURES.md → Beta Landing Page: swatch toggle + persistence +
-// no first-paint flash, the mailto CTA and its copyable fallback, the
-// "Already testing?" footer (Android link, iOS instruction-only), noindex,
-// and the link audit (no web-app links, no custom schemes, no analytics) —
-// plus the product-shot mock calendar (current month, dots, From X rows).
-// Landing Page Polish (2026-09-03) added: the two-column hero (stacked on
-// mobile), the accent-dot eyebrow and italic accent phrase, and the
-// How-it-works principles (01/02/03, after the beta block, no header nav).
+// no first-paint flash, the "Already testing?" footer (Android link, iOS
+// instruction-only), noindex, and the link audit (no web-app links, no
+// custom schemes, no analytics) — plus the product-shot mock calendar
+// (current month, dots, From X rows). Landing Page Polish (2026-09-03)
+// added: the two-column hero (stacked on mobile), the accent-dot eyebrow
+// and italic accent phrase, and the How-it-works principles (01/02/03,
+// after the beta block, no header nav). Beta Signup Pipeline (2026-09-03)
+// replaced the mailto CTA with a link to the signup form (./signup.html);
+// the owner email stays as a quiet fallback line.
 
 const LANDING_URL = process.env.E2E_LANDING_URL ?? 'http://localhost:8083';
 
 const PLAY_OPT_IN_URL = 'https://play.google.com/apps/internaltest/4701427612732216042';
 
-const TEMPLATE_LINES = [
-  'First and last name:',
-  'Who told you about Events:',
-  'iPhone or Android:',
-  'If iPhone, the email your Apple ID is under:',
-  'If Android, the Gmail your Play Store uses:',
-];
-
-test('renders Paper by default with the mock, mailto CTA, fallback, and footer', async ({
+test('renders Paper by default with the mock, signup CTA, fallback, and footer', async ({
   page,
 }) => {
   await page.goto(LANDING_URL);
@@ -66,21 +60,16 @@ test('renders Paper by default with the mock, mailto CTA, fallback, and footer',
   await expect(mock.locator('.mock-grid .sel')).toHaveCount(1);
   await expect(mock.locator('.mock-grid .dot')).toHaveCount(2);
 
-  // The CTA is a prefilled mailto with the subject and five-line template.
-  const cta = page.getByRole('link', { name: 'Ask for an invite' });
+  // The CTA links to the signup form (Beta Signup Pipeline — it replaced
+  // the prefilled mailto once the form was verified live).
+  const cta = page.getByRole('link', { name: 'Get the beta' });
   await expect(cta).toBeVisible();
-  const href = await cta.getAttribute('href');
-  expect(href).toMatch(/^mailto:kilani\.ramsey@gmail\.com\?/);
-  const decoded = decodeURIComponent(href ?? '');
-  expect(decoded).toContain('subject=Events beta — add me');
-  for (const line of TEMPLATE_LINES) expect(decoded).toContain(line);
+  expect(await cta.getAttribute('href')).toBe('/signup');
 
-  // The address and template also render as copyable text (mailto is inert
-  // with no mail handler).
+  // The owner email stays as a quiet copyable fallback line.
   const fallback = page.locator('.fallback');
   await expect(fallback).toBeVisible();
   await expect(fallback).toContainText('kilani.ramsey@gmail.com');
-  for (const line of TEMPLATE_LINES) await expect(fallback).toContainText(line);
 
   // How it works: three hairline-separated principles after the beta block
   // (the CTA stays high), renumbered 01/02/03 — the candidate's 01/02/04
@@ -126,10 +115,11 @@ test('renders Paper by default with the mock, mailto CTA, fallback, and footer',
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
   await expect(page.locator('script[src]')).toHaveCount(0);
 
-  // Link audit: every anchor is the mailto, the privacy policy (the one
-  // allowed shared-events page), or the Play opt-in. No web-app links, no
-  // custom-scheme URLs — and no in-page anchors: the header nav was ruled
-  // out 2026-09-03 (two anchors don't earn the chrome on a page this short).
+  // Link audit: every anchor is the signup form, the privacy policy (the
+  // one allowed shared-events page), or the Play opt-in. No web-app links,
+  // no custom-scheme URLs — and no in-page anchors: the header nav was
+  // ruled out 2026-09-03 (two anchors don't earn the chrome on a page this
+  // short).
   await expect(page.locator('nav')).toHaveCount(0);
   const hrefs = await page.locator('a').evaluateAll((els) =>
     els.map((el) => el.getAttribute('href') ?? '')
@@ -137,7 +127,7 @@ test('renders Paper by default with the mock, mailto CTA, fallback, and footer',
   expect(hrefs.length).toBeGreaterThan(0);
   for (const a of hrefs) {
     expect(
-      a.startsWith('mailto:') ||
+      a === '/signup' ||
         a === 'https://shared-events.pages.dev/privacy.html' ||
         a === PLAY_OPT_IN_URL
     ).toBe(true);

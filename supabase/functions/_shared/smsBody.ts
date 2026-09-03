@@ -3,15 +3,20 @@
 // reach Twilio, so no e2e can observe a real text). Pure TypeScript — no
 // Deno globals, no URL imports — on purpose.
 
-// Internal-testing CTA (2026-08-17): while beta access is owner-gated
-// (TestFlight / Play internal tracks), the SMS to recipients without an
-// account invites them to email the owner to get signed up — an interested
-// stranger has no other way in. App users already have the app, so their
-// SMS carries no invite. At launch this line is replaced by store links
-// for non-users, and app-user SMS gains an event deep link — same change,
-// never one without the other (FEATURES.md → SMS Links at Launch).
+// Internal-testing CTA: while beta access is track-gated (TestFlight /
+// Play internal), the SMS to recipients without an account points at the
+// self-serve beta signup form (FEATURES.md → Beta Signup Pipeline,
+// 2026-09-03 — it replaced the email-the-owner line from 2026-08-17, and
+// the owner approved a link in this message: it is an onboarding pointer
+// for an already-interested recipient, not a share-notification link, so
+// the no-links rule for shares is untouched). App users already have the
+// app, so their SMS carries no invite. At launch this line is replaced by
+// store links for non-users, and app-user SMS gains an event deep link —
+// same change, never one without the other (FEATURES.md → SMS Links at
+// Launch). Strip switch if carriers or the A2P campaign hate the link:
+// revert this constant and redeploy send-notification.
 const SIGNUP_INVITE_LINE =
-  'Want to invite your friends to things too? Email kilani.ramsey@gmail.com to get signed up.';
+  'Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup';
 
 export interface SmsBodyParams {
   eventTitle: string | null;
