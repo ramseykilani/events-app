@@ -3,7 +3,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // Beta Signup Pipeline (FEATURES.md) — the iOS fulfillment poller. pg_cron
 // runs it every minute (the cleanup-people pattern: verify-jwt stays on at
 // the gateway, the job sends the apikey + x-cron-secret headers, and the
-// function fails closed when CRON_SECRET is unset).
+// function fails closed when its secret is unset). It uses its own
+// BETA_CRON_SECRET rather than sharing CRON_SECRET: function secrets are
+// write-only, so reusing cleanup-people's would mean rotating it and
+// rescheduling a healthy job for no benefit.
 //
 // It advances beta_signups.ios_status through the App Store Connect API —
 // the whole iOS flow is API-driven, no browser agent:
@@ -126,9 +129,9 @@ async function holdWithError(db: Db, id: string, message: string): Promise<void>
 }
 
 Deno.serve(async (req) => {
-  const cronSecret = Deno.env.get('CRON_SECRET');
+  const cronSecret = Deno.env.get('BETA_CRON_SECRET');
   if (!cronSecret) {
-    console.error('beta-ios-fulfill: CRON_SECRET is not configured');
+    console.error('beta-ios-fulfill: BETA_CRON_SECRET is not configured');
     return jsonResponse({ error: 'Server misconfigured' }, 500);
   }
   if (req.headers.get('x-cron-secret') !== cronSecret) {
