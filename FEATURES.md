@@ -55,6 +55,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Archive Received Events](#archive-received-events) | Implemented | Reversible removal for received events; Delete stays for self-created. Shipped 2026-09-01. |
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. Owner 2026-09-02: gear/Add crowding is [KI-017](manual-tests/known_issues.md). |
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
+| [Beta Signup Pipeline](#beta-signup-pipeline) | In progress | Self-serve beta signup form → automated TestFlight (ASC API) + agent-assisted Play fulfillment. Spec owner-approved 2026-09-03. |
 | [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
@@ -1982,6 +1983,51 @@ Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar
 - ~~UX-13 location-row color~~ — resolved 2026-09-01 (owner): the accent/linkText relationship must be identical across themes, so `linkText` shares the accent's value in both themes and the location row wears `linkText` (a visual no-op under the merged values). §3 records the ruling.
 - ~~Exact pill heuristic for the radius lint~~ — resolved 2026-09-01: the style-local `2 × radius` match shipped in the conventions rule (chips, FAB, help button, swatch pass; everything else must sit in 4–12).
 - ~~Whether the selection-glyph rule graduates from code review to lint~~ — resolved 2026-09-02: stays a code-review rule; no clean lint heuristic emerged, and the two known violators (PeoplePicker, circle editor) now use the §6 circle.
+
+---
+
+## Beta Signup Pipeline
+
+**Status:** In progress (spec owner-approved 2026-09-03)
+
+### Problem
+
+Beta access is owner-gated by hand. The share SMS tells interested people to email the owner, who then works two consoles manually per person: App Store Connect (invite as Marketing scoped to Shared Events → wait for them to accept → add to the Team (Expo) internal group → Apple emails the TestFlight invite) and Play Console (add their Play Store Gmail to the internal track's email list, then relay the opt-in link and the paste-in-Chrome instructions — Google emails testers nothing). Every step waits on the owner's availability, so testers sit idle between emails. At ~3 friends this is tolerable; toward the 100-seat internal caps it is a bottleneck, and the same pipeline is needed again for external testers later (see the last Technical Notes bullet).
+
+### Proposed Solution
+
+A self-serve signup form, linked from the share SMS's signup line, feeding an automated fulfillment pipeline. The tester never talks to an agent; the confirmation screen and the stores' own emails carry the instructions.
+
+- **iOS — fully automatic, no browser agent.** The App Store Connect API does the whole flow: `POST /v1/userInvitations` (role MARKETING, `visibleApps` = Shared Events only) fires within a minute of submit → Apple emails the tester the account invite → once the tester accepts (the one human-paced step), a poller notices and `POST /v1/betaGroups/{id}/relationships/betaTesters` adds them to Team (Expo) → Apple emails the TestFlight invite. The owner's delay is removed from the loop entirely. Uses the existing ASC Admin Team Key already in secrets (`EXPO_ASC_*`).
+- **Android — agent-assisted, because Google left an API gap.** The Play Developer API's `edits.testers` resource manages Google Groups only — the Console UI's email lists have no API at any scale. A Grok Bot (xAI's persistent-cloud-computer agent, available via the owner's Cursor subscription) is taught the task once — "add this Gmail to the internal testing tester list in Play Console" — and runs it per signup, signed into a **dedicated least-privilege Google account** invited to Play Console with only tester-management permissions (never the owner's primary Google; Grok Bot's shared-computer model makes every login visible to every Bot). When the Bot records fulfillment through a shared-secret webhook, the pipeline sends the tester **one SMS from the app's Twilio number** carrying the `internaltest` opt-in link and the paste-in-Chrome instructions (owner approved a link in this SMS 2026-09-03 — a requested onboarding message, not a share notification; the no-links rule is untouched for shares).
+- **No completion message for iOS** — Apple's two emails do the work; the form's confirmation screen sets expectations per platform (iOS: two Apple emails are coming, accept the first; Android: a text with your link is coming).
+- **Abuse posture (owner call 2026-09-03):** no approval gate. Rate limiting on the submit endpoint + an SMS to the owner per signup. The audience is friends-of-friends arriving via the share SMS, the tracks cap at 100, and the web app is already reachable.
+
+### Technical Notes
+
+- **Form:** new `beta/` one-page static site deployed like `receipt/` to its own Cloudflare Pages project (`npm run deploy:beta`) — never the web app. Fields: name, platform (iOS / Android / both), Apple ID email, Play Store Gmail, phone (required for Android — the completion SMS needs a number). Platform-specific confirmation copy is rendered client-side from the submitted platform.
+- **Table:** new `beta_signups` migration — service-role only (no client policies; anon/authenticated get nothing), with per-platform status state machines (`ios_status`: pending → invited → accepted → added; `android_status`: pending → added) plus error text for retry/diagnosis. SQL tests cover the RLS.
+- **Edge function `beta-signup`** (`--no-verify-jwt`, the `send-response` pattern): validates + normalizes input (E.164 phone via libphonenumber-js port, email syntax), rate-limits, inserts the row, SMSes the owner per signup via Twilio, and exposes the shared-secret fulfillment endpoint the Grok Bot calls after a Play list add — that flip is what sends the Android completion SMS. CORS headers per the edge-function gotcha in AGENTS.md.
+- **iOS fulfillment:** a `CRON_SECRET`-gated poller function (the `cleanup-people` pg_cron pattern) advances the iOS state machine — creates the ASC user invitation for pending rows, watches `GET /v1/users?filter[email]` for acceptances, adds accepted users to the Team (Expo) beta group. ASC key lives in function secrets (same `.p8` as EAS submit; Admin role required for `userInvitations`).
+- **SMS invite line:** `SIGNUP_INVITE_LINE` in `supabase/functions/_shared/smsBody.ts` points at the form URL instead of the owner's email; the Jest body-shape assertions update with it. [SMS Links at Launch](#sms-links-at-launch) is untouched — this replaces only the internal-testing email CTA.
+- **Deploys** follow the AGENTS.md runbook: migration via `npx supabase db push`, functions via `npx supabase functions deploy` (`beta-signup` with `--no-verify-jwt`), Pages project created once via Wrangler.
+- **Why not a browser agent for iOS too:** the ASC API is official, deterministic, and uses credentials already in the secret store; browser automation of App Store Connect would be flakier and would put an Apple ID session on the Bot's shared computer for zero benefit. The Bot exists solely for the Play email-list gap.
+- **External-tester future (>100, both stores hard-cap internal at 100):** the same form/table/pipeline carries over — iOS fulfillment becomes a gated TestFlight public link (external testing, Beta App Review per version), Android stays the Bot (closed tracks still use email lists / Google Groups; lists have no API, and consumer Groups have no add-member API without Workspace). Bonus: Play closed-track testing counts toward the personal-account 12-testers-for-14-days production-access rule; internal-track time explicitly does not.
+
+### Acceptance Criteria
+
+- [ ] Form live on its Pages URL; invalid submissions get inline errors; confirmation shows platform-specific next steps (iOS: two Apple emails; Android: text incoming + Chrome instructions)
+- [ ] iOS: ASC invite fires within a minute of submit; after the tester accepts, they land in Team (Expo) within one poll cycle with no human step, and Apple's TestFlight email follows
+- [ ] Android: the Grok Bot skill adds the Gmail to the internal track list; its webhook call flips `android_status` and the completion SMS (opt-in link + Chrome instructions) arrives from the app's Twilio number
+- [ ] Owner receives an SMS per signup; rate limiting blocks scripted abuse; no approval gate
+- [ ] Share SMS invite line carries the form URL, not the owner's email; Jest body-shape tests updated
+- [ ] `beta_signups` RLS covered by SQL tests; fast checks green; STATUS.md tester section updated
+
+### Open Questions
+
+- Pages project name / form URL (`events-beta.pages.dev`?) — decided at implementation time; the SMS invite line needs the final value.
+- How the Grok Bot learns about new Android signups: a Bot routine polling a fulfillment view (fully hands-off — current lean) vs. the owner forwarding the Gmail from the per-signup notification SMS.
+- Whether phone is collected from iOS-only signups (lean: no — nothing uses it).
 
 ---
 
