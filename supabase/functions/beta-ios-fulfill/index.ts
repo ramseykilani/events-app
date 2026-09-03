@@ -261,17 +261,39 @@ Deno.serve(async (req) => {
         // it back — Apple's 409/422 on these endpoints is ambiguous
         // ("already assigned" vs "invalid"), so only the read-back marks
         // the row 'added'.
-        const lookup = await ascFetch(
-          'GET',
-          `/betaTesters?filter[email]=${encodeURIComponent(row.apple_email)}`,
-          token,
-        );
-        if (lookup.status !== 200) {
-          await holdWithError(db, row.id, `betaTesters lookup ${lookup.status}: ${ascErrorDetail(lookup.body)}`);
+        const lookupTesters = async (): Promise<{ id: string }[] | null> => {
+          const res = await ascFetch(
+            'GET',
+            `/betaTesters?filter[email]=${encodeURIComponent(row.apple_email)}`,
+            token,
+          );
+          if (res.status !== 200) {
+            await holdWithError(db, row.id, `betaTesters lookup ${res.status}: ${ascErrorDetail(res.body)}`);
+            return null;
+          }
+          return (res.body?.data ?? []) as { id: string }[];
+        };
+        const relationshipAdd = async (testerIds: { id: string }[]): Promise<boolean> => {
+          const relRes = await ascFetch(
+            'POST',
+            `/betaGroups/${group.id}/relationships/betaTesters`,
+            token,
+            { data: testerIds.map((t) => ({ type: 'betaTesters', id: t.id })) },
+          );
+          // 204 = assigned; 409/422 are ambiguous — all three fall through
+          // to the read-back. Other statuses hold with the detail visible.
+          if (relRes.status !== 204 && relRes.status !== 409 && relRes.status !== 422) {
+            await holdWithError(db, row.id, `betaTesters add ${relRes.status}: ${ascErrorDetail(relRes.body)}`);
+            return false;
+          }
+          return true;
+        };
+
+        let testers = await lookupTesters();
+        if (!testers) {
           summary.held++;
           continue;
         }
-        const testers = (lookup.body?.data ?? []) as { id: string }[];
 
         if (testers.length === 0) {
           const createRes = await ascFetch('POST', '/betaTesters', token, {
@@ -287,33 +309,38 @@ Deno.serve(async (req) => {
               },
             },
           });
-          // 201 = created + assigned. 409 = the tester resource appeared
-          // between lookup and create (a retry race) — next cycle takes
-          // the relationship path. Anything else holds for next cycle with
-          // the detail visible; the row never goes terminal here because
-          // Apple's error taxonomy on this endpoint is unreliable.
-          if (createRes.status !== 201) {
-            await holdWithError(
-              db,
-              row.id,
-              createRes.status === 409
-                ? 'betaTester create raced — taking the relationship path next cycle'
-                : `betaTesters create ${createRes.status}: ${ascErrorDetail(createRes.body)}`,
-            );
+          if (createRes.status === 201) {
+            // Created + assigned — fall through to the read-back.
+          } else if (createRes.status === 409) {
+            // Either a true race (the tester resource appeared between
+            // lookup and create) or a persistent state error (Apple's
+            // STATE_ERROR "Tester(s) cannot be assigned" — e.g. the person
+            // is not actually a team member). Re-check: a tester resource
+            // now visible takes the relationship path; none means the 409
+            // is the honest answer — hold with Apple's detail, not a
+            // misleading "raced" note.
+            const recheck = await lookupTesters();
+            if (!recheck) {
+              summary.held++;
+              continue;
+            }
+            if (recheck.length === 0) {
+              await holdWithError(db, row.id, `betaTesters create 409: ${ascErrorDetail(createRes.body)}`);
+              summary.held++;
+              continue;
+            }
+            testers = recheck;
+            if (!(await relationshipAdd(testers))) {
+              summary.held++;
+              continue;
+            }
+          } else {
+            await holdWithError(db, row.id, `betaTesters create ${createRes.status}: ${ascErrorDetail(createRes.body)}`);
             summary.held++;
             continue;
           }
         } else {
-          const relRes = await ascFetch(
-            'POST',
-            `/betaGroups/${group.id}/relationships/betaTesters`,
-            token,
-            { data: testers.map((t) => ({ type: 'betaTesters', id: t.id })) },
-          );
-          // 204 = assigned; 409/422 are ambiguous — all three fall through
-          // to the read-back. Other statuses hold with the detail visible.
-          if (relRes.status !== 204 && relRes.status !== 409 && relRes.status !== 422) {
-            await holdWithError(db, row.id, `betaTesters add ${relRes.status}: ${ascErrorDetail(relRes.body)}`);
+          if (!(await relationshipAdd(testers))) {
             summary.held++;
             continue;
           }
