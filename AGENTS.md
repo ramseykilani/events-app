@@ -93,7 +93,7 @@ E2E tests (Playwright, `e2e/`): build the web bundle first, then run all form fa
 npm run build:web && npm run test:e2e
 ```
 
-Playwright browsers (chromium + webkit) and their system libraries are preinstalled in the cloud VM image by the `.cursor/environment.json` install step — never run `npx playwright install` before e2e. If a `@playwright/test` bump ever makes the baked browsers stale, a fresh environment build picks up the new binaries.
+Playwright browsers (chromium + webkit) and their system libraries are preinstalled in the cloud VM image by the `.cursor/environment.json` install step — no `npx playwright install` needed before e2e. If a VM boots from an older snapshot without them (`~/.cache/ms-playwright` missing), `npx playwright install --with-deps chromium webkit` is the one-time fix; a `@playwright/test` bump re-bakes binaries on the next environment build.
 
 After an intentional design change, regenerate the pixel-diff baselines (`e2e/visual.spec.ts-snapshots/`) with the **Regenerate visual baselines** workflow (Actions tab → pick the screen) — it re-takes the pictures on CI's own runners, verifies, and commits them. Never commit a locally regenerated mobile-safari baseline: WebKit text rendering uses the machine's fonts, and VM fonts differ from CI's, so it passes locally and fails CI.
 
