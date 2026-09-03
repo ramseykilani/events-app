@@ -78,7 +78,10 @@ export default defineConfig({
       ? []
       : [
           {
-            command: `npx serve -s landing -l ${LANDING_PORT}`,
+            // No -s here: the landing project is a multi-page static site
+            // (index.html + signup.html), and SPA mode's catch-all rewrite
+            // would send /signup.html (cleanUrls redirect) to index.html.
+            command: `npx serve landing -l ${LANDING_PORT}`,
             url: landingURL,
             reuseExistingServer: !process.env.CI,
             timeout: 30_000,

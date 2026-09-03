@@ -3,8 +3,8 @@
  * 21211 ("Invalid 'To' number"), which poisons messaging-health metrics.
  * Test accounts live in +1 555-555-01xx; skip every SMS to that area code.
  *
- * Keep the check in `supabase/functions/send-notification/index.ts` in sync —
- * the edge function cannot import this module at deploy time.
+ * Keep the check in `supabase/functions/_shared/twilioSms.ts` in sync —
+ * the edge functions cannot import this module at deploy time.
  */
 export function isReservedTestPhone(
   phone: string | null | undefined
