@@ -39,5 +39,5 @@ Logged in `manual-tests/known_issues.md`:
 
 ## Summary
 
-- Overall result: **pass.** Play internal production EAS **submitted** (versionCode **9**, build `1a20a583`). TestFlight waits on a first iPhone tester.
+- Overall result: **pass.** Play internal versionCode **9** and TestFlight build **11** submitted (same ship). iOS device smoke of New Architecture still open.
 - Known blockers: none.
