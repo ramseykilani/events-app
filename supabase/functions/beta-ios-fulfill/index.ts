@@ -64,7 +64,8 @@ async function ascJwt(): Promise<string> {
     ['sign'],
   );
   const now = Math.floor(Date.now() / 1000);
-  const unsigned = `${base64UrlEncode(new TextEncoder().encode(JSON.stringify({ alg: 'ES256', kid: keyId, typ: 'JWT' })))}.${base64UrlEncode(new TextEncoder().encode(JSON.stringify({ iss: issuerId, iat: now, exp: now + 20 * 60, aud: 'appstoreconnect-v1' })))}`;
+  // Apple's ceiling is 20 minutes; 19 leaves a margin for clock skew.
+  const unsigned = `${base64UrlEncode(new TextEncoder().encode(JSON.stringify({ alg: 'ES256', kid: keyId, typ: 'JWT' })))}.${base64UrlEncode(new TextEncoder().encode(JSON.stringify({ iss: issuerId, iat: now, exp: now + 19 * 60, aud: 'appstoreconnect-v1' })))}`;
   const signature = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
     key,
@@ -84,12 +85,11 @@ async function ascFetch(
   token: string,
   payload?: unknown,
 ): Promise<AscResponse> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (payload) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${ASC_BASE}${path}`, {
     method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: payload ? JSON.stringify(payload) : undefined,
   });
   const body = await res.json().catch(() => null);
@@ -161,6 +161,12 @@ Deno.serve(async (req) => {
             firstName: row.first_name,
             lastName: row.last_name,
             roles: ['MARKETING'],
+            // Explicit scoping: the invitee sees ONLY Shared Events. ASC
+            // leaves these optional; sending visibleApps without pinning
+            // allAppsVisible=false risks a marketing user on every app the
+            // Admin key can see.
+            allAppsVisible: false,
+            provisioningAllowed: false,
           },
           relationships: {
             visibleApps: { data: [{ type: 'apps', id: ASC_APP_ID }] },
@@ -210,7 +216,7 @@ Deno.serve(async (req) => {
     // ── accepted → added (into the Team (Expo) beta group) ──────────────
     const { data: acceptedRows, error: acceptedErr } = await db
       .from('beta_signups')
-      .select('id, apple_email')
+      .select('id, first_name, last_name, apple_email')
       .eq('ios_status', 'accepted')
       .order('created_at', { ascending: true })
       .limit(BATCH_LIMIT);
@@ -237,33 +243,91 @@ Deno.serve(async (req) => {
       }
 
       for (const row of acceptedRows) {
-        const usersRes = await ascFetch(
+        // users and betaTesters are DIFFERENT ASC resources with different
+        // ids — the group relationship needs a betaTester id, never the
+        // users-row id. Known-good order for internal groups: when no
+        // tester resource exists yet, create it WITH the group
+        // relationship (the relationship-only POST is unreliable for
+        // internal groups); pre-existing tester resources get the
+        // relationship POST. Either way, membership is proven by reading
+        // it back — Apple's 409/422 on these endpoints is ambiguous
+        // ("already assigned" vs "invalid"), so only the read-back marks
+        // the row 'added'.
+        const lookup = await ascFetch(
           'GET',
-          `/users?filter[email]=${encodeURIComponent(row.apple_email)}`,
+          `/betaTesters?filter[email]=${encodeURIComponent(row.apple_email)}`,
           token,
         );
-        const users = usersRes.status === 200 ? ((usersRes.body?.data ?? []) as { id: string }[]) : [];
-        if (users.length === 0) {
-          // The user row vanished between acceptance and now — hold, retry.
-          await holdWithError(db, row.id, 'accepted but no ASC user row found');
+        if (lookup.status !== 200) {
+          await holdWithError(db, row.id, `betaTesters lookup ${lookup.status}: ${ascErrorDetail(lookup.body)}`);
           summary.held++;
           continue;
         }
-        const addRes = await ascFetch(
-          'POST',
-          `/betaGroups/${group.id}/relationships/betaTesters`,
+        const testers = (lookup.body?.data ?? []) as { id: string }[];
+
+        if (testers.length === 0) {
+          const createRes = await ascFetch('POST', '/betaTesters', token, {
+            data: {
+              type: 'betaTesters',
+              attributes: {
+                email: row.apple_email,
+                firstName: row.first_name,
+                lastName: row.last_name,
+              },
+              relationships: {
+                betaGroups: { data: [{ type: 'betaGroups', id: group.id }] },
+              },
+            },
+          });
+          // 201 = created + assigned. 409 = the tester resource appeared
+          // between lookup and create (a retry race) — next cycle takes
+          // the relationship path. Anything else holds for next cycle with
+          // the detail visible; the row never goes terminal here because
+          // Apple's error taxonomy on this endpoint is unreliable.
+          if (createRes.status !== 201) {
+            await holdWithError(
+              db,
+              row.id,
+              createRes.status === 409
+                ? 'betaTester create raced — taking the relationship path next cycle'
+                : `betaTesters create ${createRes.status}: ${ascErrorDetail(createRes.body)}`,
+            );
+            summary.held++;
+            continue;
+          }
+        } else {
+          const relRes = await ascFetch(
+            'POST',
+            `/betaGroups/${group.id}/relationships/betaTesters`,
+            token,
+            { data: testers.map((t) => ({ type: 'betaTesters', id: t.id })) },
+          );
+          // 204 = assigned; 409/422 are ambiguous — all three fall through
+          // to the read-back. Other statuses hold with the detail visible.
+          if (relRes.status !== 204 && relRes.status !== 409 && relRes.status !== 422) {
+            await holdWithError(db, row.id, `betaTesters add ${relRes.status}: ${ascErrorDetail(relRes.body)}`);
+            summary.held++;
+            continue;
+          }
+        }
+
+        // Verify membership — the only honest success signal.
+        const membership = await ascFetch(
+          'GET',
+          `/betaGroups/${group.id}/betaTesters?filter[email]=${encodeURIComponent(row.apple_email)}`,
           token,
-          { data: users.map((u) => ({ type: 'betaTesters', id: u.id })) },
         );
-        // 204 = added; 409/422 = already in the group (self-heal).
-        if (addRes.status === 204 || addRes.status === 409 || addRes.status === 422) {
+        if (membership.status === 200 && ((membership.body?.data ?? []) as unknown[]).length > 0) {
           await setIosState(db, row.id, 'added', null);
           summary.added++;
-        } else if (addRes.status >= 400 && addRes.status < 500) {
-          await setIosState(db, row.id, 'failed', `betaTesters add ${addRes.status}: ${ascErrorDetail(addRes.body)}`);
-          summary.failed++;
         } else {
-          await holdWithError(db, row.id, `betaTesters add ${addRes.status}: ${ascErrorDetail(addRes.body)}`);
+          await holdWithError(
+            db,
+            row.id,
+            membership.status === 200
+              ? 'add reported but membership read-back is empty'
+              : `membership read-back ${membership.status}: ${ascErrorDetail(membership.body)}`,
+          );
           summary.held++;
         }
       }

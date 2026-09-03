@@ -66,32 +66,48 @@ async function countRecent(db: Db, column: 'apple_email' | 'play_email' | 'phone
   return count ?? 0;
 }
 
+interface ExistingSignup {
+  id: string;
+  ios_status: string | null;
+  android_status: string | null;
+}
+
 // A live row for any of the submission's identities means this person
-// already signed up — return it as a no-op so a double-submit never
-// double-fulfills.
-async function findExisting(db: Db, s: BetaSubmission): Promise<boolean> {
-  const lookups: PromiseLike<{ data: { id: string } | null; error: unknown }>[] = [];
+// already signed up. The unique indexes backstop this read (parallel
+// submits race it); a 23505 on insert maps to the same response.
+async function findExisting(db: Db, s: BetaSubmission): Promise<ExistingSignup | null> {
+  const lookups: PromiseLike<{ data: ExistingSignup | null; error: unknown }>[] = [];
+  const select = 'id, ios_status, android_status';
   if (s.appleEmail) {
     lookups.push(
-      db.from('beta_signups').select('id').eq('apple_email', s.appleEmail).limit(1).maybeSingle(),
+      db.from('beta_signups').select(select).eq('apple_email', s.appleEmail).limit(1).maybeSingle(),
     );
   }
   if (s.playEmail) {
     lookups.push(
-      db.from('beta_signups').select('id').eq('play_email', s.playEmail).limit(1).maybeSingle(),
+      db.from('beta_signups').select(select).eq('play_email', s.playEmail).limit(1).maybeSingle(),
     );
   }
   if (s.phone) {
     lookups.push(
-      db.from('beta_signups').select('id').eq('phone', s.phone).limit(1).maybeSingle(),
+      db.from('beta_signups').select(select).eq('phone', s.phone).limit(1).maybeSingle(),
     );
   }
   const results = await Promise.all(lookups);
   for (const r of results) {
     if (r.error) throw r.error;
-    if (r.data) return true;
+    if (r.data) return r.data;
   }
-  return false;
+  return null;
+}
+
+// A row whose every requested platform terminally failed (e.g. ASC rejected
+// a typo'd Apple ID) must not lock the person out: resubmitting revives the
+// same row — new field values, the requested platforms back to pending —
+// instead of inserting (which the unique indexes would reject).
+function isFullyFailed(row: ExistingSignup): boolean {
+  const statuses = [row.ios_status, row.android_status].filter((s) => s !== null);
+  return statuses.length > 0 && statuses.every((s) => s === 'failed');
 }
 
 serve(async (req) => {
@@ -193,14 +209,22 @@ serve(async (req) => {
         return jsonResponse({ status: 'already' });
       }
 
-      const { error: updateErr } = await db
+      // Flip first, SMS second — and only when the flip actually happened,
+      // so a racing or retried webhook never double-texts. 'failed' rows can
+      // be revived here: the Bot reporting success after an earlier error
+      // report is a real sequence.
+      const { data: flipped, error: updateErr } = await db
         .from('beta_signups')
         .update({ android_status: 'added', android_error: null })
         .eq('id', id)
-        .eq('android_status', 'pending');
+        .in('android_status', ['pending', 'failed'])
+        .select('id');
       if (updateErr) {
         console.error('beta-signup: fulfill update failed', updateErr);
         return jsonResponse({ error: updateErr.message }, 500);
+      }
+      if (!flipped || flipped.length === 0) {
+        return jsonResponse({ status: 'already' });
       }
 
       // The list add already happened in the real world, so the row stays
@@ -253,9 +277,23 @@ serve(async (req) => {
     }
     const submission = validation.submission;
 
-    if (await findExisting(db, submission)) {
+    const existing = await findExisting(db, submission);
+    if (existing && !isFullyFailed(existing)) {
       return jsonResponse({ status: 'existing' });
     }
+
+    const rowValues = {
+      first_name: submission.firstName,
+      last_name: submission.lastName,
+      platform: submission.platform,
+      apple_email: submission.appleEmail,
+      play_email: submission.playEmail,
+      phone: submission.phone,
+      ios_status: submission.appleEmail ? 'pending' : null,
+      android_status: submission.playEmail ? 'pending' : null,
+      ios_error: null,
+      android_error: null,
+    };
 
     const sinceIso = new Date(Date.now() - RATE_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
     const identityCounts = await Promise.all([
@@ -275,23 +313,36 @@ serve(async (req) => {
       return jsonResponse({ error: 'Signups are paused right now - try again tomorrow.' }, 429);
     }
 
-    const { data: inserted, error: insertErr } = await db
-      .from('beta_signups')
-      .insert({
-        first_name: submission.firstName,
-        last_name: submission.lastName,
-        platform: submission.platform,
-        apple_email: submission.appleEmail,
-        play_email: submission.playEmail,
-        phone: submission.phone,
-        ios_status: submission.appleEmail ? 'pending' : null,
-        android_status: submission.playEmail ? 'pending' : null,
-      })
-      .select('id')
-      .single();
-    if (insertErr) {
-      console.error('beta-signup: insert failed', insertErr);
-      return jsonResponse({ error: insertErr.message }, 500);
+    let signupId: string;
+    if (existing) {
+      // Fully-failed row: revive it in place with the new values (the
+      // unique indexes make a fresh insert impossible, and the person
+      // deserves a real retry — e.g. a fixed Apple ID typo).
+      const { error: reviveErr } = await db
+        .from('beta_signups')
+        .update(rowValues)
+        .eq('id', existing.id);
+      if (reviveErr) {
+        console.error('beta-signup: revive failed', reviveErr);
+        return jsonResponse({ error: 'Something went wrong - try again in a moment.' }, 500);
+      }
+      signupId = existing.id;
+    } else {
+      const { data: inserted, error: insertErr } = await db
+        .from('beta_signups')
+        .insert(rowValues)
+        .select('id')
+        .single();
+      if (insertErr) {
+        // 23505 = a parallel submit won the race between the pre-check and
+        // the insert — the person is signed up either way.
+        if (insertErr.code === '23505') {
+          return jsonResponse({ status: 'existing' });
+        }
+        console.error('beta-signup: insert failed', insertErr);
+        return jsonResponse({ error: 'Something went wrong - try again in a moment.' }, 500);
+      }
+      signupId = inserted.id;
     }
 
     // One SMS to the owner per signup — the no-gate tripwire. Best-effort:
@@ -312,9 +363,11 @@ serve(async (req) => {
       console.error('beta-signup: BETA_OWNER_PHONE is not configured');
     }
 
-    return jsonResponse({ status: 'ok', id: inserted.id });
+    return jsonResponse({ status: 'ok', id: signupId });
   } catch (err) {
+    // Details stay in the logs — the public path never leaks constraint or
+    // driver text to the form.
     console.error('beta-signup error:', err);
-    return jsonResponse({ error: err instanceof Error ? err.message : 'Unknown error' }, 500);
+    return jsonResponse({ error: 'Something went wrong - try again in a moment.' }, 500);
   }
 });

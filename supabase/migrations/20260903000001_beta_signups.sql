@@ -45,3 +45,12 @@ CREATE TABLE public.beta_signups (
 );
 
 ALTER TABLE public.beta_signups ENABLE ROW LEVEL SECURITY;
+
+-- One row per identity: dedup is enforced here, not just in the function's
+-- read-then-insert (which would race two parallel submits). NULLs are
+-- exempt from unique indexes, so iOS-only rows (no phone) never collide.
+-- A 23505 from the insert means "already signed up" — the function maps it
+-- to the same idempotent response as its pre-check.
+CREATE UNIQUE INDEX beta_signups_apple_email_key ON public.beta_signups (apple_email);
+CREATE UNIQUE INDEX beta_signups_play_email_key ON public.beta_signups (play_email);
+CREATE UNIQUE INDEX beta_signups_phone_key ON public.beta_signups (phone);

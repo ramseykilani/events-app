@@ -144,38 +144,69 @@ EXCEPTION WHEN check_violation THEN
   RAISE NOTICE 'PASS T7: blank names rejected';
 END $$;
 
--- ===== T8: RLS for real — clients get nothing =====
+-- ===== T8: one row per identity (unique indexes) =====
+DO $$
+BEGIN
+  INSERT INTO public.beta_signups
+    (first_name, last_name, platform, apple_email, ios_status)
+  VALUES ('Ada', 'Again', 'ios', 'ada@example.com', 'pending');
+  RAISE EXCEPTION 'FAIL T8: a duplicate apple_email was accepted';
+EXCEPTION WHEN unique_violation THEN
+  RAISE NOTICE 'PASS T8: duplicate apple_email rejected';
+END $$;
+DO $$
+BEGIN
+  INSERT INTO public.beta_signups
+    (first_name, last_name, platform, play_email, phone, android_status)
+  VALUES ('Grace', 'Again', 'android', 'grace@gmail.com', '+19995551234', 'pending');
+  RAISE EXCEPTION 'FAIL T8b: a duplicate play_email was accepted';
+EXCEPTION WHEN unique_violation THEN
+  RAISE NOTICE 'PASS T8b: duplicate play_email rejected';
+END $$;
+-- NULLs never collide: a second iOS-only row (phone NULL) inserts fine.
+INSERT INTO public.beta_signups
+  (first_name, last_name, platform, apple_email, ios_status)
+VALUES ('Edsger', 'Dijkstra', 'ios', 'edsger@example.com', 'pending');
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM public.beta_signups) <> 4 THEN
+    RAISE EXCEPTION 'FAIL T8c: expected 4 rows after NULL-phone insert';
+  END IF;
+  RAISE NOTICE 'PASS T8c: NULL phones do not collide';
+END $$;
+
+-- ===== T9: RLS for real — clients get nothing =====
 -- The scratch DB has no Supabase default privileges; grant what the real
 -- project grants so these checks exercise RLS, not missing grants (the
 -- affiliate_programs_test.sql pattern).
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.beta_signups TO anon, authenticated;
 
--- T8a: authenticated SELECT sees zero rows even though three exist.
+-- T9a: authenticated SELECT sees zero rows even though four exist.
 BEGIN;
 SET LOCAL ROLE authenticated;
 DO $$
 BEGIN
   IF (SELECT count(*) FROM public.beta_signups) <> 0 THEN
-    RAISE EXCEPTION 'FAIL T8a: authenticated can read beta_signups';
+    RAISE EXCEPTION 'FAIL T9a: authenticated can read beta_signups';
   END IF;
-  RAISE NOTICE 'PASS T8a: authenticated SELECT denied';
+  RAISE NOTICE 'PASS T9a: authenticated SELECT denied';
 END $$;
 COMMIT;
 
--- T8b: anon INSERT is denied (RLS enabled, no policy → default deny).
+-- T9b: anon INSERT is denied (RLS enabled, no policy → default deny).
 BEGIN;
 SET LOCAL ROLE anon;
 DO $$
 BEGIN
   INSERT INTO public.beta_signups (first_name, last_name, platform, apple_email, ios_status)
   VALUES ('Rogue', 'Row', 'ios', 'rogue@example.com', 'pending');
-  RAISE EXCEPTION 'FAIL T8b: anon inserted a signup row';
+  RAISE EXCEPTION 'FAIL T9b: anon inserted a signup row';
 EXCEPTION WHEN insufficient_privilege THEN
-  RAISE NOTICE 'PASS T8b: anon INSERT denied';
+  RAISE NOTICE 'PASS T9b: anon INSERT denied';
 END $$;
 COMMIT;
 
--- T8c: authenticated UPDATE/DELETE silently affect nothing — the seed rows
+-- T9c: authenticated UPDATE/DELETE silently affect nothing — the seed rows
 -- survive untouched.
 BEGIN;
 SET LOCAL ROLE authenticated;
@@ -185,13 +216,13 @@ COMMIT;
 
 DO $$
 BEGIN
-  IF (SELECT count(*) FROM public.beta_signups) <> 3 THEN
-    RAISE EXCEPTION 'FAIL T8c: authenticated DELETE removed rows';
+  IF (SELECT count(*) FROM public.beta_signups) <> 4 THEN
+    RAISE EXCEPTION 'FAIL T9c: authenticated DELETE removed rows';
   END IF;
   IF EXISTS (SELECT 1 FROM public.beta_signups WHERE ios_status = 'added') THEN
-    RAISE EXCEPTION 'FAIL T8c: authenticated UPDATE modified rows';
+    RAISE EXCEPTION 'FAIL T9c: authenticated UPDATE modified rows';
   END IF;
-  RAISE NOTICE 'PASS T8c: client writes affect nothing';
+  RAISE NOTICE 'PASS T9c: client writes affect nothing';
 END $$;
 
 DO $$ BEGIN RAISE NOTICE 'ALL BETA-SIGNUPS TESTS PASSED'; END $$;
