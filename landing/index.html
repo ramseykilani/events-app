@@ -27,6 +27,12 @@
   is the hero visual (the seed grid was rejected), no header nav, How it
   works stays on the page ground, the CTA keeps its 12px radius.
 
+  Desktop polish (owner-approved 2026-09-03): the mock grows to 480px so
+  the product shot carries the hero's right column, everything below the
+  hero shares one 760px measure (beta / How it works / footer align), and
+  the hero gets the candidate's 56/72px vertical rhythm. Mobile is
+  untouched — phone viewports never reach the mock cap.
+
   Role tokens are ported 1:1 from constants/Colors.ts (2026-09-02) — the
   receipt page's stale accent is the cautionary tale (UX-25), so if
   Colors.ts moves, move these. The theme swatch behaves exactly as in the
@@ -154,8 +160,8 @@
     pointer-events: none;
     z-index: 0;
   }
-  /* Header and hero share the wide measure (the two-column hero needs it);
-     the beta block, How it works, and the footer keep the narrow one. */
+  /* Header and hero share the wide 1080px measure (the two-column hero
+     needs it); everything below the hero shares one 760px measure. */
   header {
     max-width: 1080px;
     margin: 0 auto;
@@ -209,7 +215,7 @@
   .hero {
     max-width: 1080px;
     margin: 0 auto;
-    padding: 32px 0 64px;
+    padding: 56px 0 72px;
     display: grid;
     grid-template-columns: 5fr 6fr;
     gap: 56px;
@@ -259,7 +265,9 @@
      illustration, aria-hidden; the copy carries the meaning. */
   .mock {
     width: 100%;
-    max-width: 380px;
+    /* 480px on desktop — the product shot carries the hero's right column;
+       phone viewports never reach the cap, so mobile is unchanged. */
+    max-width: 480px;
     margin: 0 auto;
     background: var(--surface);
     border: 1px solid var(--border-light);
@@ -328,8 +336,11 @@
     font-weight: 600;
     margin: 0 0 8px;
   }
+  /* Below the hero everything shares one 760px measure — beta, How it
+     works, and the footer align on the same edges (desktop polish,
+     2026-09-03). */
   .beta {
-    max-width: 560px;
+    max-width: 760px;
     margin: 0 auto;
   }
   .beta p { margin: 0 0 20px; }
@@ -403,7 +414,7 @@
     max-width: 60ch;
   }
   footer {
-    max-width: 560px;
+    max-width: 760px;
     margin: 48px auto 0;
     padding-top: 24px;
     border-top: 1px solid var(--border-light);

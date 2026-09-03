@@ -101,6 +101,14 @@ test('renders Paper by default with the mock, mailto CTA, fallback, and footer',
   const howBox = await how.boundingBox();
   expect(howBox!.y).toBeGreaterThan(betaBox!.y + betaBox!.height);
 
+  // Below the hero, beta / How it works / footer share one 760px measure —
+  // same width, same left edge (desktop polish 2026-09-03).
+  const footerBox = await page.locator('footer').boundingBox();
+  expect(betaBox!.width).toBe(howBox!.width);
+  expect(howBox!.width).toBe(footerBox!.width);
+  expect(betaBox!.x).toBe(howBox!.x);
+  expect(howBox!.x).toBe(footerBox!.x);
+
   // "Already testing?" footer: Android carries the standing Play internal
   // opt-in link; the iPhone line is instruction-only (internal TestFlight
   // has no per-app URL).
@@ -154,9 +162,11 @@ test('hero is two-column on desktop, stacked with the mock after the text on mob
     expect(mockBox!.y).toBeGreaterThanOrEqual(subBox!.y + subBox!.height);
   } else {
     // Two-column: the mock is right of the headline column and shares its
-    // vertical band (grid align-items: center).
+    // vertical band (grid align-items: center). The mock carries the
+    // column at 480px — wider than the pre-polish 380px cap.
     expect(mockBox!.x).toBeGreaterThan(headBox!.x + headBox!.width);
     expect(mockBox!.y).toBeLessThan(headBox!.y + headBox!.height);
+    expect(mockBox!.width).toBeGreaterThan(380);
   }
 });
 
