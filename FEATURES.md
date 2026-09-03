@@ -2104,13 +2104,13 @@ Content strategy is inherited unchanged from the owner-approved beta page: the a
 
 ### Open Questions
 
-- Which direction becomes the launch page (this, the beta page, or a merge) is the owner's call after comparing the two live. Partially answered 2026-09-03: the hero layout and the How-it-works section pull into the production page — see [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins).
+- Which direction becomes the launch page (this, the beta page, or a merge) is the owner's call after comparing the two live. Partially answered 2026-09-03: the hero layout and the How-it-works section pull into the production page — see [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins). `landing-v2` itself stays live permanently as a design artifact (owner call 2026-09-03 — "it's fun and cool").
 
 ---
 
 ## Landing Page Polish (Three-One-Four Pull-Ins)
 
-**Status:** Planned — direction owner-approved 2026-09-03 ("I really like the header area… I also like the how it works section… I want to include it in the production version"). Not scheduled; pick up when the owner names a when. The candidate page (`landing-v2/`, live at https://events-landing-v2.pages.dev) stays live and undeleted until this ships — it is the side-by-side comparison surface and the copy source.
+**Status:** Planned — direction owner-approved 2026-09-03 ("I really like the header area… I also like the how it works section… I want to include it in the production version"). Not scheduled; pick up when the owner names a when. The candidate page (`landing-v2/`, live at https://events-landing-v2.pages.dev) stays live permanently as a design artifact (owner call 2026-09-03 — "it's fun and cool") and is the copy source for this work.
 
 ### Problem
 
@@ -2119,16 +2119,16 @@ The production landing page (`landing/` → https://events-landing.pages.dev) is
 ### Pull in (owner-approved 2026-09-03)
 
 1. **The two-column hero.** Eyebrow + headline + sub on the left, the product visual on the right (desktop; stacked on mobile, visual after the text). Reference implementation: the `.hero` block in `landing-v2/index.html`. The headline text is unchanged — it is the owner-approved line ("A calendar of events your people share with you.").
-2. **The eyebrow and the italic accent phrase.** A small eyebrow above the H1 with an accent dot (candidate copy: "Person-to-person events" — new visible string, so it needs the owner copy bar), and the H1's key phrase ("your people") set italic in the accent. This is the one new place the accent is spent; everywhere else stays as-is.
+2. **The eyebrow and the italic accent phrase.** A small eyebrow above the H1 with an accent dot, and the H1's key phrase ("your people") set italic in the accent — both elements owner-approved 2026-09-03 (second review). The eyebrow's words ("Person-to-person events" in the candidate) still need the owner copy bar. This is the one new place the accent is spent; everywhere else stays as-is.
 3. **The "How it works" section.** Three hairline-separated rows — mono numeral, serif title, one-or-two-sentence body — placed after the beta block (the CTA stays high). The exact body copy below is what the owner saw and liked on 2026-09-03:
    - **01 Person to person** — "Everything on it comes from someone you know — added by you, or shared straight to your calendar. Nothing is posted, and nothing is public."
    - **02 The share is the ask** — "Sharing an event asks who's coming. A yes or a no finds its way back to the asker — from the app, or straight from the text."
    - **03 Quiet by design** — "You hear from Events when a person does something, and never otherwise."
-   **Renumber 01/02/03.** The candidate's 01/02/04 gap is a seed gag (the string produced no 3) and does not ship; the missing-03 footnote drops with it. With the page gaining sections, also pull the candidate's in-page header nav (anchors: Invite → `#beta`, How it works → `#how`).
+   **Renumber 01/02/03.** The candidate's 01/02/04 gap is a seed gag (the string produced no 3) and does not ship; the missing-03 footnote drops with it. **No header nav** (owner question 2026-09-03 — "do we need it if all we have is invite and how it works?": no — two anchors don't earn the chrome on a page this short, and an Invite nav item just duplicates the CTA; revisit only if the page grows more sections).
 
 ### Recommended by the build agent (owner to rule)
 
-4. **Hero visual: keep the mock calendar, not the letter grid.** The seed year-grid only reads as a calendar after the colophon explains it; to a first-time visitor it reads as a word-search. The mock is the app itself — show-don't-tell is the current page's strength. Recommendation: two-column hero with the existing mock on the right. If the owner wants the grid instead, adapt it — 12×6 day cells, six marked days including one two-day event, but blank or day-numbered cells (never the seed characters) and a new caption (owner copy bar; the "Seventy-two days" caption does not ship).
+4. **Hero visual: the mock calendar — resolved 2026-09-03 (owner).** The owner explicitly rejected the seed grid as the production visual. The seed year-grid only reads as a calendar after the colophon explains it; to a first-time visitor it reads as a word-search. The mock is the app itself — show-don't-tell is the current page's strength. Two-column hero with the existing mock on the right.
 5. **A second register (optional).** The candidate's dark band gives the page two moods. If wanted, the How-it-works section could wear the Evening tokens as a band. Skip if it fights the theme swatch.
 6. **Pill CTA (recommend against).** The candidate's fully-rounded invite button is friendlier, but the page should read as the same object as the app (owner ruling 2026-09-02) — keep the §5 12px radius.
 
@@ -2141,7 +2141,7 @@ The production landing page (`landing/` → https://events-landing.pages.dev) is
 
 ### Technical Notes
 
-- Target: `landing/index.html`. Reference + copy source: `landing-v2/index.html`. Do not delete `landing-v2/` or its Pages project until this ships and the owner has compared.
+- Target: `landing/index.html`. Reference + copy source: `landing-v2/index.html`. `landing-v2/` and its Pages project stay live permanently (owner call 2026-09-03) — a design artifact, not a staging area.
 - Carry over untouched: the beta block (mailto CTA, guidance, copyable fallback), the Already-testing footer, `noindex`, the no-web-app-links / no-custom-scheme rules, and the theme swatch with its no-flash bootstrap.
 - Copy bar: every new visible string (eyebrow, nav labels, any caption) needs owner approval, same as SMS copy. The three principle bodies above are pre-approved (owner, 2026-09-03).
 - Verify bar: update `e2e/landing.spec.ts` — it pins the current single-column page; the hero/mock/CTA/fallback/footer/noindex/link-audit assertions stay, add the principles (01/02/03), the nav anchors, and the two-column layout. Green on desktop Chrome plus one mobile project; attach desktop + ~390px screenshots to the run summary.
@@ -2149,6 +2149,5 @@ The production landing page (`landing/` → https://events-landing.pages.dev) is
 
 ### Open Questions
 
-- Hero visual: mock calendar (recommended) vs adapted year-grid — owner's call.
 - Does How it works wear a dark second register or stay on the page ground?
 - Eyebrow copy ("Person-to-person events" or something else — owner words).
