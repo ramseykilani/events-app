@@ -66,6 +66,7 @@ supabase/migrations/ SQL migrations (schema, RLS, triggers, RPCs) — run in ord
 supabase/functions/  Edge Functions (send-notification, og-metadata, cleanup-people, twilio-status, send-response-notification, send-response; shared helpers in _shared/)
 receipt/             Who's Coming receipt page (static, one page) — deployed to the events-reply Pages project via npm run deploy:receipt
 landing/             Beta landing page (static, one page) — live at events-landing.pages.dev via npm run deploy:landing (agent-run, no CI; deploy only on a green staging push)
+landing-v2/          Three-One-Four landing redesign candidate (static, no JS) — events-landing-v2.pages.dev via npm run deploy:landing-v2 (same rules; FEATURES.md → Landing Page Redesign)
 ```
 
 ## Data flow cheat sheet

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#f7efe7" />
+<meta name="color-scheme" content="light" />
+<title>Events</title>
+<link rel="icon" type="image/png" href="./favicon.png" />
+<!--
+  Three-One-Four — a new-design candidate for the landing page
+  (FEATURES.md → Landing Page Redesign (Three-One-Four)). The beta landing
+  page at landing/ is untouched; this is a separate static site for its own
+  Pages project, same shape as receipt/.
+
+  The creative direction was drawn from one random seed, generated once
+  from /dev/urandom on 2026-09-03 and never re-rolled:
+    yTfu92WMVLT2NcAmAuRlMN4a2ed6ql7vSw9jNw1I99QT1t9ZyPiAJ8AOIKp2Sfk8fj9uwz14
+  What the seed gave the design:
+    · 72 characters = 12 × 6 — twelve across, like months: the hero year-grid.
+    · Six 9s, the only digit that repeats (including its lone adjacent pair,
+      which lands side-by-side in the grid) — the six marked days.
+    · "Pi" at character 50, a string that ends "14", and not one 3 anywhere
+      (nor 0, nor 5) — π, declined. The accent is hue 314; the principles
+      are numbered 01, 02, 04.
+    · "AmAuRl" — six characters of perfect alternating case, one keystroke
+      from amour. · "QT" — quiet, the product's own word.
+
+  Content strategy is inherited from the owner-approved beta page: lead with
+  what it is, mailto is the whole CTA, noindex, no analytics, no links into
+  the web app, no custom schemes. This page ships no JavaScript at all.
+-->
+<style>
+  :root {
+    --ground: #f7efe7;
+    --surface: #fffdfa;
+    --ink: #251b21;
+    --ink-soft: #6d5c64;
+    --accent: #8f2476;        /* hue 314 — the seed's pi */
+    --accent-deep: #7a1e64;
+    --accent-bright: #e3a8ce; /* marks on the dark band */
+    --accent-soft: #f0dbe8;
+    --hairline: #e7d9cd;
+    --band-ink: #d8ccd2;
+    --serif: Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body { background: var(--ground); }
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-soft); }
+  a { color: var(--ink); }
+  a:hover { color: var(--accent); }
+  a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  /* ---------- header ---------- */
+
+  .site-header {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 22px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .monogram {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: grid;
+    place-items: center;
+    font-family: var(--serif);
+    font-size: 19px;
+  }
+  .wordmark {
+    font-family: var(--serif);
+    font-size: 20px;
+  }
+  .site-nav {
+    display: flex;
+    gap: 24px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .site-nav a {
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 8px 0;
+  }
+  .site-nav a:hover { color: var(--accent); }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 56px 24px 72px;
+    display: grid;
+    grid-template-columns: 5fr 6fr;
+    gap: 56px;
+    align-items: center;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex: none;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(32px, 4.4vw, 50px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 20px;
+  }
+  h1 .em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--ink-soft);
+    max-width: 44ch;
+    margin: 0;
+  }
+
+  /* the year-grid: the seed as a calendar */
+
+  .year-figure { margin: 0; }
+  .year-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+    max-width: 560px;
+  }
+  .cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: clamp(11px, 1.9vw, 16px);
+    color: var(--ink-soft);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    position: relative;
+    animation: rise 500ms ease both;
+    animation-delay: calc(var(--i) * 10ms);
+  }
+  /* a marked day: ink char + accent dot — the app's own calendar grammar */
+  .cell.nine {
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .cell.nine::after {
+    content: "";
+    position: absolute;
+    bottom: 12%;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  /* the adjacent 99 pair reads as one two-day event */
+  .cell.pair {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--ground);
+  }
+  .cell.pair::after { content: none; }
+  .year-caption {
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* ---------- beta ---------- */
+
+  .beta {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 0 24px 72px;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 28px;
+    margin: 0 0 10px;
+  }
+  .beta p { margin: 0 0 20px; }
+  .beta .what { color: var(--ink-soft); }
+  .cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    margin: 20px 0 16px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--ground);
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 150ms ease;
+  }
+  .cta:hover { background: var(--accent-deep); color: var(--ground); }
+  .guidance {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .fallback {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-top: 24px;
+  }
+  .fallback p {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin: 0 0 12px;
+  }
+  .fallback .address { color: var(--ink); font-weight: 500; }
+  .template div {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ---------- how it works ---------- */
+
+  .how {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+  .principle {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 6px 24px;
+    padding: 26px 0;
+    border-top: 1px solid var(--hairline);
+  }
+  .num {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--ink-soft);
+    padding-top: 7px;
+  }
+  .principle h3 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+  .principle p {
+    margin: 0;
+    color: var(--ink-soft);
+    max-width: 60ch;
+  }
+  .missing-three {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 18px 0 0;
+  }
+  .missing-three .star { color: var(--accent); }
+
+  /* ---------- the seed (dark band) ---------- */
+
+  .seed {
+    background: var(--ink);
+    color: var(--ground);
+    padding: 72px 24px 80px;
+  }
+  .seed-inner {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .seed h2 { color: var(--ground); }
+  .seed .intro {
+    color: var(--band-ink);
+    max-width: 62ch;
+    margin: 0 0 28px;
+  }
+  .seed .intro code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    color: var(--accent-bright);
+  }
+  .seed-string {
+    font-family: var(--mono);
+    font-size: clamp(13px, 2.3vw, 17px);
+    line-height: 2.1;
+    letter-spacing: 0.04em;
+    word-break: break-all;
+    margin: 0 0 32px;
+  }
+  .mk-nine {
+    color: var(--accent-bright);
+    font-weight: 700;
+    border-bottom: 2px solid var(--accent-bright);
+  }
+  .mk-pi, .mk-tail {
+    background: var(--accent);
+    color: var(--ground);
+    border-radius: 4px;
+    padding: 1px 2px;
+  }
+  .mk-amour {
+    font-style: italic;
+    color: var(--accent-bright);
+  }
+  .mk-qt {
+    border-bottom: 1px dashed var(--accent-bright);
+    letter-spacing: 0.12em;
+  }
+  .legend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 14px;
+  }
+  .legend li {
+    color: var(--band-ink);
+    font-size: 15px;
+    max-width: 68ch;
+  }
+  .legend .mk {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent-bright);
+    margin-right: 8px;
+  }
+
+  /* ---------- footer ---------- */
+
+  .site-footer {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 48px 24px 56px;
+  }
+  .already-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin: 0 0 8px;
+  }
+  .already-line {
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin: 0 0 8px;
+  }
+  .already-line a { color: var(--accent); }
+  .privacy {
+    margin: 24px 0 0;
+    font-size: 13px;
+  }
+  /* a legal link earns no warmth — stays tertiary (same ruling as the app) */
+  .privacy a { color: var(--ink-soft); }
+
+  /* ---------- responsive + motion ---------- */
+
+  @media (max-width: 900px) {
+    .hero {
+      grid-template-columns: 1fr;
+      gap: 44px;
+      padding-top: 36px;
+    }
+    .year-grid { max-width: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .cell { animation: none; }
+    .cta { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">
+    <span class="monogram" aria-hidden="true">E’s</span>
+    <span class="wordmark">Events</span>
+  </div>
+  <nav class="site-nav" aria-label="Page">
+    <a href="#beta">Invite</a>
+    <a href="#how">How it works</a>
+    <a href="#seed">The seed</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Person-to-person events</p>
+      <h1>A calendar of events <em class="em">your people</em> share with you.</h1>
+      <p class="lede">
+        Everything on it comes from someone you know. See something you’d go
+        to? Pass it on with a tap.
+      </p>
+    </div>
+
+    <figure class="year-figure">
+      <div class="year-grid" aria-hidden="true"><span class="cell" style="--i:0">y</span><span class="cell" style="--i:1">T</span><span class="cell" style="--i:2">f</span><span class="cell" style="--i:3">u</span><span class="cell nine" style="--i:4">9</span><span class="cell" style="--i:5">2</span><span class="cell" style="--i:6">W</span><span class="cell" style="--i:7">M</span><span class="cell" style="--i:8">V</span><span class="cell" style="--i:9">L</span><span class="cell" style="--i:10">T</span><span class="cell" style="--i:11">2</span><span class="cell" style="--i:12">N</span><span class="cell" style="--i:13">c</span><span class="cell" style="--i:14">A</span><span class="cell" style="--i:15">m</span><span class="cell" style="--i:16">A</span><span class="cell" style="--i:17">u</span><span class="cell" style="--i:18">R</span><span class="cell" style="--i:19">l</span><span class="cell" style="--i:20">M</span><span class="cell" style="--i:21">N</span><span class="cell" style="--i:22">4</span><span class="cell" style="--i:23">a</span><span class="cell" style="--i:24">2</span><span class="cell" style="--i:25">e</span><span class="cell" style="--i:26">d</span><span class="cell" style="--i:27">6</span><span class="cell" style="--i:28">q</span><span class="cell" style="--i:29">l</span><span class="cell" style="--i:30">7</span><span class="cell" style="--i:31">v</span><span class="cell" style="--i:32">S</span><span class="cell" style="--i:33">w</span><span class="cell nine" style="--i:34">9</span><span class="cell" style="--i:35">j</span><span class="cell" style="--i:36">N</span><span class="cell" style="--i:37">w</span><span class="cell" style="--i:38">1</span><span class="cell" style="--i:39">I</span><span class="cell nine pair" style="--i:40">9</span><span class="cell nine pair" style="--i:41">9</span><span class="cell" style="--i:42">Q</span><span class="cell" style="--i:43">T</span><span class="cell" style="--i:44">1</span><span class="cell" style="--i:45">t</span><span class="cell nine" style="--i:46">9</span><span class="cell" style="--i:47">Z</span><span class="cell" style="--i:48">y</span><span class="cell" style="--i:49">P</span><span class="cell" style="--i:50">i</span><span class="cell" style="--i:51">A</span><span class="cell" style="--i:52">J</span><span class="cell" style="--i:53">8</span><span class="cell" style="--i:54">A</span><span class="cell" style="--i:55">O</span><span class="cell" style="--i:56">I</span><span class="cell" style="--i:57">K</span><span class="cell" style="--i:58">p</span><span class="cell" style="--i:59">2</span><span class="cell" style="--i:60">S</span><span class="cell" style="--i:61">f</span><span class="cell" style="--i:62">k</span><span class="cell" style="--i:63">8</span><span class="cell" style="--i:64">f</span><span class="cell" style="--i:65">j</span><span class="cell nine" style="--i:66">9</span><span class="cell" style="--i:67">u</span><span class="cell" style="--i:68">w</span><span class="cell" style="--i:69">z</span><span class="cell" style="--i:70">1</span><span class="cell" style="--i:71">4</span></div>
+      <p class="visually-hidden">
+        A decorative seventy-two-cell grid, twelve across like months, spelling
+        the random seed this page was designed from. Six cells are marked the
+        way the app marks days that have events.
+      </p>
+      <figcaption class="year-caption">
+        Seventy-two days, twelve across like months. Six have something on.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="beta" id="beta" aria-labelledby="beta-title">
+    <h2 id="beta-title">In beta</h2>
+    <p class="what">Events is in beta, and invites go out personally. The button opens a pre-filled email; send it and we’ll add you.</p>
+    <a class="cta" href="mailto:kilani.ramsey@gmail.com?subject=Events%20beta%20%E2%80%94%20add%20me&amp;body=First%20and%20last%20name%3A%0AWho%20told%20you%20about%20Events%3A%0AiPhone%20or%20Android%3A%0AIf%20iPhone%2C%20the%20email%20your%20Apple%20ID%20is%20under%3A%0AIf%20Android%2C%20the%20Gmail%20your%20Play%20Store%20uses%3A%0A">Ask for an invite</a>
+    <p class="guidance">iPhone: Apple sends two emails — accept the first. Android: we add your Gmail to the tester list, and your Play testing link starts working.</p>
+    <div class="fallback">
+      <p>If the button doesn’t open your mail app, write to <span class="address">kilani.ramsey@gmail.com</span> with the subject “Events beta — add me” and these five lines:</p>
+      <div class="template">
+        <div>First and last name:</div>
+        <div>Who told you about Events:</div>
+        <div>iPhone or Android:</div>
+        <div>If iPhone, the email your Apple ID is under:</div>
+        <div>If Android, the Gmail your Play Store uses:</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="how" id="how" aria-labelledby="how-title">
+    <h2 id="how-title">How it works</h2>
+
+    <div class="principle">
+      <span class="num" aria-hidden="true">01</span>
+      <div>
+        <h3>Person to person</h3>
+        <p>Everything on it comes from someone you know — added by you, or shared straight to your calendar. Nothing is posted, and nothing is public.</p>
+      </div>
+    </div>
+
+    <div class="principle">
+      <span class="num" aria-hidden="true">02</span>
+      <div>
+        <h3>The share is the ask</h3>
+        <p>Sharing an event asks who’s coming. A yes or a no finds its way back to the asker — from the app, or straight from the text.</p>
+      </div>
+    </div>
+
+    <div class="principle">
+      <span class="num" aria-hidden="true">04</span>
+      <div>
+        <h3>Quiet by design</h3>
+        <p>You hear from Events when a person does something, and never otherwise.</p>
+      </div>
+    </div>
+
+      <p class="missing-three">
+        <span class="star">*</span> There is no 03. The seventy-two random characters this page was designed from contained no 3 (nor 0, nor 5). A good seed is to be respected.
+      </p>
+  </section>
+
+  <section class="seed" id="seed" aria-labelledby="seed-title">
+    <div class="seed-inner">
+      <h2 id="seed-title">The seed</h2>
+      <p class="intro">
+        This page was designed from seventy-two random characters, drawn once
+        from <code>/dev/urandom</code> on September 3, 2026, and never re-rolled.
+        It ships no JavaScript, no analytics, and no tracking.
+      </p>
+      <p class="seed-string">yTfu<span class="mk-nine">9</span>2WMVLT2Nc<span class="mk-amour">A</span><span class="mk-amour">m</span><span class="mk-amour">A</span><span class="mk-amour">u</span><span class="mk-amour">R</span><span class="mk-amour">l</span>MN4a2ed6ql7vSw<span class="mk-nine">9</span>jNw1I<span class="mk-nine">9</span><span class="mk-nine">9</span><span class="mk-qt">Q</span><span class="mk-qt">T</span>1t<span class="mk-nine">9</span>Zy<span class="mk-pi">P</span><span class="mk-pi">i</span>AJ8AOIKp2Sfk8fj<span class="mk-nine">9</span>uwz<span class="mk-tail">1</span><span class="mk-tail">4</span></p>
+      <ul class="legend">
+        <li><span class="mk">SIX 9s</span>The only digit that repeats, including the string’s lone adjacent pair. They became the six marked days above.</li>
+        <li><span class="mk">Pi + 14</span>A P and an i at the fiftieth character, a string that ends 1-4, and not one 3 anywhere. Pi, declined. It set the accent color: hue 314.</li>
+        <li><span class="mk">AmAuRl</span>Six characters of perfect alternating case, one keystroke from <em>amour</em>. Person to person, indeed.</li>
+        <li><span class="mk">QT</span>Quiet. The product’s own word, found in the noise.</li>
+        <li><span class="mk">26/27/19</span>Uppercase, lowercase, digits. Twenty-six capitals: the whole alphabet, clearing its throat.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p class="already-title">Already testing?</p>
+  <p class="already-line">Android: <a href="https://play.google.com/apps/internaltest/4701427612732216042">open your Play testing link</a> — it works once we’ve added your Gmail to the tester list.</p>
+  <p class="already-line">iPhone: accept the invite email, then open TestFlight and install Events.</p>
+  <p class="privacy"><a href="https://shared-events.pages.dev/privacy.html">Privacy policy</a></p>
+</footer>
+
+</body>
+</html>

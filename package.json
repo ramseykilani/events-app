@@ -20,6 +20,7 @@
     "deploy:staging": "npm run build:web && wrangler pages deploy --branch=staging",
     "deploy:receipt": "wrangler pages deploy receipt --project-name=events-reply --branch=main",
     "deploy:landing": "wrangler pages deploy landing --project-name=events-landing --branch=main",
+    "deploy:landing-v2": "wrangler pages deploy landing-v2 --project-name=events-landing-v2 --branch=main",
     "test:manual": "bash ./scripts/manual-test-suite.sh",
     "test:manual:strict": "bash ./scripts/manual-test-suite.sh --strict",
     "test:manual:start": "bash ./scripts/manual-test-suite.sh --strict --start"

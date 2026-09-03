@@ -33,6 +33,11 @@ const receiptURL = process.env.E2E_RECEIPT_URL ?? `http://localhost:${RECEIPT_PO
 // overrides for running that spec against a deployed preview.
 const LANDING_PORT = Number(process.env.E2E_LANDING_PORT ?? 8083);
 const landingURL = process.env.E2E_LANDING_URL ?? `http://localhost:${LANDING_PORT}`;
+// The Three-One-Four landing redesign candidate (landing-v2/) gets the same
+// treatment on its own port; E2E_LANDING_V2_URL overrides for a deploy.
+const LANDING_V2_PORT = Number(process.env.E2E_LANDING_V2_PORT ?? 8084);
+const landingV2URL =
+  process.env.E2E_LANDING_V2_URL ?? `http://localhost:${LANDING_V2_PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -75,6 +80,16 @@ export default defineConfig({
           {
             command: `npx serve -s landing -l ${LANDING_PORT}`,
             url: landingURL,
+            reuseExistingServer: !process.env.CI,
+            timeout: 30_000,
+          },
+        ]),
+    ...(process.env.E2E_LANDING_V2_URL
+      ? []
+      : [
+          {
+            command: `npx serve -s landing-v2 -l ${LANDING_V2_PORT}`,
+            url: landingV2URL,
             reuseExistingServer: !process.env.CI,
             timeout: 30_000,
           },

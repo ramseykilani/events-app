@@ -57,6 +57,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
 | [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
+| [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
 
 ## Using and testing
 
@@ -2059,3 +2060,47 @@ A polish pass on the receipt page that brings its look closer to the event detai
 - [ ] Any other unmotivated divergence from the detail screen's grammar found during the pass is aligned (or recorded here with the reason it stays)
 - [ ] The page stays dependency-free (no icon font, no framework) and keeps its inert-GET / Yes-No-first behavior
 - [ ] `e2e/receipt.spec.ts` updated and green on desktop Chrome; mobile-viewport screenshots reviewed
+
+---
+
+## Landing Page Redesign (Three-One-Four)
+
+**Status:** Implemented (2026-09-03) — live at https://events-landing-v2.pages.dev (Pages project `events-landing-v2`, production branch `main`). A new-design candidate next to the beta landing page; `landing/` and `events-landing` are untouched. Owner task 2026-09-03: "build a new landing page with a new design — don't overwrite the old one yet," with the creative direction derived from a random string.
+
+### Problem
+
+The beta landing page is deliberately in the app's own design language. The owner wanted to see a completely new design direction for the page before deciding what the launch page becomes — built as a separate artifact so the two can be compared side by side.
+
+### Solution
+
+The design was seeded by one 72-character random string drawn from `/dev/urandom` (`bash`-piped, alphanumeric, never re-rolled):
+
+`yTfu92WMVLT2NcAmAuRlMN4a2ed6ql7vSw9jNw1I99QT1t9ZyPiAJ8AOIKp2Sfk8fj9uwz14`
+
+The direction — **Three-One-Four** — comes from what the string turned out to contain:
+
+- It spells `Pi` at character 50 and ends `…14`, while never producing a `3` (nor `0`, nor `5`): π, declined. The accent is **hue 314** (raspberry `#8f2476` on warm blush paper `#f7efe7`, wine ink `#251b21`), and the How-it-works principles are numbered **01, 02, 04** with a footnote explaining the missing 03.
+- **72 = 12 × 6** — the hero renders the seed itself as a year-grid, twelve across like months. The **six 9s** (the only digit that repeats) are marked with the app's own calendar grammar (ink digit + accent dot); the string's lone adjacent pair `99` lands side-by-side in the grid and reads as one two-day event.
+- `AmAuRl` (perfect alternating case, one keystroke from *amour*) and `QT` (quiet) are annotated in the colophon band, which shows the raw seed and its legend.
+
+Content strategy is inherited unchanged from the owner-approved beta page: the approved headline and sub line, the prefilled mailto as the whole CTA with the copyable fallback, the "Already testing?" footer (Play opt-in link; iPhone instruction-only), `noindex`, no analytics, no links into the web app, no custom schemes. Unlike the beta page it ships **no JavaScript at all** — the grid is static HTML and the load-in stagger is pure CSS (`prefers-reduced-motion` honored).
+
+### Technical Notes
+
+- New top-level `landing-v2/` directory: one self-contained `index.html` plus the favicon (same Pages-project shape as `receipt/` and `landing/`). Deploy: `npm run deploy:landing-v2` → project `events-landing-v2` (created 2026-09-03 via `wrangler pages project create` — wrangler 4.120 does not auto-create).
+- No theme swatch and no app tokens: the new design is the point of the exercise (the beta page's "same object as the app" rule was that page's brief). If the owner picks this direction for launch, the token question gets decided then.
+- E2e: `e2e/landing-v2.spec.ts` (landing.spec.ts pattern — own `serve` port 8084 in `playwright.config.ts`, `E2E_LANDING_V2_URL` override) pins the seed design (72 cells / six nines / the pair / 01-02-04 / colophon string), the mailto CTA + fallback, the footer, noindex, zero scripts, and the link audit.
+
+### Acceptance Criteria
+
+- [x] Page serves at its Pages URL and renders correctly at desktop and ~390px mobile widths
+- [x] Hero year-grid renders the seed: 72 cells, twelve across, six marked days, the `99` pair filled
+- [x] Principles numbered 01 / 02 / 04 with the missing-03 footnote; colophon shows the annotated seed
+- [x] CTA is the prefilled beta mailto; address and five-line template also render as copyable text
+- [x] "Already testing?" footer: Android Play opt-in link, iPhone instruction-only
+- [x] `noindex`; no JavaScript, analytics, or tracking; no web-app or custom-scheme links
+- [x] `landing/` (the beta page) untouched; deploys via its own `npm run deploy:landing-v2`
+
+### Open Questions
+
+- Which direction becomes the launch page (this, the beta page, or a merge) is the owner's call after comparing the two live.
