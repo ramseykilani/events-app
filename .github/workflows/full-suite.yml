@@ -2,11 +2,14 @@
 #   - staging.yml  on every push to staging (before the preview deploy)
 #   - release.yml  on every staging→production PR (the release gate)
 #
-# Layers: static checks (tsc, Jest, SQL semantics) → web build → Playwright
-# e2e against the built bundle on desktop Chrome, Mobile Safari (WebKit), and
-# Mobile Chrome. The e2e suite signs in with the Supabase test-OTP accounts
-# documented in AGENTS.md, so it needs EXPO_PUBLIC_SUPABASE_URL /
-# EXPO_PUBLIC_SUPABASE_ANON_KEY secrets to build the bundle.
+# Layers: static checks (tsc, Jest, SQL semantics) run in PARALLEL with the
+# browser matrix — the repo is public, so runner-minutes are free and a red
+# static check still signals at minute ~3. The e2e-browsers matrix runs each
+# Playwright project (desktop Chrome, Mobile Safari/WebKit, Mobile Chrome) as
+# its own leg, each with its OWN standing test-account pair via E2E_PHONE_A/B
+# (e2e/helpers.ts reads the overrides), so parallel legs never race each
+# other's calendars. The no-op `e2e` aggregator job preserves the required
+# status check name `full-suite / e2e` on production.
 name: Full suite
 on:
   workflow_call:
@@ -45,9 +48,32 @@ jobs:
       - name: SQL semantics suite
         run: bash supabase/tests/run_local.sh
 
-  e2e:
-    needs: checks
+  e2e-browsers:
+    strategy:
+      # One leg's failure must not cancel the others — the surviving legs'
+      # results are the useful signal.
+      fail-fast: false
+      matrix:
+        include:
+          # Standing pairs documented in AGENTS.md → Signing in. Each leg
+          # owns its pair; never point two legs at the same accounts.
+          - project: desktop-chrome
+            phone_a: '+15555550100'
+            phone_b: '+15555550103'
+          - project: mobile-safari
+            phone_a: '+15555550110'
+            phone_b: '+15555550111'
+          - project: mobile-chrome
+            phone_a: '+15555550112'
+            phone_b: '+15555550113'
     runs-on: ubuntu-latest
+    # Browsers + OS deps come preinstalled in the image, so there is no
+    # playwright install step and no apt flakiness. The tag MUST match the
+    # @playwright/test version in package-lock.json — bump both together.
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
+    env:
+      E2E_PHONE_A: ${{ matrix.phone_a }}
+      E2E_PHONE_B: ${{ matrix.phone_b }}
     steps:
       - uses: actions/checkout@v4
 
@@ -83,18 +109,9 @@ jobs:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
-      - name: Cache Playwright browsers
-        if: steps.secrets.outputs.present == 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install Playwright browsers
-        if: steps.secrets.outputs.present == 'true'
-        run: npx playwright install --with-deps chromium webkit
-
-      - name: Playwright e2e (desktop + mobile web)
+      # The `setup` project (auth.setup.ts) runs automatically as a declared
+      # dependency of each browser project and signs in this leg's pair once.
+      - name: Playwright e2e (${{ matrix.project }})
         if: steps.secrets.outputs.present == 'true'
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
@@ -103,10 +120,13 @@ jobs:
           # Absent → the setup falls back to the OTP UI (one rejected Twilio
           # send attempt per account per run).
           E2E_ACCOUNT_PASSWORD: ${{ secrets.E2E_ACCOUNT_PASSWORD }}
-        run: npm run test:e2e
+        run: npx playwright test --project=${{ matrix.project }}
 
+      # Only one leg may upload the `dist` artifact (names are run-global);
+      # the staging preview deploy downloads it. All legs build the identical
+      # bundle from the same commit and secrets.
       - name: Upload built bundle (reused by the staging preview deploy)
-        if: steps.secrets.outputs.present == 'true'
+        if: steps.secrets.outputs.present == 'true' && matrix.project == 'desktop-chrome'
         uses: actions/upload-artifact@v4
         with:
           name: dist
@@ -118,6 +138,23 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: playwright-report/
           retention-days: 7
+
+  # Aggregator: branch protection on production requires the check
+  # `full-suite / e2e`, but a matrix renames its checks to
+  # `full-suite / e2e-browsers (<project>)`. This job keeps the old name
+  # binding with no settings change. `if: always()` + an explicit result
+  # check matters: a job skipped because its `needs` failed would otherwise
+  # report SUCCESS to branch protection.
+  e2e:
+    needs: e2e-browsers
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate browser legs
+        run: |
+          result="${{ needs.e2e-browsers.result }}"
+          echo "e2e-browsers: $result"
+          [ "$result" = "success" ]
