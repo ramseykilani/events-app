@@ -44,6 +44,18 @@ describe('app/(auth)/sign-in', () => {
     ).toBeNull();
   });
 
+  it('shows the SMS consent line with terms and privacy links (A2P opt-in CTA)', () => {
+    const screen = render(<SignInScreen />);
+
+    expect(
+      screen.getByText(
+        'By tapping Send code, you agree to receive SMS sign-in codes from Shared Events (one per sign-in). Msg & data rates may apply. Reply STOP to opt out.'
+      )
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Terms of service')).toBeTruthy();
+    expect(screen.getByLabelText('Privacy policy')).toBeTruthy();
+  });
+
   it('shows validation alert for invalid phone numbers', () => {
     const screen = render(<SignInScreen />);
 

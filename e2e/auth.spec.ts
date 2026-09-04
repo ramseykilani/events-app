@@ -49,6 +49,32 @@ test('invalid phone number shows a friendly alert (M-001)', async ({
   }
 });
 
+test('sign-in shows the SMS consent line and legal links (A2P opt-in CTA)', async ({
+  browser,
+}, testInfo) => {
+  // The 10DLC campaign's registered opt-in evidence is the sign-in screen at
+  // the production URL — this copy is what the TCR reviewer verifies
+  // (docs/a2p-registration.md). If it regresses, the campaign re-rejects.
+  const context = await newExtraContext(browser, testInfo);
+  try {
+    const page = await context.newPage();
+    await page.goto('/');
+    await expect(
+      page.getByText(
+        /agree to receive SMS sign-in codes from Shared Events/
+      )
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Terms of service' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Privacy policy' })
+    ).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
 test('verify screen starts the resend cooldown and rejects a wrong code (M-002)', async ({
   browser,
 }, testInfo) => {

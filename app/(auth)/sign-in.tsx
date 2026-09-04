@@ -22,9 +22,16 @@ import { useTheme } from '../../hooks/useTheme';
 import { PrimaryButton } from '../../components/PrimaryButton';
 
 const PRIVACY_POLICY_URL = 'https://shared-events.pages.dev/privacy.html';
+const TERMS_URL = 'https://shared-events.pages.dev/terms.html';
 
 const ORIENTATION_LINE =
   'Found something you want to go to? Add it here and share it with the right people — instead of texting them one by one.';
+
+// A2P 10DLC: this screen is the campaign's registered opt-in CTA evidence —
+// the reviewer verifies this exact line at https://shared-events.pages.dev/
+// (docs/a2p-registration.md). Removing or rewording it risks re-rejection.
+const CONSENT_LINE =
+  'By tapping Send code, you agree to receive SMS sign-in codes from Shared Events (one per sign-in). Msg & data rates may apply. Reply STOP to opt out.';
 
 export default function SignInScreen() {
   const [phone, setPhone] = useState('');
@@ -131,17 +138,34 @@ export default function SignInScreen() {
             accessibilityLabel="Phone number"
           />
           <PrimaryButton label="Send code" onPress={handleSignIn} loading={loading} />
-          <TouchableOpacity
-            onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
-            activeOpacity={0.6}
-            accessibilityRole="link"
-            accessibilityLabel="Privacy policy"
-            style={styles.privacyLink}
-          >
-            <Text style={[styles.privacyText, { color: theme.textTertiary }]}>
-              Privacy policy
-            </Text>
-          </TouchableOpacity>
+          <Text style={[styles.consent, { color: theme.textTertiary }]}>
+            {CONSENT_LINE}
+          </Text>
+          <View style={styles.legalLinks}>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(TERMS_URL)}
+              activeOpacity={0.6}
+              accessibilityRole="link"
+              accessibilityLabel="Terms of service"
+              style={styles.legalLink}
+            >
+              <Text style={[styles.legalLinkText, { color: theme.textTertiary }]}>
+                Terms
+              </Text>
+            </TouchableOpacity>
+            <Text style={[styles.legalLinkText, { color: theme.textTertiary }]}>·</Text>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+              activeOpacity={0.6}
+              accessibilityRole="link"
+              accessibilityLabel="Privacy policy"
+              style={styles.legalLink}
+            >
+              <Text style={[styles.legalLinkText, { color: theme.textTertiary }]}>
+                Privacy policy
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -184,14 +208,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 16,
   },
-  privacyLink: {
+  consent: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  legalLinks: {
+    flexDirection: 'row',
     alignSelf: 'center',
-    marginTop: 20,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  legalLink: {
     minHeight: 44,
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
   },
-  privacyText: {
+  legalLinkText: {
     fontSize: 14,
   },
 });
