@@ -79,3 +79,15 @@ Self-serve signup replaces the email-the-owner flow (FEATURES.md → Beta Signup
 - **Android — Grok Bot (owner to wire, below):** the Bot polls `GET …/functions/v1/beta-signup/pending-android` (header `x-beta-bot-secret`), adds each `play_email` to the internal-track email list in Play Console, then POSTs `…/fulfill-android` with the same secret — that flip sends the tester's completion SMS (opt-in link + paste-in-Chrome instructions).
 - **Owner actions remaining:** (1) create the dedicated least-privilege Google account and invite it to Play Console (app access: Shared Events only; app permission: "Manage testing tracks and edit tester lists" — the read-only "View app information" baseline is auto-checked); (2) create the Grok Bot, sign it into that account, and teach it the task with the prompt + secret from the agent's handoff message. ~~(3) confirm `BETA_OWNER_PHONE`~~ — owner-confirmed 2026-09-03.
 - **Watch the table:** `SELECT * FROM beta_signups ORDER BY created_at DESC;` — per-platform statuses + error text. A row stuck at `accepted` means the tester accepted but the group add keeps failing (see `ios_error`); `failed` is terminal (resubmitting the form revives the row).
+
+## A2P 10DLC registration (Twilio)
+
+US carriers hard-block unregistered 10DLC traffic (`30034`); Canadian carriers don't filter — which is why only US numbers fail. Playbook (status checks, OTP workaround, resubmission steps): `docs/a2p-registration.md`.
+
+| Piece | State |
+|-------|-------|
+| Sender | `+15709385240` (US long code), sole number on Messaging Service "Events" `MG977e4096e94f84bee689c40c8537d554` |
+| Brand | `BN31e431b9c89ca30bb4ed785cadc2e1bd` (TCR `B40R7D7`), Sole Proprietor — **APPROVED + VERIFIED 2026-08-17**. The verification OTP never reached the owner's Canadian mobile; verified by texting YES to `+1-915-278-2000` (see the doc) |
+| Campaign | `QE2c6890da8086d771620e9b13fadeba0b` — **FAILED 2026-08-19**, TCR error 30909: the opt-in CTA couldn't be verified (the sign-in screen doesn't explicitly say the user agrees to receive texts). Resubmit after consent copy ships — **owner decision pending 2026-09-04** |
+| Effect until approved | US-bound SMS (sign-in OTP + share notifications) carrier-blocked; Canadian delivery unaffected |
+| Stale artifact | Trust Hub profile "My Starter Profile" `BU5ad001ea04af4d02c801a66202421520` sat `in-review` since 2026-02-16; nothing uses it — ignore |

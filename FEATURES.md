@@ -37,7 +37,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Explain Before Share (No Unshare)](#explain-before-share-no-unshare) | Implemented | The share screen says you can't take it back before the first send. |
 | [Button Size & Clickability](#button-size--clickability) | Superseded | Absorbed into [Design System Consolidation](#design-system-consolidation) (owner call 2026-09-01). |
 | [Share Delivery Status](#share-delivery-status) | Implemented | One-word per-person status on the share sheet — "✓ Shared" for everyone; only failures differ (✕). |
-| [US Phone Numbers](#us-phone-numbers) | Planned | Suspected Twilio path; US numbers don't work. Needs investigation. |
+| [US Phone Numbers](#us-phone-numbers) | Planned | Diagnosed: unregistered 10DLC (`30034`). A2P campaign resubmission pending — `docs/a2p-registration.md`. |
 | [Add to Other Calendars](#add-to-other-calendars) | Implemented | One-shot export: Google template link + .ics (Apple/Outlook/Other), in-app and on the receipt page. Native sheets land with the next EAS build. |
 | [Share Sent Confirmation](#share-sent-confirmation) | Implemented | Persistent "✓ Sent to N people" on the sheet after a send; selection is circles now, ✓ means done. |
 | [Touch Targets & Footer Safe Area (People Screen)](#touch-targets--footer-safe-area-people-screen) | Implemented | Pre-tester polish. Text buttons tap only on the glyphs; footer can sit under 3-button nav. |
@@ -1142,7 +1142,7 @@ Labels come from a pure mapper (`lib/deliveryStatus.ts`); the share screen reads
 
 ## US Phone Numbers
 
-**Status:** Planned — needs investigation, not a blocker. Recorded 2026-08-16 from internal testing.
+**Status:** Planned — diagnosed 2026-08-17 (unregistered 10DLC; see first Open Questions bullet). The fix is A2P registration, not code: brand approved + verified 2026-08-17; campaign rejected 2026-08-19 on CTA evidence (TCR 30909) and awaits resubmission once sign-in consent copy ships (owner decision pending). State + playbook: `docs/a2p-registration.md` and `STATUS.md` → A2P 10DLC registration. Recorded 2026-08-16 from internal testing.
 
 ### Problem
 
@@ -1162,6 +1162,7 @@ Support US phone numbers end-to-end (add person, sign-in, share SMS). Look into 
 
 - What exactly fails today (Twilio geo permissions, A2P/toll-free, sender pool, Auth SMS vs `send-notification` SMS, number format at send time). Not diagnosed yet — that’s the work.
 - 2026-08-17 diagnosis (Twilio API pull) answers a big chunk of that: the sender `+15709385240` is an unregistered 10DLC long code — no A2P brand, no campaign on the “Events” Messaging Service — and US carriers hard-block its traffic with `30034`. The country split is total: **0 of 5 US-bound real SMS delivered (all `30034`) vs 39 of 39 Canadian-bound delivered** — Canadian carriers don’t run A2P filtering, US carriers do. Both legs (Auth OTP and `send-notification`) share the one sender, so both fail for US recipients. Completing A2P registration (the starter Trust Hub profile has been stuck `in-review` since 2026-02-16; owner is re-registering via the A2P Brands wizard, which creates a fresh sole-proprietor profile) is the fix. Not a geo-permissions issue (zero `21408`s) and not a client parser issue. Same pull found the account’s “fair” messaging health was ~95% self-inflicted: e2e/manual test sign-ins firing SMS at the fictional 555 test numbers (`21211`). Once-per-run e2e sign-in (`e2e/auth.setup.ts`, 2026-08-17) cut the volume; 2026-08-28 closed the remaining paths: password grant (no Auth SMS), `sms_test_otp` registered *before* Auth Admin create (so OTP never calls Twilio), and `send-notification` skipping NANP area-code 555. Unregistered 555s still 21211. See AGENTS.md → Signing in (test accounts).
+- 2026-08-19: sole-proprietor brand approved + verified (2026-08-17); campaign `QE2c6890da8086d771620e9b13fadeba0b` submitted and **rejected same day** — TCR error 30909, `MESSAGE_FLOW`: the opt-in CTA (the app sign-in screen) couldn't be verified because it never explicitly says the user is agreeing to receive texts. Resubmission is gated on consent copy at the sign-in CTA (owner decision pending 2026-09-04). Full state and playbook: `docs/a2p-registration.md`; live table: `STATUS.md` → A2P 10DLC registration.
 
 ---
 
