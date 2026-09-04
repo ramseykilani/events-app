@@ -3,10 +3,11 @@
 # Why this exists: pixel-diff baselines (e2e/visual.spec.ts) must be re-taken
 # after every INTENTIONAL design change, but a baseline re-taken on a cloud
 # dev VM can fail CI — WebKit draws text with the machine's fonts, and VM
-# fonts (Noto) differ from the ubuntu-latest runners' (Liberation). That
-# turned staging red for six pushes on 2026-08-17. This workflow re-takes the
-# pictures on the same runner type that judges them, scoped to one screen so
-# every other baseline stays untouched and keeps guarding.
+# fonts (Noto) differ from the CI image's (Liberation). That turned staging
+# red for six pushes on 2026-08-17. This workflow re-takes the pictures in
+# the same Playwright container image that judges them (full-suite.yml's
+# e2e-browsers legs), scoped to one screen so every other baseline stays
+# untouched and keeps guarding.
 #
 # Use: Actions → Regenerate visual baselines → Run workflow → pick the screen
 # you changed (and a form factor, or "all"). The workflow verifies the new
@@ -52,6 +53,10 @@ jobs:
   regenerate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Same image full-suite's e2e-browsers legs run in, so regenerated
+    # baselines are rendered by the same fonts/browser builds that judge
+    # them. The tag MUST match @playwright/test in package-lock.json.
+    container: mcr.microsoft.com/playwright:v1.62.1-noble
     steps:
       - uses: actions/checkout@v4
 
@@ -80,15 +85,6 @@ jobs:
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium webkit
 
       - name: Map screen input to test filter
         id: filter
