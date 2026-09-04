@@ -363,6 +363,39 @@ serve(async (req) => {
       console.error('beta-signup: BETA_OWNER_PHONE is not configured');
     }
 
+    // Push trigger for the Grok Bot (Android fulfillment): wake the Bot the
+    // moment an Android signup lands instead of letting it poll on a fast
+    // schedule. The event carries no PII — the Bot reads the work items
+    // from pending-android when it wakes. Bounded and best-effort: a hung
+    // or failing trigger never fails the signup, and the Bot's hourly
+    // backstop poll self-heals a missed kick. Unset BETA_BOT_TRIGGER_URL =
+    // polling-only mode.
+    const triggerUrl = Deno.env.get('BETA_BOT_TRIGGER_URL');
+    if (triggerUrl && submission.playEmail) {
+      const triggerKey = Deno.env.get('BETA_BOT_TRIGGER_KEY');
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      try {
+        await fetch(triggerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(triggerKey ? { Authorization: `Bearer ${triggerKey}` } : {}),
+          },
+          body: JSON.stringify({
+            event: 'beta-signup',
+            id: signupId,
+            at: new Date().toISOString(),
+          }),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        console.error('beta-signup: bot trigger failed', err);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
     return jsonResponse({ status: 'ok', id: signupId });
   } catch (err) {
     // Details stay in the logs — the public path never leaks constraint or
