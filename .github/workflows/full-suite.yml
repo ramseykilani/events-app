@@ -49,6 +49,9 @@ jobs:
         run: bash supabase/tests/run_local.sh
 
   e2e-browsers:
+    # Explicit name keeps the per-leg check names free of the matrix phone
+    # values: "full-suite / e2e-browsers (desktop-chrome)" etc.
+    name: e2e-browsers (${{ matrix.project }})
     strategy:
       # One leg's failure must not cancel the others — the surviving legs'
       # results are the useful signal.
