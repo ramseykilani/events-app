@@ -83,9 +83,12 @@ template change ships (`supabase/functions/send-notification/index.ts`, the
 Supabase Auth SMS template), update the campaign description/samples in the
 console. Recorded instances: `FEATURES.md` → Web Support rejected list (app
 links in SMS) and → SMS Links at Launch (store/event links at launch change
-message content — update the campaign then). **Known drift right now:** the
-2026-09-03 invite-line change (share SMS now points at the beta signup form)
-postdates the submitted sample 2 — refresh the sample at resubmission.
+message content — update the campaign then). **Known drift right now:**
+sample 2 is stale by **two** lines, not one — the `Coming? <receipt-link>`
+line (in every share SMS since 2026-08-31, while `RESPONSE_LINK_BASE_URL` is
+set) and the 2026-09-03 invite-line change (share SMS now points at the beta
+signup form, replacing the email CTA). Refresh the sample at resubmission —
+exact current text in the Resubmission section.
 
 ## Registered content (2026-08-19 submission, as advised — the owner may have adjusted in the form)
 
@@ -116,7 +119,7 @@ postdates the submitted sample 2 — refresh the sample at resubmission.
   `https://shared-events.pages.dev/terms` (both carry the required SMS
   disclosures since 2026-08-19).
 
-## Resubmission (pending)
+## Resubmission (runbook — consent copy shipped to staging 2026-09-04)
 
 The 2026-08-19 rejection — TCR `30909`, field `MESSAGE_FLOW`: "issues
 verifying the Call to Action (CTA) provided for the campaign" — means the
@@ -126,10 +129,78 @@ entering your number agrees to receiving texts. Options discussed with the
 owner 2026-08-19: (1) a consent line on the sign-in screen — strongest, and
 exactly what the reviewer asked for; (2) sharper consent-field wording only;
 (3) resubmit unchanged. The owner chose (3); the rejection settled the
-question — resubmission needs (1) or equivalent public CTA language. Note
-that option (1) covers only the sign-in leg; share-notification recipients
-never pass any screen (person-to-person initiation is the registered story
-for that leg). **Owner decision on the consent copy pending (2026-09-04).**
+question, and on 2026-09-04 the owner approved (1). Note that (1) covers
+only the sign-in leg; share-notification recipients never pass any screen
+(person-to-person initiation is the registered story for that leg — it was
+in the rejected submission and was not the flagged field).
+
+**Step 1 — consent line on the sign-in screen (done, staging 2026-09-04).**
+`app/(auth)/sign-in.tsx` now renders, directly under the Send code button:
+
+> By tapping Send code, you agree to receive SMS sign-in codes from Shared
+> Events (one per sign-in). Msg & data rates may apply. Reply STOP to opt
+> out.
+
+with **Terms** (`/terms.html`) and **Privacy policy** links beneath it. The
+line names the registered brand ("Shared Events") and carries the CTA
+disclosure elements (agreement, purpose, frequency, rates, opt-out, terms /
+privacy). Covered by `__tests__/app/auth/sign-in.test.tsx` and
+`e2e/auth.spec.ts` ("A2P opt-in CTA") so it cannot silently regress.
+
+**Step 2 — ship it to production (owner ship call).** The registered CTA
+evidence is the *production* deploy: the reviewer loads
+https://shared-events.pages.dev/ and must see the line there. Resubmitting
+before it is live reproduces the exact rejection. After promoting, load the
+production URL signed-out and eyeball the line before touching Twilio.
+
+**Step 3 — edit the failed campaign in place and resubmit.** Console →
+Messaging → Regulatory Compliance → Campaigns → the FAILED campaign
+`QE2c6890da8086d771620e9b13fadeba0b` → **Edit Campaign** → **Update**
+(= resubmit). Do NOT delete and recreate: the vetting fee is charged once
+per campaign, and editing in place keeps the same SID. (API equivalent:
+update the Usa2p resource.) Change exactly two fields:
+
+- **Message flow:** keep the existing two-leg text; in the sign-in leg,
+  quote the on-screen consent line verbatim so the reviewer knows what to
+  look for: *"…the sign-in screen displays the consent line 'By tapping Send
+  code, you agree to receive SMS sign-in codes from Shared Events (one per
+  sign-in). Msg & data rates may apply. Reply STOP to opt out.' with Terms
+  (https://shared-events.pages.dev/terms) and Privacy
+  (https://shared-events.pages.dev/privacy) links. Verifiable at
+  https://shared-events.pages.dev/."* Leave the person-to-person share
+  paragraph unchanged.
+- **Sample 2** (stale by two lines — see The sync rule). Current production
+  text (`supabase/functions/_shared/smsBody.ts`):
+
+  ```
+  Ramsey Kilani wants to go to "Rooftop Cinema night" with you
+  Fri, Aug 21, 7:30 PM
+  https://example.com/tickets
+
+  Coming? https://events-reply.pages.dev/?t=abc123
+
+  Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup
+
+  Reply STOP to unsubscribe.
+  ```
+
+  (The `Coming?` line is live while `RESPONSE_LINK_BASE_URL` is set —
+  confirmed set 2026-09-04. If it has been unset by resubmission time, drop
+  that line from the sample.)
+
+Leave everything else untouched — description, opt-out/help messages and
+keywords, disclosure links all passed review. Keep the opt-in checkboxes at
+**Other** only (never "Via Text" — no text-to-join flow; checking it
+triggers a keyword-evidence demand).
+
+**Step 4 — wait, then verify.** Sole Proprietor campaigns are typically
+decided in hours to days (standard campaigns can take weeks). Poll with the
+status curl above. On approval: do a real US sign-in and confirm the OTP
+arrives, run the delivery/error scan and watch `30034`s stop, then update
+`STATUS.md` → A2P table and `FEATURES.md` → US Phone Numbers. If it rejects
+again on the same field, the fallback is a toll-free sender (toll-free
+verification instead of TCR campaign review) — a sender-number change, not
+contemplated anywhere else in the repo today.
 
 ## History
 
@@ -140,4 +211,7 @@ for that leg). **Owner decision on the consent copy pending (2026-09-04).**
   eliminated by password-grant sign-in 2026-08-28). Brand registered and
   OTP-verified (YES-reply workaround).
 - 2026-08-19: campaign submitted; rejected same day (`30909`, CTA evidence).
-- 2026-09-04: rejection surfaced on an API re-check; this doc written.
+- 2026-09-04: rejection surfaced on an API re-check; this doc written. Owner
+  approved the consent-line fix; copy shipped to `staging` (sign-in screen +
+  Jest/e2e coverage). Resubmission gated on the production deploy — runbook
+  above.

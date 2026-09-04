@@ -1142,7 +1142,7 @@ Labels come from a pure mapper (`lib/deliveryStatus.ts`); the share screen reads
 
 ## US Phone Numbers
 
-**Status:** Planned — diagnosed 2026-08-17 (unregistered 10DLC; see first Open Questions bullet). The fix is A2P registration, not code: brand approved + verified 2026-08-17; campaign rejected 2026-08-19 on CTA evidence (TCR 30909) and awaits resubmission once sign-in consent copy ships (owner decision pending). State + playbook: `docs/a2p-registration.md` and `STATUS.md` → A2P 10DLC registration. Recorded 2026-08-16 from internal testing.
+**Status:** Planned — diagnosed 2026-08-17 (unregistered 10DLC; see first Open Questions bullet). The fix is A2P registration, not app logic: brand approved + verified 2026-08-17; campaign rejected 2026-08-19 on CTA evidence (TCR 30909). Owner approved the fix 2026-09-04: the sign-in screen now carries an explicit SMS consent line (+ Terms link) — shipped to `staging` 2026-09-04; campaign resubmission is gated on that line reaching the production deploy (the reviewer's evidence URL). State + playbook + resubmission runbook: `docs/a2p-registration.md` and `STATUS.md` → A2P 10DLC registration. Recorded 2026-08-16 from internal testing.
 
 ### Problem
 
