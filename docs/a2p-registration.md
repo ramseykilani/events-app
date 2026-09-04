@@ -119,7 +119,7 @@ exact current text in the Resubmission section.
   `https://shared-events.pages.dev/terms` (both carry the required SMS
   disclosures since 2026-08-19).
 
-## Resubmission (runbook — consent copy shipped to staging 2026-09-04)
+## Resubmission (submitted 2026-09-04 — awaiting TCR)
 
 The 2026-08-19 rejection — TCR `30909`, field `MESSAGE_FLOW`: "issues
 verifying the Call to Action (CTA) provided for the campaign" — means the
@@ -147,18 +147,17 @@ disclosure elements (agreement, purpose, frequency, rates, opt-out, terms /
 privacy). Covered by `__tests__/app/auth/sign-in.test.tsx` and
 `e2e/auth.spec.ts` ("A2P opt-in CTA") so it cannot silently regress.
 
-**Step 2 — ship it to production (owner ship call).** The registered CTA
+**Step 2 — ship it to production (done 2026-09-04).** The registered CTA
 evidence is the *production* deploy: the reviewer loads
-https://shared-events.pages.dev/ and must see the line there. Resubmitting
-before it is live reproduces the exact rejection. After promoting, load the
-production URL signed-out and eyeball the line before touching Twilio.
+https://shared-events.pages.dev/ and must see the line there. Confirmed
+live on the production URL the same day.
 
-**Step 3 — edit the failed campaign in place and resubmit.** Console →
-Messaging → Regulatory Compliance → Campaigns → the FAILED campaign
-`QE2c6890da8086d771620e9b13fadeba0b` → **Edit Campaign** → **Update**
-(= resubmit). Do NOT delete and recreate: the vetting fee is charged once
-per campaign, and editing in place keeps the same SID. (API equivalent:
-update the Usa2p resource.) Change exactly two fields:
+**Step 3 — edit the failed campaign in place and resubmit (done 2026-09-04).**
+Owner edited the FAILED campaign `QE2c6890da8086d771620e9b13fadeba0b` in
+the console (same SID — do not delete/recreate; the vetting fee is charged
+once per campaign). Twilio's automated check passed; the submission needs
+TCR human review. Live status **IN_PROGRESS**, errors cleared. The two
+fields that changed:
 
 - **Message flow:** keep the existing two-leg text; in the sign-in leg,
   quote the on-screen consent line verbatim so the reviewer knows what to
@@ -193,14 +192,15 @@ keywords, disclosure links all passed review. Keep the opt-in checkboxes at
 **Other** only (never "Via Text" — no text-to-join flow; checking it
 triggers a keyword-evidence demand).
 
-**Step 4 — wait, then verify.** Sole Proprietor campaigns are typically
-decided in hours to days (standard campaigns can take weeks). Poll with the
-status curl above. On approval: do a real US sign-in and confirm the OTP
-arrives, run the delivery/error scan and watch `30034`s stop, then update
-`STATUS.md` → A2P table and `FEATURES.md` → US Phone Numbers. If it rejects
-again on the same field, the fallback is a toll-free sender (toll-free
-verification instead of TCR campaign review) — a sender-number change, not
-contemplated anywhere else in the repo today.
+**Step 4 — wait, then verify (current).** Sole Proprietor campaigns are
+typically decided in hours to days (standard campaigns can take weeks).
+Poll with the status curl above. On approval: do a real US sign-in and
+confirm the OTP arrives, run the delivery/error scan and watch `30034`s
+stop, then update `STATUS.md` → A2P table and `FEATURES.md` → US Phone
+Numbers. If it rejects again on the same field, the fallback is a
+toll-free sender (toll-free verification instead of TCR campaign review)
+— a sender-number change, not contemplated anywhere else in the repo
+today.
 
 ## History
 
@@ -212,6 +212,8 @@ contemplated anywhere else in the repo today.
   OTP-verified (YES-reply workaround).
 - 2026-08-19: campaign submitted; rejected same day (`30909`, CTA evidence).
 - 2026-09-04: rejection surfaced on an API re-check; this doc written. Owner
-  approved the consent-line fix; copy shipped to `staging` (sign-in screen +
-  Jest/e2e coverage). Resubmission gated on the production deploy — runbook
-  above.
+  approved the consent-line fix; copy shipped to `staging` then production.
+  Owner resubmitted the same campaign SID (message_flow quotes the live
+  consent line; sample 2 refreshed for the Coming? receipt link and the
+  beta-signup invite). Automated check passed; status **IN_PROGRESS**,
+  awaiting TCR.
