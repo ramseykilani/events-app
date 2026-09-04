@@ -42,7 +42,7 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
 
 | Trigger | Workflow | What runs |
 |---------|----------|-----------|
-| Push to `staging` | `staging.yml` | **Full suite** (`full-suite.yml`): tsc, convention checks, Jest, SQL semantics, web build, Playwright e2e on desktop Chrome / Mobile Safari / Mobile Chrome. If green, redeploys the staging preview with the tested bundle. |
+| Push to `staging` | `staging.yml` | **Full suite** (`full-suite.yml`): tsc, convention checks, Jest, SQL semantics (`checks`), in parallel with Playwright e2e as three parallel matrix legs (desktop Chrome / Mobile Safari / Mobile Chrome), each in the Playwright container image with its own standing account pair. If green, redeploys the staging preview with the tested bundle. Superseded queued pushes are cancelled (`cancel-in-progress`) — the latest tip covers everything. |
 | Ship time (owner says "ship it") | in-session `computerUse` subagent | Complete click-through of every manual-suite scenario against the staging preview → `VERDICT: SHIP` / `DON'T SHIP` + report committed to `staging`. Gate for promotion. |
 | PR → `production` (optional path) | `agent-ux-review.yml` | CI-launched copy of the same review. Inert until `CURSOR_API_KEY` is set. |
 | PR → `staging` (optional) | `ci-fast.yml` | Fast checks only. PRs into staging are optional paper trail. |
@@ -199,10 +199,12 @@ so production always contains the review that blessed it.
   No PR or check requirements — agents push directly.
 - `production`: add a rule with **Require status checks to pass before
   merging** and select `full-suite / checks` and `full-suite / e2e` (they
-  appear in the picker after the suite has run once). Defaults block force
-  pushes and deletion. Do **not** require pull requests — promotion is a
-  fast-forward push, and the required checks still guarantee only green-tested
-  commits land.
+  appear in the picker after the suite has run once). `full-suite / e2e` is
+  the no-op aggregator job that depends on the three `e2e-browsers (...)`
+  matrix legs — the matrix's own per-leg checks are not the required ones.
+  Defaults block force pushes and deletion. Do **not** require pull requests —
+  promotion is a fast-forward push, and the required checks still guarantee
+  only green-tested commits land.
 - Settings → General → **Default branch** → `production`, then delete the old
   `master` branch. (`workflow_run` triggers and PR defaulting read from the
   default branch.)

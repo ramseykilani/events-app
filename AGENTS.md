@@ -37,10 +37,12 @@ printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_
 
 ### Signing in (test accounts)
 
-Six test accounts are configured on the Supabase project, all with test OTP `123456` (expires March 31, 2027) and all sharing one password:
+Six test accounts are configured on the Supabase project, all with test OTP `123456` (expires March 31, 2027) and all sharing one password. CI's three parallel browser legs each own a standing pair (`.github/workflows/full-suite.yml` matrix) — never reuse a CI-owned pair for local runs while a pipeline is active:
 
-- **Standing pair:** account A `+15555550100`, account B `+15555550103` — the e2e defaults.
-- **Parallel runs self-serve:** `node scripts/create-test-accounts.mjs --fresh-pair` provisions two fresh numbers (random unregistered picks from the fictional 555-01xx block) and prints the `E2E_PHONE_A` / `E2E_PHONE_B` exports — export them and every e2e run in that session uses a private pair. Needs `SUPABASE_ACCESS_TOKEN` (cloud agents have it). Without it: pre-provisioned spares C–F `+15555550110`–`+15555550113`, or A/B when working alone — A/B are CI's defaults.
+- **desktop-chrome leg:** A/B `+15555550100` / `+15555550103` — also the local e2e defaults when no CI run is active.
+- **mobile-safari leg:** C/D `+15555550110` / `+15555550111`.
+- **mobile-chrome leg:** E/F `+15555550112` / `+15555550113`.
+- **Parallel local runs self-serve:** `node scripts/create-test-accounts.mjs --fresh-pair` provisions two fresh numbers (random unregistered picks from the fictional 555-01xx block, 0114–0199) and prints the `E2E_PHONE_A` / `E2E_PHONE_B` exports — export them and every e2e run in that session uses a private pair. Needs `SUPABASE_ACCESS_TOKEN`. Without it: use A/B while working alone and no CI run is active.
 
 **Password sign-in (preferred):** the password lives in `E2E_ACCOUNT_PASSWORD` (`.env` locally, repo/Cursor secrets in CI/cloud). The e2e setup signs in via the token endpoint, which fires **no SMS**. Without the password it falls back to driving the OTP UI. Registered test numbers are in `sms_test_otp`, so that OTP request returns `message_id: test-otp` and **does not call Twilio** — only an unregistered 555 number still 21211s. The OTP UI itself stays covered by `auth.spec.ts`; that is the product surface. Provisioning goes through the Auth Admin API (no OTP, no Twilio) — to grow the pool, rotate the password, or create a throwaway account: `node scripts/create-test-accounts.mjs [+15555550114 ...]` (needs `SUPABASE_ACCESS_TOKEN`). `send-notification` also skips NANP area-code 555, so sharing to a test account does not hit Twilio either.
 
@@ -77,7 +79,7 @@ The review is batched per release on purpose: one complete click-through at ship
 
 **Model policy:** use the session's default model for development. For agentic click-through/manual testing (computerUse subagents, the UX-review automation), use `cursor-grok-4.6-high-fast` — screenshot review doesn't need the top coding model. The CI-launched UX review defaults to it too (repo variable `UX_REVIEW_MODEL` overrides; discover IDs via `GET https://api.cursor.com/v1/models`).
 
-The full suite (`.github/workflows/full-suite.yml`) = tsc + conventions + Jest + SQL semantics + web build + Playwright e2e on desktop Chrome, Mobile Safari (WebKit), and Mobile Chrome. Branch-protection settings are listed in `docs/development-workflow.md`.
+The full suite (`.github/workflows/full-suite.yml`) = tsc + conventions + Jest + SQL semantics (the `checks` job) running in parallel with the `e2e-browsers` matrix: one leg per Playwright project (desktop Chrome, Mobile Safari/WebKit, Mobile Chrome), each in the `mcr.microsoft.com/playwright` container (tag must match `@playwright/test` in package-lock — bump together) with its own standing account pair, followed by a no-op `e2e` aggregator job that keeps the required check name `full-suite / e2e` binding on production. Branch-protection settings are listed in `docs/development-workflow.md`.
 
 ### Tests
 
