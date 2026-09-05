@@ -49,6 +49,13 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
 | PR → `production` (optional path) | `release.yml` | Rejects any source branch that isn't `staging`, re-runs the full suite. Defense in depth; normal promotion is the fast-forward push above. |
 | Push to `production` | `deploy-web.yml` | Production deploy. |
 
+All workflows share one `node_modules` actions cache keyed on OS/arch/Node
+version/lockfile hash — a hit skips `npm ci` entirely (the tarball-only
+`cache: npm` left npm ci's full re-extract on the critical path, measured
+anywhere from 13s to 7min per job depending on runner health). A lockfile
+or Node-version bump misses once and re-saves; there are no restore-keys,
+so a stale tree can never skip the install.
+
 ## Layers of the safety net
 
 Ordered cheapest → most expensive; each layer catches what the layer above
