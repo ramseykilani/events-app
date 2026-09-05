@@ -233,12 +233,13 @@ the TCR clause, and say affiliate tagging does not share mobile numbers
 or consent. Covered by `__tests__/public/legal-pages.test.ts` and
 `e2e/privacy.spec.ts`.
 
-**Step 2 — ship the pages to production.** The reviewer loads
-`https://shared-events.pages.dev/privacy` — staging is not evidence.
-Confirm the clause is live on that URL before the campaign POST.
+**Step 2 — ship the pages to production (done 2026-09-05).** The
+reviewer loads `https://shared-events.pages.dev/privacy` — staging is
+not evidence. Confirmed live: title is Shared Events, Ramsey Kilani is
+named, TCR non-sharing clause is on the page.
 
-**Step 3 — Auth OTP template (config, not code).** Management API
-`sms_template`:
+**Step 3 — Auth OTP template (done 2026-09-05, config, not code).**
+Management API `sms_template`:
 
 ```
 Shared Events: {{ .Code }} is your sign-in code. Reply STOP to opt out.
@@ -248,9 +249,9 @@ Shared Events: {{ .Code }} is your sign-in code. Reply STOP to opt out.
 STOP account-wide; the words have to be on the sample and the live
 message or we fail the sync rule.
 
-**Step 4 — edit the failed campaign in place and resubmit.** Same SID
-`QE2c6890da8086d771620e9b13fadeba0b` — do not delete/recreate. Change
-sample 1 only:
+**Step 4 — edit the failed campaign in place and resubmit (done
+2026-09-05).** Same SID `QE2c6890da8086d771620e9b13fadeba0b` — do not
+delete/recreate. Sample 1 is now:
 
 ```
 Shared Events: [code] is your sign-in code. Reply STOP to opt out.
@@ -262,13 +263,13 @@ per pass): set `PrivacyPolicyUrl` /
 `TermsAndConditionsUrl` to the extensionless production URLs, and put
 the brand on the help / opt-out auto-replies.
 
-**Step 5 — wait, then verify (current).** Poll with the status curl
-above. On approval: a real US sign-in (OTP arrives), delivery/error
-scan (`30034`s stop), then update `STATUS.md` → A2P table and
-`FEATURES.md` → US Phone Numbers. If it rejects again on a new field,
-fix that field and resubmit the same SID. Toll-free is still the
-fallback after another pass — a sender-number change, not contemplated
-anywhere else in the repo today.
+**Step 5 — wait, then verify (current).** Status **IN_PROGRESS**,
+errors cleared. Poll with the status curl above. On approval: a real
+US sign-in (OTP arrives), delivery/error scan (`30034`s stop), then
+update `STATUS.md` → A2P table and `FEATURES.md` → US Phone Numbers.
+If it rejects again on a new field, fix that field and resubmit the
+same SID. Toll-free is still the fallback after another pass — a
+sender-number change, not contemplated anywhere else in the repo today.
 
 ## History
 
@@ -287,5 +288,5 @@ anywhere else in the repo today.
   awaiting TCR.
 - 2026-09-05: campaign **FAILED** again — `30908` (privacy clause) +
   `30893` (sample 1). `30909` did not return. Privacy/terms pages and
-  Auth template updated; same SID to be resubmitted once the production
-  evidence URL shows the new clause.
+  Auth template updated; same SID resubmitted with the new sample 1;
+  status **IN_PROGRESS**.
