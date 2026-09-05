@@ -22,11 +22,25 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # Same node_modules cache as full-suite.yml (shared key — see the
+      # comment there). A hit skips npm ci entirely; the wrangler invocation
+      # below then also resolves from the restored tree without a registry
+      # fetch.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (npm ci on cache miss)
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
 
       # EXPO_PUBLIC_* values are inlined into the bundle at export time.
       - name: Build web bundle

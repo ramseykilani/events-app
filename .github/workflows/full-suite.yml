@@ -22,11 +22,28 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # node_modules rides the actions cache — a hit skips npm ci entirely.
+      # setup-node's npm cache only stores tarballs; npm ci still re-extracted
+      # the whole tree from them on every run (~15s on a healthy runner,
+      # measured up to 7min on a throttled one — that variance, not the
+      # tests, was the pipeline's long tail). The key carries the node
+      # version because canvas/sharp builds are node-ABI sensitive.
+      # No restore-keys: a stale node_modules must never skip npm ci.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (npm ci on cache miss)
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Type check
         run: npx tsc --noEmit
@@ -81,11 +98,23 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # Same node_modules cache as the checks job (shared key — first job to
+      # miss saves it, the rest restore). See the comment there.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (npm ci on cache miss)
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
 
       # The e2e suite signs in against the real Supabase project, so it needs
       # the EXPO_PUBLIC_* repo secrets. Until they're configured, skip the

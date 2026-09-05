@@ -36,6 +36,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          # Warms ~/.npm so the npx wrangler call below reuses its cached
+          # install instead of fetching from the registry (an uncached fetch
+          # measured 7min during a degraded-registry window).
+          cache: npm
 
       # Deploy the exact bundle the e2e job just tested.
       - name: Download tested bundle
@@ -46,7 +50,7 @@ jobs:
 
       # No npm ci: installing the whole tree (measured 55–425s) only put
       # wrangler in node_modules for a 4s deploy. npx fetches just wrangler,
-      # pinned to the version in package.json.
+      # pinned inline to match package.json.
       - name: Deploy preview to Cloudflare Pages (branch alias "staging")
         run: npx --yes wrangler@4.120.0 pages deploy --branch=staging
         env:
