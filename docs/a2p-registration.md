@@ -83,9 +83,18 @@ template change ships (`supabase/functions/send-notification/index.ts`, the
 Supabase Auth SMS template), update the campaign description/samples in the
 console. Recorded instances: `FEATURES.md` → Web Support rejected list (app
 links in SMS) and → SMS Links at Launch (store/event links at launch change
-message content — update the campaign then). **Known drift right now:** none on the samples after the 2026-09-05
-template update (sample 1 matches the Auth template; sample 2 still
-matches `smsBody.ts`). Re-check before the next SMS-template change.
+message content — update the campaign then). **Known drift right now:** none —
+sample 1 matches the Auth template (`Shared Events by Ramsey Kilani: …`,
+2026-09-05 second update) and sample 2 matches `smsBody.ts`. Re-check before
+the next SMS-template change.
+
+**The registered brand name is `Ramsey Kilani`, not "Shared Events".** The
+sole-proprietor brand's TCR name is the owner's personal name — verify via
+Trust Hub: `GET https://trusthub.twilio.com/v1/EndUsers/IT8ad0d4aec538ca2424d940eac0912f18`
+→ `attributes.brand_name`. Every place the checker string-matches the brand
+(description, **each** sample message) must contain that exact string.
+"Shared Events" alone does not satisfy it (that misread cost the 2026-09-05
+resubmission — see the rejection #3 section).
 
 ## Registered content (2026-08-19 submission, as advised — the owner may have adjusted in the form)
 
@@ -101,8 +110,10 @@ matches `smsBody.ts`). Re-check before the next SMS-template change.
   notifications (one-time, STOP honored). Opt-in checkboxes: **Other** only —
   never "Via Text" (we have no text-to-join flow; checking it triggers a
   keyword-evidence demand).
-- **Sample 1:** `Shared Events: [code] is your sign-in code. Reply STOP to opt out.`
-  (live Auth template: `Shared Events: {{ .Code }} is your sign-in code. Reply STOP to opt out.`)
+- **Sample 1:** `Shared Events by Ramsey Kilani: [code] is your sign-in code. Reply STOP to opt out.`
+  (live Auth template: `Shared Events by Ramsey Kilani: {{ .Code }} is your sign-in code. Reply STOP to opt out.`
+  — must contain the registered brand name `Ramsey Kilani`, not just the app
+  name; see The sync rule)
 - **Sample 2:** the production share text with the brand name in the sharer
   slot ("Ramsey Kilani wants to go to \"Rooftop Cinema night\" with you …"
   + date + event URL + invite line + "Reply STOP to unsubscribe.")
@@ -115,7 +126,12 @@ matches `smsBody.ts`). Re-check before the next SMS-template change.
   direct lending: No.
 - Links: privacy `https://shared-events.pages.dev/privacy`, terms
   `https://shared-events.pages.dev/terms` (both carry the required SMS
-  disclosures since 2026-08-19).
+  disclosures since 2026-08-19). Since 2026-06-30 Twilio also requires these
+  as **dedicated campaign fields** (`PrivacyPolicyUrl` /
+  `TermsAndConditionsUrl`) — inline `message_flow` links alone are not enough
+  (that gap is rejection #3's `30908`). Sent on the 2026-09-05 API update;
+  note the Usa2p GET never echoes the two fields, so their stored values are
+  only confirmable in the console.
 
 ## Resubmission (submitted 2026-09-04 — awaiting TCR)
 
@@ -258,18 +274,71 @@ Shared Events: [code] is your sign-in code. Reply STOP to opt out.
 ```
 
 Leave message_flow, sample 2, description, and the consent line alone.
-Optional hardening (not the flagged fields; TCR often reports one layer
-per pass): set `PrivacyPolicyUrl` /
-`TermsAndConditionsUrl` to the extensionless production URLs, and put
-the brand on the help / opt-out auto-replies.
+~~Optional hardening~~ — wrong call: the dedicated `PrivacyPolicyUrl` /
+`TermsAndConditionsUrl` turned out to be the actual `30908` root cause
+(see the next section), not optional hardening.
 
-**Step 5 — wait, then verify (current).** Status **IN_PROGRESS**,
-errors cleared. Poll with the status curl above. On approval: a real
+**Step 5 — wait, then verify.** Status went **IN_PROGRESS**, then the
+campaign was rejected a third time within hours (see the next section) —
+do not treat IN_PROGRESS as the live state. On approval: a real
 US sign-in (OTP arrives), delivery/error scan (`30034`s stop), then
 update `STATUS.md` → A2P table and `FEATURES.md` → US Phone Numbers.
 If it rejects again on a new field, fix that field and resubmit the
 same SID. Toll-free is still the fallback after another pass — a
 sender-number change, not contemplated anywhere else in the repo today.
+
+## Rejection #3 and resubmission (2026-09-05 — brand name + dedicated policy URLs)
+
+The 2026-09-05 resubmit was rejected again within hours — **same two codes**
+(`30908` + `30893`) — even though the privacy-page and sample-1 fixes were
+confirmed live before resubmitting. API inspection found the actual root
+causes; the earlier pass fixed the page content but missed both real issues.
+
+**`30893` — sample 1 named the wrong brand.** The registered TCR brand name
+is **`Ramsey Kilani`** (the sole-proprietor EndUser's `brand_name` attribute:
+`GET https://trusthub.twilio.com/v1/EndUsers/IT8ad0d4aec538ca2424d940eac0912f18`).
+Twilio requires *each* sample to identify the brand by name. Sample 2 passes
+because it starts "Ramsey Kilani wants to go to…"; sample 1 said
+"Shared Events: …" — the app name, which does not string-match the brand.
+That is why only `SAMPLE_MESSAGE_1` was flagged, in every review that
+examined it.
+
+**`30908` — the campaign carried no dedicated `PrivacyPolicyUrl` /
+`TermsAndConditionsUrl`.** Since 2026-06-30 Twilio requires both as campaign
+fields and fetches them during review; ours only existed as inline
+`message_flow` text. Twilio's 30908 page lists a missing `PrivacyPolicyUrl`
+as cause #1. Caveat: the Usa2p GET never echoes the two fields (the response
+schema has variants), so whether the API update stored them is not externally
+confirmable — if `30908` returns again, set them in the console campaign
+form directly.
+
+**Resubmission #4 (2026-09-05, all API-driven — no console needed):**
+
+1. Auth `sms_template` → `Shared Events by Ramsey Kilani: {{ .Code }} is your
+   sign-in code. Reply STOP to opt out.` (Management API `PATCH
+   /v1/projects/{ref}/config/auth` — config, not code; no deploy; verified
+   by read-back).
+2. Campaign update: `POST
+   /v1/Services/{serviceSid}/Compliance/Usa2p/{campaignSid}` with all seven
+   required update fields (description, message_flow, message_samples,
+   has_embedded_links, has_embedded_phone, direct_lending, age_gated — all
+   unchanged except sample 1) plus `PrivacyPolicyUrl` and
+   `TermsAndConditionsUrl` (extensionless production URLs). Sample 1 →
+   `Shared Events by Ramsey Kilani: [code] is your sign-in code. Reply STOP to opt out.`
+   Result: FAILED → **IN_PROGRESS**, errors cleared.
+3. While under review the campaign is locked: further updates 400 with
+   "Campaign update is allowed only for FAILURE state(s)" (the internal
+   state reads `PENDING_DCA1_REVIEW`). Wait for the verdict before touching
+   it again.
+4. Hardening shipped on `staging`: the sign-in screen's legal links now use
+   the extensionless URLs (the `.html` forms 308-redirect; a non-browser
+   verifier sees an empty body). Reaches production with the next web
+   deploy — hardening, not the flagged issue, so not gated.
+
+On approval: real US sign-in (OTP arrives), delivery scan (`30034`s stop),
+update `STATUS.md` + `FEATURES.md`. If `30908` returns despite all this, the
+lever is the console campaign form (owner) — the API update accepted the
+fields without error but cannot prove it stored them.
 
 ## History
 
@@ -290,3 +359,11 @@ sender-number change, not contemplated anywhere else in the repo today.
   `30893` (sample 1). `30909` did not return. Privacy/terms pages and
   Auth template updated; same SID resubmitted with the new sample 1;
   status **IN_PROGRESS**.
+- 2026-09-05 (later): campaign **FAILED** a third time — same `30908` +
+  `30893`. Root causes found by API inspection: sample 1 never named the
+  registered brand (`Ramsey Kilani`, per the sole-prop EndUser
+  `brand_name`), and the campaign had no dedicated `PrivacyPolicyUrl` /
+  `TermsAndConditionsUrl` (required since 2026-06-30). Fixed and
+  resubmitted by API (Auth template + campaign update, same SID); status
+  **IN_PROGRESS** (`PENDING_DCA1_REVIEW`). Sign-in legal links switched to
+  extensionless URLs on `staging`.
