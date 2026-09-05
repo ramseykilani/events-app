@@ -60,6 +60,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
 | [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins) | Implemented | Pulled the candidate's two-column hero + How-it-works section into the production landing page; seed artifacts stay behind. Shipped 2026-09-03. Live: https://events-landing.pages.dev |
+| [Already-Added Contacts in Add People](#already-added-contacts-in-add-people) | Planned | Add People hides contacts already on My People. Show the full list; already-added should be marked (grayed out or similar). Not designed. |
 
 ## Using and testing
 
@@ -2211,3 +2212,25 @@ The production landing page (`landing/` → https://events-landing.pages.dev) is
 
 - ~~Does How it works wear a dark second register or stay on the page ground?~~ Resolved 2026-09-03 (owner): page ground — a fixed dark band fights the theme swatch.
 - ~~Eyebrow copy ("Person-to-person events" or something else — owner words).~~ Resolved 2026-09-03 (owner): "Person-to-person events".
+
+---
+
+## Already-Added Contacts in Add People
+
+**Status:** Planned — recorded 2026-09-05 from owner feedback. **Not designed; do not implement from this section.** Related: [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) (a different Add People gap — finding the manual path, not who appears in the picker).
+
+### Problem
+
+On the Add People screen, when it opens your contacts, anyone already in My People no longer shows up. The picker is not your full contact list.
+
+### Proposed Solution
+
+Not designed. The need is: the contacts list should include people already on My People, and those already-added people should be marked somehow — grayed out or similar. How that looks, and any other details, are for later.
+
+### Acceptance Criteria
+
+- [ ] Do not implement from this section. A later pass, with the owner, decides what the already-added state looks like.
+
+### Open Questions
+
+- None recorded. Details are for later, if they need deciding at all.
