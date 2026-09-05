@@ -62,6 +62,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins) | Implemented | Pulled the candidate's two-column hero + How-it-works section into the production landing page; seed artifacts stay behind. Shipped 2026-09-03. Live: https://events-landing.pages.dev |
 | [Already-Added Contacts in Add People](#already-added-contacts-in-add-people) | Planned | Add People hides contacts already on My People. Show the full list; already-added should be marked (grayed out or similar). Not designed. |
 | [Circle Membership on My People](#circle-membership-on-my-people) | Planned | See how many / which circles someone is in from the people list; maybe add them to circles while scrolling. Not designed. |
+| [Link Autofill Polish](#link-autofill-polish) | Planned | Polish. Owner pasted a Luma link: title + description filled (description ended with …); date, time, and location did not; blur / keyboard-checkmark trigger feels untrustworthy. Not designed. |
 
 ## Using and testing
 
@@ -445,6 +446,8 @@ One free-text `location` column on events. No Google Places API, no autocomplete
 ## Richer Link Autofill
 
 **Status:** Planned — upgrade, not a blocker. Depends on [Location](#location). Provider evidence and re-verify runbook: [docs/link-autofill-provider-matrix.md](docs/link-autofill-provider-matrix.md) (82 providers verified 2026-09-01). Paste-a-link already works: the URL is stored, Open Graph title/description/image fill when the page allows it, and the user can always type a title and pick a date.
+
+Owner 2026-09-05: a live Luma paste filled title and a truncated description only — date, time, and location stayed empty. That is today's OG-only path (Luma is already Layer 1 in the matrix; this upgrade is what would fill the rest). The "…" description and the blur / checkmark trigger are recorded separately under [Link Autofill Polish](#link-autofill-polish) and are not part of this spec.
 
 ### What this is not
 
@@ -2257,3 +2260,21 @@ Not designed. The need is: while looking at the people list, you should be able 
 ### Open Questions
 
 - None recorded. Details are for later, if they need deciding at all.
+
+---
+
+## Link Autofill Polish
+
+**Status:** Planned — polish, not a blocker. Recorded 2026-09-05 from owner feedback after pasting a Luma link. **Not designed; do not implement from this section.** Related: [Richer Link Autofill](#richer-link-autofill) (the planned date/time/location upgrade — Luma is already Layer 1 in the provider matrix; today's shipped path is Open Graph title/description/image only).
+
+### Owner comments (2026-09-05)
+
+Pasted a Luma link on add-event. What happened:
+
+- It did not pull the location or the time. Unsure whether that was supposed to happen.
+- It did not pull the date either.
+- It only pulled the title and description, which is pretty good, but some stuff was missing.
+- The description came in with a "..." at the end, which is weird.
+- The way it fires is not very good: after you put in the link, you either need to tap the checkmark on the keyboard (unclear that people would) or click out of the field, and then it autofills. If there's a delay, the whole thing feels weird — you don't realize it's going to autofill, then you don't trust it. There's probably a Nielsen heuristic about that.
+
+Do not scope this. A later pass, with the owner, decides what to change.
