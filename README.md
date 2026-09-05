@@ -134,3 +134,9 @@ events-app/
 ## Setup
 
 See [SETUP.md](SETUP.md) for full installation instructions, environment configuration, database migrations, edge function deployment, and EAS build setup.
+
+---
+
+## License
+
+This repository is public for transparency, but it is **not open source** — all rights reserved. See [LICENSE](LICENSE) and [docs/repo-visibility.md](docs/repo-visibility.md).
