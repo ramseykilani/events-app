@@ -83,12 +83,9 @@ template change ships (`supabase/functions/send-notification/index.ts`, the
 Supabase Auth SMS template), update the campaign description/samples in the
 console. Recorded instances: `FEATURES.md` → Web Support rejected list (app
 links in SMS) and → SMS Links at Launch (store/event links at launch change
-message content — update the campaign then). **Known drift right now:**
-sample 2 is stale by **two** lines, not one — the `Coming? <receipt-link>`
-line (in every share SMS since 2026-08-31, while `RESPONSE_LINK_BASE_URL` is
-set) and the 2026-09-03 invite-line change (share SMS now points at the beta
-signup form, replacing the email CTA). Refresh the sample at resubmission —
-exact current text in the Resubmission section.
+message content — update the campaign then). **Known drift right now:** none on the samples after the 2026-09-05
+template update (sample 1 matches the Auth template; sample 2 still
+matches `smsBody.ts`). Re-check before the next SMS-template change.
 
 ## Registered content (2026-08-19 submission, as advised — the owner may have adjusted in the form)
 
@@ -104,7 +101,8 @@ exact current text in the Resubmission section.
   notifications (one-time, STOP honored). Opt-in checkboxes: **Other** only —
   never "Via Text" (we have no text-to-join flow; checking it triggers a
   keyword-evidence demand).
-- **Sample 1:** `Your Events code: 123456`
+- **Sample 1:** `Shared Events: [code] is your sign-in code. Reply STOP to opt out.`
+  (live Auth template: `Shared Events: {{ .Code }} is your sign-in code. Reply STOP to opt out.`)
 - **Sample 2:** the production share text with the brand name in the sharer
   slot ("Ramsey Kilani wants to go to \"Rooftop Cinema night\" with you …"
   + date + event URL + invite line + "Reply STOP to unsubscribe.")
@@ -192,15 +190,85 @@ keywords, disclosure links all passed review. Keep the opt-in checkboxes at
 **Other** only (never "Via Text" — no text-to-join flow; checking it
 triggers a keyword-evidence demand).
 
-**Step 4 — wait, then verify (current).** Sole Proprietor campaigns are
-typically decided in hours to days (standard campaigns can take weeks).
-Poll with the status curl above. On approval: do a real US sign-in and
-confirm the OTP arrives, run the delivery/error scan and watch `30034`s
-stop, then update `STATUS.md` → A2P table and `FEATURES.md` → US Phone
-Numbers. If it rejects again on the same field, the fallback is a
-toll-free sender (toll-free verification instead of TCR campaign review)
-— a sender-number change, not contemplated anywhere else in the repo
-today.
+**Step 4 — wait, then verify.** Sole Proprietor campaigns are typically
+decided in hours to days (standard campaigns can take weeks). Poll with
+the status curl above. The 2026-09-04 resubmit was rejected 2026-09-05
+(see below) — do not treat IN_PROGRESS as the live state.
+
+## Resubmission (2026-09-05 — privacy + sample 1)
+
+The 2026-09-04 resubmit cleared `30909` (the consent line worked) and
+failed on two new fields. Brand stayed APPROVED + VERIFIED.
+
+| Code | Field | Twilio’s words |
+|------|--------|----------------|
+| `30908` | `MESSAGE_FLOW` | “a compliant privacy policy can not be verified” |
+| `30893` | `SAMPLE_MESSAGE_1` | “invalid sample message content” |
+
+**30908** — the privacy URL in message_flow is reachable
+(`https://shared-events.pages.dev/privacy` serves `public/privacy.html`).
+TCR scans for an explicit non-sharing clause that names **mobile
+information / messaging consent** and **third parties/affiliates**. The
+page said numbers are never shared “with third parties for their
+marketing” — close, but it omitted consent data and affiliates, and the
+affiliate-commission bullet sat next to that weaker sentence. The
+policy and terms were also titled “Events,” not the registered brand.
+
+Required clause (now on the page, do not reword):
+
+> No mobile information will be shared with third parties/affiliates for
+> marketing/promotional purposes. Information sharing to subcontractors
+> in support services, such as customer service, is permitted. All other
+> use case categories exclude text messaging originator opt-in data and
+> consent; this information will not be shared with any third parties.
+
+**30893** — sample 1 was still `Your Events code: 123456`: no registered
+brand, no STOP, and it did not match the live Auth template
+(`Events: {{ .Code }} is your sign-in code.`). Twilio wants each sample
+to identify the brand and mark templated bits with `[brackets]`.
+
+**Step 1 — privacy / terms pages (done 2026-09-05).** `public/privacy.html`
+and `public/terms.html` now name Shared Events + Ramsey Kilani, carry
+the TCR clause, and say affiliate tagging does not share mobile numbers
+or consent. Covered by `__tests__/public/legal-pages.test.ts` and
+`e2e/privacy.spec.ts`.
+
+**Step 2 — ship the pages to production.** The reviewer loads
+`https://shared-events.pages.dev/privacy` — staging is not evidence.
+Confirm the clause is live on that URL before the campaign POST.
+
+**Step 3 — Auth OTP template (config, not code).** Management API
+`sms_template`:
+
+```
+Shared Events: {{ .Code }} is your sign-in code. Reply STOP to opt out.
+```
+
+(~69 chars with a 6-digit code — one GSM-7 segment). Twilio intercepts
+STOP account-wide; the words have to be on the sample and the live
+message or we fail the sync rule.
+
+**Step 4 — edit the failed campaign in place and resubmit.** Same SID
+`QE2c6890da8086d771620e9b13fadeba0b` — do not delete/recreate. Change
+sample 1 only:
+
+```
+Shared Events: [code] is your sign-in code. Reply STOP to opt out.
+```
+
+Leave message_flow, sample 2, description, and the consent line alone.
+Optional hardening (not the flagged fields; TCR often reports one layer
+per pass): set `PrivacyPolicyUrl` /
+`TermsAndConditionsUrl` to the extensionless production URLs, and put
+the brand on the help / opt-out auto-replies.
+
+**Step 5 — wait, then verify (current).** Poll with the status curl
+above. On approval: a real US sign-in (OTP arrives), delivery/error
+scan (`30034`s stop), then update `STATUS.md` → A2P table and
+`FEATURES.md` → US Phone Numbers. If it rejects again on a new field,
+fix that field and resubmit the same SID. Toll-free is still the
+fallback after another pass — a sender-number change, not contemplated
+anywhere else in the repo today.
 
 ## History
 
@@ -217,3 +285,7 @@ today.
   consent line; sample 2 refreshed for the Coming? receipt link and the
   beta-signup invite). Automated check passed; status **IN_PROGRESS**,
   awaiting TCR.
+- 2026-09-05: campaign **FAILED** again — `30908` (privacy clause) +
+  `30893` (sample 1). `30909` did not return. Privacy/terms pages and
+  Auth template updated; same SID to be resubmitted once the production
+  evidence URL shows the new clause.

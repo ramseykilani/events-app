@@ -92,6 +92,6 @@ US carriers hard-block unregistered 10DLC traffic (`30034`); Canadian carriers d
 |-------|-------|
 | Sender | `+15709385240` (US long code), sole number on Messaging Service "Events" `MG977e4096e94f84bee689c40c8537d554` |
 | Brand | `BN31e431b9c89ca30bb4ed785cadc2e1bd` (TCR `B40R7D7`), Sole Proprietor — **APPROVED + VERIFIED 2026-08-17**. The verification OTP never reached the owner's Canadian mobile; verified by texting YES to `+1-915-278-2000` (see the doc) |
-| Campaign | `QE2c6890da8086d771620e9b13fadeba0b` — **IN_PROGRESS** (resubmitted 2026-09-04 after the 2026-08-19 `30909` CTA rejection). Same SID; automated check passed, now in TCR human review. Consent line live at the production evidence URL. Playbook: `docs/a2p-registration.md` |
+| Campaign | `QE2c6890da8086d771620e9b13fadeba0b` — **FAILED** (2026-09-05). `30909` CTA cleared; new codes `30908` (privacy non-sharing clause) + `30893` (sample 1). Privacy/terms pages + Auth OTP template updated 2026-09-05; resubmit the same SID once `https://shared-events.pages.dev/privacy` shows the TCR clause. Playbook: `docs/a2p-registration.md` |
 | Effect until approved | US-bound SMS (sign-in OTP + share notifications) carrier-blocked; Canadian delivery unaffected |
 | Stale artifact | Trust Hub profile "My Starter Profile" `BU5ad001ea04af4d02c801a66202421520` sat `in-review` since 2026-02-16; nothing uses it — ignore |

@@ -64,7 +64,7 @@ The `EXPO_PUBLIC_` prefix makes these available to the app at build time. Do not
 2. Find **Phone** in the provider list and enable it.
 3. For development, you can use the built-in Supabase test OTP. Under **Authentication > Settings**, scroll to "Test Users" or "Test OTP" and add a phone number / OTP pair (e.g. `+15555550100` / `123456`). Auth then returns that code without calling Twilio (`message_id: test-otp`). Do not use `/otp` to *create* those users — `scripts/create-test-accounts.mjs` registers `sms_test_otp` first, then creates them via Auth Admin with `phone_confirm: true`. Share SMS is a separate path: `send-notification` skips NANP **area code** 555 (a 416-555 placeholder still sends). Full test-account rules: AGENTS.md → Signing in (test accounts).
 4. For production, connect a real SMS provider (Twilio, MessageBird, or Vonage) under the Phone provider settings. Enter your provider credentials (Account SID, Auth Token, and Messaging Service SID for Twilio).
-5. Set the phone-auth SMS template (Authentication → Sign In / Up → SMS template, or Management API `sms_template`) to `Events: {{ .Code }} is your sign-in code.` so the verification text names the app. Keep it to one GSM-7 segment.
+5. Set the phone-auth SMS template (Authentication → Sign In / Up → SMS template, or Management API `sms_template`) to `Shared Events: {{ .Code }} is your sign-in code. Reply STOP to opt out.` so the verification text names the registered brand and matches the A2P sample. Keep it to one GSM-7 segment.
 
 ---
 
