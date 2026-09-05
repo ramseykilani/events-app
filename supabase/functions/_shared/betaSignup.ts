@@ -17,6 +17,7 @@ export interface BetaSubmission {
   appleEmail: string | null;
   playEmail: string | null;
   phone: string | null; // E.164
+  heardFrom: string;
 }
 
 export type BetaValidation =
@@ -25,6 +26,7 @@ export type BetaValidation =
 
 const MAX_NAME_LENGTH = 100;
 const MAX_EMAIL_LENGTH = 254;
+export const MAX_HEARD_FROM_LENGTH = 200;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const E164_RE = /^\+[1-9]\d{6,14}$/;
 
@@ -108,9 +110,20 @@ export function validateBetaSubmission(raw: unknown): BetaValidation {
     }
   }
 
+  // Provenance: required on new submits. Flatten whitespace so the owner
+  // SMS stays two lines even if the form sent a multi-line answer.
+  const heardFrom =
+    typeof body.heardFrom === 'string' ? body.heardFrom.trim().replace(/\s+/g, ' ') : '';
+  if (!heardFrom) {
+    return { ok: false, error: 'Tell us how you heard about Events.' };
+  }
+  if (heardFrom.length > MAX_HEARD_FROM_LENGTH) {
+    return { ok: false, error: 'Keep that to 200 characters or fewer.' };
+  }
+
   return {
     ok: true,
-    submission: { firstName, lastName, platform, appleEmail, playEmail, phone },
+    submission: { firstName, lastName, platform, appleEmail, playEmail, phone, heardFrom },
   };
 }
 
@@ -119,13 +132,14 @@ export function betaPlatformLabel(platform: BetaPlatform): string {
 }
 
 // One SMS to the owner per signup (the abuse tripwire — no approval gate,
-// so every signup is visible). GSM-7-safe: straight quotes and hyphens
-// only, so the alert prices at one segment.
+// so every signup is visible). Template is GSM-7-safe (straight quotes and
+// hyphens); the person's own heard-from words may not be, and a long
+// answer can price at two segments — accepted for an owner-only alert.
 export function buildOwnerAlertBody(s: BetaSubmission): string {
   const emails = [s.appleEmail, s.playEmail].filter(Boolean).join(' / ');
   return `New Events beta signup: ${s.firstName} ${s.lastName} (${betaPlatformLabel(
     s.platform,
-  )}) - ${emails}`;
+  )}) - ${emails}\nHeard from: ${s.heardFrom}`;
 }
 
 // The Android completion text, sent when the Grok Bot's webhook flips

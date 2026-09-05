@@ -42,6 +42,7 @@ describe('validateBetaSubmission', () => {
       appleEmail: 'ADA@Example.com ',
       playEmail: 'ignored@gmail.com',
       phone: '(416) 555-1234',
+      heardFrom: '  a friend shared\nan event  ',
     });
     expect(result).toEqual({
       ok: true,
@@ -52,6 +53,7 @@ describe('validateBetaSubmission', () => {
         appleEmail: 'ada@example.com',
         playEmail: null,
         phone: null,
+        heardFrom: 'a friend shared an event',
       },
     });
   });
@@ -63,6 +65,7 @@ describe('validateBetaSubmission', () => {
       platform: 'android',
       playEmail: 'Grace@Gmail.com',
       phone: '(416) 555-1234',
+      heardFrom: 'Instagram',
     });
     expect(result).toEqual({
       ok: true,
@@ -73,6 +76,7 @@ describe('validateBetaSubmission', () => {
         appleEmail: null,
         playEmail: 'grace@gmail.com',
         phone: '+14165551234',
+        heardFrom: 'Instagram',
       },
     });
   });
@@ -85,6 +89,7 @@ describe('validateBetaSubmission', () => {
       appleEmail: 'alan@example.com',
       playEmail: 'alan@gmail.com',
       phone: '+14165551235',
+      heardFrom: 'a friend',
     });
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -116,6 +121,30 @@ describe('validateBetaSubmission', () => {
       { firstName: 'A', lastName: 'B', platform: 'android', playEmail: 'a@gmail.com', phone: '555' },
       "That phone number doesn't look right.",
     ],
+    [
+      { firstName: 'A', lastName: 'B', platform: 'ios', appleEmail: 'a@b.co' },
+      'Tell us how you heard about Events.',
+    ],
+    [
+      {
+        firstName: 'A',
+        lastName: 'B',
+        platform: 'ios',
+        appleEmail: 'a@b.co',
+        heardFrom: '   ',
+      },
+      'Tell us how you heard about Events.',
+    ],
+    [
+      {
+        firstName: 'A',
+        lastName: 'B',
+        platform: 'ios',
+        appleEmail: 'a@b.co',
+        heardFrom: 'x'.repeat(201),
+      },
+      'Keep that to 200 characters or fewer.',
+    ],
   ])('rejects %o with a human error', (input, error) => {
     expect(validateBetaSubmission(input)).toEqual({ ok: false, error });
   });
@@ -127,7 +156,7 @@ describe('validateBetaSubmission', () => {
 });
 
 describe('buildOwnerAlertBody', () => {
-  it('carries name, platform label, and the relevant emails', () => {
+  it('carries name, platform label, emails, and how they heard', () => {
     expect(
       buildOwnerAlertBody({
         firstName: 'Ada',
@@ -136,8 +165,11 @@ describe('buildOwnerAlertBody', () => {
         appleEmail: 'ada@example.com',
         playEmail: null,
         phone: null,
+        heardFrom: 'a friend shared an event',
       }),
-    ).toBe('New Events beta signup: Ada Lovelace (iOS) - ada@example.com');
+    ).toBe(
+      'New Events beta signup: Ada Lovelace (iOS) - ada@example.com\nHeard from: a friend shared an event',
+    );
     expect(
       buildOwnerAlertBody({
         firstName: 'Alan',
@@ -146,8 +178,25 @@ describe('buildOwnerAlertBody', () => {
         appleEmail: 'alan@example.com',
         playEmail: 'alan@gmail.com',
         phone: '+14165551235',
+        heardFrom: 'Instagram',
       }),
-    ).toBe('New Events beta signup: Alan Turing (iOS + Android) - alan@example.com / alan@gmail.com');
+    ).toBe(
+      'New Events beta signup: Alan Turing (iOS + Android) - alan@example.com / alan@gmail.com\nHeard from: Instagram',
+    );
+  });
+
+  it('keeps the template GSM-7 safe (user words are not sanitized)', () => {
+    const body = buildOwnerAlertBody({
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      platform: 'ios',
+      appleEmail: 'ada@example.com',
+      playEmail: null,
+      phone: null,
+      heardFrom: 'a friend',
+    });
+    const template = body.slice(0, body.indexOf('Heard from:') + 'Heard from:'.length);
+    expect(template).not.toMatch(/[\u2018\u2019\u201C\u201D\u2013\u2014\u2015\u2026]/);
   });
 });
 

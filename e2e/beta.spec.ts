@@ -20,6 +20,7 @@ const IOS_SUBMISSION = {
   firstName: 'Ada',
   lastName: 'Lovelace',
   platform: 'ios',
+  heardFrom: 'a friend shared an event',
   appleEmail: 'ada@example.com',
 };
 
@@ -27,6 +28,7 @@ const ANDROID_SUBMISSION = {
   firstName: 'Grace',
   lastName: 'Hopper',
   platform: 'android',
+  heardFrom: 'a friend shared an event',
   playEmail: 'grace@gmail.com',
   phone: '(416) 555-1234',
 };
@@ -53,6 +55,7 @@ async function fillValidIos(page: import('@playwright/test').Page): Promise<void
   await page.getByLabel('Last name').fill('Lovelace');
   await page.locator('label.option', { hasText: 'iPhone' }).click();
   await page.getByLabel('The email your Apple ID is under').fill('ada@example.com');
+  await page.getByLabel('How did you hear about Events?').fill('a friend shared an event');
 }
 
 test('renders the form with conditional fields hidden until a platform is chosen', async ({
@@ -70,6 +73,7 @@ test('renders the form with conditional fields hidden until a platform is chosen
   await expect(page.locator('.eyebrow')).toHaveText(/events closed beta/i);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Get the beta.');
   await expect(page.getByRole('button', { name: 'Join the beta' })).toBeVisible();
+  await expect(page.getByLabel('How did you hear about Events?')).toBeVisible();
 
   // Neither platform's fields render before a choice.
   await expect(page.locator('#ios-fields')).toBeHidden();
@@ -97,6 +101,7 @@ test('invalid submissions get inline errors and never reach the API', async ({ p
   await expect(page.locator('#first-name-error')).toHaveText('First name is required.');
   await expect(page.locator('#last-name-error')).toHaveText('Last name is required.');
   await expect(page.locator('#platform-error')).toHaveText('Choose iPhone, Android, or both.');
+  await expect(page.locator('#heard-from-error')).toHaveText('Tell us how you heard about Events.');
 
   // Android without Gmail/phone, then with a malformed Gmail.
   await page.getByLabel('First name').fill('Grace');
@@ -144,6 +149,7 @@ test('Android submit posts Gmail + phone and shows the text-incoming confirmatio
   await page.locator('label.option', { hasText: 'Android' }).click();
   await page.getByLabel('The Gmail your Play Store uses').fill('grace@gmail.com');
   await page.getByLabel('Your phone number').fill('(416) 555-1234');
+  await page.getByLabel('How did you hear about Events?').fill('a friend shared an event');
   await page.getByRole('button', { name: 'Join the beta' }).click();
 
   expect(payloads).toEqual([ANDROID_SUBMISSION]);

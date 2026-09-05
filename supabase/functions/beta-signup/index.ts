@@ -289,6 +289,7 @@ serve(async (req) => {
       apple_email: submission.appleEmail,
       play_email: submission.playEmail,
       phone: submission.phone,
+      heard_from: submission.heardFrom,
       ios_status: submission.appleEmail ? 'pending' : null,
       android_status: submission.playEmail ? 'pending' : null,
       ios_error: null,

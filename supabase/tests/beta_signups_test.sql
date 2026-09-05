@@ -1,10 +1,11 @@
 -- Beta Signup Pipeline: the beta_signups table (migration
--- 20260903000001). Service-role only by design — RLS enabled with zero
--- policies, so anon/authenticated get default-deny and only the edge
--- functions (service role) read or write. This suite pins the schema
--- guards: name/platform/email/phone coherence CHECKs, the per-platform
--- status enums, and the RLS posture. The fulfillment state machines
--- themselves live in the beta-signup / beta-ios-fulfill edge functions.
+-- 20260903000001, heard-from 20260905000001). Service-role only by
+-- design — RLS enabled with zero policies, so anon/authenticated get
+-- default-deny and only the edge functions (service role) read or write.
+-- This suite pins the schema guards: name/platform/email/phone coherence
+-- CHECKs, heard_from blank/length, the per-platform status enums, and the
+-- RLS posture. The fulfillment state machines themselves live in the
+-- beta-signup / beta-ios-fulfill edge functions.
 
 \set ON_ERROR_STOP on
 
@@ -134,6 +135,40 @@ EXCEPTION WHEN check_violation THEN
   RAISE NOTICE 'PASS T6b: android_status enum enforced';
 END $$;
 
+-- ===== T7b: heard_from is nullable (predates the column) but rejects blank / over-long =====
+INSERT INTO public.beta_signups
+  (id, first_name, last_name, platform, apple_email, ios_status, heard_from)
+VALUES
+  ('be000000-0000-0000-0000-00000000000a', 'Heard', 'From', 'ios',
+   'heard@example.com', 'pending', 'a friend shared an event');
+DO $$
+BEGIN
+  IF (SELECT heard_from FROM public.beta_signups
+      WHERE id = 'be000000-0000-0000-0000-00000000000a')
+     <> 'a friend shared an event' THEN
+    RAISE EXCEPTION 'FAIL T7b: heard_from did not persist';
+  END IF;
+  RAISE NOTICE 'PASS T7b: heard_from stores a value';
+END $$;
+DO $$
+BEGIN
+  INSERT INTO public.beta_signups
+    (first_name, last_name, platform, apple_email, ios_status, heard_from)
+  VALUES ('A', 'B', 'ios', 'blank-heard@example.com', 'pending', '   ');
+  RAISE EXCEPTION 'FAIL T7c: a blank heard_from was accepted';
+EXCEPTION WHEN check_violation THEN
+  RAISE NOTICE 'PASS T7c: blank heard_from rejected';
+END $$;
+DO $$
+BEGIN
+  INSERT INTO public.beta_signups
+    (first_name, last_name, platform, apple_email, ios_status, heard_from)
+  VALUES ('A', 'B', 'ios', 'long-heard@example.com', 'pending', repeat('x', 201));
+  RAISE EXCEPTION 'FAIL T7d: a 201-char heard_from was accepted';
+EXCEPTION WHEN check_violation THEN
+  RAISE NOTICE 'PASS T7d: over-long heard_from rejected';
+END $$;
+
 -- ===== T7: names must be non-empty =====
 DO $$
 BEGIN
@@ -178,8 +213,8 @@ INSERT INTO public.beta_signups
 VALUES ('Edsger', 'Dijkstra', 'ios', 'edsger@example.com', 'pending');
 DO $$
 BEGIN
-  IF (SELECT count(*) FROM public.beta_signups) <> 4 THEN
-    RAISE EXCEPTION 'FAIL T8c: expected 4 rows after NULL-phone insert';
+  IF (SELECT count(*) FROM public.beta_signups) <> 5 THEN
+    RAISE EXCEPTION 'FAIL T8c: expected 5 rows after NULL-phone insert';
   END IF;
   RAISE NOTICE 'PASS T8c: NULL phones do not collide';
 END $$;
@@ -190,7 +225,7 @@ END $$;
 -- affiliate_programs_test.sql pattern).
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.beta_signups TO anon, authenticated;
 
--- T9a: authenticated SELECT sees zero rows even though four exist.
+-- T9a: authenticated SELECT sees zero rows even though five exist.
 BEGIN;
 SET LOCAL ROLE authenticated;
 DO $$
@@ -225,7 +260,7 @@ COMMIT;
 
 DO $$
 BEGIN
-  IF (SELECT count(*) FROM public.beta_signups) <> 4 THEN
+  IF (SELECT count(*) FROM public.beta_signups) <> 5 THEN
     RAISE EXCEPTION 'FAIL T9c: authenticated DELETE removed rows';
   END IF;
   IF EXISTS (SELECT 1 FROM public.beta_signups WHERE ios_status = 'added') THEN
