@@ -21,8 +21,10 @@ import { showError } from '../../lib/showError';
 import { useTheme } from '../../hooks/useTheme';
 import { PrimaryButton } from '../../components/PrimaryButton';
 
-const PRIVACY_POLICY_URL = 'https://shared-events.pages.dev/privacy.html';
-const TERMS_URL = 'https://shared-events.pages.dev/terms.html';
+// Extensionless URLs: the .html forms 308-redirect, and a non-browser fetcher
+// (e.g. the A2P campaign reviewer's verifier) sees an empty redirect body.
+const PRIVACY_POLICY_URL = 'https://shared-events.pages.dev/privacy';
+const TERMS_URL = 'https://shared-events.pages.dev/terms';
 
 const ORIENTATION_LINE =
   'Found something you want to go to? Add it here and share it with the right people — instead of texting them one by one.';
