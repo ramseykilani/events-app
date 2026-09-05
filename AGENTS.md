@@ -37,7 +37,7 @@ printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_
 
 ### Signing in (test accounts)
 
-Six test accounts are configured on the Supabase project, all with test OTP `123456` (expires March 31, 2027) and all sharing one password. CI's three parallel browser legs each own a standing pair (`.github/workflows/full-suite.yml` matrix) — never reuse a CI-owned pair for local runs while a pipeline is active:
+Six test accounts are configured on the Supabase project, all sharing one test OTP (expires March 31, 2027) and one password. The repo is public, so the OTP is a real secret: it lives as `E2E_TEST_OTP` in the GitHub repo secrets (CI) and Cursor secrets (cloud-agent VMs), and in `.env` locally — never write the value into the tree (it was rotated out of these docs 2026-09-05). CI's three parallel browser legs each own a standing pair (`.github/workflows/full-suite.yml` matrix) — never reuse a CI-owned pair for local runs while a pipeline is active:
 
 - **desktop-chrome leg:** A/B `+15555550100` / `+15555550103` — also the local e2e defaults when no CI run is active.
 - **mobile-safari leg:** C/D `+15555550110` / `+15555550111`.

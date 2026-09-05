@@ -20,8 +20,8 @@ Use this when:
    - `npx expo start --web --port 8081`
 
 Use these test credentials (configured on the Supabase project, expire 2027-03-31):
-- Phone: `+15555550100` (account A), OTP: `123456`
-- Second account (multi-user scenarios): `+15555550103` (account B), OTP `123456`
+- Phone: `+15555550100` (account A), OTP: the shared test OTP in the `E2E_TEST_OTP` environment variable (a Cursor secret, injected into cloud-agent VMs)
+- Second account (multi-user scenarios): `+15555550103` (account B), same OTP
 - `+15555550101` is NOT a configured test number — Twilio rejects it with `sms_send_failed`.
 
 When this suite runs as the pre-release gate (see `docs/development-workflow.md`),

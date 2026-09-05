@@ -21,9 +21,11 @@
 // Required env (.env is loaded automatically, without overriding real env):
 //   EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY
 //   SUPABASE_ACCESS_TOKEN — Management API token; registers each number's
-//     test OTP (123456) so the OTP-UI tests (auth.spec.ts) and native Maestro
-//     flows keep working. The merge is read-then-write: existing test OTPs
-//     are never clobbered.
+//     test OTP so the OTP-UI tests (auth.spec.ts) and native Maestro flows
+//     keep working. The merge is read-then-write: existing test OTPs are
+//     never clobbered.
+//   E2E_TEST_OTP — the shared test OTP registered for every number. The repo
+//     is public, so the value lives only in secrets/.env — never hardcode it.
 //   E2E_ACCOUNT_PASSWORD — password to set on every account. If unset, one is
 //     generated and printed once; store it in .env, Cursor Secrets, and the
 //     GitHub repo secrets.
@@ -47,7 +49,7 @@ if (existsSync('.env')) {
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
-const TEST_OTP = '123456';
+const TEST_OTP = process.env.E2E_TEST_OTP;
 const TEST_OTP_VALID_UNTIL = '2027-03-31T00:00:00Z'; // matches A/B
 
 const DEFAULT_POOL = [
@@ -71,6 +73,7 @@ for (const [name, value] of Object.entries({
   EXPO_PUBLIC_SUPABASE_URL: SUPABASE_URL,
   EXPO_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
   SUPABASE_ACCESS_TOKEN: ACCESS_TOKEN,
+  E2E_TEST_OTP: TEST_OTP,
 })) {
   if (!value) {
     console.error(`missing ${name} — set it in the environment or .env`);
@@ -212,7 +215,7 @@ async function ensureTestOtps() {
   const config = await getAuthConfig();
   // The Management API serializes sms_test_otp as one comma-separated string
   // of `phone=code` pairs, phones WITHOUT the leading '+':
-  // "15555550100=123456,15555550103=123456". Merge in that shape and PATCH it
+  // "15555550100=<code>,15555550103=<code>". Merge in that shape and PATCH it
   // back unchanged in kind — a wholesale replace would clobber the standing
   // accounts.
   const raw = config.sms_test_otp ?? '';
@@ -252,7 +255,7 @@ async function ensureTestOtps() {
     );
   }
   console.log(
-    `test OTP (${TEST_OTP}) registered for ${targets.length} number(s); ` +
+    `test OTP registered for ${targets.length} number(s); ` +
       `${merged.size} total in config`
   );
 }

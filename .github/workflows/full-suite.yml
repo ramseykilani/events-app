@@ -152,6 +152,9 @@ jobs:
           # Absent → the setup falls back to the OTP UI (one rejected Twilio
           # send attempt per account per run).
           E2E_ACCOUNT_PASSWORD: ${{ secrets.E2E_ACCOUNT_PASSWORD }}
+          # Shared test OTP for the sms_test_otp-registered numbers — only
+          # the OTP-UI fallback path needs it (password sign-in is the norm).
+          E2E_TEST_OTP: ${{ secrets.E2E_TEST_OTP }}
         run: npx playwright test --project=${{ matrix.project }}
 
       # Only one leg may upload the `dist` artifact (names are run-global);

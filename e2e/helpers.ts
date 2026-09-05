@@ -1,18 +1,20 @@
 import { expect, type Dialog, type Page } from '@playwright/test';
 
 // Test accounts configured on the Supabase project (see AGENTS.md →
-// "Signing in (test accounts)"). Test OTPs expire March 31, 2027. They are
-// documented in the repo, so defaults here are not secrets; override via env
-// to point the suite at a different project — or to claim a pool account
-// pair (C–F: +15555550110–113) so a parallel local run never races the
-// standing accounts' calendars.
+// "Signing in (test accounts)"). The shared test OTP is a real credential
+// and the repo is public, so the value never lives in the tree: it comes
+// from E2E_TEST_OTP (GitHub repo secret for CI, Cursor secret for cloud
+// agents, .env locally; expires March 31, 2027). Override phones via env to
+// point the suite at a different project — or to claim a pool account pair
+// (C–F: +15555550110–113) so a parallel local run never races the standing
+// accounts' calendars.
 export const ACCOUNT_A = {
   phone: process.env.E2E_PHONE_A ?? '+15555550100',
-  otp: process.env.E2E_OTP_A ?? '123456',
+  otp: process.env.E2E_OTP_A ?? process.env.E2E_TEST_OTP ?? '',
 };
 export const ACCOUNT_B = {
   phone: process.env.E2E_PHONE_B ?? '+15555550103',
-  otp: process.env.E2E_OTP_B ?? '123456',
+  otp: process.env.E2E_OTP_B ?? process.env.E2E_TEST_OTP ?? '',
 };
 // Shared password for every test account (scripts/create-test-accounts.mjs).
 // When set, the auth setup signs in via the token endpoint — no SMS fired.
@@ -27,6 +29,12 @@ export async function signIn(
   page: Page,
   account: { phone: string; otp: string }
 ): Promise<void> {
+  if (!account.otp) {
+    throw new Error(
+      'OTP sign-in needs E2E_TEST_OTP in the environment (or .env) — ' +
+        'see AGENTS.md → Signing in (test accounts)'
+    );
+  }
   // Clear any persisted session first: a shared account whose session was
   // revoked by a later sign-in would otherwise boot into a permanently
   // loading screen instead of the sign-in form.

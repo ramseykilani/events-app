@@ -29,9 +29,10 @@ Test the deployed staging preview at
 **https://staging.shared-events.pages.dev** (never a local dev server). The
 repo is checked out for you; `manual-tests/cloud_manual_regression.md` has
 scenario details and `AGENTS.md` has test credentials (account A
-`+15555550100`, account B `+15555550103`, OTP `123456`). For the first-run
-track, add a temporary test OTP via the Supabase Management API (AGENTS.md
-documents how) and REMOVE it when done.
+`+15555550100`, account B `+15555550103`; the shared test OTP is in the
+`E2E_TEST_OTP` environment variable — a Cursor secret injected into your VM).
+For the first-run track, add a temporary test OTP via the Supabase Management
+API (AGENTS.md documents how) and REMOVE it when done.
 
 ## Rules
 
