@@ -61,6 +61,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
 | [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins) | Implemented | Pulled the candidate's two-column hero + How-it-works section into the production landing page; seed artifacts stay behind. Shipped 2026-09-03. Live: https://events-landing.pages.dev |
 | [Already-Added Contacts in Add People](#already-added-contacts-in-add-people) | Planned | Add People hides contacts already on My People. Show the full list; already-added should be marked (grayed out or similar). Not designed. |
+| [Circle Membership on My People](#circle-membership-on-my-people) | Planned | See how many / which circles someone is in from the people list; maybe add them to circles while scrolling. Not designed. |
 
 ## Using and testing
 
@@ -1377,7 +1378,7 @@ Not designed. The need: on Android, a summoned sheet should read as a sheet/pop-
 
 ## Circles UX
 
-**Status:** Planned — recorded 2026-08-20 from owner feedback. **Not designed; do not implement from this section.** Circles already ship as an optional share shortcut; this is a later pass on that implementation. Related: [People List Scrolling](#people-list-scrolling) (list feel on My People — not a circles rewrite). The circle-editor sheet is one of the Modals that swallow Android system Back ([KI-012](manual-tests/known_issues.md)); that is a platform Back gap, not a circles-UX spec.
+**Status:** Planned — recorded 2026-08-20 from owner feedback. **Not designed; do not implement from this section.** Circles already ship as an optional share shortcut; this is a later pass on that implementation. Related: [People List Scrolling](#people-list-scrolling) (list feel on My People — not a circles rewrite), [Circle Membership on My People](#circle-membership-on-my-people) (seeing / adding membership from the people list — a later jot, not this rewrite). The circle-editor sheet is one of the Modals that swallow Android system Back ([KI-012](manual-tests/known_issues.md)); that is a platform Back gap, not a circles-UX spec.
 
 ### Problem
 
@@ -2230,6 +2231,28 @@ Not designed. The need is: the contacts list should include people already on My
 ### Acceptance Criteria
 
 - [ ] Do not implement from this section. A later pass, with the owner, decides what the already-added state looks like.
+
+### Open Questions
+
+- None recorded. Details are for later, if they need deciding at all.
+
+---
+
+## Circle Membership on My People
+
+**Status:** Planned — recorded 2026-09-05 from owner feedback. **Not designed; do not implement from this section.** Related: [Circles UX](#circles-ux) (the broader circles pass — not this), [People List Scrolling](#people-list-scrolling) (list feel — not membership).
+
+### Problem
+
+On the My People screen, you can't tell how many circles someone is in, or which ones. Adding a person to a circle while scrolling the list is also harder than it should be.
+
+### Proposed Solution
+
+Not designed. The need is: while looking at the people list, you should be able to see how many circles or which circles each person is in, and perhaps add them to circles more easily from that list. Count vs names, and how adding works, are for later.
+
+### Acceptance Criteria
+
+- [ ] Do not implement from this section. A later pass, with the owner, decides what this looks like.
 
 ### Open Questions
 
