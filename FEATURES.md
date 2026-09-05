@@ -56,7 +56,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. Owner 2026-09-02: gear/Add crowding is [KI-017](manual-tests/known_issues.md). |
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
 | [Beta Signup Pipeline](#beta-signup-pipeline) | Implemented | Self-serve beta signup form → automated TestFlight (ASC API) + agent-assisted Play fulfillment. Live: https://events-landing.pages.dev/signup |
-| [Beta Signup Heard-From](#beta-signup-heard-from) | In progress | Free-text "how did you hear about Events?" on the beta form; included in the owner SMS. |
+| [Beta Signup Heard-From](#beta-signup-heard-from) | Implemented | Free-text "how did you hear about Events?" on the beta form; included in the owner SMS. |
 | [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
@@ -2055,7 +2055,7 @@ A self-serve signup form, linked from the share SMS's signup line, feeding an au
 
 ## Beta Signup Heard-From
 
-**Status:** In progress.
+**Status:** Implemented (2026-09-05).
 
 A one-field amendment to [Beta Signup Pipeline](#beta-signup-pipeline). The original landing mailto already asked "who told you about Events"; the self-serve form dropped that prompt. The owner wants it back — on the form, and in the per-signup SMS.
 
@@ -2076,11 +2076,11 @@ One required free-text field on `landing/signup.html`: "How did you hear about E
 
 ### Acceptance Criteria
 
-- [ ] Form shows the field; empty submit gets an inline error and never reaches the API
-- [ ] Valid submit POSTs `heardFrom`; confirmation is unchanged
-- [ ] Owner SMS includes a `Heard from:` line with the submitted text
-- [ ] Existing `beta_signups` rows stay valid (column nullable); blank / over-long values rejected
-- [ ] Fast checks green; `e2e/beta.spec.ts` updated
+- [x] Form shows the field; empty submit gets an inline error and never reaches the API
+- [x] Valid submit POSTs `heardFrom`; confirmation is unchanged
+- [x] Owner SMS includes a `Heard from:` line with the submitted text
+- [x] Existing `beta_signups` rows stay valid (column nullable); blank / over-long values rejected
+- [x] Fast checks green; `e2e/beta.spec.ts` updated
 
 ### Open Questions
 
