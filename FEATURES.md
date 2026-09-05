@@ -56,6 +56,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Hide Confirmation & People Settings Sheet](#hide-confirmation--people-settings-sheet) | Implemented | Hide gains a confirm dialog; the People footer consolidates into a gear-opened Settings sheet with a permanent home for Hidden people. Spec owner-approved 2026-09-01. Owner 2026-09-02: gear/Add crowding is [KI-017](manual-tests/known_issues.md). |
 | [Design System Consolidation](#design-system-consolidation) | Implemented | One AppHeader grammar, a three-tier button set, and lint rules against re-drift. Shipped 2026-09-01/02; form-grammar gate for Richer Link Autofill satisfied. Audit: [manual-tests/ux_pattern_audit_2026-09-01.md](manual-tests/ux_pattern_audit_2026-09-01.md). Anomaly: [KI-016](manual-tests/known_issues.md). |
 | [Beta Signup Pipeline](#beta-signup-pipeline) | Implemented | Self-serve beta signup form → automated TestFlight (ASC API) + agent-assisted Play fulfillment. Live: https://events-landing.pages.dev/signup |
+| [Beta Signup Heard-From](#beta-signup-heard-from) | In progress | Free-text "how did you hear about Events?" on the beta form; included in the owner SMS. |
 | [Beta Landing Page](#beta-landing-page) | Implemented | Static "Events" page on its own Pages project; prefilled mailto is the whole CTA. Seed of the launch page. Live: https://events-landing.pages.dev |
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
@@ -2048,6 +2049,41 @@ A self-serve signup form, linked from the share SMS's signup line, feeding an au
 - ~~Pages project name / form URL~~ — resolved: `events-landing.pages.dev/signup` (form lives in the landing project).
 - ~~How the Grok Bot learns about new Android signups~~ — resolved: the Bot polls `pending-android` (fully hands-off).
 - ~~Whether phone is collected from iOS-only signups~~ — resolved: no.
+
+---
+
+## Beta Signup Heard-From
+
+**Status:** In progress.
+
+A one-field amendment to [Beta Signup Pipeline](#beta-signup-pipeline). The original landing mailto already asked "who told you about Events"; the self-serve form dropped that prompt. The owner wants it back — on the form, and in the per-signup SMS.
+
+### Problem
+
+Every signup texts the owner (the no-gate tripwire), but the text only carries name, platform, and email. There is no record of how the person found the app — friend-of-a-friend vs a share SMS vs something else — so the owner cannot tell which channel is actually feeding the beta.
+
+### Solution
+
+One required free-text field on `landing/signup.html`: "How did you hear about Events?" Stored on `beta_signups.heard_from` (nullable for rows that predate the column). The owner SMS appends a second line, `Heard from: …`. No dropdown, no analytics — the same provenance prompt the mailto already asked for.
+
+### Technical Notes
+
+- Column: `heard_from` (migration `20260905000001`) — `text`, nullable (existing rows stay valid), CHECK rejects blank and >200 chars. The form and `validateBetaSubmission` require it on new submits; revive writes the new value.
+- SMS: `buildOwnerAlertBody` adds the line. User text is flattened to one line (newlines → spaces) so the alert stays two lines. The template stays GSM-7; the person's own words may not, and a long answer can price at two segments — accepted for an owner-only alert.
+- Payload field: `heardFrom` (camelCase, same as `firstName`). E2e: `e2e/beta.spec.ts`. Jest: `__tests__/edge-functions/betaSignup.test.ts`. SQL: `supabase/tests/beta_signups_test.sql`.
+- Deploys must move together: migration, then `beta-signup` (`--no-verify-jwt`), then `npm run deploy:landing`. The live form talks to the live function; requiring the field in the function before the form is out 400s existing submits.
+
+### Acceptance Criteria
+
+- [ ] Form shows the field; empty submit gets an inline error and never reaches the API
+- [ ] Valid submit POSTs `heardFrom`; confirmation is unchanged
+- [ ] Owner SMS includes a `Heard from:` line with the submitted text
+- [ ] Existing `beta_signups` rows stay valid (column nullable); blank / over-long values rejected
+- [ ] Fast checks green; `e2e/beta.spec.ts` updated
+
+### Open Questions
+
+- None — owner asked for the field and the SMS line.
 
 ---
 
