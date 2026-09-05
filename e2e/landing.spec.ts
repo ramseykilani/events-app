@@ -60,6 +60,13 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   await expect(mock.locator('.mock-grid .sel')).toHaveCount(1);
   await expect(mock.locator('.mock-grid .dot')).toHaveCount(2);
 
+  // Status copy is "closed beta"; the CTA verb stays "Get the beta"
+  // (owner 2026-09-05).
+  await expect(page.getByRole('heading', { level: 2, name: 'In closed beta' })).toBeVisible();
+  await expect(page.locator('.beta')).toContainText(
+    'Events is in closed beta, and invites go out personally.'
+  );
+
   // The CTA links to the signup form (Beta Signup Pipeline — it replaced
   // the prefilled mailto once the form was verified live).
   const cta = page.getByRole('link', { name: 'Get the beta' });

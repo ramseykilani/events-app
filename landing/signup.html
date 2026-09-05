@@ -187,7 +187,7 @@
   }
   /* One content measure for the whole page (§: one measure) — a form reads
      at conversation width, not billboard width. */
-  main, footer {
+  main {
     max-width: 560px;
     margin: 0 auto;
   }
@@ -344,6 +344,8 @@
     color: var(--text-tertiary);
     margin: 16px 0 0;
   }
+  /* A legal link earns no warmth (§3): the one privacy link lives here,
+     next to the form disclosure — not also in a footer. */
   .data-note a { color: var(--text-tertiary); }
   /* Confirmation: replaces the form after a successful submit. */
   #confirmation { display: none; }
@@ -353,14 +355,6 @@
     color: var(--text-secondary);
   }
   #confirmation .who { color: var(--text-primary); font-weight: 500; }
-  footer {
-    margin-top: 48px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border-light);
-  }
-  /* A legal link earns no warmth (§3): the privacy link stays tertiary. */
-  .privacy { margin: 0; font-size: 13px; }
-  .privacy a { color: var(--text-tertiary); }
   a:focus-visible, button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -382,7 +376,7 @@
   </button>
 </header>
 <main>
-  <p class="eyebrow">Events beta</p>
+  <p class="eyebrow">Events closed beta</p>
   <h1>Get the beta.</h1>
   <p class="sub">Invites go out automatically — iPhone by email from Apple, Android by text from us.</p>
 
@@ -455,9 +449,6 @@
     <p id="confirmation-android" hidden>A text is on its way to <span class="who" id="confirmation-phone"></span> with your Play testing link. Open it in Chrome on your phone — copy and paste it into the address bar, since tapping it opens the Play Store, which can't join you — then tap "Become a tester" and install Events.</p>
   </div>
 </main>
-<footer>
-  <p class="privacy"><a href="https://shared-events.pages.dev/privacy.html">Privacy policy</a></p>
-</footer>
 <script>
 (function () {
   // Swatch toggle: flips the mood, persists it, and syncs browser chrome.

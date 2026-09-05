@@ -67,6 +67,7 @@ test('renders the form with conditional fields hidden until a platform is chosen
   // noindex while in beta (landing precedent).
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
 
+  await expect(page.locator('.eyebrow')).toHaveText(/events closed beta/i);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Get the beta.');
   await expect(page.getByRole('button', { name: 'Join the beta' })).toBeVisible();
 
@@ -182,7 +183,8 @@ test('link audit: no web-app or custom-scheme links, privacy link only', async (
   for (const href of hrefs) {
     expect(href).toBe('https://shared-events.pages.dev/privacy.html');
   }
-  expect(hrefs.length).toBeGreaterThan(0);
+  // One privacy link, next to the form disclosure — not also in a footer.
+  expect(hrefs).toHaveLength(1);
 });
 
 test('theme swatch toggles to Evening, persists, and syncs browser chrome', async ({ page }) => {

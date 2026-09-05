@@ -2001,6 +2001,8 @@ Every phase that touches a pixel-baselined screen (sign-in, onboarding, calendar
 
 As-built amendments to the approved spec (all owner-decided or smoke-driven, 2026-09-03):
 
+- **Status copy is "closed beta" (2026-09-05).** The signup eyebrow reads "Events closed beta". CTAs stay "Get the beta" / "Join the beta"; the share-SMS invite line is unchanged. One privacy-policy link, next to the form disclosure — the footer duplicate is gone.
+
 - **The form lives in the landing project**, not a separate `beta/` site: `landing/signup.html`, served at `events-landing.pages.dev/signup` (Pages clean URL), deployed by the existing `npm run deploy:landing`. Owner call when planning surfaced the drift risk of two "get the beta" destinations. The landing page's mailto CTA was replaced by a link to the form only after the live form was verified end-to-end (owner constraint: the mailto stays up until the form is ready); the owner email stays as a quiet fallback line.
 - **The Bot learns by push trigger, with a polling backstop** (amended 2026-09-04 — owner call after the polling model shipped): on any Android-carrying signup, `beta-signup` POSTs a fire-and-forget wake event (no PII — just the row id) to `BETA_BOT_TRIGGER_URL` (optional bearer `BETA_BOT_TRIGGER_KEY`), bounded at 5s so a hung trigger never fails a signup; unset secret = polling-only mode. The Bot's scheduled routine drops to an hourly backstop that self-heals a missed trigger. The Bot's two shared-secret routes are unchanged: `GET /functions/v1/beta-signup/pending-android` lists pending Android Gmail adds; `POST /fulfill-android` records fulfillment and sends the completion SMS. Both fail closed when `BETA_BOT_SECRET` is unset.
 - **Phone is not collected from iOS-only signups** (the spec's lean).
@@ -2051,7 +2053,7 @@ A self-serve signup form, linked from the share SMS's signup line, feeding an au
 
 ## Beta Landing Page
 
-**Status:** Implemented (2026-09-02) — live at https://events-landing.pages.dev (Pages project `events-landing`, production branch `main`). Spec owner-approved 2026-09-02; final copy owner-approved same day. The seed of the future launch page: built as its own Pages project now so launch is a domain attachment, not a migration. **Amended 2026-09-03 by [Beta Signup Pipeline](#beta-signup-pipeline):** the mailto CTA was replaced by a link to the self-serve signup form (`/signup`, same project) once the form was verified live; the owner email stays as a quiet fallback line. Tester fulfillment is automated by that pipeline.
+**Status:** Implemented (2026-09-02) — live at https://events-landing.pages.dev (Pages project `events-landing`, production branch `main`). Spec owner-approved 2026-09-02; final copy owner-approved same day. The seed of the future launch page: built as its own Pages project now so launch is a domain attachment, not a migration. **Amended 2026-09-03 by [Beta Signup Pipeline](#beta-signup-pipeline):** the mailto CTA was replaced by a link to the self-serve signup form (`/signup`, same project) once the form was verified live; the owner email stays as a quiet fallback line. Tester fulfillment is automated by that pipeline. **Amended 2026-09-05:** the beta block's status copy is "In closed beta" / "Events is in closed beta…"; the CTA stays "Get the beta". `landing-v2` is untouched (design artifact).
 
 ### Problem
 
