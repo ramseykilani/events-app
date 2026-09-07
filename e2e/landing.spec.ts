@@ -33,6 +33,9 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   const hero = page.getByRole('heading', { level: 1 });
   await expect(hero).toHaveText('A calendar of events your people share with you.');
   expect(await hero.evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Georgia');
+  await expect(page.locator('.sub')).toHaveText(
+    "Everything on it comes from someone you know. See something you'd go to? Pass it on with a tap. If they don't have the app, they get a text."
+  );
 
   // The eyebrow carries the accent dot; with the italic phrase it is the
   // one new accent spend (owner-approved 2026-09-03). text-transform makes
