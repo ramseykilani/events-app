@@ -56,6 +56,10 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   await expect(mock.locator('#mock-month')).toHaveText(monthLabel);
   await expect(mock.locator('.mock-event')).toHaveCount(2);
+  await expect(mock.locator('.mock-event .t')).toHaveText([
+    'Mitski at Brooklyn Steel',
+    'The National — Forest Hills',
+  ]);
   await expect(mock.locator('.mock-event .f').first()).toHaveText('From Alice');
   await expect(mock.locator('.mock-grid .sel')).toHaveCount(1);
   await expect(mock.locator('.mock-grid .dot')).toHaveCount(2);
