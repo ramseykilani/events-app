@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shared Events — SMS Opt-In</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+      color: #222;
+    }
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.15rem; margin-top: 2em; }
+    ol, ul { padding-left: 1.2em; }
+    blockquote {
+      margin: 1em 0;
+      padding: 12px 16px;
+      border-left: 3px solid #999;
+      background: #f6f6f4;
+    }
+    figure { margin: 1em 0; }
+    img { max-width: 320px; width: 100%; border: 1px solid #ccc; border-radius: 8px; }
+    figcaption { font-size: 0.85rem; color: #555; margin-top: 6px; }
+    pre {
+      background: #f6f6f4;
+      padding: 12px 16px;
+      white-space: pre-wrap;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Shared Events — SMS Opt-In</h1>
+  <p><em>Last updated: September 10, 2026</em></p>
+  <p>Operated by Ramsey Kilani.</p>
+
+  <p>Ramsey Kilani operates Shared Events, a small app for sharing events person-to-person. Shared Events sends <strong>transactional SMS only — never marketing messages</strong>. This page documents the two ways a person comes to receive a text from Shared Events and the consent shown at each step.</p>
+
+  <h2>1. Sign-in verification codes (direct recipient opt-in)</h2>
+  <p>Sign-in is by SMS one-time code — there are no passwords. The recipient opts in directly:</p>
+  <ol>
+    <li>The recipient opens the Shared Events app (sign-in page: <a href="https://shared-events.pages.dev/">https://shared-events.pages.dev/</a>).</li>
+    <li>They enter their own mobile number in the phone field.</li>
+    <li>Directly under the <strong>Send code</strong> button, the screen displays this consent line, with <a href="https://shared-events.pages.dev/terms">Terms</a> and <a href="https://shared-events.pages.dev/privacy">Privacy policy</a> links beneath it:</li>
+  </ol>
+  <blockquote>By tapping Send code, you agree to receive SMS sign-in codes from Shared Events (one per sign-in). Msg &amp; data rates may apply. Reply STOP to opt out.</blockquote>
+  <ol start="4">
+    <li>Tapping Send code sends exactly one SMS with the sign-in code to the number entered: "Shared Events by Ramsey Kilani: [code] is your sign-in code. Reply STOP to opt out." One code per sign-in — no recurring messages.</li>
+  </ol>
+  <figure>
+    <img src="opt-in-signin.png" alt="The Shared Events sign-in screen: phone number field, Send code button, the SMS consent line, and Terms and Privacy policy links" />
+    <figcaption>The Shared Events sign-in screen, showing the consent line and the Terms / Privacy policy links under the Send code button.</figcaption>
+  </figure>
+
+  <h2>2. Event-share notifications (person-to-person)</h2>
+  <p>A signed-in user chooses a specific person — a contact from their address book, or a phone number they type — to tell them about an event. That number receives a <strong>single, one-time SMS</strong> with the event details, initiated person-to-person by the sharer. Example:</p>
+  <pre>Ramsey Kilani wants to go to "Rooftop Cinema night" with you
+Fri, Aug 21, 7:30 PM
+https://example.com/tickets
+
+Coming? https://events-reply.pages.dev/?t=abc123
+
+Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup
+
+Reply STOP to unsubscribe.</pre>
+
+  <h2>Frequency, rates, opt out, help</h2>
+  <ul>
+    <li><strong>Message frequency varies.</strong> Texts are occasional and event-driven: one when you request a sign-in code, one when someone shares an event to your number.</li>
+    <li><strong>Message and data rates may apply</strong>, depending on your mobile plan.</li>
+    <li><strong>Opt out anytime:</strong> reply STOP to any text. The reply is confirmed — "You have successfully been unsubscribed. You will not receive any more messages from this number. Reply START to resubscribe."</li>
+    <li><strong>Help:</strong> reply HELP to any text, or email <a href="mailto:kilani.ramsey@gmail.com">kilani.ramsey@gmail.com</a>.</li>
+  </ul>
+
+  <p>See also: <a href="https://shared-events.pages.dev/terms">Terms of Service</a> · <a href="https://shared-events.pages.dev/privacy">Privacy Policy</a> — mobile numbers and messaging consent are never shared with third parties/affiliates for marketing or promotional purposes.</p>
+</body>
+</html>

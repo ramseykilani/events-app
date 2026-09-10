@@ -340,6 +340,61 @@ update `STATUS.md` + `FEATURES.md`. If `30908` returns despite all this, the
 lever is the console campaign form (owner) — the API update accepted the
 fields without error but cannot prove it stored them.
 
+## Rejection #4 and resubmission (2026-09-10 — hosted CTA evidence page)
+
+Resubmission #4 was rejected — **`30909` `MESSAGE_FLOW` again** ("issues
+verifying the Call to Action (CTA)"), the code from rejection #1. `30908`
+and `30893` did not return: the brand-named sample 1 and the dedicated
+policy URLs held.
+
+**Root cause: the CTA evidence is a JavaScript app.** The registered
+opt-in proof is the sign-in screen at https://shared-events.pages.dev/ —
+client-rendered. A browser shows the consent line (verified 2026-09-10:
+line and both legal links render on production); a non-JS verifier fetches
+a ~1.2 kB empty shell — no phone input, no consent line, no legal links.
+The same evidence passed two reviews and failed the third, so whether
+`30909` fires depends on whether the reviewer's tool executes JavaScript.
+Twilio's 30909 page names exactly this ("opt-in evidence cannot be
+verified because the website is … missing publicly accessible screenshots
+of the consent flow") and prescribes the fix: "add a public URL with
+hosted screenshots or other proof that shows the full consent experience."
+
+**Step 1 — static evidence page (done 2026-09-10, staging).**
+`public/opt-in.html` → `https://shared-events.pages.dev/opt-in`:
+server-rendered (no JS), names Shared Events + Ramsey Kilani, walks the
+sign-in opt-in step by step, quotes the consent line verbatim, hosts a
+screenshot of the real sign-in screen (`public/opt-in-signin.png`,
+captured from production), shows both registered message samples, and
+carries the frequency / rates / STOP / HELP disclosures plus terms and
+privacy links. Covered by `__tests__/public/legal-pages.test.ts` (extracts
+`CONSENT_LINE` from the sign-in source so the page cannot drift from the
+screen) and `e2e/privacy.spec.ts`.
+
+**Step 2 — ship the page to production (done 2026-09-10).** Direct
+Wrangler deploy (`wrangler pages deploy dist --project-name=shared-events
+--branch=production`), same pattern as the 2026-09-05 pages fix — the
+production git branch is untouched. Verified live: `/opt-in` 200 with the
+consent line, `/opt-in-signin.png` 200.
+
+**Step 3 — resubmit the same SID (done 2026-09-10, all API).** Same seven
+required fields plus `PrivacyPolicyUrl` / `TermsAndConditionsUrl`
+re-asserted; only `message_flow` changed — leg 1 now ends: *"Verifiable at
+https://shared-events.pages.dev/ — the sign-in screen is a JavaScript app,
+so if the page does not render in the review tool, a plain-HTML
+walkthrough of the full consent experience (including a screenshot of the
+sign-in screen showing the consent line) is hosted at
+https://shared-events.pages.dev/opt-in."* Leg 2, the description, and both
+samples unchanged (the samples passed this round — do not touch passing
+fields). Result: FAILED → **IN_PROGRESS**, errors cleared; read-back
+confirms the stored flow.
+
+**Step 4 — wait, then verify.** On approval: real US sign-in (OTP
+arrives), delivery scan (`30034`s stop), update `STATUS.md` → A2P table
+and `FEATURES.md` → US Phone Numbers. If `30909` returns despite the
+hosted evidence, the remaining levers are the console campaign form
+(owner) and the toll-free fallback (a sender-number change, not
+contemplated anywhere else in the repo today).
+
 ## History
 
 - 2026-02-16: account, number, messaging service created; starter profile
@@ -367,3 +422,10 @@ fields without error but cannot prove it stored them.
   resubmitted by API (Auth template + campaign update, same SID); status
   **IN_PROGRESS** (`PENDING_DCA1_REVIEW`). Sign-in legal links switched to
   extensionless URLs on `staging`.
+- 2026-09-10: campaign **FAILED** a fourth time — `30909` returned (CTA
+  evidence); `30908`/`30893` stayed cleared. Root cause: the sign-in
+  screen is a client-rendered JS app, so a non-browser review tool sees an
+  empty shell. Fix: server-rendered evidence page `public/opt-in.html` (+
+  hosted sign-in screenshot) deployed to production; `message_flow` now
+  points reviewers at `https://shared-events.pages.dev/opt-in`. Same SID
+  resubmitted by API; status **IN_PROGRESS**.
