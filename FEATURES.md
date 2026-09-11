@@ -64,6 +64,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Already-Added Contacts in Add People](#already-added-contacts-in-add-people) | Planned | Add People hides contacts already on My People. Show the full list; already-added should be marked (grayed out or similar). Not designed. |
 | [Circle Membership on My People](#circle-membership-on-my-people) | Planned | See how many / which circles someone is in from the people list; maybe add them to circles while scrolling. Not designed. |
 | [Link Autofill Polish](#link-autofill-polish) | Planned | Polish. Owner pasted a Luma link: title + description filled (description ended with …); date, time, and location did not; blur / keyboard-checkmark trigger feels untrustworthy. Not designed. |
+| [Selected Date on Add Event](#selected-date-on-add-event) | Planned | Polish. Tapping + after selecting a day on the calendar should pre-fill that date, not today. Not designed. |
 
 ## Using and testing
 
@@ -2318,3 +2319,25 @@ Pasted a Luma link on add-event. What happened:
 - The way it fires is not very good: after you put in the link, you either need to tap the checkmark on the keyboard (unclear that people would) or click out of the field, and then it autofills. If there's a delay, the whole thing feels weird — you don't realize it's going to autofill, then you don't trust it. There's probably a Nielsen heuristic about that.
 
 Do not scope this. A later pass, with the owner, decides what to change.
+
+---
+
+## Selected Date on Add Event
+
+**Status:** Planned — polish, not a blocker. Recorded 2026-09-11 from owner feedback. **Not designed; do not implement from this section.**
+
+### Problem
+
+When you're on the calendar, you've clicked a date, and then you tap + to add a new event, the date field is today's date instead of the day you had selected.
+
+### Proposed Solution
+
+Not designed. The need is: add-event should pre-fill the date you had selected on the calendar, rather than always defaulting to today.
+
+### Acceptance Criteria
+
+- [ ] Do not implement from this section. A later pass, with the owner, decides the details.
+
+### Open Questions
+
+- None recorded. Details are for later, if they need deciding at all.
