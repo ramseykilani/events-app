@@ -65,6 +65,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Circle Membership on My People](#circle-membership-on-my-people) | Planned | See how many / which circles someone is in from the people list; maybe add them to circles while scrolling. Not designed. |
 | [Link Autofill Polish](#link-autofill-polish) | Planned | Polish. Owner pasted a Luma link: title + description filled (description ended with …); date, time, and location did not; blur / keyboard-checkmark trigger feels untrustworthy. Not designed. |
 | [Selected Date on Add Event](#selected-date-on-add-event) | Planned | Polish. Tapping + after selecting a day on the calendar should pre-fill that date, not today. Not designed. |
+| [Back After Create](#back-after-create) | Planned | Polish. Save creates the event and opens share; Back feels like the event was discarded. Not designed. |
 
 ## Using and testing
 
@@ -2341,3 +2342,17 @@ Not designed. The need is: add-event should pre-fill the date you had selected o
 ### Open Questions
 
 - None recorded. Details are for later, if they need deciding at all.
+
+---
+
+## Back After Create
+
+**Status:** Planned — polish, not a blocker. Recorded 2026-09-11 from owner feedback after creating an event. **Not designed; do not implement from this section.**
+
+### Owner comments (2026-09-11)
+
+When you create an event and then you click save and it takes you to the share people screen, if you click back right now, it's a little bit confusing because I assume that the event got deleted because I didn't finish creating it. But actually it seems what happened is that the event is created, it's just now we're sharing it. So either it should somehow confirm for me that the event has been created and now I'm on the share screen, or it should take me to the events page that has now been created when I click it.
+
+Because when I was doing it in my mind, it felt like, oh, the event's not done until I click share. But actually, it is done. I don't know. We'll have to figure this out later.
+
+Do not scope this. A later pass, with the owner, decides what to change.
