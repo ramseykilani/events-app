@@ -65,7 +65,7 @@ Rates verified by web research **2026-09-02**; they drift — re-verify before q
 | 7 | Ticket Liquidator / Event Tickets Center | Affiliate programs | 10% / 3% | 30 / 14 days | network-listed | research needed |
 | 8 | The tail: TodayTix, Fever, Dice, AXS, See Tickets, Etix, Eventim, Skiddle, Tixel, TickPick, Gametime, Showpass, Telecharge, Broadway.com, Airbnb Experiences | unknown | unknown | — | — | research needed |
 
-**No program / not applicable** (pass through untouched — this is the default, not a gap): Facebook Events, Meetup, Luma, Partiful, Mobilizon, Evite, Punchbowl, Paperless Post, Songkick (no program found), and the aggregators (EDM Train, 19hz, Playbill — see the boundaries). Most of the matrix's 82 providers will never have a program; that is expected.
+**No program / not applicable** (pass through untouched — this is the default, not a gap): Facebook Events, Meetup, Luma, Partiful, Wygo, Mobilizon, Evite, Punchbowl, Paperless Post, Songkick (no program found), and the aggregators (EDM Train, 19hz, Playbill — see the boundaries). Most of the matrix's 83 providers will never have a program; that is expected.
 
 ## Research runbook (for "research needed" rows)
 
@@ -83,4 +83,5 @@ Rates verified by web research **2026-09-02**; they drift — re-verify before q
 
 ## Changelog
 
+- **2026-09-11** — Wygo added to the no-program list (community hoster, same bucket as Luma/Partiful; no affiliate program found). Matrix is now 83 providers.
 - **2026-09-02** — Doc created from the second monetization discussion. Initial rates researched (Ticketmaster, Eventbrite, StubHub, Vivid Seats, SeatGeek verified; tail marked research needed). Nothing applied for yet; step zero (Impact account) is the owner's.

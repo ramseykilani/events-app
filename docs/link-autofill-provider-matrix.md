@@ -2,7 +2,7 @@
 
 Which event providers a pasted link can actually be autofilled from, and how. This is the evidence base for [Richer Link Autofill](../FEATURES.md#richer-link-autofill) — the feature spec lives in FEATURES.md; this doc is the provider-by-provider record plus the runbook for keeping it current. The monetization side of these same providers — which have affiliate programs, setup status, and tagging rules — lives in [docs/affiliate-programs.md](affiliate-programs.md); hostname coverage there derives from this matrix.
 
-**Snapshot:** 2026-09-01 — every row verified by fetching a live event page from a datacenter IP (this repo's cloud-agent VM) with the same request shape `og-metadata` uses. See [How to re-verify](#how-to-re-verify).
+**Snapshot:** 2026-09-01 for 82 rows; **2026-09-11** added Wygo (same fetch shape). See [How to re-verify](#how-to-re-verify).
 
 **Why staleness is benign:** the fetch is fail-open. If a provider changes its markup or bot wall after the snapshot, autofill for that provider degrades to (or upgrades from) "URL stored, type the rest" — no event breaks. The Jest fixtures pin *our parser*; this matrix pins *reality*; the ~6-month sweep reconciles them.
 
@@ -14,17 +14,17 @@ Which event providers a pasted link can actually be autofilled from, and how. Th
 - **Aggregator** — a listings site whose value is outbound links to ticketing providers; users paste the provider's link, which this matrix covers.
 - **URL-only** — blocked (403/406/429/challenge/login wall/JS shell). The URL is stored; everything else is typed.
 
-## Summary (82 providers, 2026-09-01)
+## Summary (83 providers — 82 from 2026-09-01, Wygo added 2026-09-11)
 
 | Bucket | Count |
 |---|---|
-| Layer 1 (JSON-LD) | 26 |
+| Layer 1 (JSON-LD) | 27 |
 | API-covered (Layer 2) | 3 |
 | Partial (OG only) | 13 |
 | Aggregator | 3 |
 | URL-only | 37 |
 
-## Layer 1 — JSON-LD works (26)
+## Layer 1 — JSON-LD works (27)
 
 startDate flavor legend: **offset** = local time with UTC offset (`-04:00`); **offset-nc** = offset without colon (`-0400`); **floating** = local time, no offset; **utc** = UTC (`Z` / `+00:00`); **date-only** = date with no time.
 
@@ -34,6 +34,7 @@ startDate flavor legend: **offset** = local time with UTC offset (`-04:00`); **o
 | Meetup | meetup.com/a11ynyc/events/315708657 | Event | offset | Place + PostalAddress |
 | Luma | luma.com/agkeb9m8 | Event | offset | Place + PostalAddress + geo |
 | Partiful | partiful.com/e/00lCNE0K8F7YmUBXG00R | Event | utc (IANA tz in `__NEXT_DATA__`) | Place |
+| Wygo | wygo.world/vs4l3 | Event | **offset + fractional seconds** (`2026-09-24T18:00:00.229-04:00`) — quirk table | Place + PostalAddress. Hidden venues emit literal `"Register to See Address"` as name + street (keep city/region). Organizer (`/o/…`) and collection pages have no Event block — multi-date rule. Research: [FEATURES.md → Location from Event Websites](../FEATURES.md#location-from-event-websites-incl-wygo) |
 | Dice | dice.fm/event/923w2n-higher-…-signal-new-york-city-tickets | MusicEvent | offset | Place + address + geo |
 | Ticketweb | ticketweb.ca/event/afrojack-dprtmnt-tickets/14265004 | Event | floating | location block |
 | The Ticket Fairy | ticketfairy.com/event/ceremonia-jungle-5sep2026 | Event | offset | Place + PostalAddress |
@@ -107,10 +108,10 @@ APIs noted for the record (none committed): JamBase has a paid data API (data.ja
 ## What the parser must handle (snapshot findings)
 
 1. **Event-family subtypes**, not just `Event`: MusicEvent, SportsEvent, BusinessEvent, TheaterEvent, Festival, etc. — including blocks inside arrays and `@graph`.
-2. **startDate flavors:** offset with colon (`-04:00`), offset without colon (`-0400` — ShowClix, TicketLeap), floating local (Ticketweb, TickPick — take the wall clock as-is), UTC `Z`/`+00:00` (SeatEngine, Mobilizon, Airbnb, Events.com, SimpleTix — convert via the device timezone; same-city assumption), UTC with the IANA tz in a separate field (Partiful `__NEXT_DATA__`), date-only (Prekindle — fill the date, leave time).
-3. **Per-provider quirk table**, isolated per provider — e.g. Gametime's `startDate` is unmarked UTC while `og:title` carries the local time.
-4. **Multi-date rule:** never invent a single night. `startDate` in the past or a long span (TodayTix's opening date, Airbnb's bookable slots, artist/tour pages) → skip date/time.
-5. **Sanitize extracted strings** — Events.com emitted the literal `"streetAddress": "undefined"`.
+2. **startDate flavors:** offset with colon (`-04:00`), offset without colon (`-0400` — ShowClix, TicketLeap), **offset with fractional seconds** (`2026-09-24T18:00:00.229-04:00` — Wygo; strip the millis, keep the offset), floating local (Ticketweb, TickPick — take the wall clock as-is), UTC `Z`/`+00:00` (SeatEngine, Mobilizon, Airbnb, Events.com, SimpleTix — convert via the device timezone; same-city assumption), UTC with the IANA tz in a separate field (Partiful `__NEXT_DATA__`), date-only (Prekindle — fill the date, leave time).
+3. **Per-provider quirk table**, isolated per provider — e.g. Gametime's `startDate` is unmarked UTC while `og:title` carries the local time; Wygo hidden venues emit `"Register to See Address"`.
+4. **Multi-date rule:** never invent a single night. `startDate` in the past or a long span (TodayTix's opening date, Airbnb's bookable slots, artist/tour pages, Wygo `/o/…` organizer hubs and `/event-collections/…`) → skip date/time.
+5. **Sanitize extracted strings** — Events.com emitted the literal `"streetAddress": "undefined"`; Wygo hidden venues emit `"Register to See Address"` as Place name and street — drop the placeholder, keep city/region if present.
 6. JSON-LD lives in `<head>`, so the 1MB read cap in `og-metadata` is safe even on multi-MB pages (Gametime's event page is 3.2MB) — fixtures prove this per provider.
 
 ## How to re-verify
@@ -144,4 +145,5 @@ Re-verify roughly every 6 months (parallel agents on a cheap fast model — the 
 
 ## Changelog
 
+- **2026-09-11** — Wygo (`wygo.world`) added as Layer 1. Missed in the 2026-09-01 sweep (never mentioned in-repo). Live event page `wygo.world/vs4l3` returns Event JSON-LD with offset+millis `startDate` and Place + PostalAddress; a second page (`startupsandbeerseptember2026`) uses the hidden-address placeholder. Organizer/collection pages have no Event block. Other 82 rows unchanged. Owner ask + write-up: [FEATURES.md → Location from Event Websites](../FEATURES.md#location-from-event-websites-incl-wygo).
 - **2026-09-01** — Initial snapshot. 82 providers verified (26 Layer 1, 3 API-covered, 13 partial, 3 aggregators, 37 URL-only) by the owning agent + four parallel research agents.
