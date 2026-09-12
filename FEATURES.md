@@ -23,6 +23,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Add Sharer to Your People](#add-sharer-to-your-people) | Planned | Convenience. Recipients who know the number can add them today. |
 | [Location](#location) | Implemented | Free-text venue field; tappable Maps link on the detail screen. Ships before Richer Link Autofill. Spec owner-approved 2026-09-01. |
 | [Richer Link Autofill](#richer-link-autofill) | Planned | JSON-LD + Ticketmaster/RA lookups fill title/date/time/location/image. Provider evidence: [docs/link-autofill-provider-matrix.md](docs/link-autofill-provider-matrix.md). Spec owner-approved 2026-09-01. |
+| [Location from Event Websites (incl. Wygo)](#location-from-event-websites-incl-wygo) | Planned | Owner 2026-09-11: we had never classified wygo.world. It is a Luma-like hoster with Layer-1 JSON-LD (date/time/location). Location fill itself is [Richer Link Autofill](#richer-link-autofill) — include Wygo when that ships. |
 | [People List Scrolling](#people-list-scrolling) | Planned | Polish. The People screen works; the list feel does not. Related: [KI-011](manual-tests/known_issues.md) (person rows too tall). |
 | [Branded OTP SMS](#branded-otp-sms) | Implemented | The verification text didn't say it's from Events. Config, not code. |
 | [Share SMS Content & Formatting](#share-sms-content--formatting) | Implemented | Nicer share text with the event description. Server-side only. |
@@ -449,7 +450,7 @@ One free-text `location` column on events. No Google Places API, no autocomplete
 
 ## Richer Link Autofill
 
-**Status:** Planned — upgrade, not a blocker. Depends on [Location](#location). Provider evidence and re-verify runbook: [docs/link-autofill-provider-matrix.md](docs/link-autofill-provider-matrix.md) (82 providers verified 2026-09-01). Paste-a-link already works: the URL is stored, Open Graph title/description/image fill when the page allows it, and the user can always type a title and pick a date.
+**Status:** Planned — upgrade, not a blocker. Depends on [Location](#location). Provider evidence and re-verify runbook: [docs/link-autofill-provider-matrix.md](docs/link-autofill-provider-matrix.md) (83 providers; 82 verified 2026-09-01, Wygo added 2026-09-11). Paste-a-link already works: the URL is stored, Open Graph title/description/image fill when the page allows it, and the user can always type a title and pick a date. Owner 2026-09-11 asked whether we had looked at [wygo.world](#location-from-event-websites-incl-wygo) and whether location can come from listing pages — yes, via this upgrade; Wygo is Layer 1.
 
 Owner 2026-09-05: a live Luma paste filled title and a truncated description only — date, time, and location stayed empty. That is today's OG-only path (Luma is already Layer 1 in the matrix; this upgrade is what would fill the rest). The "…" description and the blur / checkmark trigger are recorded separately under [Link Autofill Polish](#link-autofill-polish) and are not part of this spec.
 
@@ -469,7 +470,7 @@ So a Ticketmaster paste often lands as **Untitled event** on today, with the lis
 
 Keep the current paste → blur → preview → confirm → Save flow. Make the preview actually fill a calendar row for real event listings. Three layers, cheapest first:
 
-1. **JSON-LD Event parse (open web).** In `og-metadata`, also read `application/ld+json` Event-family blocks and return date/time/location alongside the OG fields. Verified working on 26 providers (2026-09-01 snapshot), including Eventbrite, Meetup, Luma, Partiful, Dice, Ticketweb, The Ticket Fairy, ShowClix, Prekindle, TickPick, Gametime, AllEvents, TicketLeap, Discotech, Tixel, TodayTix, and Live Nation — the full list with per-provider evidence is in the [matrix](docs/link-autofill-provider-matrix.md). Same edge function, no new vendors.
+1. **JSON-LD Event parse (open web).** In `og-metadata`, also read `application/ld+json` Event-family blocks and return date/time/location alongside the OG fields. Verified working on 27 providers (26 from the 2026-09-01 snapshot, plus Wygo on 2026-09-11), including Eventbrite, Meetup, Luma, Partiful, Wygo, Dice, Ticketweb, The Ticket Fairy, ShowClix, Prekindle, TickPick, Gametime, AllEvents, TicketLeap, Discotech, Tixel, TodayTix, and Live Nation — the full list with per-provider evidence is in the [matrix](docs/link-autofill-provider-matrix.md). Same edge function, no new vendors.
 
 2. **Ticketmaster Discovery (official API).** TM blocks the HTML fetch (403), so parse `/event/{id}` from the URL and call Discovery → name, `localDate`, `localTime`, venue, image. Also covers livenation.com and admission.com (same inventory and ids). API key as a function secret.
 
@@ -484,10 +485,10 @@ Until a host is covered, the onboarding line stays softened to match reality: pa
 - `og-metadata` (`supabase/functions/og-metadata/index.ts`) stays JWT-gated, 5s / 1MB capped, fail-open. Extend the JSON body to `{ title, description, image_url, event_date, event_time, location }` — all nullable. JSON-LD lives in `<head>`, so the 1MB cap is safe even on multi-MB pages; fixtures prove it per provider.
 - Parser rules, each pinned by a recorded HTML fixture per provider (the matrix's "What the parser must handle" is the authoritative list):
   - Match any Event-family `@type` (Event, MusicEvent, SportsEvent, BusinessEvent, TheaterEvent, Festival…), including arrays and `@graph`.
-  - startDate flavors: offset with colon, offset without colon (`-0400` — ShowClix, TicketLeap), floating local (Ticketweb, TickPick — take the wall clock as-is), UTC `Z`/`+00:00` (convert via the device timezone — same-city assumption), UTC with the IANA tz in a separate field (Partiful `__NEXT_DATA__`), date-only (Prekindle — fill the date, leave time). Same "land on the day the user meant" rule as the web date inputs.
+  - startDate flavors: offset with colon, offset without colon (`-0400` — ShowClix, TicketLeap), offset with fractional seconds (`2026-09-24T18:00:00.229-04:00` — Wygo), floating local (Ticketweb, TickPick — take the wall clock as-is), UTC `Z`/`+00:00` (convert via the device timezone — same-city assumption), UTC with the IANA tz in a separate field (Partiful `__NEXT_DATA__`), date-only (Prekindle — fill the date, leave time). Same "land on the day the user meant" rule as the web date inputs.
   - Per-provider quirk table, isolated per provider (e.g. Gametime's `startDate` is unmarked UTC; its `og:title` carries the local time).
-  - Multi-date rule: `startDate` in the past or a long span (TodayTix's opening date, Airbnb slots, artist/tour pages) → skip date/time.
-  - Sanitize every extracted string (Events.com emitted the literal `"streetAddress": "undefined"`).
+  - Multi-date rule: `startDate` in the past or a long span (TodayTix's opening date, Airbnb slots, artist/tour pages, Wygo organizer/collection pages) → skip date/time.
+  - Sanitize every extracted string (Events.com emitted the literal `"streetAddress": "undefined"`; Wygo hidden venues emit `"Register to See Address"` as Place name and street — drop that placeholder, keep city/region if present).
 - Client: `fetchOgMetadata` in [app/(app)/add-event.tsx](app/(app)/add-event.tsx) fills empty fields only — never overwrites anything the user typed or changed. Edit Event refetches on a URL change with the same rules (decided 2026-09-01; the URL field became editable with KI-004).
 - Location autofill requires [Location](#location) shipped first — the field must exist to be filled.
 - Ticketmaster: API key as a function secret; parse `/event/{id}` only for the automatic path. No scraping/bypass dependency. RA: isolated module, no secret needed (no-auth endpoint), browser-like headers.
@@ -496,7 +497,8 @@ Until a host is covered, the onboarding line stays softened to match reality: pa
 
 ### Acceptance Criteria
 
-- [ ] JSON-LD providers fill title + date/time + location + image — fixtures green for every Layer-1 row in the matrix
+- [ ] JSON-LD providers fill title + date/time + location + image — fixtures green for every Layer-1 row in the matrix (including a Wygo `wygo.world/{slug}` event page)
+- [ ] A Wygo hidden-address event does not write the literal "Register to See Address" into `location`
 - [ ] A Ticketmaster `/event/{id}` link fills title, date/time, venue, and image via Discovery (also livenation.com and admission.com)
 - [ ] An `ra.co/events/{id}` link fills via the GraphQL module; module failure degrades to URL-stored
 - [ ] A blocked/failed preview still saves the URL; Save never waits on the fetch
@@ -2308,7 +2310,7 @@ Not designed. The need is: while looking at the people list, you should be able 
 
 ## Link Autofill Polish
 
-**Status:** Planned — polish, not a blocker. Recorded 2026-09-05 from owner feedback after pasting a Luma link. **Not designed; do not implement from this section.** Related: [Richer Link Autofill](#richer-link-autofill) (the planned date/time/location upgrade — Luma is already Layer 1 in the provider matrix; today's shipped path is Open Graph title/description/image only).
+**Status:** Planned — polish, not a blocker. Recorded 2026-09-05 from owner feedback after pasting a Luma link. **Not designed; do not implement from this section.** Related: [Richer Link Autofill](#richer-link-autofill) (the planned date/time/location upgrade — Luma is already Layer 1 in the provider matrix; today's shipped path is Open Graph title/description/image only); [Location from Event Websites (incl. Wygo)](#location-from-event-websites-incl-wygo) (same location-fill gap, plus the Wygo host we had never classified).
 
 ### Owner comments (2026-09-05)
 
@@ -2373,3 +2375,55 @@ Obviously, as you share it with more people, you're gonna have to scroll down an
 I think if there's no image, then we shouldn't have a giant empty box at the top of the screen.
 
 Do not scope this. A later pass, with the owner, decides what to change.
+
+---
+
+## Location from Event Websites (incl. Wygo)
+
+**Status:** Planned — recorded 2026-09-11 from an owner question. **Not a new add-event path and not a Wygo integration.** Location-from-listing-pages is already specified under [Richer Link Autofill](#richer-link-autofill); this section is the research record for `wygo.world` (absent from the 2026-09-01 sweep) plus the reminder that a paste should fill the venue, not only the title. **Do not implement a second scraper from this section** — when someone picks up Richer Link Autofill, include Wygo.
+
+### Owner comments (2026-09-11)
+
+Have we looked into wygo.world as an event hoster, and how that works? Can we pull location from the event websites? Write that down as a planned thing.
+
+### What we already had
+
+We had **not** looked at Wygo. Zero mentions in the repo. The 2026-09-01 provider sweep covered 82 hosts (Luma, Partiful, Eventbrite, Dice, …) and missed it.
+
+Pulling location from a pasted listing URL is already the planned upgrade: today's `og-metadata` path fills Open Graph title / description / image only. [Location](#location) shipped the free-text field. [Richer Link Autofill](#richer-link-autofill) is what reads JSON-LD (and Ticketmaster / RA APIs) and writes `event_date` / `event_time` / `location`. A Luma paste on 2026-09-05 confirmed the gap — title filled, date/time/location stayed empty — and is also noted under [Link Autofill Polish](#link-autofill-polish).
+
+### How Wygo works (verified 2026-09-11)
+
+Toronto / Waterloo community ticketing hoster (Luma-shaped: hosts create pages, sell tickets, collect RSVPs). Next.js site at `wygo.world`. Fetched from a datacenter IP with the same request shape `og-metadata` uses.
+
+- **Event URL:** `https://wygo.world/{slug}` — examples: `wygo.world/vs4l3` (The Viaduct), `wygo.world/startupsandbeerseptember2026`.
+- **Organizer hub:** `https://wygo.world/o/{org}` (e.g. `/o/waterlootechweek`) — a list of events, not one night.
+- **Collection:** `https://wygo.world/event-collections/{slug}` — same, many nights.
+- **Event pages are Layer 1.** A plain GET returns `application/ld+json` `@type: Event` with `startDate` / `endDate` (offset, often with leftover milliseconds: `2026-09-24T18:00:00.229-04:00`), `location` as Place + PostalAddress, OG title / description / image, and an organizer. Today's paste would already fill title + image; date/time/location wait on Richer Link Autofill.
+- **Hidden venue quirk.** Some hosts gate the street address. Markup still emits a Place, but name and `streetAddress` are the literal `"Register to See Address"` (city/region remain real — e.g. Kitchener, ON). Sanitize: never write that placeholder into `location`; city is fine if that's all we have.
+- **Not every slug is a night out.** Wygo also hosts interest forms and job posts on the same event template (`/host-with-wygo`, `/designer`). Multi-date / past-`startDate` rules still apply; a form that spans weeks should not invent a single calendar night.
+- **No partnership, no scrape, no affiliate.** Same-provider tagging has nothing to attach (community hoster, same bucket as Luma / Partiful). We store the URL the user pasted; we do not embed Wygo, sell their tickets, or hit a private API.
+
+Evidence and the parser notes live in [docs/link-autofill-provider-matrix.md](docs/link-autofill-provider-matrix.md) (Wygo row + changelog).
+
+### Proposed Solution
+
+Nothing new to design. When [Richer Link Autofill](#richer-link-autofill) is built:
+
+1. A `wygo.world/{slug}` paste fills title, date, time, location, and image from the Event JSON-LD — same as Luma / Eventbrite.
+2. Strip fractional seconds from `startDate`; keep the offset.
+3. Drop `"Register to See Address"`; keep a real city if that's all that's left.
+4. Organizer hubs and collection pages stay "URL stored, you pick the night."
+5. Fail-open stays the rule — a dead or challenged Wygo page never blocks Save.
+
+Until that ships, a Wygo paste behaves like every other OG page: URL stored, title / description / image when the tags exist, venue typed by hand.
+
+### Acceptance Criteria
+
+- [x] Wygo is classified in the provider matrix (Layer 1, 2026-09-11)
+- [ ] Richer Link Autofill fixtures include a Wygo event page and a hidden-address page
+- [ ] Do not implement a separate Wygo or location scraper from this section
+
+### Open Questions
+
+- None that block recording. A Wygo-specific API is unnecessary — the HTML already carries Event JSON-LD. Re-check a live slug if a user reports autofill missing; event URLs rot after the night.
