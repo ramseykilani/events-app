@@ -8,7 +8,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 
 | Feature | Status | What it is |
 |---------|--------|------------|
-| [Notifications](#notifications) | Implemented | |
+| [Notifications](#notifications) | Implemented | Tapping a push is supposed to open the event; a killed-app tap currently lands on the calendar ([KI-018](manual-tests/known_issues.md)). |
 | [SMS Invitations](#sms-invitations) | Implemented | |
 | [Hide](#hide) | Implemented | |
 | [Forwarding Shares](#forwarding-shares) | Implemented | |
@@ -46,7 +46,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [SMS Links at Launch](#sms-links-at-launch) | Planned | Launch-time pair: store link for non-users, event deep link for app users. Ship together. |
 | [Share Subscription](#share-subscription) | Planned | Annual sub to share; receive stays free. The fallback, deferred until the affiliate experiment concludes; **do not implement**. Spec: [docs/events-monetization.md](docs/events-monetization.md). |
 | [Affiliate Link Tagging](#affiliate-link-tagging) | Implemented | Passive same-provider affiliate tags on outbound listing taps (app + receipt page); SMS never tagged. Shipped dark 2026-09-02 — activation is one SQL update per program. Setup: [docs/affiliate-programs.md](docs/affiliate-programs.md). |
-| [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. |
+| [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. Owner 2026-09-12: tapping the asker push lands on the calendar — [KI-018](manual-tests/known_issues.md). |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
@@ -85,7 +85,7 @@ How people get onto a first share today:
 
 ## Notifications
 
-**Status:** Implemented
+**Status:** Implemented. Owner 2026-09-12: tapping a push from a killed app lands on the calendar, not the event — [KI-018](manual-tests/known_issues.md).
 
 ### Problem
 
@@ -116,7 +116,7 @@ When a user shares an event with someone, the recipient receives a push notifica
 
 - [x] Recipient receives a push notification when added to an event on a physical device
 - [x] Notification shows event title and date (and time if present)
-- [x] Tapping the notification opens the event detail screen
+- [x] Tapping the notification opens the event detail screen — **owner 2026-09-12: a tap from a killed app lands on the calendar instead** ([KI-018](manual-tests/known_issues.md)). Same handler serves Who's Coming asker pushes.
 - [x] No notification is sent if the sharer is hidden by the recipient
 - [x] No notification is sent if the recipient has no push token
 - [x] Only newly shared recipients are notified on an additive share (KI-003)
@@ -1557,7 +1557,7 @@ At launch, in the same `send-notification` change:
 
 ## Who's Coming
 
-**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building). Follow-up (shipped 2026-08-31): [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) puts the receipt link on app-user texts too — the original ship aimed the SMS line at non-app recipients only.
+**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building). Follow-up (shipped 2026-08-31): [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) puts the receipt link on app-user texts too — the original ship aimed the SMS line at non-app recipients only. Owner 2026-09-12: tapping the asker push ("X said yes") opens the calendar, not the event — [KI-018](manual-tests/known_issues.md).
 
 ### User stories
 
@@ -1630,7 +1630,7 @@ The story that waits without the link is the SMS-only recipient. The asker's sto
 - Migration `20260828000002_whos_coming.sql`: `sends` gains `response text CHECK (response IN ('yes','no'))` (NULL = unanswered), `responded_at timestamptz`, and `response_token uuid NOT NULL DEFAULT gen_random_uuid()` (unique) — the receipt-link capability, stable across re-shares because `share_event` is `ON CONFLICT DO NOTHING`. Reads ride the existing `sends_select_owner` policy; no new RLS.
 - Recipient write path: `respond_to_send(p_event_id, p_response)` (SECURITY DEFINER) — `p_event_id` is the caller's **own** row; the send resolves through `from_event_id` + the sender's `my_people` row with `user_id = auth.uid()`. Writes only on change (`IS DISTINCT FROM`) and returns whether it changed — the client invokes `send-response-notification` only then, so page-opens never ping and flips always do. Self-created rows and non-recipients are rejected. `get_my_send_response(p_event_id)` returns the caller's answer + sharer attribution (contact_name → display_name → NULL), one row when answerable, zero rows otherwise.
 - App UI: the event detail screen shows a Yes/No reply block on received events (keyed off the row's own `from_event_id`, so it works on push deep links) and per-person answers on "Shared with". The selected answer gets the accent fill (`calendarSelected`, the selected-day treatment — `selectedBg` proved indistinguishable from `surfaceSecondary`; owner call 2026-08-28); no red (design-language §3). Save feedback (owner calls 2026-08-29, design-language §6 → Confirmation feedback): no status prose — the fill is the state; a "✓ Saved." line appears on every server-confirmed write and stays until you leave the screen (nothing auto-dismisses); the tapped button spins while the write is in flight; re-tapping the selected answer round-trips (`changed=false`, no re-ping) and re-asserts "Saved." — the reassurance probe. No ✓ inside the button. Adjacent strings confirmed as-is: "Alice asked — are you in?", "Coming? \<link\>", "Bob said yes/no".
-- Asker push: `send-response-notification` edge function (user JWT; verifies the caller is the send's recipient, requires `responded_at` within 2 minutes so replayed invokes can't re-ping, honors the asker's `notify_push`, skips when the asker hid the responder). Title "Bob said yes" / "Bob said no"; payload carries the **asker's** row id. Push only, never an SMS per answer. The Expo batch sender is shared in `supabase/functions/_shared/expoPush.ts`; the asker-notify logic is shared in `_shared/responseNotify.ts`.
+- Asker push: `send-response-notification` edge function (user JWT; verifies the caller is the send's recipient, requires `responded_at` within 2 minutes so replayed invokes can't re-ping, honors the asker's `notify_push`, skips when the asker hid the responder). Title "Bob said yes" / "Bob said no"; payload carries the **asker's** row id. Push only, never an SMS per answer. The Expo batch sender is shared in `supabase/functions/_shared/expoPush.ts`; the asker-notify logic is shared in `_shared/responseNotify.ts`. The tap that should open that event currently lands on the calendar ([KI-018](manual-tests/known_issues.md)).
 - SMS receipt page: the non-app share SMS gains one line — `Coming? <link>` — **only when the `RESPONSE_LINK_BASE_URL` function secret is set** (the strip switch: unset it and the line disappears with no redeploy; the in-app path is unaffected). The link is `https://events-reply.pages.dev/?t=<response_token>` — a dedicated one-page Cloudflare Pages project (`receipt/` + `npm run deploy:receipt`, Wrangler project `events-reply`), deliberately not the web app. Its API is the `send-response` edge function (deployed `--no-verify-jwt`; the token is the credential): GET returns who asked / title / date / current answer and never writes (prefetch-safe); POST writes on explicit tap and pushes the asker on change. Page feedback (owner calls 2026-08-29): the hint is only "You can change your answer anytime with this link."; a successful tap prefixes "Saved." until reload; the tapped button spins in flight; re-tapping the selected button re-confirms against the server and re-asserts "Saved.".
 - E2e: `e2e/whos-coming.spec.ts` (A↔B answer + flip + asker list, and notify-on-change-only via request counting). SQL: `supabase/tests/whos_coming_test.sql`.
 - Copy rule (owner, 2026-08-28): no group-chat framing in user-facing copy, anywhere — the asker-makes-a-chat model in "What we decided" is the decision record, never UI text. The app and the receipt page do not discuss group chats with users.

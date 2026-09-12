@@ -48,7 +48,9 @@ pass / fail + note.
 2. Device B: push notification arrives, showing the sharer's name/number, the
    event title, and date/time.
 3. Device B: **tap the notification** → the app opens directly to the event
-   detail screen, with "From X" attribution.
+   detail screen, with "From X" attribution. (Who's Coming asker-push taps
+   from a killed app currently land on the calendar — [KI-018](known_issues.md);
+   do not flag that as a new finding.)
 4. Device B: the event is on the calendar and survives a relaunch.
 
 **One-device variant (agent-assisted):** an agent plays Device A. Ask it to

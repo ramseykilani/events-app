@@ -492,6 +492,54 @@ flag that.
   pixel change there needs the **Regenerate visual baselines** workflow
   (People screen), not a locally regenerated mobile-safari shot.
 
+### KI-018 — Tapping a Who's Coming push lands on the calendar, not the event
+
+- Severity: minor
+- Status: open
+- Found: 2026-09-12 owner report. Someone answered yes on a share; the
+  asker tapped the "X said yes" push and landed on the calendar home
+  (today selected), not the event. Owner hoped the tap would open the
+  event, or at least the calendar with that event's date selected.
+- Expected: tapping a Who's Coming push opens the asker's event detail
+  (`/(app)/event/[id]`, the row whose "Shared with" list holds the
+  answer). If the event cannot be opened, the calendar should at least
+  select that event's date.
+- Actual: the tap opens the app on the calendar with today selected. The
+  payload is not the miss — `responseNotify.ts` already sends
+  `data: { eventId: <asker's own row id> }`, which is the right id for
+  the asker's detail screen.
+- Why (code, not reproduced in a cloud VM — no native device here):
+  `app/_layout.tsx` only registers
+  `addNotificationResponseReceivedListener` and `router.push`es to the
+  event. Two gaps against Expo's killed-state / boot path:
+
+  1. Cold start never reads `getLastNotificationResponseAsync()`. The
+     response that launched the process can fire before the listener
+     attaches, so the tap is dropped and the session gate
+     `router.replace('/(app)')` is what the user sees.
+  2. Even when the listener does fire, it is registered while the boot
+     spinner is up (`isLoading || !themeLoaded` unmounts the `Stack`).
+     A `router.push` in that window is lost; when the stack mounts, the
+     auth effect replaces to the calendar root. The calendar
+     (`components/Calendar.tsx`) initializes `selectedDate` to today
+     and accepts no date param, so the owner's lesser path is also
+     unimplemented.
+
+  Share pushes use the same handler. N-005 (2026-08-15) passed a share
+  tap into event detail — likely a warm/background case. Do not treat
+  that pass as clearing this; the owner hit it on a Who's Coming tap.
+- Repro: native, signed in, app not already in the foreground (killed
+  or never opened since boot). Receive a Who's Coming push ("X said
+  yes" / "X said no") → tap it → calendar home, not the event. Web
+  never delivers these pushes (do not flag there).
+- Fix (separate task): consume the last notification response *after*
+  session + theme are ready and the `(app)` stack is mounted, then
+  `router.replace` to the event so the auth `replace('/(app)')` cannot
+  clobber it; keep the live listener for warm taps. Opening the event is
+  the intended path; selecting the date on the calendar is only the
+  fallback the owner named if the event cannot be opened. Same handler
+  should then also cover share-notification taps from a killed app.
+
 ## Deleted bug classes (do not re-flag, do not reintroduce)
 
 - **KI-002 (global dedup drops description/image) — deleted 2026-08-24 by the
