@@ -86,12 +86,7 @@ links in SMS) and → SMS Links at Launch (store/event links at launch change
 message content — update the campaign then). **Known drift right now:** none —
 sample 1 matches the Auth template (`Shared Events by Ramsey Kilani: …`,
 2026-09-05 second update) and sample 2 matches `smsBody.ts`. Re-check before
-the next SMS-template change. One watch item (noted 2026-09-17, on approval):
-the Beta Signup Pipeline's two texts (the per-signup owner alert and the
-Android completion text) are not enumerated in the registered
-description/samples — the campaign was approved with that traffic already
-live, so it is tolerated drift, not a blocker; mention the beta fulfillment
-text in the campaign description at the next console touch (owner action).
+the next SMS-template change.
 
 **The registered brand name is `Ramsey Kilani`, not "Shared Events".** The
 sole-proprietor brand's TCR name is the owner's personal name — verify via
