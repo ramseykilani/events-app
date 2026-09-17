@@ -86,12 +86,12 @@ Self-serve signup replaces the email-the-owner flow (FEATURES.md → Beta Signup
 
 ## A2P 10DLC registration (Twilio)
 
-US carriers hard-block unregistered 10DLC traffic (`30034`); Canadian carriers don't filter — which is why only US numbers fail. Playbook (status checks, OTP workaround, resubmission steps): `docs/a2p-registration.md`.
+**Complete — campaign VERIFIED (approved), confirmed via API 2026-09-17** (owner report + `campaign_status: VERIFIED`, errors empty). US carriers hard-block unregistered 10DLC traffic (`30034`); Canadian carriers don't filter — which is why only US numbers failed before approval. Playbook (status checks, OTP workaround, the four rejections): `docs/a2p-registration.md`.
 
 | Piece | State |
 |-------|-------|
 | Sender | `+15709385240` (US long code), sole number on Messaging Service "Events" `MG977e4096e94f84bee689c40c8537d554` |
 | Brand | `BN31e431b9c89ca30bb4ed785cadc2e1bd` (TCR `B40R7D7`), Sole Proprietor — **APPROVED + VERIFIED 2026-08-17**. The verification OTP never reached the owner's Canadian mobile; verified by texting YES to `+1-915-278-2000` (see the doc) |
-| Campaign | `QE2c6890da8086d771620e9b13fadeba0b` — **IN_PROGRESS** (resubmission #5, API-driven 2026-09-10). Rejection #4 returned `30909` (CTA evidence): the sign-in screen is a client-rendered JS app, so non-browser review tools see an empty shell. Fix: server-rendered evidence page `public/opt-in.html` (+ hosted sign-in screenshot) live at https://shared-events.pages.dev/opt-in and referenced from `message_flow`; `30908`/`30893` fixes held. Playbook: `docs/a2p-registration.md` |
-| Effect until approved | US-bound SMS (sign-in OTP + share notifications) carrier-blocked; Canadian delivery unaffected |
+| Campaign | `QE2c6890da8086d771620e9b13fadeba0b` — **VERIFIED** (approved between 2026-09-11 and 2026-09-15, after resubmission #5 with the hosted `/opt-in` evidence page). Registered content: `docs/a2p-registration.md` — keep the sync rule on any SMS template change |
+| Effect | US block lifted. Delivery scan 2026-09-17 (traffic since 2026-09-10): 15 delivered / 2 `30034` — both `30034`s were 2026-09-11, pre-approval; a real US sign-in OTP delivered 2026-09-15 (`+1 561 …`). Canadian delivery was never affected |
 | Stale artifact | Trust Hub profile "My Starter Profile" `BU5ad001ea04af4d02c801a66202421520` sat `in-review` since 2026-02-16; nothing uses it — ignore |

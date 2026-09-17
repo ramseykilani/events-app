@@ -86,7 +86,12 @@ links in SMS) and → SMS Links at Launch (store/event links at launch change
 message content — update the campaign then). **Known drift right now:** none —
 sample 1 matches the Auth template (`Shared Events by Ramsey Kilani: …`,
 2026-09-05 second update) and sample 2 matches `smsBody.ts`. Re-check before
-the next SMS-template change.
+the next SMS-template change. One watch item (noted 2026-09-17, on approval):
+the Beta Signup Pipeline's two texts (the per-signup owner alert and the
+Android completion text) are not enumerated in the registered
+description/samples — the campaign was approved with that traffic already
+live, so it is tolerated drift, not a blocker; mention the beta fulfillment
+text in the campaign description at the next console touch (owner action).
 
 **The registered brand name is `Ramsey Kilani`, not "Shared Events".** The
 sole-proprietor brand's TCR name is the owner's personal name — verify via
@@ -395,6 +400,14 @@ hosted evidence, the remaining levers are the console campaign form
 (owner) and the toll-free fallback (a sender-number change, not
 contemplated anywhere else in the repo today).
 
+**Outcome (2026-09-17): APPROVED.** Owner reported the registration
+complete; API confirms `campaign_status: VERIFIED` with errors empty
+(approval landed between the last `30034` on 2026-09-11 and a delivered
+real US sign-in OTP on 2026-09-15 — the runbook's two verification
+signals, both observed in production traffic; no Android beta signups
+were stranded by the block). `STATUS.md` and `FEATURES.md` updated the
+same day.
+
 ## History
 
 - 2026-02-16: account, number, messaging service created; starter profile
@@ -429,3 +442,7 @@ contemplated anywhere else in the repo today).
   hosted sign-in screenshot) deployed to production; `message_flow` now
   points reviewers at `https://shared-events.pages.dev/opt-in`. Same SID
   resubmitted by API; status **IN_PROGRESS**.
+- 2026-09-17: campaign **VERIFIED** — registration complete (owner report,
+  confirmed via API: `campaign_status: VERIFIED`, errors empty). Delivery
+  scan: the last `30034`s are 2026-09-11 (pre-approval); a real US
+  sign-in OTP delivered 2026-09-15. US block lifted for both SMS legs.
