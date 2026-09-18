@@ -41,13 +41,13 @@ Once the project is ready, go to **Project Settings > API Keys** (in the left si
 
 ### 3. Configure Environment Variables
 
-Copy the example env file and fill in your keys:
+Copy the example env file and fill in your keys (the app workspace is `apps/events/`):
 
 ```bash
-cp .env.example .env
+cp apps/events/.env.example apps/events/.env
 ```
 
-Edit `.env`:
+Edit `apps/events/.env`:
 
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://abcdefghijk.supabase.co
@@ -75,7 +75,7 @@ The app's database schema, security policies, triggers, and functions are define
 #### Option A: Supabase SQL Editor (no CLI needed)
 
 1. In the Supabase Dashboard, go to **SQL Editor** (left sidebar).
-2. Open each file below (from `supabase/migrations/`), paste its contents into the editor, and click **Run**. Do them one at a time, in order:
+2. Open each file below (from `apps/events/supabase/migrations/`), paste its contents into the editor, and click **Run**. Do them one at a time, in order:
 
 | File | What it does |
 |------|-------------|
@@ -103,10 +103,11 @@ If any migration fails, check the error message — it usually means a previous 
 If you have the [Supabase CLI](https://supabase.com/docs/guides/cli) installed and linked to your project:
 
 ```bash
-supabase db push
+cd apps/events
+npx supabase db push
 ```
 
-This runs all migrations in the `supabase/migrations/` folder in order.
+This runs all migrations in the `apps/events/supabase/migrations/` folder in order.
 
 ---
 
@@ -132,9 +133,12 @@ npx supabase <command>
 
 #### Link to your project
 
+Run from the app workspace (`apps/events/`, where `supabase/config.toml` lives):
+
 ```bash
-supabase login
-supabase link --project-ref your-project-ref
+cd apps/events
+npx supabase login
+npx supabase link --project-ref your-project-ref
 ```
 
 Your project ref is the `abcdefghijk` part of your Supabase URL (`https://abcdefghijk.supabase.co`). You can also find it in **Project Settings > General**.
@@ -144,12 +148,13 @@ Your project ref is the `abcdefghijk` part of your Supabase URL (`https://abcdef
 The cleanup function is called server-side (from cron), not from the app; the twilio-status webhook is called by Twilio, which cannot present a user JWT (its request signature is the auth); and the send-response receipt API is called by the Who's Coming SMS receipt page, whose visitors have no account (the per-send response_token is the auth). Deploy those three with `--no-verify-jwt`:
 
 ```bash
-supabase functions deploy og-metadata
-supabase functions deploy send-notification
-supabase functions deploy send-response-notification
-supabase functions deploy cleanup-people --no-verify-jwt
-supabase functions deploy twilio-status --no-verify-jwt
-supabase functions deploy send-response --no-verify-jwt
+# from apps/events/
+npx supabase functions deploy og-metadata
+npx supabase functions deploy send-notification
+npx supabase functions deploy send-response-notification
+npx supabase functions deploy cleanup-people --no-verify-jwt
+npx supabase functions deploy twilio-status --no-verify-jwt
+npx supabase functions deploy send-response --no-verify-jwt
 ```
 
 #### What each function does
@@ -192,7 +197,7 @@ Replace `abcdefghijk` with your project ref and `sb_secret_...` with your secret
 ### 7. Start the App
 
 ```bash
-npm start
+npm start        # repo root — delegates to the apps/events workspace
 ```
 
 This launches the Expo dev server. You'll see a QR code and several options:
@@ -245,7 +250,10 @@ eas env:create --name GOOGLE_SERVICES_JSON --type file --value "$(cat google-ser
 
 ### Login and build
 
+Run from the app workspace — `apps/events/` carries `eas.json` and `app.config.js`, and EAS installs dependencies from the workspace root (monorepo builds are officially supported):
+
 ```bash
+cd apps/events
 eas login
 
 # Internal APK for testing (Android)
@@ -297,6 +305,6 @@ eas build --profile development --platform android
 ## Manual Regression (for cloud agents)
 
 1. Run `npm run test:manual`.
-2. Start app in web mode (`npx expo start --web --port 8081`) if not already running.
-3. Execute scenarios in `manual-tests/cloud_manual_regression.md`.
-4. Record results in `manual-tests/manual_test_report_template.md`.
+2. Start app in web mode (`cd apps/events && npx expo start --web --port 8081`) if not already running.
+3. Execute scenarios in `apps/events/manual-tests/cloud_manual_regression.md`.
+4. Record results in `apps/events/manual-tests/manual_test_report_template.md`.

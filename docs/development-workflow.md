@@ -4,14 +4,25 @@ How changes move from an agent to production, what gets tested where, and why.
 
 ## Branches
 
+One shared trunk plus per-app production pointers (monorepo model,
+2026-09-18 — see `docs/monorepo-migration-plan.md`):
+
 | Branch | Environment | What it's for |
 |--------|-------------|---------------|
-| `staging` | https://staging.shared-events.pages.dev | Every finished change lands here. The owner's "try it when I feel like it" app. |
-| `production` | https://shared-events.pages.dev | The live app. Only green-tested staging commits get promoted. |
+| `staging` | https://staging.shared-events.pages.dev | The trunk. Every finished change lands here, for every app and package. The owner's "try it when I feel like it" app. |
+| `production-events` | https://shared-events.pages.dev | The Events app's production pointer: the newest staging commit that passed the Events release review. Future sibling apps get their own `production-<name>` pointers. |
 
 Both sites are the same Cloudflare Pages project — branch aliases mean no
 extra infrastructure. They share the production Supabase backend, so use the
 test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
+
+A `production-<app>` pointer is a bookmark, not a container: every branch in
+a monorepo contains every app's code, and what ships is determined by the
+app's build inputs (`apps/events/` + `packages/`), not by what else exists
+in the tree. The pointer only moves via the owner-gated release review, and
+the full repo suite runs on every `production-*` push. There is no "ship
+infrastructure" verb — `packages/` changes ride the next app deploy; CI,
+scripts, and docs are live the moment they land on `staging`.
 
 ## The process
 
@@ -20,11 +31,12 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
    agents: the fast checks (`tsc`, conventions, Jest, SQL) must pass locally
    first. Cursor Cloud's default "create `cursor/…`, open a PR" template does
    **not** apply in this repo — ignore it and push `staging`. Delete any
-   leftover `cursor/…` branch; only `staging` and `production` are long-lived.
+   leftover `cursor/…` branch; only `staging` and the per-app `production-*`
+   pointers are long-lived.
 2. **Every push to `staging` runs the full suite in CI.** When green, the
    staging preview redeploys automatically. When red, the branch shows it and
    the next agent fixes forward — staging is allowed to be briefly red,
-   production never is.
+   production pointers never are.
 3. **The owner says "ship it."** The agent runs the release click-through
    review first (see "Agentic UX review"): a complete pass over every scenario
    in the manual regression suite against the staging preview, desktop +
@@ -34,9 +46,10 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
    works from the report's blocker briefs), and the next "ship it" starts a
    fresh review from Phase 0 against the new tip.
 4. **On SHIP, the agent fast-forwards the exact green-tested staging commit
-   to `production`** (`git push origin staging:production`). Branch protection
-   on `production` requires the full-suite checks on that commit, so an
-   untested or red commit is physically rejected. The push deploys production.
+   to `production-events`** (`git push origin staging:production-events`).
+   Branch protection on `production-events` requires the full-suite checks on
+   that commit, so an untested or red commit is physically rejected. The push
+   deploys production.
 
 ## What runs where
 
@@ -44,10 +57,10 @@ test-OTP accounts (AGENTS.md) on staging rather than real phone numbers.
 |---------|----------|-----------|
 | Push to `staging` | `staging.yml` | **Full suite** (`full-suite.yml`): tsc, convention checks, Jest, SQL semantics (`checks`), in parallel with Playwright e2e as three parallel matrix legs (desktop Chrome / Mobile Safari / Mobile Chrome), each in the Playwright container image with its own standing account pair. If green, redeploys the staging preview with the tested bundle. Superseded queued pushes are cancelled (`cancel-in-progress`) — the latest tip covers everything. |
 | Ship time (owner says "ship it") | in-session `computerUse` subagent | Complete click-through of every manual-suite scenario against the staging preview → `VERDICT: SHIP` / `DON'T SHIP` + report committed to `staging`. Gate for promotion. |
-| PR → `production` (optional path) | `agent-ux-review.yml` | CI-launched copy of the same review. Inert until `CURSOR_API_KEY` is set. |
+| PR → `production-events` (optional path) | `agent-ux-review.yml` | CI-launched copy of the same review. Inert until `CURSOR_API_KEY` is set. |
 | PR → `staging` (optional) | `ci-fast.yml` | Fast checks only. PRs into staging are optional paper trail. |
-| PR → `production` (optional path) | `release.yml` | Rejects any source branch that isn't `staging`, re-runs the full suite. Defense in depth; normal promotion is the fast-forward push above. |
-| Push to `production` | `deploy-web.yml` | Production deploy. |
+| PR → `production-events` (optional path) | `release.yml` | Rejects any source branch that isn't `staging`, re-runs the full suite. Defense in depth; normal promotion is the fast-forward push above. |
+| Push to `production-events` | `deploy-web.yml` | Production deploy. |
 
 All workflows share one `node_modules` actions cache keyed on OS/arch/Node
 version/lockfile hash — a hit skips `npm ci` entirely (the tarball-only
@@ -146,14 +159,14 @@ known**:
 - **Phase 1 (pennies):** one Grok-fast agent smoke-sweeps the happy paths.
   Any failure → `DON'T SHIP`, stop.
 - **Phase 2 (the budget):** five `computerUse` tracks per
-  `manual-tests/release_review_checklist.md` (auth+first-run, event lifecycle,
+  `apps/events/manual-tests/release_review_checklist.md` (auth+first-run, event lifecycle,
   sharing/people, the visual matrix over screen × form factor × theme, edge
   states) — sequential in-session, one fresh subagent per track. Severity is
   two-tier: a **blocker** (broken core flow, data loss, crash, debug output
   shown to users) halts everything immediately — evidence gathered after a
   known blocker is contaminated by it; a **minor** (cosmetic, edge-case
   papercut) is flagged and the track continues. Tracks are briefed with the
-  open entries in `manual-tests/known_issues.md` so accepted issues aren't
+  open entries in `apps/events/manual-tests/known_issues.md` so accepted issues aren't
   re-flagged.
 - **Phase 3:** a stronger model re-judges the flagged evidence only —
   dismissing false alarms, confirming minors, and upgrading any misjudged
@@ -176,17 +189,18 @@ itself:
    account default if the ID is rejected.
 
 Either way the output is a report committed straight to `staging`
-(`manual-tests/manual_test_report_<date>-release.md`, docs-only) whose first
+(`apps/events/manual-tests/manual_test_report_<date>-release.md`, docs-only) whose first
 line is `VERDICT: SHIP` / `VERDICT: DON'T SHIP`, with self-contained briefs
 per blocker and per confirmed minor — the report IS the bug record; there is
 no separate tracker. Confirmed minors also land in
-`manual-tests/known_issues.md` (the open-issues ledger future reviews are
+`apps/events/manual-tests/known_issues.md` (the open-issues ledger future reviews are
 briefed from) in the same commit. A DON'T SHIP blocks promotion until fixed
 (independent fix tasks, fresh sessions) and re-reviewed from Phase 0. On
 SHIP, the report ships with the code: the orchestrator waits for the suite to
 go green on the report commit, verifies the staging tip is still the reviewed
-commit plus docs-only deltas, and only then fast-forwards to `production` —
-so production always contains the review that blessed it.
+commit plus docs-only deltas, and only then fast-forwards to
+`production-events` — so production always contains the review that blessed
+it.
 
 ## GitHub settings (one time)
 
@@ -204,26 +218,27 @@ so production always contains the review that blessed it.
 
 - `staging`: add a rule with the defaults (blocks force pushes and deletion).
   No PR or check requirements — agents push directly.
-- `production`: add a rule with **Require status checks to pass before
-  merging** and select `full-suite / checks` and `full-suite / e2e` (they
-  appear in the picker after the suite has run once). `full-suite / e2e` is
-  the no-op aggregator job that depends on the three `e2e-browsers (...)`
-  matrix legs — the matrix's own per-leg checks are not the required ones.
-  Defaults block force pushes and deletion. Do **not** require pull requests —
-  promotion is a fast-forward push, and the required checks still guarantee
-  only green-tested commits land.
-- Settings → General → **Default branch** → `production`, then delete the old
-  `master` branch. (`workflow_run` triggers and PR defaulting read from the
-  default branch.)
-- Cloudflare Pages project `shared-events`: set the **production branch** to
-  `production` (Pages dashboard → project → Settings → Builds & deployments →
-  Production branch, or
-  `curl -X PATCH "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/shared-events" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d '{"production_branch":"production"}'`).
+- `production-events` (and later each `production-<app>`): add a rule with
+  **Require status checks to pass before merging** and select
+  `full-suite / checks` and `full-suite / e2e` (they appear in the picker
+  after the suite has run once). `full-suite / e2e` is the no-op aggregator
+  job that depends on the three `e2e-browsers (...)` matrix legs — the
+  matrix's own per-leg checks are not the required ones. Defaults block force
+  pushes and deletion. Do **not** require pull requests — promotion is a
+  fast-forward push, and the required checks still guarantee only
+  green-tested commits land.
+- Settings → General → **Default branch** → `staging` (the trunk).
+  (`workflow_run` triggers and PR defaulting read from the default branch.)
+- Cloudflare Pages project `shared-events`: the **production branch** is
+  `production-events` (Pages dashboard → project → Settings → Builds &
+  deployments → Production branch, or
+  `curl -X PATCH "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/shared-events" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d '{"production_branch":"production-events"}'`).
   Pages decides production vs preview by comparing the deploy's branch to
-  this setting — while it still says `master`, every `--branch=production`
+  this setting — if it says anything else, every `--branch=production-events`
   deploy lands as a **preview** and https://shared-events.pages.dev silently
   stops updating. (2026-08-09 incident: production served a stale build for
-  ~25h because merges to `master` never deployed.)
+  ~25h because merges to `master` never deployed. Set to `production-events`
+  in the 2026-09-18 monorepo migration.)
 
 ## Deploying the staging preview by hand
 
@@ -245,7 +260,7 @@ the owner's machine. The ship-it protocol
 (`scripts/release-review-orchestrator.md` → Native rollout) drives them after
 a git promotion; auth setup and exact commands live in AGENTS.md → Native
 builds (agent-run); current enrollment/secrets/build/tester state lives in
-`STATUS.md`.
+`apps/events/STATUS.md`.
 
 ### One-time prerequisites (owner)
 
@@ -262,7 +277,7 @@ builds (agent-run); current enrollment/secrets/build/tester state lives in
   `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID`, `EXPO_APPLE_TEAM_ID`,
   `EXPO_ASC_API_KEY_P8_BASE64`. This key submits IPAs to App Store Connect.
   It is **not** an APNs push key. The APNs key (`8T775QY87V`) was uploaded to
-  Expo 2026-08-17 (STATUS.md).
+  Expo 2026-08-17 (apps/events/STATUS.md).
   ASC listing name is **Shared Events** (`Events` was taken); bundle ID
   `com.rkilani.events`; home-screen name stays `Events`.
 - Play service account — **done 2026-08-15.** GCP project `rkilani-events`,
@@ -278,7 +293,7 @@ builds (agent-run); current enrollment/secrets/build/tester state lives in
    binary moves on its own.
 2. The agent builds the owner's smoke APK from the promoted commit
    (`preview` profile → sideloadable APK) and hands over the install link
-   plus the smoke checklist (`manual-tests/native_device_smoke.md`).
+   plus the smoke checklist (`apps/events/manual-tests/native_device_smoke.md`).
 3. On the owner's pass, the agent builds + submits `production` to the Play
    internal track (TestFlight once iPhone testers exist). On fail, fix
    forward on staging — testers never see the build.
@@ -330,7 +345,7 @@ spends 1–2 per release; don't build speculatively.
 
 ### After each build lands on the owner's phone
 
-Run `manual-tests/native_device_smoke.md` before inviting anyone new — the
+Run `apps/events/manual-tests/native_device_smoke.md` before inviting anyone new — the
 native-only paths (contacts picker, datetimepicker, push, notification tap)
 have no automated coverage. The push step has a one-device agent-assisted
 variant (N-005).
