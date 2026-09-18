@@ -72,7 +72,12 @@ jobs:
         id: node-modules
         uses: actions/cache@v4
         with:
-          path: node_modules
+          # Workspaces hoist to root node_modules, but version conflicts land
+          # in apps/*/node_modules — a cache hit skips npm ci, so both must
+          # ride the cache or a non-hoisted dep would silently go missing.
+          path: |
+            node_modules
+            apps/*/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies (npm ci on cache miss)
@@ -93,7 +98,7 @@ jobs:
 
       # EXPO_PUBLIC_* values are inlined into the bundle at export time.
       - name: Build web bundle
-        run: npm run build:web
+        run: npm run build:web --workspace=apps/events
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
@@ -114,6 +119,7 @@ jobs:
           echo "title=$TITLE" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate baselines (scoped)
+        working-directory: apps/events
         env:
           TITLE: ${{ steps.filter.outputs.title }}
           PROJECT: ${{ inputs.project }}
@@ -125,9 +131,9 @@ jobs:
 
       - name: Guard — only baseline snapshots may change
         run: |
-          OFFENDING=$(git status --porcelain | cut -c4- | grep -v '^e2e/visual\.spec\.ts-snapshots/' || true)
+          OFFENDING=$(git status --porcelain | cut -c4- | grep -v '^apps/events/e2e/visual\.spec\.ts-snapshots/' || true)
           if [ -n "$OFFENDING" ]; then
-            echo "::error::Regeneration touched files outside e2e/visual.spec.ts-snapshots/:"
+            echo "::error::Regeneration touched files outside apps/events/e2e/visual.spec.ts-snapshots/:"
             echo "$OFFENDING"
             exit 1
           fi
@@ -146,6 +152,7 @@ jobs:
       # Prove the new baselines pass in this environment before blessing them.
       - name: Verify regenerated baselines pass
         if: steps.changes.outputs.changed == 'true'
+        working-directory: apps/events
         env:
           TITLE: ${{ steps.filter.outputs.title }}
           PROJECT: ${{ inputs.project }}
@@ -160,7 +167,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add e2e/visual.spec.ts-snapshots/
+          git add apps/events/e2e/visual.spec.ts-snapshots/
           git commit -m "Regenerate ${{ inputs.screen }} visual baselines (${{ inputs.project }})"
           git push origin "HEAD:${{ github.ref_name }}"
 

@@ -1,6 +1,6 @@
 # Distribution Strategy
 
-Decided 2026-08-09. This doc captures how the app reaches people, why the web build is no longer a user surface, and what the notification SMS does and doesn't do. `docs/events-technical-architecture.md` remains the source of truth for how the app behaves; this doc is the source of truth for how people *get* it.
+Decided 2026-08-09. This doc captures how the app reaches people, why the web build is no longer a user surface, and what the notification SMS does and doesn't do. `apps/events/docs/events-technical-architecture.md` remains the source of truth for how the app behaves; this doc is the source of truth for how people *get* it.
 
 ## The strategy
 
@@ -14,7 +14,7 @@ Decided 2026-08-09. This doc captures how the app reaches people, why the web bu
 
 The recipient side of web always worked (SMS → sign in → event on your calendar). The sharer side didn't: there is no contacts API in any iOS browser context (tab or installed PWA), so a new web user — and anyone landing on web is almost by definition a new user — hits the worst version of the add-people flow at the exact moment of highest intent. First impressions are one-shot: a user who opens the app and hits a dead end is lost, and losing early users is how the app never gets to "forced to come back." The cost of that bad impression exceeds the acquisition convenience of "no install."
 
-Considered and rejected as fixes (details in FEATURES.md → Web Support): Contact Picker API (web-only), PWA install prompts (installing unlocks no contacts capability on any platform — can't be honestly pitched as fixing add-people), shareable event invite links (duplicates the group-chat behavior the app replaces, with extra steps), bulk contact paste (target users don't maintain lists).
+Considered and rejected as fixes (details in apps/events/FEATURES.md → Web Support): Contact Picker API (web-only), PWA install prompts (installing unlocks no contacts capability on any platform — can't be honestly pitched as fixing add-people), shareable event invite links (duplicates the group-chat behavior the app replaces, with extra steps), bulk contact paste (target users don't maintain lists).
 
 ## The SMS is the artifact
 
@@ -23,9 +23,9 @@ Notification SMS carries **no app or web links at all** — only the event detai
 - Non-app recipients: `"{sharer} wants to go to {title} with you\n{date}, {time}\n{event URL}\n\n{signup invite}\n\nReply STOP to unsubscribe."` — a pure notification plus, during internal testing, one signup-invite line. They are deliberately *not* pulled into the web app.
 - App users: push notification (tappable, deep-links to the event) plus the same link-free SMS as backup (no invite line — they already have the app).
 
-Rationale: the message's job is to notify, not to acquire. Links from unfamiliar senders also read as spam to carrier filters. The single exception is the internal-testing signup invite: while beta access is track-gated, the non-app SMS ends with `Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup` — the self-serve signup form (FEATURES.md → Beta Signup Pipeline; owner approved the link 2026-09-03 as an onboarding pointer for an already-interested recipient, replacing the 2026-08-17 email CTA). If carriers or the A2P campaign push back, the strip switch is reverting the constant and redeploying send-notification.
+Rationale: the message's job is to notify, not to acquire. Links from unfamiliar senders also read as spam to carrier filters. The single exception is the internal-testing signup invite: while beta access is track-gated, the non-app SMS ends with `Want to invite your friends to things too? Get the beta: https://events-landing.pages.dev/signup` — the self-serve signup form (apps/events/FEATURES.md → Beta Signup Pipeline; owner approved the link 2026-09-03 as an onboarding pointer for an already-interested recipient, replacing the 2026-08-17 email CTA). If carriers or the A2P campaign push back, the strip switch is reverting the constant and redeploying send-notification.
 
-**At launch, the two URLs return together** (owner 2026-08-20 — spec: `FEATURES.md` → SMS Links at Launch). Do not ship one variant without the other, and do not implement before the app is listed:
+**At launch, the two URLs return together** (owner 2026-08-20 — spec: `apps/events/FEATURES.md` → SMS Links at Launch). Do not ship one variant without the other, and do not implement before the app is listed:
 
 - Non-app recipients: store links replace the email invite. That is the only acquisition CTA. Not a web-app URL, not an event deep link.
 - App users: one https event deep link that opens the native app on that event (backup for a missed/muted/denied push). Not a store link. Testers asked for this.
@@ -45,11 +45,11 @@ A2P campaign description must mention both link types **before** the first live 
 **Google Play (Android):**
 - Internal testing track: up to ~100 testers, no review, available within seconds of upload.
 - Personal developer accounts created after 2023-11-13 must run a *closed* test with ≥12 testers opted in for 14 continuous days before production access unlocks. Internal testing does not count toward this; it gates production only, not beta distribution.
-- Play Console app setup (privacy policy URL at `/privacy.html`, data-safety form, content-rating questionnaire, App access) is required for a **closed test or production listing**, not for internal testing. Current enrollment is in `STATUS.md`.
+- Play Console app setup (privacy policy URL at `/privacy.html`, data-safety form, content-rating questionnaire, App access) is required for a **closed test or production listing**, not for internal testing. Current enrollment is in `apps/events/STATUS.md`.
 - Requires a Play Console account ($25 one-time); identity verification completed 2026-08-15.
 
 ## Owner critical path (updated 2026-08-15)
 
-1. ~~Enroll in the Apple Developer Program and create the Play Console account~~ — Apple active 2026-08-12; Play identity verification complete 2026-08-15. App records, service account, ASC API key, and submit secrets are in (`STATUS.md`).
-2. Android preview APK — first build `3c0f99e5` crashed at launch; replacement `5f477380` launches (2026-08-15). Full `manual-tests/native_device_smoke.md` checklist is still outstanding.
+1. ~~Enroll in the Apple Developer Program and create the Play Console account~~ — Apple active 2026-08-12; Play identity verification complete 2026-08-15. App records, service account, ASC API key, and submit secrets are in (`apps/events/STATUS.md`).
+2. Android preview APK — first build `3c0f99e5` crashed at launch; replacement `5f477380` launches (2026-08-15). Full `apps/events/manual-tests/native_device_smoke.md` checklist is still outstanding.
 3. **After that checklist:** production Android AAB → Play internal track, then invite ~3 friends (talk first; owner shares the opt-in link — Play does not email). First iPhone testers via **internal** TestFlight (Marketing role on the ASC team → group **Team (Expo)**; no Beta App Review). Closed-test / store-listing forms (data safety, content rating, reviewer sign-in) wait until then.

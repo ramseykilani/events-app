@@ -10,9 +10,9 @@ blocker is already known), and you alone promote.
 You are the **reviewer**, not the developer. During this protocol you may NOT
 edit app code, commit or push fixes, run migrations, or modify the product in
 any way. The only git writes allowed are: the release-report commit to
-`staging` (report file plus `manual-tests/known_issues.md` updates — docs
-only), the promotion push to `production` on SHIP, and the post-promotion
-rollout bookkeeping (`STATUS.md`). Never a code change.
+`staging` (report file plus `apps/events/manual-tests/known_issues.md` updates — docs
+only), the promotion push to `production-events` on SHIP, and the post-promotion
+rollout bookkeeping (`apps/events/STATUS.md`). Never a code change.
 
 A found bug is a **successful review outcome**, not a task. The moment ANY
 phase or track surfaces a real blocker: halt all sub-agents, write the report
@@ -30,7 +30,7 @@ from Phase 0 against the new tip.
 For this task, "complete" means a verdict delivered — not a shippable app.
 
 The checklist that defines "complete" is
-`manual-tests/release_review_checklist.md`. Every item must be evidenced.
+`apps/events/manual-tests/release_review_checklist.md`. Every item must be evidenced.
 
 ## Phase 0 — Gates (seconds, free). Stop on any failure.
 
@@ -46,10 +46,11 @@ The checklist that defines "complete" is
 - [ ] If the pipeline never ran e2e (secrets warning), run the full suite
       locally instead: `npm run build:web && CI=1 npm run test:e2e`.
 - [ ] **Short-circuit:** if a release report on `staging`
-      (`manual-tests/manual_test_report_<date>-release.md`) has
+      (`apps/events/manual-tests/manual_test_report_<date>-release.md`) has
       `VERDICT: SHIP` whose reviewed commit is an ancestor of the staging tip
-      AND the delta since is docs/tests/tooling only (no `app/`,
-      `components/`, `lib/`, `constants/`, or `supabase/` changes), cite that
+      AND the delta since is docs/tests/tooling only (no `apps/events/app/`,
+      `apps/events/components/`, `apps/events/lib/`, `apps/events/constants/`,
+      `packages/`, or `apps/events/supabase/` changes), cite that
       report and skip to Promotion. Any code delta means running the full
       protocol.
 
@@ -80,7 +81,7 @@ AGENTS.md and REMOVE it after; track 2: account A; track 3: accounts A+B;
 tracks 4–5 are read-only-ish and share A).
 
 Shared rules for every track (paste into each track prompt, followed by the
-current open entries from `manual-tests/known_issues.md`):
+current open entries from `apps/events/manual-tests/known_issues.md`):
 
 - Test accounts are shared fixtures — clean up everything you create; unhide
   anyone you hid.
@@ -94,7 +95,7 @@ current open entries from `manual-tests/known_issues.md`):
   broken release.
 - On a blocker: note it immediately and stop your track.
 - On a minor: screenshot it, note it, and KEEP TESTING — minors never halt.
-- Known issues: the entries pasted from `manual-tests/known_issues.md` are
+- Known issues: the entries pasted from `apps/events/manual-tests/known_issues.md` are
   known and accepted. Do NOT flag, halt on, or screenshot them. If one
   appears materially WORSE than its entry describes, flag that as a new
   finding. If unsure whether what you see matches an entry, flag it as new —
@@ -120,15 +121,15 @@ verdict to DON'T SHIP). It also looks for anything the tracks missed.
 
 ## Verdict & report
 
-Write `manual-tests/manual_test_report_<YYYY-MM-DD>-release.md` from
-`manual-tests/release_review_report_template.md`: first line `VERDICT: SHIP`
+Write `apps/events/manual-tests/manual_test_report_<YYYY-MM-DD>-release.md` from
+`apps/events/manual-tests/release_review_report_template.md`: first line `VERDICT: SHIP`
 or `VERDICT: DON'T SHIP`, the reviewed commit SHA, the FULL checklist
 evidenced (or the un-run tracks listed), and a self-contained brief per
 blocker and per confirmed minor (expected vs actual, exact repro with
 account/viewport/theme, evidence paths) — a fresh agent must be able to fix
 the bug from the brief alone.
 
-Update `manual-tests/known_issues.md` in the same commit: add confirmed
+Update `apps/events/manual-tests/known_issues.md` in the same commit: add confirmed
 minors as KI-xxx entries (on either verdict — they exist on staging), remove
 entries the review's re-check verified fixed. Blockers NEVER enter the
 ledger: a blocker must be fixed, not accepted.
@@ -154,7 +155,7 @@ SHIP, END YOUR TURN.
 4. Promote:
 
    ```bash
-   git fetch origin && git push origin origin/staging:production
+   git fetch origin && git push origin origin/staging:production-events
    ```
 
    Branch protection requires the full-suite checks to be green on that exact
@@ -169,12 +170,12 @@ SHIP, END YOUR TURN.
 The production push deploys the **web** app only — no native binary moves on
 its own. Testers get updates through this explicit sequence (auth setup and
 command details: AGENTS.md → Native builds (agent-run); current state:
-`STATUS.md`):
+`apps/events/STATUS.md`):
 
 1. Build the owner's smoke APK from the exact promoted commit:
    `eas build --platform android --profile preview --non-interactive --wait`.
    Hand the owner the artifact link plus the smoke checklist from
-   `manual-tests/native_device_smoke.md` — print it inline; never make them
+   `apps/events/manual-tests/native_device_smoke.md` — print it inline; never make them
    go find it.
 2. Wait for the owner's explicit pass/fail. On fail: the fix is an
    independent task on staging (fresh session, per the DON'T SHIP handoff),
@@ -185,7 +186,7 @@ command details: AGENTS.md → Native builds (agent-run); current state:
    then `eas submit --platform android --profile production --non-interactive --latest`.
    iOS (TestFlight) joins once iPhone testers exist — same profiles, with the
    ASC key env vars exported.
-4. Update `STATUS.md` (build numbers, links, date) and tell the owner the
+4. Update `apps/events/STATUS.md` (build numbers, links, date) and tell the owner the
    build is rolling out to testers.
 
 If the EAS secrets are not in the environment (`EXPO_TOKEN`, and for submits

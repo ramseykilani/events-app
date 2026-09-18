@@ -2,7 +2,7 @@
 
 The canonical reference for how Events looks and feels. This document defines the two themes and the rules behind them, so the language is unambiguous today and extensible tomorrow. It is philosophy-forward; the implementation (theme tokens, the toggle) is built against this spec, not the other way around.
 
-Companion reads: `docs/events-philosophy.md` (why the app behaves the way it does), `docs/events-product.md` (what it does), `docs/events-technical-architecture.md` (how it's built).
+Companion reads: `docs/events-philosophy.md` (why the app behaves the way it does), `apps/events/docs/events-product.md` (what it does), `apps/events/docs/events-technical-architecture.md` (how it's built).
 
 ---
 
@@ -136,7 +136,7 @@ A write that matters announces itself once, then stays visible for the rest of t
 - **Certainty is always re-derivable.** State renders from a server read on every load, and re-tapping the same control re-confirms against the server (a same-value write is a no-op and re-pings nobody) — the reassurance probe always gets a truthful answer.
 - **Glyphs have fixed meanings.** Circle = selectable. ✓ = confirmed/done ("✓ Saved.", "✓ Shared"). ✕ = failed ("✕ Unsubscribed", "✕ Undelivered"). Accent fill = selection/state. Plain words = information that isn't a confirmation (a person's "No" is not a failure). Destructive = consequence.
 
-First instance: the Who's Coming reply widget and SMS receipt page. The share screen's sent confirmation (FEATURES.md → Share Sent Confirmation) follows the same template.
+First instance: the Who's Coming reply widget and SMS receipt page. The share screen's sent confirmation (apps/events/FEATURES.md → Share Sent Confirmation) follows the same template.
 
 ---
 

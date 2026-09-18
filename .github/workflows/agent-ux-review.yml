@@ -5,7 +5,7 @@
 # production. The normal path is the ship-it protocol in AGENTS.md (the agent
 # runs the review in-session via a computerUse subagent, no GitHub secrets
 # needed). This workflow is the optional hands-off path: it fires on release
-# PRs (staging → production) and on manual dispatch.
+# PRs (staging → production-events) and on manual dispatch.
 #
 # Setup (one time): add the repo secret CURSOR_API_KEY (Cursor Dashboard →
 # API Keys). Until then the workflow exits quietly. Cursor-side, the repo's
@@ -14,7 +14,7 @@
 name: Agent UX review
 on:
   pull_request:
-    branches: [production]
+    branches: [production-events]
   workflow_dispatch:
 
 concurrency:

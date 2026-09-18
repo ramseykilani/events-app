@@ -49,11 +49,17 @@
 //      one header grammar is chevron + destination label (audit UX-02/03).
 //      Programmatic router.back() after an action is unaffected.
 import ts from 'typescript';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const SCAN_DIRS = ['app', 'components', 'hooks', 'lib'];
+// Every app under apps/* is scanned (family-wide by construction). Rule logic
+// uses paths relative to the owning app, so allowlists like lib/dialogs.ts
+// stay stable per app.
+const APP_ROOTS = readdirSync(join(ROOT, 'apps'))
+  .map((d) => join(ROOT, 'apps', d))
+  .filter((p) => statSync(p).isDirectory());
 const SOURCE_RE = /\.(ts|tsx)$/;
 const HEX_RE = /#[0-9a-fA-F]{3}\b|#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{8}\b/g;
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
@@ -115,7 +121,7 @@ function checkAccessibilityRoles(path, source) {
 }
 
 function checkTimeoutImports(path, source) {
-  const relPath = rel(path);
+  const relPath = ruleRel(path);
   if (relPath === 'lib/timeoutSignal.ts') return;
   const visit = (node) => {
     if (
@@ -146,7 +152,7 @@ function checkTimeoutImports(path, source) {
 }
 
 function checkShowErrorCalls(path, source, text) {
-  const relPath = rel(path);
+  const relPath = ruleRel(path);
   if (SHOWERROR_ALLOWED(relPath)) return;
   const lines = text.split('\n');
 
@@ -195,7 +201,7 @@ function checkShowErrorCalls(path, source, text) {
 }
 
 function checkModalRequestClose(path, source, text) {
-  const relPath = rel(path);
+  const relPath = ruleRel(path);
   const lines = text.split('\n');
   const visit = (node) => {
     if (
@@ -224,7 +230,7 @@ function checkModalRequestClose(path, source, text) {
 }
 
 function checkBottomInset(path, text) {
-  const relPath = rel(path);
+  const relPath = ruleRel(path);
   const lines = text.split('\n');
   // Same comment-line tolerance as the hex/emoji rules: a trimmed line
   // starting with // or * is prose, not usage.
@@ -244,7 +250,7 @@ function checkBottomInset(path, text) {
 }
 
 function checkRawSwitchImport(path, source) {
-  const relPath = rel(path);
+  const relPath = ruleRel(path);
   if (relPath === THEMED_SWITCH_FILE) return;
   const visit = (node) => {
     if (
@@ -269,7 +275,7 @@ function checkRawSwitchImport(path, source) {
 }
 
 function checkVisualTokens(path, source, text) {
-  const relPath = rel(path);
+  const relPath = ruleRel(path);
   const lines = text.split('\n');
   const visit = (node) => {
     if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name)) {
@@ -315,7 +321,7 @@ function checkVisualTokens(path, source, text) {
 }
 
 function checkBareBackButtons(path, source, text) {
-  const relPath = rel(path);
+  const relPath = ruleRel(path);
   if (relPath === APP_HEADER_FILE) return;
   const lines = text.split('\n');
   const visit = (node) => {
@@ -345,7 +351,7 @@ function checkBareBackButtons(path, source, text) {
 
 function checkRegexRules(path, text, source) {
   const lines = text.split('\n');
-  const relPath = rel(path);
+  const relPath = ruleRel(path);
 
   if (!ALERT_ALLOWED_FILES.has(relPath)) {
     for (const m of text.matchAll(/Alert\.alert\(/g)) {
@@ -382,26 +388,32 @@ function checkRegexRules(path, text, source) {
 }
 
 const rel = (path) => relative(ROOT, path);
+// Strip the leading apps/<name>/ so rule paths are relative to the owning app.
+const ruleRel = (path) => relative(ROOT, path).split(sep).slice(2).join(sep);
 
-for (const dir of SCAN_DIRS) {
-  for (const path of walk(join(ROOT, dir))) {
-    const text = readFileSync(path, 'utf8');
-    const source = ts.createSourceFile(
-      path,
-      text,
-      ts.ScriptTarget.Latest,
-      true,
-      path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-    );
-    checkAccessibilityRoles(path, source);
-    checkRegexRules(path, text, source);
-    checkTimeoutImports(path, source);
-    checkShowErrorCalls(path, source, text);
-    checkRawSwitchImport(path, source);
-    checkModalRequestClose(path, source, text);
-    checkBottomInset(path, text);
-    checkVisualTokens(path, source, text);
-    checkBareBackButtons(path, source, text);
+for (const appRoot of APP_ROOTS) {
+  for (const dir of SCAN_DIRS) {
+    const scanRoot = join(appRoot, dir);
+    if (!existsSync(scanRoot)) continue;
+    for (const path of walk(scanRoot)) {
+      const text = readFileSync(path, 'utf8');
+      const source = ts.createSourceFile(
+        path,
+        text,
+        ts.ScriptTarget.Latest,
+        true,
+        path.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+      );
+      checkAccessibilityRoles(path, source);
+      checkRegexRules(path, text, source);
+      checkTimeoutImports(path, source);
+      checkShowErrorCalls(path, source, text);
+      checkRawSwitchImport(path, source);
+      checkModalRequestClose(path, source, text);
+      checkBottomInset(path, text);
+      checkVisualTokens(path, source, text);
+      checkBareBackButtons(path, source, text);
+    }
   }
 }
 

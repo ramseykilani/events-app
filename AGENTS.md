@@ -10,19 +10,21 @@ When the owner asks for help thinking through an idea, **discuss — do not impl
 
 This is a React Native (Expo SDK 54) events-sharing app. The backend is a remote Supabase project (Postgres + Auth + Edge Functions). There is no local backend to start.
 
-**Strategy (2026-08-09):** the native app is the product; the web build is the dev/staging/CI surface and is never promoted to users. See `docs/distribution-strategy.md`. Beta distribution is TestFlight internal + Play internal testing; native builds are EAS-run (`docs/development-workflow.md` → Native builds). Agents test via the web build (`npx expo start --web --port 8081`) — the only option in a headless cloud VM — but user-facing design decisions should assume native.
+**Monorepo layout (2026-09-18 — `docs/monorepo-migration-plan.md`):** this is an npm-workspaces family monorepo. The Events app lives in `apps/events/`; shared design/infra code lives in `packages/`; family tooling (`scripts/`, `.github/workflows/`, family docs in `docs/`) stays at the repo root. Product paths in this file (`app/`, `components/`, `lib/`, `e2e/`, `supabase/`, `manual-tests/`, `receipt/`, `landing/`, `FEATURES.md`, `STATUS.md`, …) are relative to `apps/events/` unless stated otherwise. The root `package.json` delegates the usual commands (`npm test`, `npm run build:web`, `npm run test:sql`, …) to the app workspace, so most commands still run from the repo root; the exceptions that must run from `apps/events/` are marked.
+
+**Strategy (2026-08-09):** the native app is the product; the web build is the dev/staging/CI surface and is never promoted to users. See `docs/distribution-strategy.md`. Beta distribution is TestFlight internal + Play internal testing; native builds are EAS-run (`docs/development-workflow.md` → Native builds). Agents test via the web build (`cd apps/events && npx expo start --web --port 8081`) — the only option in a headless cloud VM — but user-facing design decisions should assume native.
 
 ### Running the app (web mode)
 
 ```bash
-npx expo start --web --port 8081
+cd apps/events && npx expo start --web --port 8081
 ```
 
-The app opens at `http://localhost:8081`. This is the only way to test in a headless cloud VM (no iOS/Android simulators available). The web build requires `react-native-web` — it is listed in `package.json` after initial setup.
+The app opens at `http://localhost:8081`. This is the only way to test in a headless cloud VM (no iOS/Android simulators available). The web build requires `react-native-web` — it is listed in `apps/events/package.json` after initial setup.
 
 ### Environment variables
 
-The app requires a `.env` file at the repo root with two values (see `.env.example`):
+The app requires a `.env` file at `apps/events/.env` (the app workspace root — Expo reads it from the project directory) with two values (see `apps/events/.env.example`):
 
 - `EXPO_PUBLIC_SUPABASE_URL` — Supabase project URL
 - `EXPO_PUBLIC_SUPABASE_ANON_KEY` — Supabase publishable (anon) key
@@ -32,7 +34,7 @@ Without real Supabase credentials the UI renders but auth/data calls fail with n
 If `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are available as environment variables (injected via Cursor Secrets), create the `.env` file from them:
 
 ```bash
-printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_PUBLIC_SUPABASE_URL" "$EXPO_PUBLIC_SUPABASE_ANON_KEY" > .env
+printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$EXPO_PUBLIC_SUPABASE_URL" "$EXPO_PUBLIC_SUPABASE_ANON_KEY" > apps/events/.env
 ```
 
 ### Signing in (test accounts)
@@ -55,23 +57,23 @@ Never point test accounts at real-format numbers — account B was re-pointed of
 There is no ESLint configuration. The only static check available is TypeScript:
 
 ```bash
-npx tsc --noEmit
+npm run typecheck    # npx tsc --noEmit -p apps/events
 ```
 
 The tree is currently `tsc`-clean — keep it that way.
 
 ### Branching, merging & releases
 
-Two long-lived branches, named after their environments (see `docs/development-workflow.md` for the full model):
+One shared trunk plus per-app production pointers (see `docs/development-workflow.md` for the full model):
 
-- `staging` — where all finished work lands. The staging preview at `https://staging.shared-events.pages.dev` redeploys automatically when the full suite is green on a push.
-- `production` — the live app at `https://shared-events.pages.dev`.
+- `staging` — the trunk: where all finished work lands, for every app and package. The staging preview at `https://staging.shared-events.pages.dev` redeploys automatically when the full suite is green on a push.
+- `production-events` — the Events app's production pointer: the newest staging commit that passed the Events release review. Deploys `https://shared-events.pages.dev`. Future sibling apps get their own `production-<name>` pointers. A pointer only moves via the owner-gated ship-it protocol, and the full repo suite runs on every `production-*` push — the pointer is a bookmark, not a container: what ships is determined by the app's build inputs (`apps/events/` + `packages/`), not by what else exists in the tree.
 
-**Push policy (set by the repo owner):** agents push finished work **straight to `staging`** — no PR, no human review, no feature branch. Hard rule: before pushing, the fast checks must pass locally (`npx tsc --noEmit && npm run test:conventions && npm test -- --runInBand && npm run test:sql`). Every push then runs the full suite in CI; if it goes red, the next agent fixes forward before anything ships. PRs into staging are optional paper trail, never required.
+**Push policy (set by the repo owner):** agents push finished work **straight to `staging`** — no PR, no human review, no feature branch. Hard rule: before pushing, the fast checks must pass locally (`npm run typecheck && npm run test:conventions && npm test -- --runInBand && npm run test:sql`). Every push then runs the full suite in CI; if it goes red, the next agent fixes forward before anything ships. PRs into staging are optional paper trail, never required.
 
-**This overrides Cursor Cloud's default git workflow.** Cloud-agent runs often inject a template: create `cursor/<name>-…` off `production`, open a PR with `ManagePullRequest`, leave the feature branch around. Do not follow that here. The only long-lived branches are `staging` and `production`. Implement on `staging` (or a throwaway local branch you fast-forward into it), push `staging`, and delete any `cursor/…` branch you accidentally created. Recorded 2026-08-12 after an agent shipped the contacts explainer via that template and had to clean it up.
+**This overrides Cursor Cloud's default git workflow.** Cloud-agent runs often inject a template: create `cursor/<name>-…` off `production-events`, open a PR with `ManagePullRequest`, leave the feature branch around. Do not follow that here. The only long-lived branches are `staging` and the per-app `production-*` pointers. Implement on `staging` (or a throwaway local branch you fast-forward into it), push `staging`, and delete any `cursor/…` branch you accidentally created. Recorded 2026-08-12 after an agent shipped the contacts explainer via that template and had to clean it up.
 
-**Only promote `staging → production` when the owner explicitly says to ship/release/push to prod.** The ship-it protocol lives in **`scripts/release-review-orchestrator.md`** — follow it exactly. Summary: Phase 0 free gates (staging pipeline green incl. pixel diffs; record the staging tip as the reviewed commit) → Phase 1 cheap Grok smoke sweep (halt on failure) → Phase 2 five deep tracks per `manual-tests/release_review_checklist.md` (sequential in-session, one fresh subagent per track; a blocker halts everything — never finish an expensive review when a bug is already known; minors are flagged, never halt) → Phase 3 skeptic pass adjudicates severity on flagged evidence → report committed straight to `staging` with `VERDICT: SHIP` / `DON'T SHIP` (no PR) → only on SHIP: wait for the suite to go green on the report commit, verify the staging tip is still the reviewed commit plus docs-only deltas, then `git push origin origin/staging:production`. Branch protection requires the full-suite checks on the promoted commit, so untested code physically cannot ship.
+**Only promote `staging → production-events` when the owner explicitly says to ship/release/push to prod.** The ship-it protocol lives in **`scripts/release-review-orchestrator.md`** — follow it exactly. Summary: Phase 0 free gates (staging pipeline green incl. pixel diffs; record the staging tip as the reviewed commit) → Phase 1 cheap Grok smoke sweep (halt on failure) → Phase 2 five deep tracks per `apps/events/manual-tests/release_review_checklist.md` (sequential in-session, one fresh subagent per track; a blocker halts everything — never finish an expensive review when a bug is already known; minors are flagged, never halt) → Phase 3 skeptic pass adjudicates severity on flagged evidence → report committed straight to `staging` with `VERDICT: SHIP` / `DON'T SHIP` (no PR) → only on SHIP: wait for the suite to go green on the report commit, verify the staging tip is still the reviewed commit plus docs-only deltas, then `git push origin origin/staging:production-events`. Branch protection requires the full-suite checks on the promoted commit, so untested code physically cannot ship.
 
 **A ship-it review is read-only on the product.** On any blocker: halt everything, write the DON'T SHIP report, push it to `staging`, and end the turn — never fix or push code mid-review. A found bug is a successful review outcome, not a task; fixes are independent tasks handed to a fresh session after the owner reads the report, and the next "ship it" re-runs the protocol from Phase 0 against the new tip (early phases are cheap by design).
 
@@ -79,7 +81,7 @@ The review is batched per release on purpose: one complete click-through at ship
 
 **Model policy:** use the session's default model for development. For agentic click-through/manual testing (computerUse subagents, the UX-review automation), use `cursor-grok-4.6-high-fast` — screenshot review doesn't need the top coding model. The CI-launched UX review defaults to it too (repo variable `UX_REVIEW_MODEL` overrides; discover IDs via `GET https://api.cursor.com/v1/models`).
 
-The full suite (`.github/workflows/full-suite.yml`) = tsc + conventions + Jest + SQL semantics (the `checks` job) running in parallel with the `e2e-browsers` matrix: one leg per Playwright project (desktop Chrome, Mobile Safari/WebKit, Mobile Chrome), each in the `mcr.microsoft.com/playwright` container (tag must match `@playwright/test` in package-lock — bump together) with its own standing account pair, followed by a no-op `e2e` aggregator job that keeps the required check name `full-suite / e2e` binding on production. All jobs share one `node_modules` actions cache (a hit skips `npm ci`; see `docs/development-workflow.md`). Branch-protection settings are listed in `docs/development-workflow.md`.
+The full suite (`.github/workflows/full-suite.yml`) = tsc + conventions + Jest + SQL semantics (the `checks` job) running in parallel with the `e2e-browsers` matrix: one leg per Playwright project (desktop Chrome, Mobile Safari/WebKit, Mobile Chrome), each in the `mcr.microsoft.com/playwright` container (tag must match `@playwright/test` in package-lock — bump together) with its own standing account pair, followed by a no-op `e2e` aggregator job that keeps the required check name `full-suite / e2e` binding on production-events. All jobs share one `node_modules` actions cache (a hit skips `npm ci`; see `docs/development-workflow.md`). Branch-protection settings are listed in `docs/development-workflow.md`.
 
 ### Tests
 
@@ -89,7 +91,7 @@ Automated regression tests are configured with Jest + React Native Testing Libra
 npm test -- --runInBand
 ```
 
-E2E tests (Playwright, `e2e/`): build the web bundle first, then run all form factors (or `test:e2e:mobile` for mobile only). Set `E2E_BASE_URL` to run against a deployed build:
+E2E tests (Playwright, `apps/events/e2e/`): build the web bundle first, then run all form factors (or `test:e2e:mobile` for mobile only). Set `E2E_BASE_URL` to run against a deployed build:
 
 ```bash
 npm run build:web && npm run test:e2e
@@ -97,7 +99,7 @@ npm run build:web && npm run test:e2e
 
 Playwright browsers (chromium + webkit) and their system libraries are preinstalled in the cloud VM image by the `.cursor/environment.json` install step — no `npx playwright install` needed before e2e. If a VM boots from an older snapshot without them (`~/.cache/ms-playwright` missing), `npx playwright install --with-deps chromium webkit` is the one-time fix; a `@playwright/test` bump re-bakes binaries on the next environment build.
 
-After an intentional design change, regenerate the pixel-diff baselines (`e2e/visual.spec.ts-snapshots/`) with the **Regenerate visual baselines** workflow (Actions tab → pick the screen) — it re-takes the pictures on CI's own runners, verifies, and commits them. Never commit a locally regenerated mobile-safari baseline: WebKit text rendering uses the machine's fonts, and VM fonts differ from CI's, so it passes locally and fails CI.
+After an intentional design change, regenerate the pixel-diff baselines (`apps/events/e2e/visual.spec.ts-snapshots/`) with the **Regenerate visual baselines** workflow (Actions tab → pick the screen) — it re-takes the pictures on CI's own runners, verifies, and commits them. Never commit a locally regenerated mobile-safari baseline: WebKit text rendering uses the machine's fonts, and VM fonts differ from CI's, so it passes locally and fails CI.
 
 Convention checks (no ESLint in this repo — this is the mechanical layer): `npm run test:conventions` enforces accessibilityRole on touchables, no `Alert.alert` outside the dialog helpers, no hard-coded hex colors, no emoji glyphs in UI source (use `@expo/vector-icons` tinted by role tokens), no importing the raw `withTimeout`/`timeoutSignal` budget API outside `lib/timeoutSignal.ts` (reads: `withFetchTimeout`/`withRetries`; writes: `withWriteTimeout`), no `showError(` outside the auth/boot allowlist (`app/(auth)/`, `SessionContext.tsx`, `lib/`), and `onRequestClose` on every `<Modal>` (RN's Android Modal consumes hardware Back and only forwards it to that handler — a missing one leaves the sheet swallowing Back, KI-009/KI-012; wire it to the sheet's Close/Cancel), and bottom safe-area padding in any file that spends `insets.top` (Android 15+ enforces edge-to-edge, so an unpadded bottom slides under the 3-button nav bar — KI-005; short top-pinned forms opt out). Design System Consolidation added three visual-structure rules: `fontSize` stays inside the design-language §4 bands (12–18, 28–32 — the button tiers own button text), `borderRadius` stays inside the §5 spectrum (4–12) unless the same style object proves a pill (width/height/minWidth/minHeight = 2 × radius), and no bare "Back" text buttons outside `components/AppHeader.tsx` (the one header grammar: chevron + destination label left, Cancel/Close/Done per the fixed vocabulary). Intentional exceptions carry an inline `conventions-ok` comment.
 
@@ -124,7 +126,7 @@ A feature task = its `FEATURES.md` section (Problem / Solution / Technical Notes
 
 - **Scope:** the agent owns the files its feature touches, derived from the FEATURES.md section; the dispatcher may narrow it ("you own `components/ShareSheet.tsx`"). One writer per scope — two agents never edit the same files at the same time, so the dispatcher sequences features that obviously share code instead of running them in parallel.
 - **Status self-service:** the agent's first commit flips its feature to **In progress** in `FEATURES.md`; its last flips it to Implemented. Never start a feature already marked In progress — report back instead. The dispatcher's only coordination duty is checking the table before dispatching.
-- **Verify bar:** the fast checks (`npx tsc --noEmit && npm run test:conventions && npm test -- --runInBand && npm run test:sql`) **plus a new or updated Playwright spec covering the feature's web actions**, run locally on desktop Chrome (`npm run build:web && npx playwright test e2e/<spec> --project=desktop-chrome`) before pushing. CI runs the full three-browser suite on push. The suite grows toward covering every web action: every screen's save/cancel/confirm/empty/validation paths — not every click permutation.
+- **Verify bar:** the fast checks (`npm run typecheck && npm run test:conventions && npm test -- --runInBand && npm run test:sql`) **plus a new or updated Playwright spec covering the feature's web actions**, run locally on desktop Chrome (`npm run build:web && cd apps/events && npx playwright test e2e/<spec> --project=desktop-chrome`) before pushing. CI runs the full three-browser suite on push. The suite grows toward covering every web action: every screen's save/cancel/confirm/empty/validation paths — not every click permutation.
 - **Specs describe intended behavior.** Making a test match what was built — weaker assertion, skip, rewritten expectation — is never an allowed fix. A red spec means the code is wrong, or the intent changed (which is the owner's call, not the agent's).
 - **Second opinion (risky changes only):** for migrations, RLS, or share/hide/auth logic, have a second agent on `cursor-grok-4.6-high-fast` review the diff and run the tests before pushing. Scary changes only — not every commit.
 - **Sign-in discipline:** sign in once per run and reuse stored sessions; never sign in per test. Before running e2e locally, provision your own pair — `node scripts/create-test-accounts.mjs --fresh-pair`, then export the printed `E2E_PHONE_A/B`. Password sign-in (see Signing in) fires no SMS. OTP on a registered test number uses `sms_test_otp` and does not call Twilio. `send-notification` skips NANP area-code 555, so sharing to a test account does not hit Twilio either.
@@ -135,7 +137,10 @@ Migrations `20260807000001`–`20260807000008` and the hardened edge functions w
 
 Prerequisites: `SUPABASE_ACCESS_TOKEN` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). If the CLI fails at "Initialising login role..." (upstream bug supabase/cli#5091 — a stale `cli_login_postgres` role), rotate the DB password via `PATCH /v1/projects/{ref}/database/password` and export `SUPABASE_DB_PASSWORD` (setting it skips the login-role path entirely). Deleting the role via `DELETE /v1/projects/{ref}/cli/login-role` was the earlier documented fix, but on 2026-08-28 the CLI still failed after the role was gone — password rotation is the reliable path.
 
+Run all `supabase` CLI commands from `apps/events/` — the project's `supabase/config.toml` lives there:
+
 ```bash
+cd apps/events
 npx supabase link --project-ref ijmwtjyuvdnvhblwwtpt
 npx supabase db push                 # applies all pending migrations in order
 npx supabase functions deploy send-notification cleanup-people og-metadata send-response-notification
@@ -155,29 +160,29 @@ Notification SMS carries no app/web links (decision 2026-08-09 — see `docs/dis
 
 ### Deploying the web app (Cloudflare Pages)
 
-The web build is hosted on **Cloudflare Pages** as a **direct-upload** project managed via Wrangler (not Pages' built-in Git integration — Wrangler keeps the whole deploy path in the repo and runnable by any agent). Two standing sites: production `https://shared-events.pages.dev` (deploys from the `production` branch) and the staging preview `https://staging.shared-events.pages.dev` (`npm run deploy:staging`, or CI `staging.yml`).
+The web build is hosted on **Cloudflare Pages** as a **direct-upload** project managed via Wrangler (not Pages' built-in Git integration — Wrangler keeps the whole deploy path in the repo and runnable by any agent). Two standing sites: production `https://shared-events.pages.dev` (deploys from the `production-events` branch) and the staging preview `https://staging.shared-events.pages.dev` (`npm run deploy:staging`, or CI `staging.yml`).
 
-- Config: `wrangler.toml` (project name `shared-events`, output dir `dist/`). `public/_redirects` carries the SPA fallback (`/* /index.html 200`) so deep links like `/event/<id>` load the app; it's copied into `dist/` at export time.
+- Config: `apps/events/wrangler.toml` (project name `shared-events`, output dir `dist/` relative to the app). `apps/events/public/_redirects` carries the SPA fallback (`/* /index.html 200`) so deep links like `/event/<id>` load the app; it's copied into `dist/` at export time.
 - Prerequisites: `CLOUDFLARE_API_TOKEN` (Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID` in the environment (Cursor Secrets inject into new cloud-agent VMs only — a running VM never picks up newly added secrets). `CLOUDFLARE_ACCOUNT_ID` must be the 32-char hex account id — not the API token.
 - Live site: **https://shared-events.pages.dev** (`WEB_APP_URL` already points here). Project already exists — do not recreate.
 - **Why not `events-app.pages.dev`:** Pages `*.pages.dev` names are globally unique. `events-app` was already claimed by another Cloudflare account, so the first deploy got a random suffix (`events-app-lzv`). The project was renamed to `shared-events` to get a clean URL. Leave the Wrangler `name` as `shared-events`; do not try to reclaim `events-app`.
-- Deploy: `npm run deploy:web` (builds `dist/` then `wrangler pages deploy`). Production updates go to `https://shared-events.pages.dev` when deploying with `--branch=production` (or from the production branch); other `--branch` values create preview URLs. This requires the Pages project's production-branch setting to be `production` (one-time cutover step — see `docs/development-workflow.md` → Branch protection); while it still says `master`, `--branch=production` deploys land as previews.
+- Deploy: `npm run deploy:web` (builds `apps/events/dist/` then `wrangler pages deploy`). Production updates go to `https://shared-events.pages.dev` when deploying with `--branch=production-events`; other `--branch` values create preview URLs. This requires the Pages project's production-branch setting to be `production-events` (see `docs/development-workflow.md` → Branch protection); while it says anything else, `--branch=production-events` deploys land as previews.
 - After a domain change, update `WEB_APP_URL` and the `PRIVACY_POLICY_URL` constant in `app/(auth)/sign-in.tsx`.
-- CI alternative: `.github/workflows/deploy-web.yml` deploys on every push to `production` once the repo Variable `DEPLOY_WEB=true` and Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` are set. It runs the same `wrangler pages deploy` command, so CI and agents behave identically.
+- CI alternative: `.github/workflows/deploy-web.yml` deploys on every push to `production-events` once the repo Variable `DEPLOY_WEB=true` and Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` are set. It runs the same `wrangler pages deploy` command, so CI and agents behave identically.
 - When a custom domain is purchased: Pages dashboard → Custom domains → add it (free auto SSL; instant if DNS is on Cloudflare), then update `WEB_APP_URL`.
 
 Verify afterwards:
 
 ```bash
-bash supabase/tests/run_local.sh     # SQL semantics suite (local scratch postgres)
-npm test -- --runInBand              # Jest suite
+npm run test:sql                   # SQL semantics suite (local scratch postgres)
+npm test -- --runInBand            # Jest suite
 ```
 
 Then run the manual regression suite (`manual-tests/cloud_manual_regression.md`), especially E-108/E-109 (forwarding) and M-003.
 
 ### Native builds (agent-run)
 
-Native binaries are built on EAS **by agents** — not by CI, not on the owner's machine. `STATUS.md` (repo root) tracks enrollment/secrets/build/tester state: read it before any release work and update it whenever you change any of that state. The ship-time sequence that uses these commands lives in `scripts/release-review-orchestrator.md` → Native rollout.
+Native binaries are built on EAS **by agents** — not by CI, not on the owner's machine. `apps/events/STATUS.md` tracks enrollment/secrets/build/tester state: read it before any release work and update it whenever you change any of that state. The ship-time sequence that uses these commands lives in `scripts/release-review-orchestrator.md` → Native rollout. Run all `eas` commands from `apps/events/` — its `eas.json` and `app.config.js` live there, and EAS installs dependencies from the workspace root (monorepo builds are officially supported: keep the root lockfile committed and never gitignore it).
 
 Prerequisites (Cursor secrets — injected into new cloud-agent VMs only; a running VM never picks up newly added secrets):
 

@@ -35,7 +35,7 @@ yarn-error.*
 .env*.local
 
 # Supabase CLI local state
-supabase/.temp/
+**/supabase/.temp/
 
 # Deno type-check byproduct (edge functions are checked ad hoc, no lockfile)
 deno.lock
@@ -47,7 +47,7 @@ google-play-service-account.json
 coverage/
 
 # Playwright e2e
-e2e/.auth/
+**/e2e/.auth/
 playwright-report/
 test-results/
 
@@ -58,6 +58,6 @@ test-results/
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# generated native folders (per app workspace)
+apps/*/ios/
+apps/*/android/

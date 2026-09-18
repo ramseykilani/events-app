@@ -35,7 +35,12 @@ jobs:
         id: node-modules
         uses: actions/cache@v4
         with:
-          path: node_modules
+          # Workspaces hoist to root node_modules, but version conflicts land
+          # in apps/*/node_modules — a cache hit skips npm ci, so both must
+          # ride the cache or a non-hoisted dep would silently go missing.
+          path: |
+            node_modules
+            apps/*/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies (npm ci on cache miss)
@@ -43,13 +48,13 @@ jobs:
         run: npm ci
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit -p apps/events
 
       - name: Convention checks
         run: npm run test:conventions
 
       - name: Jest suite
-        run: npm test -- --runInBand --ci
+        run: npm test --workspace=apps/events -- --runInBand --ci
 
       - name: Set up PostgreSQL
         run: |
@@ -60,4 +65,4 @@ jobs:
           sudo -u postgres psql -c 'SELECT 1'
 
       - name: SQL semantics suite
-        run: bash supabase/tests/run_local.sh
+        run: bash apps/events/supabase/tests/run_local.sh

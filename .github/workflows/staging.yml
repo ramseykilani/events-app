@@ -46,13 +46,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: apps/events/dist/
 
       # No npm ci: installing the whole tree (measured 55–425s) only put
       # wrangler in node_modules for a 4s deploy. npx fetches just wrangler,
-      # pinned inline to match package.json.
+      # pinned inline to match package.json. Directory and project name are
+      # explicit because wrangler.toml lives in apps/events/ now.
       - name: Deploy preview to Cloudflare Pages (branch alias "staging")
-        run: npx --yes wrangler@4.120.0 pages deploy --branch=staging
+        run: npx --yes wrangler@4.120.0 pages deploy apps/events/dist --project-name=shared-events --branch=staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

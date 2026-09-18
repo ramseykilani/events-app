@@ -1,6 +1,6 @@
 # Full test suite — reusable workflow (workflow_call) invoked by:
 #   - staging.yml  on every push to staging (before the preview deploy)
-#   - release.yml  on every staging→production PR (the release gate)
+#   - release.yml  on every staging→production-events PR (the release gate)
 #
 # Layers: static checks (tsc, Jest, SQL semantics) run in PARALLEL with the
 # browser matrix — the repo is public, so runner-minutes are free and a red
@@ -38,7 +38,12 @@ jobs:
         id: node-modules
         uses: actions/cache@v4
         with:
-          path: node_modules
+          # Workspaces hoist to root node_modules, but version conflicts land
+          # in apps/*/node_modules — a cache hit skips npm ci, so both must
+          # ride the cache or a non-hoisted dep would silently go missing.
+          path: |
+            node_modules
+            apps/*/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies (npm ci on cache miss)
@@ -46,13 +51,13 @@ jobs:
         run: npm ci
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit -p apps/events
 
       - name: Convention checks
         run: npm run test:conventions
 
       - name: Jest suite
-        run: npm test -- --runInBand --ci
+        run: npm test --workspace=apps/events -- --runInBand --ci
 
       - name: Set up PostgreSQL
         run: |
@@ -63,7 +68,7 @@ jobs:
           sudo -u postgres psql -c 'SELECT 1'
 
       - name: SQL semantics suite
-        run: bash supabase/tests/run_local.sh
+        run: bash apps/events/supabase/tests/run_local.sh
 
   e2e-browsers:
     # Explicit name keeps the per-leg check names free of the matrix phone
@@ -109,7 +114,12 @@ jobs:
         id: node-modules
         uses: actions/cache@v4
         with:
-          path: node_modules
+          # Workspaces hoist to root node_modules, but version conflicts land
+          # in apps/*/node_modules — a cache hit skips npm ci, so both must
+          # ride the cache or a non-hoisted dep would silently go missing.
+          path: |
+            node_modules
+            apps/*/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies (npm ci on cache miss)
@@ -136,7 +146,7 @@ jobs:
       # EXPO_PUBLIC_* values are inlined into the bundle at export time.
       - name: Build web bundle
         if: steps.secrets.outputs.present == 'true'
-        run: npm run build:web
+        run: npm run build:web --workspace=apps/events
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
@@ -145,6 +155,7 @@ jobs:
       # dependency of each browser project and signs in this leg's pair once.
       - name: Playwright e2e (${{ matrix.project }})
         if: steps.secrets.outputs.present == 'true'
+        working-directory: apps/events
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
@@ -165,7 +176,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: apps/events/dist/
           retention-days: 1
           if-no-files-found: error
 
@@ -174,10 +185,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ matrix.project }}
-          path: playwright-report/
+          path: apps/events/playwright-report/
           retention-days: 7
 
-  # Aggregator: branch protection on production requires the check
+  # Aggregator: branch protection on production-events requires the check
   # `full-suite / e2e`, but a matrix renames its checks to
   # `full-suite / e2e-browsers (<project>)`. This job keeps the old name
   # binding with no settings change. `if: always()` + an explicit result

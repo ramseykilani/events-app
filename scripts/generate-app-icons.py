@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-# constants/Colors.ts → paper (docs/events-design-language.md §3)
+# apps/events/constants/Colors.ts → paper (docs/events-design-language.md §3)
 PAPER_BG = (0xFA, 0xF7, 0xF0, 255)
 INK = (0x1A, 0x18, 0x15, 255)
 WHITE = (255, 255, 255, 255)
@@ -23,7 +23,7 @@ CANVAS = 1024
 LOCKUP_SIZE = 400
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "assets"
+ASSETS = ROOT / "apps" / "events" / "assets"
 
 
 def lockup(size: int, bg, fg, font_size: int) -> Image.Image:

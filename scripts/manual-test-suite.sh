@@ -3,8 +3,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SUITE_PATH="$ROOT_DIR/manual-tests/cloud_manual_regression.md"
-REPORT_TEMPLATE_PATH="$ROOT_DIR/manual-tests/manual_test_report_template.md"
+APP_DIR="$ROOT_DIR/apps/events"
+SUITE_PATH="$APP_DIR/manual-tests/cloud_manual_regression.md"
+REPORT_TEMPLATE_PATH="$APP_DIR/manual-tests/manual_test_report_template.md"
 
 STRICT=0
 START_SERVER=0
@@ -54,8 +55,8 @@ ISSUES=0
 echo "Manual regression preflight"
 echo "==========================="
 
-if [[ ! -f "$ROOT_DIR/.env" ]]; then
-  echo "WARN: .env not found at repo root."
+if [[ ! -f "$APP_DIR/.env" ]]; then
+  echo "WARN: .env not found at $APP_DIR/.env."
   echo "      The app can render, but auth/data flows will fail without Supabase values."
   ((ISSUES+=1))
 else
@@ -80,7 +81,7 @@ echo "Report template:  $REPORT_TEMPLATE_PATH"
 echo
 echo "Recommended flow:"
 echo "1) Read the suite doc."
-echo "2) Start app: npx expo start --web --port $PORT"
+echo "2) Start app: cd apps/events && npx expo start --web --port $PORT"
 echo "3) Run scenarios with computer-use."
 echo "4) Save evidence and complete the report template."
 
@@ -93,5 +94,6 @@ fi
 if [[ $START_SERVER -eq 1 ]]; then
   echo
   echo "Starting Expo web server on port $PORT..."
+  cd "$APP_DIR"
   exec npx expo start --web --port "$PORT"
 fi
