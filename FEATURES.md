@@ -49,6 +49,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Affiliate Link Tagging](#affiliate-link-tagging) | Implemented | Passive same-provider affiliate tags on outbound listing taps (app + receipt page); SMS never tagged. Shipped dark 2026-09-02 — activation is one SQL update per program. Setup: [docs/affiliate-programs.md](docs/affiliate-programs.md). |
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. Owner 2026-09-12: tapping the asker push lands on the calendar — [KI-018](manual-tests/known_issues.md). |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
+| [Yes-Only Who's Coming](#yes-only-whos-coming) | Planned | Revision decided 2026-09-18: the response becomes a one-time yes; the no dies. Not yet implemented. |
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
@@ -1560,7 +1561,7 @@ At launch, in the same `send-notification` change:
 
 ## Who's Coming
 
-**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building). Follow-up (shipped 2026-08-31): [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) puts the receipt link on app-user texts too — the original ship aimed the SMS line at non-app recipients only. Owner 2026-09-12: tapping the asker push ("X said yes") opens the calendar, not the event — [KI-018](manual-tests/known_issues.md).
+**Status:** Implemented 2026-08-28. Outline recorded 2026-08-27 from the product conversation; the "What we decided" section is that outline, preserved as the decision record. Implementation notes (schema, RPCs, URL layout) are in Technical Notes below — they were designed at build time, not in the outline. Related: [Notifications](#notifications), [SMS Invitations](#sms-invitations), [SMS Links at Launch](#sms-links-at-launch), [Forwarding Shares](#forwarding-shares) / [Per-User Events (Copy + Follow)](#per-user-events-copy--follow). Distinct from hosted-event RSVP (see [Creator-Linked Events](#creator-linked-events-edits-propagate) — the thing we are not building). Follow-up (shipped 2026-08-31): [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) puts the receipt link on app-user texts too — the original ship aimed the SMS line at non-app recipients only. Owner 2026-09-12: tapping the asker push ("X said yes") opens the calendar, not the event — [KI-018](manual-tests/known_issues.md). Revised 2026-09-18: [Yes-Only Who's Coming](#yes-only-whos-coming) — the response becomes a one-time yes; the no and last-write-wins are reversed. This section remains the record of what shipped 2026-08-28.
 
 ### User stories
 
@@ -1578,10 +1579,10 @@ A share puts the event on someone's calendar and records who you told (`sends` /
 
 This is a **response**, not an RSVP. It hangs off the send: this person answered the person who asked them. It is not a guest list on "the event," not hosted, not visible to anyone but the asker.
 
-- **Yes / no only.** No maybe. Yes means add me to the group chat. No means don't. Empty means they haven't said. The asker makes the chat from the yeses.
+- **Yes / no only.** No maybe. Yes means add me to the group chat. No means don't. Empty means they haven't said. The asker makes the chat from the yeses. *(Superseded 2026-09-18: yes-only — see [Yes-Only Who's Coming](#yes-only-whos-coming).)*
 - **Every send has a response slot.** No separate "ask who's going." The share already is the ask.
 - **Only the asker sees the answers.** Alice sees her people's yes/no. If Bob forwards to Carol, Carol answers Bob — not Alice. Same person-to-person rule as sharing.
-- **Last write wins.** You can change your answer anytime (in the app or via the SMS page).
+- **Last write wins.** You can change your answer anytime (in the app or via the SMS page). *(Superseded 2026-09-18: the yes is one-time — see [Yes-Only Who's Coming](#yes-only-whos-coming).)*
 - **Events does not create the chat** and does not export one. The artifact is the list.
 
 **On the event in the app**
@@ -1718,6 +1719,54 @@ This is not [SMS Links at Launch](#sms-links-at-launch). That pair is store CTA 
 - None on audience — owner decided 2026-08-31: both variants get the link; do not force the app to answer.
 - ~~Exact wording stays the shipped `Coming? <link>` unless the owner wants a different line now that app users see it too (approve on a real text).~~ — approved 2026-08-31 on a real text to the owner's app-user number; wording unchanged.
 - A2P: the campaign already has to mention this link type ([Who's Coming](#whos-coming) open question). This change puts that same link on more messages (app-user texts), not a new link type.
+
+---
+
+## Yes-Only Who's Coming
+
+**Status:** Planned — decided 2026-09-18 in the product conversation that also produced [SMS-Side Hide](#sms-side-hide) and the attending frame (`docs/events-product.md` → Attending, Not Organizing). Revises [Who's Coming](#whos-coming) (shipped 2026-08-28); that section stays as the record of what shipped. Not yet implemented — read both sections before picking this up.
+
+### Problem
+
+Who's Coming shipped with yes/no on every send. The no has no function in the app's frame. The app is for events that survive the recipients' absence — "I'm going to this; let me know if you'd like to join." A no only matters when an event is contingent on the recipients (lunch, hosting): it tells the organizer to replan. Carrying a no slot on every send quietly asserts that contingent frame, and it is what makes a share feel like a DM demanding an answer — the recipient owes a decline, the asker collects rejections, and "unanswered" sits in the Shared with list as a visible snub. The original user story only ever consumed the yeses ("so I can make one group chat of the people who are in").
+
+The no was added at a user request rooted in the contingent frame ("know who's not coming"). The same requester later reported that sharing to acquaintances felt presumptuous — one out-of-frame import producing both the feature and the barrier.
+
+### What we decided (2026-09-18)
+
+- **Yes only.** The response slot becomes yes or empty. No no, no maybe (the maybe line stands). The list is the yeses; at decision time, everyone not-yes is effectively no.
+- **The yes is one-time.** Tap → terminal "You're in" state. No flip, no un-yes — the yes inherits the share's own permanence ("sharing is like sending a text — once you send it, you can't take it back"). The asker may already hold the "said yes" push; an un-yes button would pretend retraction works. Changing your mind is a conversation, not a button: text the sharer. This reverses Who's Coming's "Last write wins — you can change your answer anytime" (marked superseded there).
+- **Both surfaces, same semantics.** The in-app reply block and the receipt page behave identically: one write ever; a re-tap is the existing reassurance probe (`changed=false`, no re-ping).
+- **Asker side.** "Shared with" shows empty / yes. The answer push is only ever "Bob said yes" — the app never delivers a rejection. Freshness gating, `notify_push`, and the hidden-responder skip are unchanged.
+- **The stale yes is accepted.** The asker makes the going-chat from the yeses; the chat becomes the source of truth. A yes that quietly rots before the chat exists costs at most a "thought you were in?" — normal human friction, not a data problem.
+- **The receipt page survives.** It simplifies on the response axis (one button, no "change your answer anytime") and grows [SMS-Side Hide](#sms-side-hide) on the control axis. It remains the non-app recipient's event surface (details, add-to-calendar, response).
+- **One tap, never zero.** The yes stays behind an explicit tap on the page; GET stays inert (SMS/iMessage prefetch and carrier link scanners must never record a yes). Under yes-only a false yes is the most corrupting data the app can hold — the yes-list is the artifact the asker acts on.
+- **Contact assumption.** Copy in the family of "Text Ramsey to coordinate" needs no contact info from the page: sharing assumes the recipient can already reach the sharer out of band (`docs/events-product.md` — "you already have their number — text them"). The page never exposes the sharer's number.
+
+### Copy paper trail (for the implementation pass)
+
+The attending frame arbitrates these strings. Review; don't necessarily change:
+
+- Share SMS "Alice wants to go to X with you" — contingent framing.
+- In-app "Alice asked — are you in?" — "asked" is the request frame.
+- "Sharing is like sending a text — once you send it, you can't take it back" — DM framing (it exists for permanence; the register is a side effect).
+- Receipt page "You can change your answer anytime with this link." — dies with the flip.
+- `Coming? <link>` SMS line — still the right ask shape; final wording approved by the owner on a real text (same bar as [Share SMS Content & Formatting](#share-sms-content--formatting)).
+- The no-group-chat-framing copy rule (owner, 2026-08-28) still binds.
+
+### Open questions for implementation
+
+- Existing `no` values in `sends.response`: migrate to NULL, or keep historical and relax the CHECK? Decide in the migration pass.
+- Schema shape: tighten the `sends.response` CHECK to yes-only, or keep the column's domain and stop offering no in the UI/RPC — implementation choice, deliberately open.
+- `respond_to_send` rejects non-yes writes; `send-response-notification` loses the "said no" title.
+- The in-app reply block's terminal state ("You're in" + coordinate line) mirrors the page.
+- `e2e/whos_coming.spec.ts` and `supabase/tests/whos_coming_test.sql` are rewritten for one-time yes. Specs describe intended behavior; the intent changed here by owner decision, so the rewrite is legitimate — record the change in the spec comments.
+
+### What this is not
+
+- Not a maybe, not an RSVP with states, not a guest list.
+- Not removing the response slot — the share is still the ask; the answer is just only ever yes.
+- Not an un-yes with a notification — retraction is a conversation.
 
 ---
 
