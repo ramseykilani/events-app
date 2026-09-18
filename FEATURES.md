@@ -50,6 +50,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Who's Coming](#whos-coming) | Implemented | Response (yes/no) on every send; asker sees the going-list. Not an RSVP, not a chat. Shipped 2026-08-28. Owner 2026-09-12: tapping the asker push lands on the calendar — [KI-018](manual-tests/known_issues.md). |
 | [Coming Link in Every Share SMS](#coming-link-in-every-share-sms) | Implemented | Same Who's Coming receipt link on app-user share texts, not only the non-app variant. Answering must not require opening the app. |
 | [Yes-Only Who's Coming](#yes-only-whos-coming) | Planned | Revision decided 2026-09-18: the response becomes a one-time yes; the no dies. Not yet implemented. |
+| [SMS-Side Hide](#sms-side-hide) | Planned | Decided 2026-09-18: non-app recipients hide a sharer from the receipt page; today their only SMS-level out is STOP. |
 | [Adjacent-Month Event Dots](#adjacent-month-event-dots) | Implemented | Greyed overflow days in the month grid never showed event dots. |
 | [AT Protocol Backend](#at-protocol-backend) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
 | [Recurring Events](#recurring-events) | Considering | Maybe never — idea stage only, nothing designed. Recorded so the idea isn't lost. |
@@ -1767,6 +1768,57 @@ The attending frame arbitrates these strings. Review; don't necessarily change:
 - Not a maybe, not an RSVP with states, not a guest list.
 - Not removing the response slot — the share is still the ask; the answer is just only ever yes.
 - Not an un-yes with a notification — retraction is a conversation.
+
+---
+
+## SMS-Side Hide
+
+**Status:** Planned — decided 2026-09-18 in the same conversation as [Yes-Only Who's Coming](#yes-only-whos-coming). Extends [Hide](#hide) to recipients without accounts. Related: [Who's Coming](#whos-coming) (the receipt page), [Notification On/Off](#notification-onoff) (account-level channel toggles), [Share Delivery Status](#share-delivery-status) (the ✕ Unsubscribed surface this avoids).
+
+### Problem
+
+A recipient without the app has exactly one SMS-level out: reply STOP. STOP is Twilio-level and kills everything — every future share text from anyone, including the first-impression text a community migration depends on (`docs/events-product.md` → Community Migration). A person who finds one sharer noisy nukes the whole channel. In-app [Hide](#hide) solves this for account holders; most recipients during internal testing have no account.
+
+### What we decided (2026-09-18)
+
+- **The receipt page carries it.** The per-send `response_token` link already identifies the exact (sender, recipient-phone) pair, so the action is unambiguous with no account and no new SMS copy. The page becomes the non-app recipient's control surface, not just a response form.
+- **Present, quiet, bottom.** A line in the family of "Hide events from Ramsey" at the foot of the page — there if you want it, never advertised. Mirrors the in-app posture: contextual, not promoted.
+- **One confirm step.** In-app hide confirms first; the page mirrors that. Hide is at least as intentional as the yes on the same page.
+- **Reversible from the same place.** The link is stable per send; revisiting after hiding shows the hidden state and offers undo. No account, no new surface.
+- **One word: hide.** Same action as in-app hide, second entry point. Not "mute."
+- **Silent to the sender.** Hide philosophy, not the STOP precedent: no notification, no status change on the sends row (STOP's "✕ Unsubscribed" stays STOP-only).
+- **Hiding changes nothing else.** The send's response slot, delivered copies, and pending shares are untouched; hide only suppresses future notifications from that sender to that phone.
+
+### Storage and the sign-up conversion
+
+In-app hide is keyed on the recipient's account (`hidden_people`: the owner's users row → their `my_people` row for the sender). A non-app recipient has neither, so the SMS-side state is phone-scoped: it hangs off the sender-side relationship (the sender's `my_people` row for that phone) and is checked by `send-notification` alongside the existing `hidden_people` and `notify_sms` checks. The unification point is that one check, not the table.
+
+Owner call 2026-09-18: on sign-up, a phone-scoped hide converts to a full account-scoped hide — the new user's calendar filters the hidden sender's events too, not just the texts. The conversion rides the existing sign-up trigger path (the `deliver_pending_shares` moment). One behavior, one word, two entry points — and for anyone who joins, literally the same row.
+
+### Rejected alternatives (do not re-litigate)
+
+- **Reply-based commands ("MUTE", "Mute Ramsey").** Senders are stable across events, so a sender-scoped reply is unambiguous in a way reply-YES never could be — but: non-users have no contact names, so "Ramsey" can only match senders' `display_name`s (collisions, typos, and renames all fail); recency-scoping ("MUTE" = whoever texted last) has the wrong-sender failure; and any reply path needs new inbound-webhook infrastructure, confirmation texts, and A2P keyword registration. Worst: a mistaken mute silently drops future shares — the sender sees nothing and the recipient assumes the community went quiet.
+- **Two links (yes-link + hide-link).** Two capability URLs in one text: longer message, more carrier-filter exposure (own-domain links in cold texts are the top filter risk), and the hide link still needs an inert GET plus a tap — no benefit over one link.
+- **One-click yes (GET writes).** SMS/iMessage preview fetches and carrier link scanners would record yeses the recipient never chose. GET stays inert; the yes is open + one intentional tap. (Recorded here because the same prefetch rule is why a hide link can't write on open either.)
+
+### Technical notes for implementation
+
+- `send-response` (`--no-verify-jwt`; the token is the credential) gains the hide write. GET stays inert — hide writes only on explicit tap + confirm (POST).
+- `send-notification` checks the phone-scoped hide before queueing SMS — same place as the reserved-555 skip, `notify_sms`, and `hidden_people` checks.
+- The sign-up trigger converts phone-scoped hides to `hidden_people` rows.
+- Receipt page copy follows the page's conventions: quiet, no group-chat framing (owner copy rule 2026-08-28), hide is neutral, not destructive red.
+- SMS bodies are unchanged, so the A2P campaign description is likely unaffected (no new link type, no keywords) — verify at implementation.
+- Deploy shape: migration + `send-response` + `send-notification` + receipt page — client and backend move together per the runbook in AGENTS.md.
+
+### Acceptance criteria (draft)
+
+- [ ] The receipt page shows a quiet hide line naming the sender; hiding takes an explicit tap plus a confirm
+- [ ] After hiding, `send-notification` sends no further SMS from that sender to that phone; other senders are unaffected
+- [ ] The same link shows the hidden state and offers undo; undo restores delivery
+- [ ] The sender is never notified and sees no status change on the send
+- [ ] On sign-up, the hide materializes as an account-scoped `hidden_people` row (calendar filter included)
+- [ ] GET on the receipt URL remains inert — prefetch never writes
+- [ ] In-app hide behavior is unchanged
 
 ---
 
