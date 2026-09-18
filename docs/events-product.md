@@ -22,6 +22,16 @@ There is no feed. There is nothing to scroll. There are no likes, no comments, n
 
 ---
 
+## Attending, Not Organizing
+
+An event, here, is something that happens whether or not anyone joins you. You are going to the concert either way. The share says: I'm going — let me know if you'd like to join. It is an announcement with an open door, not a request that needs an answer.
+
+The test is whether the event survives its recipients' absence. A concert survives it. Lunch with two friends does not — lunch needs them there, and anything that needs its recipients is coordination, which is what texting is for. Hosting needs a crowd, and hosting is Partiful's territory; hosted events stay unbuilt (see Creator-Linked Events in `FEATURES.md`).
+
+You can use the app to invite two people to lunch, but it is not designed for that, and designing for it would break the case the app exists for.
+
+---
+
 ## Your People
 
 You curate an in-app contact list of up to 50 people — your people. These are the people you share events with and who share events with you. This is not your full phone contact list. It's the people you actually want to exchange events with.
@@ -63,6 +73,12 @@ You're likely downloading Events because at least one friend told you about it. 
 From there, the network grows naturally. Your friend tells their friends. Those friends bring their people. The node network expands outward — or it doesn't, and the app serves you and 15 friends and reduces your collective friction, which is a perfectly good outcome.
 
 **Events does not need to grow to work.** It provides value to a single user with a single connection. There is no critical mass required, no network effect threshold to hit before it becomes useful. It works on day one.
+
+### Community Migration
+
+A community that already exists somewhere else — a group chat, a mailing list — moves when its curator moves it, not because the app pulls it. The move is social, not product: the curator asks who wants to keep receiving events, collects numbers, adds them, and starts sharing through the app. Whoever opts in is the community; whoever doesn't was never really in it. That re-opt-in is a feature of the move, not a cost — the old room's membership was whoever was added once and never left loudly enough.
+
+The old structure dies by migration, not demolition. The traffic moves, and the room goes quiet on its own.
 
 ---
 
