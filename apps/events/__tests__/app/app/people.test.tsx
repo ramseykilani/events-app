@@ -3,7 +3,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Modal, Platform } from 'react-native';
 import { abortable, abortablePromise } from '../../helpers/abortable';
 import PeopleScreen from '../../../app/(app)/people';
-import { showAlert, showConfirm } from '../../../lib/dialogs';
+import { showAlert, showConfirm } from '@family/infra';
 
 const mockMyPeopleOrder = jest.fn();
 const mockMyPeopleEq = jest.fn();
@@ -30,7 +30,7 @@ jest.mock('../../../app/_context/SessionContext', () => ({
   }),
 }));
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
     rpc: (...args: unknown[]) => mockRpc(...args),
@@ -38,7 +38,7 @@ jest.mock('../../../lib/supabase', () => ({
   },
 }));
 
-jest.mock('../../../lib/dialogs', () => ({
+jest.mock('@family/infra/dialogs', () => ({
   showAlert: jest.fn(),
   showConfirm: jest.fn(),
 }));

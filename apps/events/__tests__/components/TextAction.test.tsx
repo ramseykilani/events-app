@@ -1,8 +1,8 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import { TextAction } from '../../components/TextAction';
-import { Colors } from '../../constants/Colors';
+import { TextAction } from '@family/design';
+import { Colors } from '@family/design';
 
 describe('components/TextAction', () => {
   it('renders the label and fires onPress', () => {

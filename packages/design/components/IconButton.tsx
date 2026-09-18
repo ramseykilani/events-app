@@ -1,6 +1,6 @@
 import { StyleSheet, TouchableOpacity, type ViewStyle } from 'react-native';
 import type { ReactNode } from 'react';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../useTheme';
 
 // The 44×44 icon-button shape (FEATURES.md → Design System Consolidation) —
 // surfaceSecondary fill, radius 10. The glyph(s) are the caller's

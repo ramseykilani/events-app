@@ -6,8 +6,8 @@ import {
   THEME_REGISTRY,
   type ThemeName,
   type ThemePalette,
-} from '../../constants/Colors';
-import { applyWebBrowserChrome } from '../../lib/applyWebBrowserChrome';
+} from './Colors';
+import { applyWebBrowserChrome } from './applyWebBrowserChrome';
 
 // Stable storage key — a rename would silently reset every user's chosen mood.
 const THEME_STORAGE_KEY = 'theme_preference';

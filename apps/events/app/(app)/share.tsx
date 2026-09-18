@@ -10,16 +10,16 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
-import { showAlert } from '../../lib/dialogs';
+import { supabase } from '@family/infra';
+import { showAlert } from '@family/infra';
 import { useSession } from '../_context/SessionContext';
 import { ShareSheet } from '../../components/ShareSheet';
 import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
-import { AppHeader } from '../../components/AppHeader';
-import { PrimaryButton } from '../../components/PrimaryButton';
+import { AppHeader } from '@family/design';
+import { PrimaryButton } from '@family/design';
 import type { MyPerson, Circle, CircleMember, Send } from '../../lib/types';
-import { useTheme } from '../../hooks/useTheme';
-import { isAbortError, withFetchTimeout, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
+import { useTheme } from '@family/design';
+import { isAbortError, withFetchTimeout, withRetries, withWriteTimeout } from '@family/infra';
 
 type ShareParams = {
   eventId?: string | string[];

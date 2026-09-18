@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 import { Platform } from 'react-native';
-import { applyWebBrowserChrome } from '../../lib/applyWebBrowserChrome';
-import { Colors } from '../../constants/Colors';
+import { applyWebBrowserChrome } from '@family/design';
+import { Colors } from '@family/design';
 
 /** jsdom may round-trip hex style colors as rgb(); normalize for assertions. */
 function cssColor(value: string): string {

@@ -18,7 +18,7 @@ jest.mock('../../lib/pushNotifications', () => ({
 const mockUpdate = jest.fn();
 const mockEq = jest.fn();
 
-jest.mock('../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     from: () => ({
       update: (...args: unknown[]) => {

@@ -1,6 +1,6 @@
 import { Modal, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '@family/design';
 
 type Props = {
   visible: boolean;

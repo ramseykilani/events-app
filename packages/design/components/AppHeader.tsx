@@ -1,7 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../useTheme';
 
 // The one header grammar (FEATURES.md → Design System Consolidation; audit
 // UX-01/02/03). The bar and every action carry a real minHeight: 44 — visible

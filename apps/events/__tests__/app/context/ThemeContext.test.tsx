@@ -5,9 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ThemeContextProvider,
   useThemePreference,
-} from '../../../app/_context/ThemeContext';
-import { useTheme } from '../../../hooks/useTheme';
-import { Colors } from '../../../constants/Colors';
+} from '@family/design';
+import { useTheme } from '@family/design';
+import { Colors } from '@family/design';
 
 function ThemeProbe() {
   const { themeName, theme, setTheme, isLoaded } = useThemePreference();

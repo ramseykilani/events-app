@@ -14,8 +14,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import { useTheme } from '../../hooks/useTheme';
-import { PrimaryButton } from '../../components/PrimaryButton';
+import { useTheme } from '@family/design';
+import { PrimaryButton } from '@family/design';
 
 const ONBOARDING_KEY = 'onboarding_complete';
 

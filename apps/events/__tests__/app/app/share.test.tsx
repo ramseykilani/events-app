@@ -32,7 +32,7 @@ jest.mock('../../../app/_context/SessionContext', () => ({
   }),
 }));
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
     rpc: (...args: unknown[]) => mockRpc(...args),
@@ -42,7 +42,7 @@ jest.mock('../../../lib/supabase', () => ({
   },
 }));
 
-jest.mock('../../../lib/dialogs', () => ({
+jest.mock('@family/infra/dialogs', () => ({
   showAlert: jest.fn(),
   showConfirm: jest.fn(),
 }));
@@ -366,7 +366,7 @@ describe('app/(app)/share', () => {
   });
 
   it('shows a short alert, not a stack dump, when the share_event RPC fails', async () => {
-    const { showAlert } = require('../../../lib/dialogs');
+    const { showAlert } = require('@family/infra/dialogs');
     mockRpc.mockImplementation(() =>
       abortablePromise(
         Promise.resolve({
@@ -494,7 +494,7 @@ describe('app/(app)/share', () => {
     });
 
     it('shows a short alert and keeps the gate when saving the name fails', async () => {
-      const { showAlert } = require('../../../lib/dialogs');
+      const { showAlert } = require('@family/infra/dialogs');
       mockUsersSingle.mockResolvedValue({ data: { display_name: null }, error: null });
       mockUsersUpdateEq.mockImplementation(() =>
         abortablePromise(

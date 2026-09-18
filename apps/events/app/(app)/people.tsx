@@ -13,19 +13,19 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../lib/supabase';
-import { showAlert, showConfirm } from '../../lib/dialogs';
+import { supabase } from '@family/infra';
+import { showAlert, showConfirm } from '@family/infra';
 import { formatPhoneDisplay } from '../../lib/format';
 import { useSession } from '../_context/SessionContext';
 import { ContactsPermissionFlow } from '../../components/ContactsPermissionFlow';
 import { ManualAddPersonModal } from '../../components/ManualAddPersonModal';
-import { ThemedSwitch } from '../../components/ThemedSwitch';
-import { AppHeader } from '../../components/AppHeader';
-import { PrimaryButton } from '../../components/PrimaryButton';
-import { TextAction } from '../../components/TextAction';
+import { ThemedSwitch } from '@family/design';
+import { AppHeader } from '@family/design';
+import { PrimaryButton } from '@family/design';
+import { TextAction } from '@family/design';
 import type { MyPerson, Circle, CircleMember, HiddenPerson } from '../../lib/types';
-import { useTheme } from '../../hooks/useTheme';
-import { isAbortError, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
+import { useTheme } from '@family/design';
+import { isAbortError, withRetries, withWriteTimeout } from '@family/infra';
 
 export default function PeopleScreen() {
   const { session } = useSession();

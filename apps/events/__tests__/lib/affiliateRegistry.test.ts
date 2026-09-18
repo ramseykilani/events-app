@@ -7,7 +7,7 @@ const mockProgramsOrder = jest.fn();
 const mockProgramsSelect = jest.fn();
 const mockFrom = jest.fn();
 
-jest.mock('../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
   },

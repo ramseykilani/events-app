@@ -16,9 +16,9 @@ import {
   previewFromCalendarEvent,
   rememberEventPreview,
 } from '../lib/eventPreviewCache';
-import { useTheme } from '../hooks/useTheme';
-import { useThemePreference } from '../app/_context/ThemeContext';
-import { Colors, THEME_REGISTRY } from '../constants/Colors';
+import { useTheme } from '@family/design';
+import { useThemePreference } from '@family/design';
+import { Colors, THEME_REGISTRY } from '@family/design';
 
 type Props = {
   events: CalendarEvent[];

@@ -6,7 +6,7 @@ import {
   getContactsPermission,
   requestContactsPermission,
 } from '../../lib/contacts';
-import { showAlert } from '../../lib/dialogs';
+import { showAlert } from '@family/infra';
 import { abortablePromise } from '../helpers/abortable';
 
 jest.mock('../../lib/contacts', () => ({
@@ -17,13 +17,13 @@ jest.mock('../../lib/contacts', () => ({
 
 const mockUpsert = jest.fn();
 
-jest.mock('../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     from: () => ({ upsert: (...args: unknown[]) => mockUpsert(...args) }),
   },
 }));
 
-jest.mock('../../lib/dialogs', () => ({
+jest.mock('@family/infra/dialogs', () => ({
   showAlert: jest.fn(),
   showConfirm: jest.fn(),
 }));

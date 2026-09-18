@@ -14,7 +14,7 @@ let authStateCallback:
   | ((event: string, session: unknown) => unknown)
   | null = null;
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     auth: {
       getSession: (...args: unknown[]) => mockGetSession(...args),

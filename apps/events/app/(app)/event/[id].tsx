@@ -14,25 +14,25 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { supabase } from '../../../lib/supabase';
-import { showAlert, showConfirm } from '../../../lib/dialogs';
+import { supabase } from '@family/infra';
+import { showAlert, showConfirm } from '@family/infra';
 import { addToGoogle, addToOtherCalendar } from '../../../lib/addToCalendar';
 import { formatEventDate, formatPhoneDisplay, localDateString } from '../../../lib/format';
 import { useSession } from '../../_context/SessionContext';
 import type { Event } from '../../../lib/types';
-import { useTheme } from '../../../hooks/useTheme';
-import { AppHeader } from '../../../components/AppHeader';
-import { PrimaryButton } from '../../../components/PrimaryButton';
-import { SecondaryButton } from '../../../components/SecondaryButton';
-import { TextAction } from '../../../components/TextAction';
-import { IconButton } from '../../../components/IconButton';
+import { useTheme } from '@family/design';
+import { AppHeader } from '@family/design';
+import { PrimaryButton } from '@family/design';
+import { SecondaryButton } from '@family/design';
+import { TextAction } from '@family/design';
+import { IconButton } from '@family/design';
 import {
   eventFromPreview,
   previewFromEvent,
   readEventPreview,
   rememberEventPreview,
 } from '../../../lib/eventPreviewCache';
-import { isAbortError, withRetries, withWriteTimeout } from '../../../lib/timeoutSignal';
+import { isAbortError, withRetries, withWriteTimeout } from '@family/infra';
 import { EMPTY_REGISTRY, tagListingUrl } from '../../../lib/affiliateLinks';
 import type { AffiliateRegistry } from '../../../lib/affiliateLinks';
 import { getAffiliateRegistry } from '../../../lib/affiliateRegistry';

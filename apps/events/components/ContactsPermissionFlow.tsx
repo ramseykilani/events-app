@@ -8,9 +8,9 @@ import {
   getContactsPermission,
   requestContactsPermission,
 } from '../lib/contacts';
-import { supabase } from '../lib/supabase';
-import { showAlert } from '../lib/dialogs';
-import { isAbortError, withWriteTimeout } from '../lib/timeoutSignal';
+import { supabase } from '@family/infra';
+import { showAlert } from '@family/infra';
+import { isAbortError, withWriteTimeout } from '@family/infra';
 
 type Phase = 'idle' | 'explainer' | 'picker' | 'recovery' | 'manual';
 

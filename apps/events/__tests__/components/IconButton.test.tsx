@@ -1,8 +1,8 @@
 import React from 'react';
 import { Text, StyleSheet } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
-import { IconButton } from '../../components/IconButton';
-import { Colors } from '../../constants/Colors';
+import { IconButton } from '@family/design';
+import { Colors } from '@family/design';
 
 describe('components/IconButton', () => {
   it('renders children and fires onPress via the required accessible name', () => {

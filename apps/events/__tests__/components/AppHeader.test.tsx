@@ -1,8 +1,8 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import { AppHeader } from '../../components/AppHeader';
-import { Colors } from '../../constants/Colors';
+import { AppHeader } from '@family/design';
+import { Colors } from '@family/design';
 
 describe('components/AppHeader', () => {
   it('renders the title and fires the left action', () => {

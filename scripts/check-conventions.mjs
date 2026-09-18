@@ -54,17 +54,28 @@ import { join, relative, sep } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const SCAN_DIRS = ['app', 'components', 'hooks', 'lib'];
-// Every app under apps/* is scanned (family-wide by construction). Rule logic
-// uses paths relative to the owning app, so allowlists like lib/dialogs.ts
-// stay stable per app.
-const APP_ROOTS = readdirSync(join(ROOT, 'apps'))
-  .map((d) => join(ROOT, 'apps', d))
+// Every app under apps/* and every shared package under packages/* is scanned
+// (family-wide by construction). Rule logic uses paths relative to the owning
+// app or package, so allowlists like lib/dialogs.ts stay stable per app.
+const SCAN_ROOTS = ['apps', 'packages']
+  .flatMap((base) => {
+    const dir = join(ROOT, base);
+    return existsSync(dir) ? readdirSync(dir).map((d) => join(dir, d)) : [];
+  })
   .filter((p) => statSync(p).isDirectory());
 const SOURCE_RE = /\.(ts|tsx)$/;
 const HEX_RE = /#[0-9a-fA-F]{3}\b|#[0-9a-fA-F]{4}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{8}\b/g;
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
-// lib/dialogs.ts and lib/showError.ts are the dialog implementations.
-const ALERT_ALLOWED_FILES = new Set(['lib/dialogs.ts', 'lib/showError.ts']);
+// lib/dialogs.ts and lib/showError.ts are the dialog implementations (the
+// bare names are their @family/infra package copies).
+const ALERT_ALLOWED_FILES = new Set([
+  'lib/dialogs.ts',
+  'lib/showError.ts',
+  'dialogs.ts',
+  'showError.ts',
+]);
+// The palette file is the one place hex literals are the point.
+const HEX_ALLOWED_FILES = new Set(['Colors.ts']);
 const TIMEOUT_MODULE_RE = /(^|\/)timeoutSignal$/;
 const BANNED_TIMEOUT_NAMES = new Set(['withTimeout', 'timeoutSignal']);
 const SHOWERROR_MODULE_RE = /(^|\/)showError$/;
@@ -122,7 +133,7 @@ function checkAccessibilityRoles(path, source) {
 
 function checkTimeoutImports(path, source) {
   const relPath = ruleRel(path);
-  if (relPath === 'lib/timeoutSignal.ts') return;
+  if (relPath === 'lib/timeoutSignal.ts' || relPath === 'timeoutSignal.ts') return;
   const visit = (node) => {
     if (
       ts.isImportDeclaration(node) &&
@@ -365,6 +376,7 @@ function checkRegexRules(path, text, source) {
   }
 
   for (const m of text.matchAll(HEX_RE)) {
+    if (HEX_ALLOWED_FILES.has(relPath)) break;
     const line = lineOf(source, m.index);
     const textLine = lines[line - 1].trim();
     if (textLine.startsWith('//') || textLine.startsWith('*')) continue;
@@ -391,7 +403,7 @@ const rel = (path) => relative(ROOT, path);
 // Strip the leading apps/<name>/ so rule paths are relative to the owning app.
 const ruleRel = (path) => relative(ROOT, path).split(sep).slice(2).join(sep);
 
-for (const appRoot of APP_ROOTS) {
+for (const appRoot of SCAN_ROOTS) {
   for (const dir of SCAN_DIRS) {
     const scanRoot = join(appRoot, dir);
     if (!existsSync(scanRoot)) continue;

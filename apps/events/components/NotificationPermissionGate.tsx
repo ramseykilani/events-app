@@ -7,7 +7,7 @@ import {
   requestNotificationPermission,
   getExpoPushToken,
 } from '../lib/pushNotifications';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@family/infra';
 
 // Stable storage key — once answered (Turn on notifications or Not now) the
 // ask never reappears; a rename would re-ask every user who already dismissed it.

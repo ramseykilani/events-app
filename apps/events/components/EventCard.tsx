@@ -1,7 +1,7 @@
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import type { CalendarEvent } from '../lib/types';
 import { formatEventDate } from '../lib/format';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '@family/design';
 
 type Props = {
   event: CalendarEvent;

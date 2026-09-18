@@ -1,5 +1,5 @@
 import { Alert, Platform } from 'react-native';
-import { showError } from '../../lib/showError';
+import { showError } from '@family/infra';
 
 describe('lib/showError', () => {
   beforeEach(() => {

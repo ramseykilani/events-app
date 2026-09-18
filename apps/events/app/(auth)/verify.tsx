@@ -9,14 +9,14 @@ import {
   Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { getAuthUserMessage } from '../../lib/authErrors';
-import { supabase } from '../../lib/supabase';
-import { showAlert } from '../../lib/dialogs';
-import { showError } from '../../lib/showError';
+import { getAuthUserMessage } from '@family/infra';
+import { supabase } from '@family/infra';
+import { showAlert } from '@family/infra';
+import { showError } from '@family/infra';
 import { formatPhoneDisplay } from '../../lib/format';
-import { useTheme } from '../../hooks/useTheme';
-import { PrimaryButton } from '../../components/PrimaryButton';
-import { TextAction } from '../../components/TextAction';
+import { useTheme } from '@family/design';
+import { PrimaryButton } from '@family/design';
+import { TextAction } from '@family/design';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 

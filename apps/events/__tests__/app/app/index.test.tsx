@@ -19,7 +19,7 @@ jest.mock('../../../app/_context/SessionContext', () => ({
   }),
 }));
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     rpc: (...args: unknown[]) => mockRpc(...args),
     from: (...args: unknown[]) => mockFrom(...args),

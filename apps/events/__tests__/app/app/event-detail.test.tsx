@@ -7,7 +7,7 @@ import {
   clearEventPreviewCache,
   rememberEventPreview,
 } from '../../../lib/eventPreviewCache';
-import { FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from '../../../lib/timeoutSignal';
+import { FETCH_ATTEMPTS, FETCH_TIMEOUT_MS } from '@family/infra';
 import { EMPTY_REGISTRY } from '../../../lib/affiliateLinks';
 import EventDetailScreen from '../../../app/(app)/event/[id]';
 
@@ -52,7 +52,7 @@ jest.mock('../../../app/_context/SessionContext', () => ({
   }),
 }));
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
     rpc: (...args: unknown[]) => mockRpc(...args),

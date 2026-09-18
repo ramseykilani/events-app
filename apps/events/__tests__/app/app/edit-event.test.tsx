@@ -6,7 +6,7 @@ import {
   clearEventPreviewCache,
   rememberEventPreview,
 } from '../../../lib/eventPreviewCache';
-import { FETCH_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '../../../lib/timeoutSignal';
+import { FETCH_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@family/infra';
 import EditEventScreen from '../../../app/(app)/edit-event';
 
 const mockRpc = jest.fn();
@@ -28,18 +28,18 @@ jest.mock('../../../app/_context/SessionContext', () => ({
   }),
 }));
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     rpc: (...args: unknown[]) => mockRpc(...args),
     from: (...args: unknown[]) => mockFrom(...args),
   },
 }));
 
-jest.mock('../../../lib/showError', () => ({
+jest.mock('@family/infra/showError', () => ({
   showError: jest.fn(),
 }));
 
-jest.mock('../../../lib/dialogs', () => ({
+jest.mock('@family/infra/dialogs', () => ({
   showAlert: jest.fn(),
   showConfirm: jest.fn(),
 }));
@@ -191,8 +191,8 @@ describe('app/(app)/edit-event', () => {
   });
 
   it('completes a save that takes longer than the 2s load-fetch budget (B-1)', async () => {
-    const { showAlert } = require('../../../lib/dialogs');
-    const { showError } = require('../../../lib/showError');
+    const { showAlert } = require('@family/infra/dialogs');
+    const { showError } = require('@family/infra/showError');
     seedPreview();
     mockRpc.mockImplementation(() =>
       abortablePromise(
@@ -223,8 +223,8 @@ describe('app/(app)/edit-event', () => {
   it('shows a short alert, not a stack dump, if the write itself times out', async () => {
     jest.useFakeTimers();
     try {
-      const { showAlert } = require('../../../lib/dialogs');
-      const { showError } = require('../../../lib/showError');
+      const { showAlert } = require('@family/infra/dialogs');
+      const { showError } = require('@family/infra/showError');
       seedPreview();
       mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
       // Reconcile keeps finding the old values (the save never committed).
@@ -253,7 +253,7 @@ describe('app/(app)/edit-event', () => {
   it('navigates as if saved when a timed-out write already committed (reconcile)', async () => {
     jest.useFakeTimers();
     try {
-      const { showAlert } = require('../../../lib/dialogs');
+      const { showAlert } = require('@family/infra/dialogs');
       seedPreview();
       // The save_event RPC hangs, so the write aborts at the write budget...
       mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
@@ -282,7 +282,7 @@ describe('app/(app)/edit-event', () => {
   it('alerts without navigating when the reconcile read finds a field mismatch', async () => {
     jest.useFakeTimers();
     try {
-      const { showAlert } = require('../../../lib/dialogs');
+      const { showAlert } = require('@family/infra/dialogs');
       seedPreview();
       mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
       // The row's title matches but the description is not what was typed —
@@ -314,7 +314,7 @@ describe('app/(app)/edit-event', () => {
   it('alerts when the reconcile read itself fails', async () => {
     jest.useFakeTimers();
     try {
-      const { showAlert } = require('../../../lib/dialogs');
+      const { showAlert } = require('@family/infra/dialogs');
       seedPreview();
       mockRpc.mockImplementation(() => abortablePromise(new Promise(() => {})));
       mockEventsSingle.mockRejectedValue(

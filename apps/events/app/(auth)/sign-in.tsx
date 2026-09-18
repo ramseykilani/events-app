@@ -14,12 +14,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { router } from 'expo-router';
-import { getAuthUserMessage } from '../../lib/authErrors';
-import { supabase } from '../../lib/supabase';
-import { showAlert } from '../../lib/dialogs';
-import { showError } from '../../lib/showError';
-import { useTheme } from '../../hooks/useTheme';
-import { PrimaryButton } from '../../components/PrimaryButton';
+import { getAuthUserMessage } from '@family/infra';
+import { supabase } from '@family/infra';
+import { showAlert } from '@family/infra';
+import { showError } from '@family/infra';
+import { useTheme } from '@family/design';
+import { PrimaryButton } from '@family/design';
 
 // Extensionless URLs: the .html forms 308-redirect, and a non-browser fetcher
 // (e.g. the A2P campaign reviewer's verifier) sees an empty redirect body.

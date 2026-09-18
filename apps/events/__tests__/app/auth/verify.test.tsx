@@ -8,7 +8,7 @@ const mockVerifyOtp = jest.fn();
 const mockSignInWithOtp = jest.fn();
 const mockShowError = jest.fn();
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     auth: {
       verifyOtp: (...args: unknown[]) => mockVerifyOtp(...args),
@@ -17,7 +17,7 @@ jest.mock('../../../lib/supabase', () => ({
   },
 }));
 
-jest.mock('../../../lib/showError', () => ({
+jest.mock('@family/infra/showError', () => ({
   showError: (...args: unknown[]) => mockShowError(...args),
 }));
 

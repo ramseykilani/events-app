@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { ThemePalette } from '../constants/Colors';
+import type { ThemePalette } from './Colors';
 
 const THEME_COLOR_META = 'theme-color';
 const SAFARI_CHROME_ID = 'events-safari-chrome';

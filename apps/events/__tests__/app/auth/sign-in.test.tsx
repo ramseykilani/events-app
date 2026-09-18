@@ -7,7 +7,7 @@ import SignInScreen from '../../../app/(auth)/sign-in';
 const mockSignInWithOtp = jest.fn();
 const mockShowError = jest.fn();
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('@family/infra/supabase', () => ({
   supabase: {
     auth: {
       signInWithOtp: (...args: unknown[]) => mockSignInWithOtp(...args),
@@ -15,7 +15,7 @@ jest.mock('../../../lib/supabase', () => ({
   },
 }));
 
-jest.mock('../../../lib/showError', () => ({
+jest.mock('@family/infra/showError', () => ({
   showError: (...args: unknown[]) => mockShowError(...args),
 }));
 

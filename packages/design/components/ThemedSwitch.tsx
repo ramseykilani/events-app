@@ -1,6 +1,6 @@
 import { Platform, Switch, type SwitchProps } from 'react-native';
 import type { ComponentType } from 'react';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../useTheme';
 
 // react-native-web's Switch applies thumbColor only to the off state; the
 // on-state thumb takes activeThumbColor — a web-only prop missing from RN's

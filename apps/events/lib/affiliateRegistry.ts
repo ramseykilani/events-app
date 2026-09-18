@@ -8,8 +8,8 @@
 // only when a program is activated by SQL, so a few minutes of staleness is
 // invisible next to the days-long approval cadence.
 
-import { supabase } from './supabase';
-import { withFetchTimeout } from './timeoutSignal';
+import { supabase } from '@family/infra';
+import { withFetchTimeout } from '@family/infra';
 import {
   AffiliateProgram,
   AffiliateRegistry,

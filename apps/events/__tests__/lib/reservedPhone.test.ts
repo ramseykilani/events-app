@@ -1,4 +1,4 @@
-import { isReservedTestPhone } from '../../lib/reservedPhone';
+import { isReservedTestPhone } from '@family/infra';
 
 describe('isReservedTestPhone', () => {
   it('matches standing e2e accounts in E.164 and digits-only form', () => {

@@ -1,8 +1,8 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import { SecondaryButton } from '../../components/SecondaryButton';
-import { Colors } from '../../constants/Colors';
+import { SecondaryButton } from '@family/design';
+import { Colors } from '@family/design';
 
 describe('components/SecondaryButton', () => {
   it('renders the label and fires onPress', () => {

@@ -4,7 +4,7 @@ import { ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { Calendar } from '../../components/Calendar';
-import { ThemeContextProvider } from '../../app/_context/ThemeContext';
+import { ThemeContextProvider } from '@family/design';
 import type { CalendarEvent } from '../../lib/types';
 
 // Mutable insets so the KI-005 pin below can simulate a device whose bottom

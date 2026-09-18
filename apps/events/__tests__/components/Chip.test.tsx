@@ -1,8 +1,8 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import { Chip } from '../../components/Chip';
-import { Colors } from '../../constants/Colors';
+import { Chip } from '@family/design';
+import { Colors } from '@family/design';
 
 describe('components/Chip', () => {
   it('renders the label and fires onPress', () => {

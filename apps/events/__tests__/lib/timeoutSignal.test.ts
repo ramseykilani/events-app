@@ -8,7 +8,7 @@ import {
   withFetchTimeout,
   withRetries,
   withWriteTimeout,
-} from '../../lib/timeoutSignal';
+} from '@family/infra';
 
 describe('lib/timeoutSignal', () => {
   beforeEach(() => {

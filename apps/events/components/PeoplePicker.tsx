@@ -13,10 +13,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getContactsWithPhones } from '../lib/contacts';
 import type { ContactWithPhone } from '../lib/contacts';
 import { formatPhoneDisplay } from '../lib/format';
-import { useTheme } from '../hooks/useTheme';
-import { withFetchTimeout } from '../lib/timeoutSignal';
-import { AppHeader } from './AppHeader';
-import { TextAction } from './TextAction';
+import { useTheme } from '@family/design';
+import { withFetchTimeout } from '@family/infra';
+import { AppHeader } from '@family/design';
+import { TextAction } from '@family/design';
 
 type Props = {
   onSelect: (contacts: { phoneNumber: string; name: string | null }[]) => void;

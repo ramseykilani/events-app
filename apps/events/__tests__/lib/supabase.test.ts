@@ -5,7 +5,7 @@
 // so the empty-config path is tested via resolveClientConfig directly rather
 // than by mutating process.env.)
 
-import { resolveClientConfig, supabase } from '../../lib/supabase';
+import { resolveClientConfig, supabase } from '@family/infra';
 
 describe('lib/supabase client config', () => {
   it('falls back to a valid placeholder when the env config is missing', () => {

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { supabase } from '../../lib/supabase';
-import { showError } from '../../lib/showError';
+import { supabase } from '@family/infra';
+import { showError } from '@family/infra';
 
 type SessionContextType = {
   session: Session | null;

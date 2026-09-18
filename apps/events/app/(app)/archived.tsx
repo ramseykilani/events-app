@@ -9,20 +9,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { supabase } from '../../lib/supabase';
-import { showAlert } from '../../lib/dialogs';
+import { supabase } from '@family/infra';
+import { showAlert } from '@family/infra';
 import { localDateString } from '../../lib/format';
 import { useSession } from '../_context/SessionContext';
 import type { ArchivedEvent } from '../../lib/types';
-import { useTheme } from '../../hooks/useTheme';
+import { useTheme } from '@family/design';
 import { EventCard } from '../../components/EventCard';
-import { AppHeader } from '../../components/AppHeader';
-import { Chip } from '../../components/Chip';
+import { AppHeader } from '@family/design';
+import { Chip } from '@family/design';
 import {
   previewFromCalendarEvent,
   rememberEventPreview,
 } from '../../lib/eventPreviewCache';
-import { isAbortError, withRetries, withWriteTimeout } from '../../lib/timeoutSignal';
+import { isAbortError, withRetries, withWriteTimeout } from '@family/infra';
 
 // The Archived drawer (Archive Received Events, FEATURES.md 2026-09-01):
 // every archived received event, upcoming first (nearest at top), then past

@@ -1,26 +1,21 @@
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../useTheme';
 
-// The one high-emphasis action per view (FEATURES.md → Design System
-// Consolidation; audit UX-05): primaryButtonBg fill, 16px/600 label assigned
-// to the design language's §4 Body rung, radius 12, minHeight 48. The tier
-// accepts no fontSize/borderRadius overrides — the tier is the grammar.
+// The second tier (FEATURES.md → Design System Consolidation): same geometry
+// as PrimaryButton, surfaceSecondary fill — visibly subordinate to the one
+// primary action per view. No fontSize/borderRadius overrides.
 
 type Props = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
-  // The working phase is visible (design-language §6): the label swaps to a
-  // spinner while the write is in flight.
   loading?: boolean;
   accessibilityLabel?: string;
-  // compact is for inline row submits (a name gate, a new-circle row) — same
-  // rung and radius, smaller target. fontSize/borderRadius stay unoverridable.
   size?: 'default' | 'compact';
   testID?: string;
 };
 
-export function PrimaryButton({
+export function SecondaryButton({
   label,
   onPress,
   disabled,
@@ -36,7 +31,7 @@ export function PrimaryButton({
       style={[
         styles.button,
         size === 'compact' && styles.compact,
-        { backgroundColor: theme.primaryButtonBg },
+        { backgroundColor: theme.surfaceSecondary },
         inactive && styles.dimmed,
       ]}
       onPress={onPress}
@@ -48,9 +43,9 @@ export function PrimaryButton({
       testID={testID}
     >
       {loading ? (
-        <ActivityIndicator color={theme.primaryButtonText} />
+        <ActivityIndicator color={theme.textPrimary} />
       ) : (
-        <Text style={[styles.label, { color: theme.primaryButtonText }]}>{label}</Text>
+        <Text style={[styles.label, { color: theme.textPrimary }]}>{label}</Text>
       )}
     </TouchableOpacity>
   );

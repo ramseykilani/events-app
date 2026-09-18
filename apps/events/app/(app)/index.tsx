@@ -1,13 +1,13 @@
 import { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useFocusEffect, router } from 'expo-router';
-import { useTheme } from '../../hooks/useTheme';
+import { useTheme } from '@family/design';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Calendar } from '../../components/Calendar';
 import { NotificationPermissionGate } from '../../components/NotificationPermissionGate';
 import { useSession } from '../_context/SessionContext';
-import { supabase } from '../../lib/supabase';
-import { withRetries } from '../../lib/timeoutSignal';
+import { supabase } from '@family/infra';
+import { withRetries } from '@family/infra';
 import type { CalendarEvent } from '../../lib/types';
 
 const ONBOARDING_KEY = 'onboarding_complete';

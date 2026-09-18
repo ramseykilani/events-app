@@ -1,5 +1,5 @@
 import { StyleSheet, Text, TouchableOpacity, type ViewStyle } from 'react-native';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../useTheme';
 
 // The quiet tier (FEATURES.md → Design System Consolidation): a text action
 // with a real 44pt target — the pattern people's textAction pioneered.

@@ -4,10 +4,10 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { ThemeProvider } from '@react-navigation/native';
 import { SessionContextProvider, useSession } from './_context/SessionContext';
-import { ThemeContextProvider, useThemePreference } from './_context/ThemeContext';
-import { supabase } from '../lib/supabase';
+import { ThemeContextProvider, useThemePreference } from '@family/design';
+import { supabase } from '@family/infra';
 import { getExpoPushToken } from '../lib/pushNotifications';
-import { navigationTheme, themedScreenOptions } from '../lib/navigationTheme';
+import { navigationTheme, themedScreenOptions } from '@family/design';
 
 LogBox.ignoreLogs(['unable to keep activate awake']);
 

@@ -1,5 +1,5 @@
 import { Alert, Platform } from 'react-native';
-import { showAlert, showConfirm } from '../../lib/dialogs';
+import { showAlert, showConfirm } from '@family/infra';
 
 describe('lib/dialogs', () => {
   beforeEach(() => {

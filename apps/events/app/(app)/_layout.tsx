@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
-import { useTheme } from '../../hooks/useTheme';
-import { themedScreenOptions } from '../../lib/navigationTheme';
+import { useTheme } from '@family/design';
+import { themedScreenOptions } from '@family/design';
 
 export default function AppLayout() {
   const theme = useTheme();

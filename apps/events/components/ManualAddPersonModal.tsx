@@ -1,12 +1,12 @@
 import { Modal, View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../lib/supabase';
-import { showAlert } from '../lib/dialogs';
+import { supabase } from '@family/infra';
+import { showAlert } from '@family/infra';
 import { normalizeToE164 } from '../lib/contacts';
-import { useTheme } from '../hooks/useTheme';
-import { isAbortError, withWriteTimeout } from '../lib/timeoutSignal';
-import { AppHeader } from './AppHeader';
+import { useTheme } from '@family/design';
+import { isAbortError, withWriteTimeout } from '@family/infra';
+import { AppHeader } from '@family/design';
 
 type Props = {
   visible: boolean;

@@ -57,13 +57,11 @@ This repo is an npm-workspaces family monorepo (2026-09-18 — root `docs/monore
 apps/events/
   app/(auth)/          Sign-in and OTP verification
   app/(app)/           Authenticated screens (calendar, events, sharing, people, archived drawer, onboarding walkthrough)
-  app/_context/        SessionContext (auth session) and ThemeContext (theme selection + persistence)
-  components/          Calendar (with header theme swatch), EventCard, ShareSheet, PeoplePicker, ContactsPermissionFlow (explainer + recovery), NotificationPermissionGate + NotificationExplainer (push permission ask), AppHeader (the one header grammar), PrimaryButton / SecondaryButton / TextAction (the three button tiers), IconButton
-  constants/           Colors.ts — role-token palettes for paper/evening + the theme registry
+  app/_context/        SessionContext (auth session)
+  components/          Calendar (with header theme swatch), EventCard, ShareSheet, PeoplePicker, ContactsPermissionFlow (explainer + recovery), NotificationPermissionGate + NotificationExplainer (push permission ask)
   docs/                Events product docs: architecture, product, monetization, affiliate programs, A2P
   e2e/                 Playwright e2e suite (desktop + mobile-web); shared fixtures in fixtures.ts
-  hooks/               useTheme (active theme palette from ThemeContext) and other shared hooks
-  lib/                 supabase.ts, types.ts, contacts.ts, reservedPhone.ts, pushNotifications.ts, showError.ts, dialogs.ts, format.ts, applyWebBrowserChrome.ts, timeoutSignal.ts, calendarLinks.ts (+ platform-split addToCalendar.ts), affiliateLinks.ts (+ affiliateRegistry.ts)
+  lib/                 types.ts, contacts.ts, pushNotifications.ts, format.ts, calendarLinks.ts (+ platform-split addToCalendar.ts), affiliateLinks.ts (+ affiliateRegistry.ts), eventPreviewCache.ts, deliveryStatus.ts
   app/+html.tsx        Web HTML shell (default Paper theme-color / body background)
   manual-tests/        Cloud manual regression suite, report templates, known-issues ledger
   assets/              Launcher icon, adaptive foreground, splash, favicon, notification glyph (Paper E’s)
@@ -72,6 +70,9 @@ apps/events/
   receipt/             Who's Coming receipt page (static, one page) — deployed to the events-reply Pages project via npm run deploy:receipt
   landing/             Beta landing page + the beta signup form (static, two pages) — live at events-landing.pages.dev via npm run deploy:landing (agent-run, no CI; deploy only on a green staging push)
   landing-v2/          Three-One-Four landing redesign candidate (static, no JS) — events-landing-v2.pages.dev via npm run deploy:landing-v2 (same rules; FEATURES.md → Landing Page Redesign)
+packages/
+  design/              @family/design — Colors.ts role-token palettes + theme registry, ThemeContext, useTheme, applyWebBrowserChrome, navigationTheme, and the primitives (AppHeader, the three button tiers, IconButton, ThemedSwitch, Chip)
+  infra/               @family/infra — supabase.ts, timeoutSignal.ts, dialogs.ts, showError.ts, authErrors.ts, reservedPhone.ts
 scripts/               (repo root) Family tooling: conventions checker, manual test preflight runner, test-account provisioning, release-review orchestrator
 ```
 

@@ -1,5 +1,5 @@
-import { Colors, THEME_REGISTRY } from '../../constants/Colors';
-import { navigationTheme, themedScreenOptions } from '../../lib/navigationTheme';
+import { Colors, THEME_REGISTRY } from '@family/design';
+import { navigationTheme, themedScreenOptions } from '@family/design';
 
 // Regression guard for Screen Transition Polish (2026-09-01): React Navigation's
 // default card/container background is white, which flashed at the screen edge

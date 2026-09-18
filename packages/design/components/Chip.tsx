@@ -1,5 +1,5 @@
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, type ViewStyle } from 'react-native';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../useTheme';
 
 // The pill shape (FEATURES.md → Design System Consolidation): fully rounded,
 // surfaceSecondary fill (selectedBg when selected), 14px/600 label, real

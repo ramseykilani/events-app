@@ -1,5 +1,5 @@
 import { DefaultTheme, type Theme } from '@react-navigation/native';
-import type { ThemePalette } from '../constants/Colors';
+import type { ThemePalette } from './Colors';
 
 // React Navigation's default card/container background is white. During stack
 // transitions on Android the moving card's edge exposes it — invisible in

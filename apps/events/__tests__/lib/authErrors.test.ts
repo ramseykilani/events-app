@@ -1,4 +1,4 @@
-import { getAuthUserMessage } from '../../lib/authErrors';
+import { getAuthUserMessage } from '@family/infra';
 
 describe('lib/authErrors', () => {
   it('maps otp_expired / invalid token errors to friendly copy', () => {

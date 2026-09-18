@@ -99,14 +99,14 @@ runs on every `production-*` push, and deploys are path-scoped by CI.
 
 ## Verification checklist
 
-- [ ] Fast checks green locally and in CI on the move push
-- [ ] Full local desktop-Chrome e2e green; CI three-browser matrix green
-- [ ] Pixel-diff baselines pass unchanged
-- [ ] `git log --follow` shows pre-move history on moved files (agent pastes output below)
-- [ ] `production-events` branch page matches `production` SHA (owner)
+- [x] Fast checks green locally and in CI on the move push (run 35397975241: `full-suite / checks` + all three `e2e-browsers` legs + aggregator, all success)
+- [x] Full local desktop-Chrome e2e green (60/60, fresh pair +15555550133/0134); CI three-browser matrix green
+- [x] Pixel-diff baselines pass unchanged (visual.spec passed in all three CI legs with no baseline changes)
+- [x] `git log --follow` shows pre-move history on moved files (output below)
+- [ ] `production-events` branch page matches `production` SHA (owner) — both at `545ca23`
 - [ ] Staging preview click-through (owner)
-- [ ] Production site untouched throughout
-- [ ] EAS preview APK builds and sideloads (owner smoke test)
+- [x] Production site untouched throughout (no production deploy happened)
+- [x] EAS preview APK builds from the new layout: https://expo.dev/accounts/rkilani/projects/events-app/builds/55393a5a-ee93-4d2d-83bf-a93ce0a6f0be — owner sideload smoke test pending
 - [ ] Old `production` deleted only after owner says verified
 
 ## Rollback
@@ -116,4 +116,44 @@ force-pushes. Nothing irreplaceable is deleted before the owner gate.
 
 ## Verification results
 
-(Filled in as the migration completes.)
+### Settings flips
+
+- Cloudflare Pages `shared-events` production branch: **flipped to
+  `production-events` by the agent via the API** (verified read-back).
+- GitHub branch protection for `production-events` and the default-branch
+  flip to `staging`: the agent's token has no admin rights (403), so these
+  are owner clicks — see "Owner click-paths" above.
+
+### `git log --follow` evidence (post-move)
+
+```
+=== apps/events/components/AppHeader.tsx
+911ff25 Monorepo move: Events app to apps/events/, npm workspaces
+1b60f35 Button tiers: compact inline size, Chip pill, AppHeader rightAccessory
+73292b5 Add AppHeader + three-tier button set (Design System Consolidation)
+
+=== apps/events/lib/timeoutSignal.ts
+911ff25 Monorepo move: Events app to apps/events/, npm workspaces
+23b23c7 Update stale find_or_create_event references in timeoutSignal comments
+c9f5270 Fix KI-013: bound every Supabase call with a 20s backstop fetch
+d194ddc Split timeout budgets by kind so a write can never take the 2s read budget
+8e9c239 Give writes their own timeout so edit Save is not aborted at 2s
+2265ab1 Paint event detail immediately and abort hung fetches
+
+=== apps/events/app/(app)/index.tsx
+911ff25 Monorepo move: Events app to apps/events/, npm workspaces
+5aedadc Location: free-text events.location threaded through Copy + Follow (In progress)
+af75539 Archive Received Events: Archive/Restore on event detail, say-No prompt, Archived drawer + calendar link
+4d79e88 Copy + Follow: per-user events rows with silent edit cascade
+7990cc1 Gate the OS notification prompt behind an in-app explainer
+```
+
+### Local e2e incident note (not a product bug)
+
+The first local e2e run failed 8 specs with strict-mode violations (two
+"E2E Account B" rows). Root cause: `create-test-accounts.mjs --fresh-pair`
+checks `sms_test_otp` registration, not live `auth.users` rows, and handed
+out a recycled number (0180, provisioned 2026-09-01) whose account still had
+a person row for its original pair-mate. Re-running with a verified-empty
+pair (0133/0134) passed 60/60. Tooling gap worth fixing separately: the
+fresh-pair picker should also exclude numbers with existing auth users.

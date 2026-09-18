@@ -3,10 +3,10 @@ import { router } from 'expo-router';
 import type { MyPerson, Circle, Send } from '../lib/types';
 import { formatPhoneDisplay } from '../lib/format';
 import { shareDeliveryStatus } from '../lib/deliveryStatus';
-import { useTheme } from '../hooks/useTheme';
-import { Chip } from './Chip';
-import { PrimaryButton } from './PrimaryButton';
-import { TextAction } from './TextAction';
+import { useTheme } from '@family/design';
+import { Chip } from '@family/design';
+import { PrimaryButton } from '@family/design';
+import { TextAction } from '@family/design';
 
 type Props = {
   people: MyPerson[];

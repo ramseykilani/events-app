@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '@family/design';
 
 // Web-only date/time inputs. @react-native-community/datetimepicker is
 // native-only (its pickers never open in the browser), so the add/edit event

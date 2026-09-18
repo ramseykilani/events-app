@@ -16,12 +16,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Crypto from 'expo-crypto';
 import { WebDateInput, WebTimeInput, isPlausibleEventDate } from '../../components/WebDateTimeInputs';
-import { supabase } from '../../lib/supabase';
-import { showAlert } from '../../lib/dialogs';
+import { supabase } from '@family/infra';
+import { showAlert } from '@family/infra';
 import { useSession } from '../_context/SessionContext';
-import { useTheme } from '../../hooks/useTheme';
-import { isAbortError, withFetchTimeout, withWriteTimeout } from '../../lib/timeoutSignal';
-import { AppHeader } from '../../components/AppHeader';
+import { useTheme } from '@family/design';
+import { isAbortError, withFetchTimeout, withWriteTimeout } from '@family/infra';
+import { AppHeader } from '@family/design';
 
 export default function AddEventScreen() {
   const { session } = useSession();

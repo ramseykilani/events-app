@@ -14,11 +14,11 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { WebDateInput, WebTimeInput, isPlausibleEventDate } from '../../components/WebDateTimeInputs';
-import { supabase } from '../../lib/supabase';
-import { showAlert, showConfirm } from '../../lib/dialogs';
+import { supabase } from '@family/infra';
+import { showAlert, showConfirm } from '@family/infra';
 import { useSession } from '../_context/SessionContext';
 import type { Event } from '../../lib/types';
-import { useTheme } from '../../hooks/useTheme';
+import { useTheme } from '@family/design';
 import {
   eventFromPreview,
   previewFromEvent,
@@ -29,9 +29,9 @@ import {
   isAbortError,
   withRetries,
   withWriteTimeout,
-} from '../../lib/timeoutSignal';
-import { AppHeader } from '../../components/AppHeader';
-import { TextAction } from '../../components/TextAction';
+} from '@family/infra';
+import { AppHeader } from '@family/design';
+import { TextAction } from '@family/design';
 
 function firstParam(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
