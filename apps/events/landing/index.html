@@ -44,6 +44,11 @@
   is the hero visual (the seed grid was rejected), no header nav, How it
   works stays on the page ground, the CTA keeps its 12px radius.
 
+  Video + UX pass (FEATURES.md → Landing Page Video + UX Pass, 2026-09-24):
+  the CTA moves into the hero, How it works pairs the explainer video
+  (click-to-load YouTube, nothing third-party until the visitor presses
+  play) with the three steps, and the beta block closes the page.
+
   Copy refresh (FEATURES.md → Landing Page Copy Refresh, 2026-09-24): the
   hero is sender-first, How it works is the loop (find / pick / hear), the
   mock shows both halves (a From X row and one of your own shares with its
@@ -364,9 +369,11 @@
     font-weight: 600;
     margin: 0 0 8px;
   }
+  /* The closing CTA: after the reader has seen the loop, the page ends on
+     the same ask the hero made. */
   .beta {
     max-width: 1080px;
-    margin: 0 auto;
+    margin: 64px auto 0;
   }
   .beta p { margin: 0 0 20px; }
   /* Prose keeps a reading measure inside the full-width section. */
@@ -388,32 +395,102 @@
     text-decoration: none;
     box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 12%, transparent);
   }
-  .fallback {
-    background: var(--surface);
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    padding: 16px 20px;
-    margin-top: 24px;
+  /* The hero carries the CTA (2026-09-24 UX pass) so a phone visitor meets
+     it before the mock, not after it; the note under it is the beta status
+     in one quiet line. On desktop the button hugs its label. */
+  .hero-actions { margin-top: 28px; }
+  .hero-actions .cta,
+  .beta .cta {
+    display: inline-flex;
+    margin: 0;
+    padding: 0 32px;
   }
-  .fallback p {
+  .cta-note {
+    font-size: 14px;
+    color: var(--text-tertiary);
+    margin: 12px 0 0;
+  }
+  /* The email fallback is one quiet line, not a second box competing with
+     the CTA. */
+  .beta .fallback {
     font-size: 14px;
     color: var(--text-secondary);
-    margin: 0 0 12px;
+    margin: 16px 0 0;
     max-width: 65ch;
   }
   .fallback .address { color: var(--text-primary); font-weight: 500; }
-  .template div {
-    font-size: 15px;
-    line-height: 1.6;
+  /* How it works: the video and the three steps side by side on desktop
+     (video left, mirroring the hero's text-left / mock-right), stacked
+     video-first on phones. */
+  .how-grid {
+    display: grid;
+    grid-template-columns: 6fr 5fr;
+    gap: 48px;
+    align-items: start;
+    margin-top: 20px;
   }
+  /* The click-to-load poster: drawn in the page's own tokens (no YouTube
+     thumbnail request), so it follows the mood like everything else. */
+  .video {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    overflow: hidden;
+    color: var(--text-primary);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .video .play {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--primary-button-bg);
+    display: grid;
+    place-items: center;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 16%, transparent);
+    transition: transform 120ms ease;
+  }
+  .video:hover .play { transform: scale(1.06); }
+  .video .tri {
+    width: 0;
+    height: 0;
+    margin-left: 5px;
+    border-style: solid;
+    border-width: 11px 0 11px 18px;
+    border-color: transparent transparent transparent var(--primary-button-text);
+  }
+  .video-label {
+    font-family: var(--title-font);
+    font-weight: var(--title-weight);
+    font-size: 22px;
+  }
+  .video-note { font-size: 13px; color: var(--text-tertiary); }
+  .video iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+  .video.playing { cursor: default; background: var(--shadow); }
   /* How it works: three hairline-separated rows — mono numeral, title in
      the theme's title face, one-or-two-sentence body — ported from the
      Three-One-Four candidate, renumbered 01/02/03, on the page ground
-     (owner rulings 2026-09-03). Placed after the beta block: the CTA
-     stays high. */
+     (owner rulings 2026-09-03). Since the 2026-09-24 UX pass it sits
+     right under the hero, beside the video — the hero carries the CTA, so
+     the beta block moved to the end as the closing ask. */
   .how {
     max-width: 1080px;
-    margin: 64px auto 0;
+    margin: 24px auto 0;
   }
   .principle {
     display: grid;
@@ -480,6 +557,15 @@
       gap: 44px;
       padding-top: 24px;
     }
+    .how-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+  }
+  /* Phones: the hero CTA spans the column, like the app's primary buttons. */
+  @media (max-width: 560px) {
+    .hero-actions .cta,
+    .beta .cta { display: flex; }
   }
 </style>
 <!-- Without JS the mock and swatch are inert; the hero collapses to one
@@ -500,7 +586,11 @@
     <div>
       <p class="eyebrow">Shows · games · openings</p>
       <h1>Going to something? <em class="em">Tell your people</em> once.</h1>
-      <p class="sub">Share it with everyone you'd want there. It lands on their calendar, or in a text if they don't have the app, and they tell you if they're coming.</p>
+      <p class="sub">Share it with the people you'd want there. It lands on their calendar, or as a text if they don't have the app. They tell you if they're coming.</p>
+      <div class="hero-actions">
+        <a class="cta" href="/signup">Get the beta</a>
+        <p class="cta-note">Closed beta · iPhone and Android</p>
+      </div>
     </div>
 
     <div class="mock" id="mock" aria-hidden="true">
@@ -511,18 +601,20 @@
     </div>
   </section>
 
-  <section class="beta">
-    <h2>In closed beta</h2>
-    <p>Events is in closed beta on iPhone and Android.</p>
-    <a class="cta" href="/signup">Get the beta</a>
-    <div class="fallback">
-      <p>Prefer email? Write to <span class="address">kilani.ramsey@gmail.com</span> — say who you are and whether you're on iPhone or Android.</p>
-    </div>
-  </section>
-
   <section class="how" aria-labelledby="how-title">
     <h2 id="how-title">How it works</h2>
 
+    <div class="how-grid">
+    <!-- Click-to-load: nothing from YouTube loads until the visitor asks
+         (no third-party requests on page open — the no-analytics rule).
+         Without JS the poster is a plain link to the video. -->
+    <a class="video" id="video" href="https://youtu.be/sCRhrfuBjQo" aria-label="Play the Events video">
+      <span class="play" aria-hidden="true"><span class="tri"></span></span>
+      <span class="video-label">Watch it in action</span>
+      <span class="video-note">Plays from YouTube</span>
+    </a>
+
+    <div class="steps">
     <div class="principle">
       <span class="num" aria-hidden="true">01</span>
       <div>
@@ -546,9 +638,18 @@
         <p>Each person tells you if they're coming, from the app or straight from the text. Only you see the answers.</p>
       </div>
     </div>
+    </div>
+    </div>
 
     <p class="how-close">Nothing is posted and nothing is public. Events only speaks up when a person shares something with you or answers you.</p>
     <p class="how-close">Questions? <a href="/faq">Read the FAQ</a>.</p>
+  </section>
+
+  <section class="beta">
+    <h2>In closed beta</h2>
+    <p>Events is in closed beta on iPhone and Android. Tell us which phone you're on, and your invite comes to you automatically.</p>
+    <a class="cta" href="/signup">Get the beta</a>
+    <p class="fallback">Prefer email? Write to <span class="address">kilani.ramsey@gmail.com</span> and say whether you're on iPhone or Android.</p>
   </section>
 </main>
 <footer>
@@ -669,6 +770,32 @@
     render();
   });
   render();
+})();
+</script>
+<script>
+(function () {
+  // Click-to-load video: swap the poster for the privacy-enhanced YouTube
+  // player only when asked, so opening the page makes no request to Google.
+  // Modified clicks (new tab) fall through to the plain link.
+  var v = document.getElementById('video');
+  if (!v) return;
+  v.addEventListener('click', function (e) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    if (v.classList.contains('playing')) return;
+    e.preventDefault();
+    var f = document.createElement('iframe');
+    f.src = 'https://www.youtube-nocookie.com/embed/sCRhrfuBjQo?autoplay=1&rel=0&playsinline=1';
+    f.title = 'Events: how it works (video)';
+    f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    f.setAttribute('allowfullscreen', '');
+    // YouTube refuses embeds that send no Referer.
+    f.referrerPolicy = 'strict-origin-when-cross-origin';
+    v.textContent = '';
+    v.appendChild(f);
+    v.classList.add('playing');
+    v.removeAttribute('href');
+    v.removeAttribute('aria-label');
+  });
 })();
 </script>
 </body>

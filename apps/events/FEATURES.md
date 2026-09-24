@@ -2407,6 +2407,36 @@ The landing page's copy was accurate but pitched at the wrong reader. The headli
 
 ---
 
+## Landing Page Video + UX Pass
+
+**Status:** Implemented (2026-09-24) — on a preview deploy for owner review; production (`npm run deploy:landing`) only on owner approval. Follows [Landing Page Copy Refresh](#landing-page-copy-refresh-sender-first--faq); owner asked for a full copy + UX pass and the new explainer video (`https://youtu.be/sCRhrfuBjQo`) on the page ("change what you think could be improved").
+
+### Problem
+
+On a phone the only CTA sat below the hero's full-height mock, so a visitor scrolled past the whole product shot before meeting the ask. The beta block said the same thing twice ("In closed beta" / "Events is in closed beta…") without saying what happens after signing up, and the email fallback was a bordered box competing with the button. The hero sub was one long run-on sentence. There was no video, and How it works was text-only.
+
+### Solution
+
+- **CTA in the hero:** "Get the beta" under the sub, with one quiet status line ("Closed beta · iPhone and Android"). Full-width on phones, label-hugging on desktop. The hero is now text → CTA → mock on phones.
+- **How it works = video + steps:** right under the hero; desktop pairs the video (left) with the 01/02/03 steps (right), mirroring the hero's text-left / mock-right; phones stack video first. The closing "nothing is public" line and FAQ link stay under it.
+- **Video is click-to-load:** a poster drawn in the page's own tokens (play disc, "Watch it in action", "Plays from YouTube") — no YouTube thumbnail, iframe, or script loads until the visitor presses play, keeping the no-analytics / no-third-party-on-open rule. Play swaps in the privacy-enhanced `youtube-nocookie.com` embed in place (autoplay, `rel=0`, `playsinline`, `strict-origin-when-cross-origin` referrer — YouTube refuses embeds without one). Without JS, or on a modified click, the poster is a plain link to the video. Frame is 16:9.
+- **Beta block closes the page:** same heading and CTA; body now says what happens next ("Tell us which phone you're on, and your invite comes to you automatically."); the email fallback is one quiet line.
+- **Sub tightened** to three short sentences; meta/OG descriptions unchanged; OG card regenerated (the generator hides the hero CTA).
+
+### Acceptance Criteria
+
+- [x] Hero CTA + status line; mobile order sub → CTA → mock
+- [x] Video beside the steps (stacked on phones), 16:9, click-to-load, zero third-party requests on page open
+- [x] Beta block after How it works with the next-step line and a one-line email fallback
+- [x] `e2e/landing.spec.ts` updated (new click-to-load test) and green on desktop + mobile Chrome locally; CI runs all three browsers
+- [ ] Preview deploy reviewed by the owner before production
+
+### Open Questions
+
+- If the video is vertical (a Short), the 16:9 frame letterboxes it — switch the frame to 9:16 beside the steps.
+
+---
+
 ## Already-Added Contacts in Add People
 
 **Status:** Planned — recorded 2026-09-05 from owner feedback. **Not designed; do not implement from this section.** Related: [Manual Add Discoverability on Native](#manual-add-discoverability-on-native) (a different Add People gap — finding the manual path, not who appears in the picker).

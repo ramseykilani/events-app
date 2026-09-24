@@ -17,6 +17,9 @@ import { expect, test } from './fixtures';
 // (2026-09-24) made the hero sender-first, turned How it works into the
 // find / pick / hear loop, showed both halves of the loop in the mock,
 // added the FAQ page (/faq) and link-preview tags, and bans price talk.
+// Video + UX pass (2026-09-24): the CTA moves into the hero, How it works
+// pairs a click-to-load explainer video with the steps, and the beta block
+// becomes the closing ask after How it works.
 
 const LANDING_URL = process.env.E2E_LANDING_URL ?? 'http://localhost:8083';
 const FAQ_URL = `${LANDING_URL}/faq.html`;
@@ -24,6 +27,7 @@ const OG_IMAGE_URL = 'https://events-landing.pages.dev/og-image.png';
 const PRIVACY_URL = 'https://shared-events.pages.dev/privacy.html';
 
 const PLAY_OPT_IN_URL = 'https://play.google.com/apps/internaltest/4701427612732216042';
+const VIDEO_URL = 'https://youtu.be/sCRhrfuBjQo';
 
 // og:image must be absolute, so it points at the production host; the file
 // itself ships in landing/ and must be a real 1200×630 card.
@@ -65,7 +69,7 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   await expect(hero).toHaveText('Going to something? Tell your people once.');
   expect(await hero.evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Georgia');
   await expect(page.locator('.sub')).toHaveText(
-    "Share it with everyone you'd want there. It lands on their calendar, or in a text if they don't have the app, and they tell you if they're coming."
+    "Share it with the people you'd want there. It lands on their calendar, or as a text if they don't have the app. They tell you if they're coming."
   );
 
   // The eyebrow carries the accent dot; with the italic phrase it is the
@@ -114,22 +118,31 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   await expect(page.locator('.beta')).toContainText(
     'Events is in closed beta on iPhone and Android.'
   );
+  await expect(page.locator('.beta')).toContainText('your invite comes to you automatically');
   await expect(page.locator('.beta')).not.toContainText('personally');
   await expect(page.locator('.beta')).not.toContainText('Apple sends two emails');
 
   // The CTA links to the signup form (Beta Signup Pipeline — it replaced
-  // the prefilled mailto once the form was verified live).
-  const cta = page.getByRole('link', { name: 'Get the beta' });
-  await expect(cta).toBeVisible();
-  expect(await cta.getAttribute('href')).toBe('/signup');
+  // the prefilled mailto once the form was verified live). It appears
+  // twice: in the hero (with the one-line beta status under it) and as the
+  // closing ask — the same verb and destination both times.
+  const ctas = page.getByRole('link', { name: 'Get the beta' });
+  await expect(ctas).toHaveCount(2);
+  for (const cta of await ctas.all()) {
+    await expect(cta).toBeVisible();
+    expect(await cta.getAttribute('href')).toBe('/signup');
+  }
+  await expect(page.locator('.hero .cta')).toHaveText('Get the beta');
+  await expect(page.locator('.hero .cta-note')).toHaveText('Closed beta · iPhone and Android');
 
   // The owner email stays as a quiet copyable fallback line.
   const fallback = page.locator('.fallback');
   await expect(fallback).toBeVisible();
   await expect(fallback).toContainText('kilani.ramsey@gmail.com');
 
-  // How it works: the loop as three hairline-separated steps after the beta
-  // block (the CTA stays high), numbered 01/02/03 — the candidate's
+  // How it works: the loop as three hairline-separated steps, beside the
+  // explainer video, right after the hero (the hero carries the CTA now),
+  // numbered 01/02/03 — the candidate's
   // 01/02/04 seed gag and its missing-03 footnote do not ship. The old
   // principles survive as one closing line, followed by the quiet FAQ link.
   const how = page.locator('.how');
@@ -151,9 +164,12 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
 
   // No price talk anywhere (owner 2026-09-24: "it's just noise").
   await expect(page.locator('body')).not.toContainText(/\bfree\b|\bprice\b|\$\d/i);
+  // Order: hero (with its CTA) → How it works → the closing beta block.
   const betaBox = await page.locator('.beta').boundingBox();
   const howBox = await how.boundingBox();
-  expect(howBox!.y).toBeGreaterThan(betaBox!.y + betaBox!.height);
+  const heroBottom = await page.locator('.hero').boundingBox();
+  expect(howBox!.y).toBeGreaterThanOrEqual(heroBottom!.y + heroBottom!.height);
+  expect(betaBox!.y).toBeGreaterThan(howBox!.y + howBox!.height);
 
   // One 1080px measure for the whole page: hero, beta, How it works, and
   // footer share the same width and left edge (owner call 2026-09-03 —
@@ -185,7 +201,8 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   await expectLinkPreview(page, 'https://events-landing.pages.dev/');
 
   // Link audit: every anchor is the signup form, the FAQ, the privacy
-  // policy (the one allowed shared-events page), or the Play opt-in. No
+  // policy (the one allowed shared-events page), the Play opt-in, or the
+  // explainer video (the click-to-load poster's no-JS fallback). No
   // web-app links, no custom-scheme URLs — and no in-page anchors: the
   // header nav was ruled out 2026-09-03 (two anchors don't earn the chrome
   // on a page this short).
@@ -196,7 +213,11 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   expect(hrefs.length).toBeGreaterThan(0);
   for (const a of hrefs) {
     expect(
-      a === '/signup' || a === '/faq' || a === PRIVACY_URL || a === PLAY_OPT_IN_URL
+      a === '/signup' ||
+        a === '/faq' ||
+        a === PRIVACY_URL ||
+        a === PLAY_OPT_IN_URL ||
+        a === VIDEO_URL
     ).toBe(true);
     expect(a).not.toContain('events-app://');
     expect(a.startsWith('#')).toBe(false);
@@ -215,10 +236,13 @@ test('hero is two-column on desktop, stacked with the mock after the text on mob
   expect(headBox).not.toBeNull();
 
   if (isMobile) {
-    // Stacked: the mock sits below the sub.
+    // Stacked: the sub, then the CTA — a phone visitor meets the ask before
+    // scrolling past the mock — then the mock.
     const subBox = await page.locator('.sub').boundingBox();
+    const ctaBox = await page.locator('.hero .cta').boundingBox();
     expect(subBox).not.toBeNull();
-    expect(mockBox!.y).toBeGreaterThanOrEqual(subBox!.y + subBox!.height);
+    expect(ctaBox!.y).toBeGreaterThanOrEqual(subBox!.y + subBox!.height);
+    expect(mockBox!.y).toBeGreaterThanOrEqual(ctaBox!.y + ctaBox!.height);
   } else {
     // Two-column: the mock is right of the headline column and shares its
     // vertical band (grid align-items: center). The mock carries the
@@ -227,6 +251,49 @@ test('hero is two-column on desktop, stacked with the mock after the text on mob
     expect(mockBox!.y).toBeLessThan(headBox!.y + headBox!.height);
     expect(mockBox!.width).toBeGreaterThan(380);
   }
+});
+
+test('explainer video is click-to-load: nothing from YouTube until play is pressed', async ({
+  page,
+  isMobile,
+}) => {
+  // Record every third-party request the page makes on open.
+  const external: string[] = [];
+  page.on('request', (req) => {
+    if (!req.url().startsWith(LANDING_URL)) external.push(req.url());
+  });
+  await page.goto(LANDING_URL);
+
+  const how = page.locator('.how');
+  const poster = how.getByRole('link', { name: 'Play the Events video' });
+  await expect(poster).toBeVisible();
+  await expect(poster).toHaveAttribute('href', VIDEO_URL);
+  await expect(poster).toContainText('Watch it in action');
+  // A real 16:9 frame, not a thumbnail-sized chip.
+  const box = await poster.boundingBox();
+  expect(Math.abs(box!.width / box!.height - 16 / 9)).toBeLessThan(0.02);
+
+  // Desktop: the video sits left of the steps; phones: stacked, video first.
+  const stepsBox = await how.locator('.steps').boundingBox();
+  if (isMobile) expect(stepsBox!.y).toBeGreaterThanOrEqual(box!.y + box!.height);
+  else expect(stepsBox!.x).toBeGreaterThanOrEqual(box!.x + box!.width);
+
+  // Nothing third-party loads on open (no-analytics rule).
+  await expect(page.locator('iframe')).toHaveCount(0);
+  expect(external).toEqual([]);
+
+  // Pressing play swaps the poster for the privacy-enhanced embed in place.
+  // Block the embed itself so the spec never depends on YouTube.
+  await page.route('https://www.youtube-nocookie.com/**', (route) => route.abort());
+  await poster.click();
+  const frame = how.locator('#video iframe');
+  await expect(frame).toHaveCount(1);
+  expect(await frame.getAttribute('src')).toBe(
+    'https://www.youtube-nocookie.com/embed/sCRhrfuBjQo?autoplay=1&rel=0&playsinline=1'
+  );
+  await expect(frame).toHaveAttribute('title', /video/i);
+  await expect(frame).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  expect(page.url()).toBe(`${LANDING_URL}/`);
 });
 
 test('swatch toggles to Evening, persists across reload, no first-paint flash', async ({

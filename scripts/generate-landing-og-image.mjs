@@ -25,7 +25,7 @@ await page.reload();
 await page.addStyleTag({
   content: `
     body { padding: 0 !important; }
-    .beta, .how, footer, #mock-month, #theme-swatch { display: none !important; }
+    .beta, .how, .hero-actions, footer, #mock-month, #theme-swatch { display: none !important; }
     header { position: absolute; top: 40px; left: 72px; padding: 0 !important; margin: 0 !important; }
     .hero {
       max-width: none !important;
