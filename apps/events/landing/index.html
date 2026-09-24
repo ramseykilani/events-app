@@ -7,6 +7,21 @@
 <meta name="theme-color" content="#faf7f0" />
 <meta name="color-scheme" content="light" />
 <title>Events</title>
+<meta name="description" content="Going to something? Share it with your people once. It lands on their calendar, or in a text if they don't have the app." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Events" />
+<meta property="og:title" content="Events — tell your people once" />
+<meta property="og:description" content="Going to something? Share it with your people once. It lands on their calendar, or in a text if they don't have the app." />
+<meta property="og:url" content="https://events-landing.pages.dev/" />
+<meta property="og:image" content="https://events-landing.pages.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Going to something? Tell your people once. A calendar with shared events on it." />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Events — tell your people once" />
+<meta name="twitter:description" content="Going to something? Share it with your people once. It lands on their calendar, or in a text if they don't have the app." />
+<meta name="twitter:image" content="https://events-landing.pages.dev/og-image.png" />
+<meta name="twitter:image:alt" content="Going to something? Tell your people once. A calendar with shared events on it." />
 <link rel="icon" type="image/png" href="./favicon.png" />
 <!--
   Beta landing page (FEATURES.md → Beta Landing Page). One static page —
@@ -27,8 +42,13 @@
   pulled in from the Three-One-Four candidate (landing-v2/, which stays
   live permanently as a design artifact). Owner rulings: the mock calendar
   is the hero visual (the seed grid was rejected), no header nav, How it
-  works stays on the page ground, the CTA keeps its 12px radius. The mock
-  rows are concert names (2026-09-07), not hangout names.
+  works stays on the page ground, the CTA keeps its 12px radius.
+
+  Copy refresh (FEATURES.md → Landing Page Copy Refresh, 2026-09-24): the
+  hero is sender-first, How it works is the loop (find / pick / hear), the
+  mock shows both halves (a From X row and one of your own shares with its
+  head-count), the FAQ lives on its own page (./faq.html), and link-preview
+  tags point at og-image.png. No price talk anywhere (owner ruling).
 
   Desktop polish (owner-approved 2026-09-03): the mock grows to 480px so
   the product shot carries the hero's right column, every section spans
@@ -335,6 +355,9 @@
   }
   .mock-event .t { font-size: 15px; font-weight: 500; }
   .mock-event .f { font-size: 13px; color: var(--accent); white-space: nowrap; }
+  /* The send side: your own share's head-count stays secondary — the accent
+     is spent only on From X, dots, and the selected day. */
+  .mock-event .c { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
   .mock-event .m { font-size: 13px; color: var(--text-secondary); }
   h2 {
     font-size: 18px;
@@ -347,8 +370,7 @@
   }
   .beta p { margin: 0 0 20px; }
   /* Prose keeps a reading measure inside the full-width section. */
-  .beta > p,
-  .guidance {
+  .beta > p {
     max-width: 65ch;
   }
   /* The one CTA wears the primary-button roles (§3 accent discipline). */
@@ -365,10 +387,6 @@
     font-weight: 600;
     text-decoration: none;
     box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 12%, transparent);
-  }
-  .guidance {
-    font-size: 14px;
-    color: var(--text-secondary);
   }
   .fallback {
     background: var(--surface);
@@ -421,6 +439,15 @@
     color: var(--text-secondary);
     max-width: 60ch;
   }
+  .principle:last-of-type { border-bottom: 1px solid var(--border-light); }
+  .how-close {
+    margin: 0;
+    padding-top: 26px;
+    color: var(--text-secondary);
+    max-width: 65ch;
+  }
+  .how-close + .how-close { padding-top: 8px; }
+  .how-close a { color: var(--link-text); }
   footer {
     max-width: 1080px;
     margin: 48px auto 0;
@@ -442,6 +469,7 @@
   .privacy { margin: 24px 0 0; font-size: 13px; }
   /* A legal link earns no warmth (§3): the privacy link stays tertiary. */
   .privacy a { color: var(--text-tertiary); }
+  .privacy .sep { color: var(--text-tertiary); margin: 0 8px; }
   a:focus-visible, button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -470,9 +498,9 @@
 <main>
   <section class="hero">
     <div>
-      <p class="eyebrow">Person-to-person events</p>
-      <h1>A calendar of events <em class="em">your people</em> share with you.</h1>
-      <p class="sub">Everything on it comes from someone you know. See something you'd go to? Pass it on with a tap. If they don't have the app, they get a text.</p>
+      <p class="eyebrow">For things you're going to anyway</p>
+      <h1>Going to something? <em class="em">Tell your people</em> once.</h1>
+      <p class="sub">Share a show, a game, or an opening with everyone you'd want there. It lands on their calendar, or in a text if they don't have the app, and they tell you if they're coming.</p>
     </div>
 
     <div class="mock" id="mock" aria-hidden="true">
@@ -485,9 +513,8 @@
 
   <section class="beta">
     <h2>In closed beta</h2>
-    <p>Events is in closed beta, and invites go out personally.</p>
+    <p>Events is in closed beta on iPhone and Android.</p>
     <a class="cta" href="/signup">Get the beta</a>
-    <p class="guidance">iPhone: Apple sends two emails — accept the first. Android: we text you the Play testing link once your Gmail is on the tester list.</p>
     <div class="fallback">
       <p>Prefer email? Write to <span class="address">kilani.ramsey@gmail.com</span> — say who you are and whether you're on iPhone or Android.</p>
     </div>
@@ -499,33 +526,36 @@
     <div class="principle">
       <span class="num" aria-hidden="true">01</span>
       <div>
-        <h3>Person to person</h3>
-        <p>Everything on it comes from someone you know — added by you, or shared straight to your calendar. Nothing is posted, and nothing is public.</p>
+        <h3>Find something</h3>
+        <p>Paste the link to a show, a game, or an opening. The name and picture usually fill themselves in.</p>
       </div>
     </div>
 
     <div class="principle">
       <span class="num" aria-hidden="true">02</span>
       <div>
-        <h3>The share is the ask</h3>
-        <p>Sharing an event asks who's coming. A yes or a no finds its way back to the asker — from the app, or straight from the text.</p>
+        <h3>Pick your people</h3>
+        <p>Choose everyone you'd want there. Anyone without the app gets a text with the details.</p>
       </div>
     </div>
 
     <div class="principle">
       <span class="num" aria-hidden="true">03</span>
       <div>
-        <h3>Quiet by design</h3>
-        <p>You hear from Events when a person does something, and never otherwise.</p>
+        <h3>Hear who's in</h3>
+        <p>Each person tells you if they're coming, from the app or straight from the text. Only you see the answers.</p>
       </div>
     </div>
+
+    <p class="how-close">Nothing is posted and nothing is public. Events only speaks up when a person shares something with you or answers you.</p>
+    <p class="how-close">Questions? <a href="/faq">Read the FAQ</a>.</p>
   </section>
 </main>
 <footer>
   <p class="already-title">Already testing?</p>
   <p class="already-line">Android: <a href="https://play.google.com/apps/internaltest/4701427612732216042">open your Play testing link</a> — it works once we've added your Gmail to the tester list.</p>
   <p class="already-line">iPhone: accept the invite email, then open TestFlight and install Events.</p>
-  <p class="privacy"><a href="https://shared-events.pages.dev/privacy.html">Privacy policy</a></p>
+  <p class="privacy"><a href="/faq">FAQ</a><span class="sep" aria-hidden="true">·</span><a href="https://shared-events.pages.dev/privacy.html">Privacy policy</a></p>
 </footer>
 <script>
 (function () {
@@ -581,9 +611,11 @@
       weekday: 'short', month: 'short', day: 'numeric'
     });
   }
+  // Both halves of the loop: one row a friend shared with you (From X, in
+  // the accent) and one you shared, with its head-count (secondary).
   var events = [
-    { title: 'Taylor Swift', meta: fmt(d1) + ' · 8:00 PM', from: 'Alice' },
-    { title: 'Beyoncé', meta: fmt(d2), from: 'Mike' }
+    { title: 'Jazz at the Bandshell', meta: fmt(d1) + ' · 8:00 PM', from: 'Alice' },
+    { title: 'Gallery opening', meta: fmt(d2) + ' · 6:30 PM · You shared with 6', coming: 3 }
   ];
   for (var i = 0; i < events.length; i++) {
     var ev = events[i];
@@ -595,8 +627,13 @@
     t.className = 't';
     t.textContent = ev.title;
     var f = document.createElement('span');
-    f.className = 'f';
-    f.textContent = 'From ' + ev.from;
+    if (ev.from) {
+      f.className = 'f';
+      f.textContent = 'From ' + ev.from;
+    } else {
+      f.className = 'c';
+      f.textContent = ev.coming + ' coming';
+    }
     top.appendChild(t);
     top.appendChild(f);
     var m = document.createElement('div');

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="paper">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#faf7f0" />
+<meta name="color-scheme" content="light" />
+<title>Events — Questions</title>
+<meta name="description" content="Short answers to what people ask about Events: who sees what you share, whether friends need the app, notifications, and more." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Events" />
+<meta property="og:title" content="Events — Questions people ask" />
+<meta property="og:description" content="Short answers to what people ask about Events: who sees what you share, whether friends need the app, notifications, and more." />
+<meta property="og:url" content="https://events-landing.pages.dev/faq" />
+<meta property="og:image" content="https://events-landing.pages.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Going to something? Tell your people once. A calendar with shared events on it." />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Events — Questions people ask" />
+<meta name="twitter:description" content="Short answers to what people ask about Events: who sees what you share, whether friends need the app, notifications, and more." />
+<meta name="twitter:image" content="https://events-landing.pages.dev/og-image.png" />
+<meta name="twitter:image:alt" content="Going to something? Tell your people once. A calendar with shared events on it." />
+<link rel="icon" type="image/png" href="./favicon.png" />
+<!--
+  FAQ page (FEATURES.md → Landing Page Copy Refresh, 2026-09-24). A quiet
+  second page in the landing project, linked from the landing page's How it
+  works close and its footer — never in people's faces. Answers must stay
+  true to the shipped product (check the architecture before editing one),
+  two sentences or so each, and never mention price (owner ruling
+  2026-09-24). Questions are native <details>, so they open without JS.
+
+  Tokens, the theme swatch, and the no-flash bootstrap are the same
+  hand-port as landing/index.html — if constants/Colors.ts moves, move
+  these too.
+-->
+<script>
+(function () {
+  // Runs before first paint so a returning Evening visitor never sees a
+  // Paper flash (same bootstrap as landing/index.html).
+  var themes = {
+    paper:   { label: 'Paper',   background: '#faf7f0', accent: '#96680a', colorScheme: 'light' },
+    evening: { label: 'Evening', background: '#17151a', accent: '#d9a05b', colorScheme: 'dark' }
+  };
+  window.__eventsThemes = themes;
+  var t = null;
+  try { t = localStorage.getItem('theme_preference'); } catch (e) {}
+  if (t !== 'paper' && t !== 'evening') t = 'paper';
+  var p = themes[t];
+  var root = document.documentElement;
+  root.dataset.theme = t;
+  root.style.backgroundColor = p.background;
+  var themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) themeColor.content = p.background;
+  var colorScheme = document.querySelector('meta[name="color-scheme"]');
+  if (colorScheme) colorScheme.content = p.colorScheme;
+})();
+</script>
+<style>
+  /* Role tokens ported 1:1 from constants/Colors.ts, same as
+     landing/index.html. docs/events-design-language.md §3 is the law. */
+  :root {
+    --background: #faf7f0;
+    --surface: #ffffff;
+    --text-primary: #1a1815;
+    --text-secondary: #6b6357;
+    --text-tertiary: #756c5d;
+    --border: #e3dcc9;
+    --border-light: #efe9da;
+    --primary-button-bg: #1a1815;
+    --primary-button-text: #faf7f0;
+    --link-text: #96680a;
+    --accent: #96680a;
+    --shadow: #1a1815;
+    --title-font: Georgia, "Times New Roman", serif;
+    --title-weight: 400;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    color-scheme: light;
+    --swatch-ground: #17151a;
+    --swatch-accent: #d9a05b;
+  }
+  html[data-theme='evening'] {
+    --background: #17151a;
+    --surface: #211d24;
+    --text-primary: #ece7df;
+    --text-secondary: #a49fb0;
+    --text-tertiary: #8b85a0;
+    --border: #37334a;
+    --border-light: #282435;
+    --primary-button-bg: #d9a05b;
+    --primary-button-text: #2a1d10;
+    --link-text: #d9a05b;
+    --accent: #d9a05b;
+    --shadow: #000000;
+    --title-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --title-weight: 300;
+    color-scheme: dark;
+    --swatch-ground: #faf7f0;
+    --swatch-accent: #96680a;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--background); }
+  body {
+    margin: 0;
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    padding:
+      calc(20px + env(safe-area-inset-top))
+      calc(20px + env(safe-area-inset-right))
+      calc(32px + env(safe-area-inset-bottom))
+      calc(20px + env(safe-area-inset-left));
+  }
+  #safari-chrome {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: var(--background);
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* One reading measure for the whole page — questions read at
+     conversation width, not billboard width. */
+  header, main, footer {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0 12px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    color: var(--text-primary);
+    text-decoration: none;
+  }
+  .monogram {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+  }
+  .wordmark {
+    font-family: var(--title-font);
+    font-weight: 600;
+    font-size: 18px;
+  }
+  #theme-swatch {
+    margin-left: auto;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  #theme-swatch .disc {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--swatch-ground);
+    display: grid;
+    place-items: center;
+  }
+  #theme-swatch .core {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--swatch-accent);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin: 40px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex: none;
+  }
+  h1 {
+    font-family: var(--title-font);
+    font-weight: var(--title-weight);
+    font-size: clamp(32px, 4.4vw, 44px);
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+  }
+  .group { margin-top: 40px; }
+  .group h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 4px;
+  }
+  details {
+    border-top: 1px solid var(--border-light);
+  }
+  .group details:last-child {
+    border-bottom: 1px solid var(--border-light);
+  }
+  summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 52px;
+    padding: 12px 0;
+    font-size: 17px;
+    font-weight: 500;
+  }
+  summary::-webkit-details-marker { display: none; }
+  /* A drawn chevron, not a glyph — it takes the role color and turns open. */
+  summary::after {
+    content: "";
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+    border-right: 1.5px solid var(--text-tertiary);
+    border-bottom: 1.5px solid var(--text-tertiary);
+    transform: rotate(45deg) translateY(-2px);
+  }
+  details[open] summary::after {
+    transform: rotate(-135deg) translateY(-2px);
+  }
+  details p {
+    margin: 0 0 18px;
+    color: var(--text-secondary);
+    max-width: 62ch;
+  }
+  details a, .more a { color: var(--link-text); }
+  .more {
+    margin: 48px 0 0;
+    color: var(--text-secondary);
+  }
+  .more .address { color: var(--text-primary); font-weight: 500; }
+  .cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    margin: 20px 0 0;
+    border-radius: 12px;
+    background: var(--primary-button-bg);
+    color: var(--primary-button-text);
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--shadow) 12%, transparent);
+  }
+  footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-light);
+  }
+  .privacy { margin: 0; font-size: 13px; }
+  .privacy a { color: var(--text-tertiary); }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
+<noscript><style>#theme-swatch { display: none; }</style></noscript>
+</head>
+<body>
+<div id="safari-chrome" aria-hidden="true"></div>
+<header>
+  <a class="brand" href="/" aria-label="Events home">
+    <img class="monogram" src="./icon.png" alt="" width="36" height="36" />
+    <span class="wordmark">Events</span>
+  </a>
+  <button type="button" id="theme-swatch" aria-label="Switch to Evening theme">
+    <span class="disc" aria-hidden="true"><span class="core"></span></span>
+  </button>
+</header>
+<main>
+  <p class="eyebrow">FAQ</p>
+  <h1>Questions people ask</h1>
+
+  <section class="group" aria-labelledby="g-basics">
+    <h2 id="g-basics">The basics</h2>
+    <details>
+      <summary>What is Events?</summary>
+      <p>A calendar for the things you're going to: concerts, games, openings. When you find one, you share it with the people you'd want there, and they tell you if they're coming.</p>
+    </details>
+    <details>
+      <summary>Do my friends need the app?</summary>
+      <p>No. Anyone without it gets a text with the event, its link, and a way to say if they're coming. If they get the app later, everything you've shared with them is already on their calendar.</p>
+    </details>
+    <details>
+      <summary>What kind of events is it for?</summary>
+      <p>Things that happen whether or not anyone joins you: a concert, a game, an opening, a market. For planning dinner with two friends, a group text still works best.</p>
+    </details>
+    <details>
+      <summary>How is it different from a group chat?</summary>
+      <p>A group chat only reaches the people in that chat. On Events, each friend gets the event on their own calendar and can pass it on to their own people, and nothing gets buried under the conversation.</p>
+    </details>
+    <details>
+      <summary>Does it work on my phone?</summary>
+      <p>Events is an app for iPhone and Android.</p>
+    </details>
+  </section>
+
+  <section class="group" aria-labelledby="g-sharing">
+    <h2 id="g-sharing">Sharing</h2>
+    <details>
+      <summary>Who can see what I share?</summary>
+      <p>Only the people you share it with. Nothing is posted, and there are no public profiles.</p>
+    </details>
+    <details>
+      <summary>Can I pass on something a friend shared with me?</summary>
+      <p>Yes. Open it and share it with your own people. Their answers come back to you, not to the friend who sent it.</p>
+    </details>
+    <details>
+      <summary>How do I know who's coming?</summary>
+      <p>Every event you share lists who you sent it to and who's said they're coming. Only you see those answers.</p>
+    </details>
+    <details>
+      <summary>Do I have to answer?</summary>
+      <p>No. The event happens either way, and nobody is waiting on you.</p>
+    </details>
+    <details>
+      <summary>Can I take a share back?</summary>
+      <p>No. A share is like a text: once it's sent, it's theirs. Removing an event from your calendar never touches anyone else's.</p>
+    </details>
+    <details>
+      <summary>Why can I only add 50 people?</summary>
+      <p>It keeps your list to people you'd actually want there, so Events stays about friends, not an audience. Anyone you haven't shared with in six months quietly drops off, and you can add them back anytime.</p>
+    </details>
+  </section>
+
+  <section class="group" aria-labelledby="g-calendar">
+    <h2 id="g-calendar">Your calendar</h2>
+    <details>
+      <summary>What if the details change?</summary>
+      <p>When the person who shared it with you changes the time or place, your copy updates quietly. If you've edited your copy yourself, it stays the way you left it.</p>
+    </details>
+    <details>
+      <summary>Will it bug me with notifications?</summary>
+      <p>Only when a person shares something with you or answers something you shared. You can turn off notifications and texts separately in Settings.</p>
+    </details>
+    <details>
+      <summary>What if I don't want someone's events?</summary>
+      <p>Hide them from any event they've shared with you. Their events stop showing up, they're never told, and you can unhide them in Settings. If you get Events by text instead, replying STOP stops all Events texts.</p>
+    </details>
+    <details>
+      <summary>Can I get rid of something a friend shared?</summary>
+      <p>Archive it. It leaves your calendar, and you can bring it back from Archived anytime.</p>
+    </details>
+    <details>
+      <summary>Can I put events in my other calendar?</summary>
+      <p>Yes. Every event has Add to calendar, for Google, Apple, and Outlook. It's a one-time copy, so later changes won't follow it there.</p>
+    </details>
+  </section>
+
+  <section class="group" aria-labelledby="g-account">
+    <h2 id="g-account">Your account</h2>
+    <details>
+      <summary>What do you do with my phone number?</summary>
+      <p>It's how you sign in and how your friends' shares reach you. We never sell it and never send marketing texts; the <a href="https://shared-events.pages.dev/privacy.html">privacy policy</a> has the details.</p>
+    </details>
+    <details>
+      <summary>How do I delete my account?</summary>
+      <p>In the app, open People, then Settings, then Delete account. Your data goes with it, and events you've already shared stay on your friends' calendars.</p>
+    </details>
+    <details>
+      <summary>How do I get Events?</summary>
+      <p>It's in closed beta. <a href="/signup">Sign up for the beta</a> and your invite comes to you automatically.</p>
+    </details>
+  </section>
+
+  <p class="more">Didn't find your question? Write to <span class="address">kilani.ramsey@gmail.com</span>.</p>
+  <a class="cta" href="/signup">Get the beta</a>
+</main>
+<footer>
+  <p class="privacy"><a href="https://shared-events.pages.dev/privacy.html">Privacy policy</a></p>
+</footer>
+<script>
+(function () {
+  // Swatch toggle — same behavior as landing/index.html.
+  var themes = window.__eventsThemes;
+  var root = document.documentElement;
+  var btn = document.getElementById('theme-swatch');
+  function current() { return root.dataset.theme === 'evening' ? 'evening' : 'paper'; }
+  function render() {
+    var nextName = current() === 'paper' ? 'evening' : 'paper';
+    btn.setAttribute('aria-label', 'Switch to ' + themes[nextName].label + ' theme');
+  }
+  btn.addEventListener('click', function () {
+    var name = current() === 'paper' ? 'evening' : 'paper';
+    var p = themes[name];
+    root.dataset.theme = name;
+    try { localStorage.setItem('theme_preference', name); } catch (e) {}
+    root.style.backgroundColor = p.background;
+    document.querySelector('meta[name="theme-color"]').content = p.background;
+    document.querySelector('meta[name="color-scheme"]').content = p.colorScheme;
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 
 // The beta landing page (landing/ → its own Pages project) is a static site
@@ -12,11 +13,41 @@ import { expect, test } from './fixtures';
 // and italic accent phrase, and the How-it-works principles (01/02/03,
 // after the beta block, no header nav). Beta Signup Pipeline (2026-09-03)
 // replaced the mailto CTA with a link to the signup form (./signup.html);
-// the owner email stays as a quiet fallback line.
+// the owner email stays as a quiet fallback line. Landing Page Copy Refresh
+// (2026-09-24) made the hero sender-first, turned How it works into the
+// find / pick / hear loop, showed both halves of the loop in the mock,
+// added the FAQ page (/faq) and link-preview tags, and bans price talk.
 
 const LANDING_URL = process.env.E2E_LANDING_URL ?? 'http://localhost:8083';
+const FAQ_URL = `${LANDING_URL}/faq.html`;
+const OG_IMAGE_URL = 'https://events-landing.pages.dev/og-image.png';
+const PRIVACY_URL = 'https://shared-events.pages.dev/privacy.html';
 
 const PLAY_OPT_IN_URL = 'https://play.google.com/apps/internaltest/4701427612732216042';
+
+// og:image must be absolute, so it points at the production host; the file
+// itself ships in landing/ and must be a real 1200×630 card.
+async function expectLinkPreview(page: Page, url: string) {
+  const og = (p: string) => page.locator(`meta[property="og:${p}"]`);
+  await expect(og('title')).toHaveAttribute('content', /\S/);
+  await expect(og('description')).toHaveAttribute('content', /\S/);
+  await expect(og('url')).toHaveAttribute('content', url);
+  await expect(og('image')).toHaveAttribute('content', OG_IMAGE_URL);
+  await expect(og('image:width')).toHaveAttribute('content', '1200');
+  await expect(og('image:height')).toHaveAttribute('content', '630');
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+    'content',
+    'summary_large_image'
+  );
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /\S/);
+  const size = await page.evaluate(async (src) => {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    return [img.naturalWidth, img.naturalHeight];
+  }, `${LANDING_URL}/og-image.png`);
+  expect(size).toEqual([1200, 630]);
+}
 
 test('renders Paper by default with the mock, signup CTA, fallback, and footer', async ({
   page,
@@ -31,48 +62,58 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   // The hero headline is the display element and wears Paper's serif voice
   // (design doc §4).
   const hero = page.getByRole('heading', { level: 1 });
-  await expect(hero).toHaveText('A calendar of events your people share with you.');
+  await expect(hero).toHaveText('Going to something? Tell your people once.');
   expect(await hero.evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Georgia');
   await expect(page.locator('.sub')).toHaveText(
-    "Everything on it comes from someone you know. See something you'd go to? Pass it on with a tap. If they don't have the app, they get a text."
+    "Share a show, a game, or an opening with everyone you'd want there. It lands on their calendar, or in a text if they don't have the app, and they tell you if they're coming."
   );
 
   // The eyebrow carries the accent dot; with the italic phrase it is the
   // one new accent spend (owner-approved 2026-09-03). text-transform makes
   // innerText uppercase, so match the copy case-insensitively.
   const eyebrow = page.locator('.eyebrow');
-  await expect(eyebrow).toHaveText(/person-to-person events/i);
+  await expect(eyebrow).toHaveText(/for things you're going to anyway/i);
   expect(await eyebrow.evaluate((el) => getComputedStyle(el, '::before').backgroundColor)).toBe(
     'rgb(150, 104, 10)'
   );
 
   // The key phrase is italic in the accent.
   const em = hero.locator('.em');
-  await expect(em).toHaveText('your people');
+  await expect(em).toHaveText('Tell your people');
   expect(await em.evaluate((el) => getComputedStyle(el).fontStyle)).toBe('italic');
   expect(await em.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(150, 104, 10)');
 
   // The product shot: a static mock of the app's calendar — current month,
-  // two dotted event days, and the "From X" attribution rows.
+  // two dotted event days, and both halves of the loop: a row a friend
+  // shared (From X, in the accent) and one you shared, with its head-count
+  // (secondary — the accent's in-app jobs stay three).
   const mock = page.locator('#mock');
   await expect(mock).toBeVisible();
   const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   await expect(mock.locator('#mock-month')).toHaveText(monthLabel);
   await expect(mock.locator('.mock-event')).toHaveCount(2);
   await expect(mock.locator('.mock-event .t')).toHaveText([
-    'Taylor Swift',
-    'Beyoncé',
+    'Jazz at the Bandshell',
+    'Gallery opening',
   ]);
-  await expect(mock.locator('.mock-event .f').first()).toHaveText('From Alice');
+  await expect(mock.locator('.mock-event .f')).toHaveText(['From Alice']);
+  const coming = mock.locator('.mock-event .c');
+  await expect(coming).toHaveText(['3 coming']);
+  expect(await coming.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(107, 99, 87)');
+  await expect(mock.locator('.mock-event').nth(1)).toContainText('You shared with 6');
   await expect(mock.locator('.mock-grid .sel')).toHaveCount(1);
   await expect(mock.locator('.mock-grid .dot')).toHaveCount(2);
 
   // Status copy is "closed beta"; the CTA verb stays "Get the beta"
-  // (owner 2026-09-05).
+  // (owner 2026-09-05). Fulfillment is automated, so the stale "invites go
+  // out personally" line is gone, and install guidance lives on the signup
+  // confirmation, not here.
   await expect(page.getByRole('heading', { level: 2, name: 'In closed beta' })).toBeVisible();
   await expect(page.locator('.beta')).toContainText(
-    'Events is in closed beta, and invites go out personally.'
+    'Events is in closed beta on iPhone and Android.'
   );
+  await expect(page.locator('.beta')).not.toContainText('personally');
+  await expect(page.locator('.beta')).not.toContainText('Apple sends two emails');
 
   // The CTA links to the signup form (Beta Signup Pipeline — it replaced
   // the prefilled mailto once the form was verified live).
@@ -85,21 +126,29 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   await expect(fallback).toBeVisible();
   await expect(fallback).toContainText('kilani.ramsey@gmail.com');
 
-  // How it works: three hairline-separated principles after the beta block
-  // (the CTA stays high), renumbered 01/02/03 — the candidate's 01/02/04
-  // seed gag and its missing-03 footnote do not ship.
+  // How it works: the loop as three hairline-separated steps after the beta
+  // block (the CTA stays high), numbered 01/02/03 — the candidate's
+  // 01/02/04 seed gag and its missing-03 footnote do not ship. The old
+  // principles survive as one closing line, followed by the quiet FAQ link.
   const how = page.locator('.how');
   await expect(how.getByRole('heading', { name: 'How it works' })).toBeVisible();
   await expect(how.locator('.principle .num')).toHaveText(['01', '02', '03']);
-  await expect(how.getByRole('heading', { name: 'Person to person' })).toBeVisible();
-  await expect(how.getByRole('heading', { name: 'The share is the ask' })).toBeVisible();
-  await expect(how.getByRole('heading', { name: 'Quiet by design' })).toBeVisible();
-  await expect(how).toContainText('Nothing is posted, and nothing is public.');
-  await expect(how).toContainText('A yes or a no finds its way back to the asker');
+  await expect(how.locator('.principle h3')).toHaveText([
+    'Find something',
+    'Pick your people',
+    "Hear who's in",
+  ]);
+  await expect(how).toContainText('The name and picture usually fill themselves in.');
+  await expect(how).toContainText('Anyone without the app gets a text with the details.');
+  await expect(how).toContainText('Only you see the answers.');
   await expect(how).toContainText(
-    'You hear from Events when a person does something, and never otherwise.'
+    'Nothing is posted and nothing is public. Events only speaks up when a person shares something with you or answers you.'
   );
+  await expect(how.getByRole('link', { name: 'Read the FAQ' })).toHaveAttribute('href', '/faq');
   await expect(page.getByText('There is no 03.')).toHaveCount(0);
+
+  // No price talk anywhere (owner 2026-09-24: "it's just noise").
+  await expect(page.locator('body')).not.toContainText(/\bfree\b|\bprice\b|\$\d/i);
   const betaBox = await page.locator('.beta').boundingBox();
   const howBox = await how.boundingBox();
   expect(howBox!.y).toBeGreaterThan(betaBox!.y + betaBox!.height);
@@ -125,15 +174,19 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   await expect(iphoneLine).toBeVisible();
   await expect(iphoneLine.locator('a')).toHaveCount(0);
 
-  // noindex while in beta; no analytics (zero external scripts).
+  // noindex until the store listings are public (owner 2026-09-24); no
+  // analytics (zero external scripts).
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
   await expect(page.locator('script[src]')).toHaveCount(0);
 
-  // Link audit: every anchor is the signup form, the privacy policy (the
-  // one allowed shared-events page), or the Play opt-in. No web-app links,
-  // no custom-scheme URLs — and no in-page anchors: the header nav was
-  // ruled out 2026-09-03 (two anchors don't earn the chrome on a page this
-  // short).
+  // Link previews: a pasted link shows a real card, not a bare "Events".
+  await expectLinkPreview(page, 'https://events-landing.pages.dev/');
+
+  // Link audit: every anchor is the signup form, the FAQ, the privacy
+  // policy (the one allowed shared-events page), or the Play opt-in. No
+  // web-app links, no custom-scheme URLs — and no in-page anchors: the
+  // header nav was ruled out 2026-09-03 (two anchors don't earn the chrome
+  // on a page this short).
   await expect(page.locator('nav')).toHaveCount(0);
   const hrefs = await page.locator('a').evaluateAll((els) =>
     els.map((el) => el.getAttribute('href') ?? '')
@@ -141,9 +194,7 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   expect(hrefs.length).toBeGreaterThan(0);
   for (const a of hrefs) {
     expect(
-      a === '/signup' ||
-        a === 'https://shared-events.pages.dev/privacy.html' ||
-        a === PLAY_OPT_IN_URL
+      a === '/signup' || a === '/faq' || a === PRIVACY_URL || a === PLAY_OPT_IN_URL
     ).toBe(true);
     expect(a).not.toContain('events-app://');
     expect(a.startsWith('#')).toBe(false);
@@ -211,6 +262,74 @@ test('swatch toggles to Evening, persists across reload, no first-paint flash', 
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#17151a');
 
   // Toggling back returns to Paper and persists that too.
+  await page.getByRole('button', { name: 'Switch to Paper theme' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
+  expect(await page.evaluate(() => localStorage.getItem('theme_preference'))).toBe('paper');
+});
+
+test('FAQ page: grouped questions open natively, quiet links, no price talk', async ({ page }) => {
+  await page.goto(FAQ_URL);
+
+  // Same object as the landing page: Paper by default, serif H1, swatch.
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#faf7f0');
+  const h1 = page.getByRole('heading', { level: 1 });
+  await expect(h1).toHaveText('Questions people ask');
+  expect(await h1.evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Georgia');
+  await expect(page.getByRole('button', { name: 'Switch to Evening theme' })).toBeVisible();
+
+  // Four groups; questions are native <details>, closed until asked.
+  await expect(page.locator('.group h2')).toHaveText([
+    'The basics',
+    'Sharing',
+    'Your calendar',
+    'Your account',
+  ]);
+  const questions = page.locator('details');
+  expect(await questions.count()).toBeGreaterThanOrEqual(15);
+  for (const d of await questions.all()) {
+    expect(await d.evaluate((el) => (el as HTMLDetailsElement).open)).toBe(false);
+  }
+
+  const q = page.locator('details', { hasText: 'Do my friends need the app?' });
+  const answer = q.locator('p');
+  await expect(answer).toBeHidden();
+  await q.locator('summary').click();
+  await expect(answer).toBeVisible();
+  await expect(answer).toContainText('Anyone without it gets a text');
+  // Summaries are real 44pt+ targets.
+  const box = await q.locator('summary').boundingBox();
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+
+  // No price talk anywhere, open or closed (owner 2026-09-24).
+  await expect(page.locator('body')).not.toContainText(/\bfree\b|\bprice\b|\$\d/i);
+
+  // Ends on the one CTA; the wordmark leads home.
+  const cta = page.getByRole('link', { name: 'Get the beta' });
+  await expect(cta).toHaveAttribute('href', '/signup');
+  await expect(page.getByRole('link', { name: 'Events home' })).toHaveAttribute('href', '/');
+  await expect(page.locator('main')).toContainText('kilani.ramsey@gmail.com');
+
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+  await expect(page.locator('script[src]')).toHaveCount(0);
+  await expectLinkPreview(page, 'https://events-landing.pages.dev/faq');
+
+  const hrefs = await page.locator('a').evaluateAll((els) =>
+    els.map((el) => el.getAttribute('href') ?? '')
+  );
+  for (const a of hrefs) {
+    expect(a === '/' || a === '/signup' || a === PRIVACY_URL).toBe(true);
+  }
+});
+
+test('FAQ swatch shares the landing page mood', async ({ page }) => {
+  await page.goto(LANDING_URL);
+  await page.getByRole('button', { name: 'Switch to Evening theme' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'evening');
+
+  await page.goto(FAQ_URL, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'evening');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#17151a');
   await page.getByRole('button', { name: 'Switch to Paper theme' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
   expect(await page.evaluate(() => localStorage.getItem('theme_preference'))).toBe('paper');
