@@ -65,14 +65,16 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
   await expect(hero).toHaveText('Going to something? Tell your people once.');
   expect(await hero.evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Georgia');
   await expect(page.locator('.sub')).toHaveText(
-    "Share a show, a game, or an opening with everyone you'd want there. It lands on their calendar, or in a text if they don't have the app, and they tell you if they're coming."
+    "Share it with everyone you'd want there. It lands on their calendar, or in a text if they don't have the app, and they tell you if they're coming."
   );
 
   // The eyebrow carries the accent dot; with the italic phrase it is the
   // one new accent spend (owner-approved 2026-09-03). text-transform makes
   // innerText uppercase, so match the copy case-insensitively.
   const eyebrow = page.locator('.eyebrow');
-  await expect(eyebrow).toHaveText(/for things you're going to anyway/i);
+  // A quiet label, not a second slogan (owner 2026-09-24: the "For things
+  // you're going to anyway" pitch read as too prominent).
+  await expect(eyebrow).toHaveText(/shows · games · openings/i);
   expect(await eyebrow.evaluate((el) => getComputedStyle(el, '::before').backgroundColor)).toBe(
     'rgb(150, 104, 10)'
   );
