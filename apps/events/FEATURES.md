@@ -2369,7 +2369,7 @@ The production landing page (`landing/` → https://events-landing.pages.dev) is
 
 ## Landing Page Copy Refresh (Sender-First + FAQ)
 
-**Status:** In progress — direction owner-approved 2026-09-24 ("stick with A… this is the launch"). Preview deploy for owner review; production deploy only on owner approval.
+**Status:** In progress — direction owner-approved 2026-09-24 ("stick with A… this is the launch"). Built and on a preview deploy for owner review; production (`npm run deploy:landing`) only on owner approval.
 
 ### Problem
 
@@ -2393,16 +2393,16 @@ The landing page's copy was accurate but pitched at the wrong reader. The headli
 - Scope: `landing/index.html`, new `landing/faq.html`, new `landing/og-image.png`, `e2e/landing.spec.ts`. `landing/signup.html` and `landing-v2/` untouched.
 - The FAQ page reuses the landing page's tokens, swatch, and no-flash bootstrap (hand-port — if `constants/Colors.ts` moves, move these too). Questions are native `<details>`/`<summary>` — keyboard-accessible, no JS needed to open them.
 - `og:image` must be an absolute URL, so it points at the production host (`https://events-landing.pages.dev/og-image.png`); on a preview deploy the card image resolves only once production carries the file.
-- FAQ answers must stay true to the shipped product; the planned [Yes-Only Who's Coming](#yes-only-whos-coming) revision would change the answer model, so answer copy says "tell you if they're coming" rather than promising a no.
+- Copy must stay true to the shipped product: link autofill fills title/description/image only (dates are typed until [Richer Link Autofill](#richer-link-autofill)), so step 01 promises the name and picture, not the date; the planned [Yes-Only Who's Coming](#yes-only-whos-coming) revision would change the answer model, so answer copy says "tell you if they're coming" rather than promising a no.
 - Deploy: `wrangler pages deploy landing --project-name=events-landing --branch=preview` for review; `npm run deploy:landing` only on owner approval and a green staging push.
 
 ### Acceptance Criteria
 
-- [ ] New hero, How-it-works steps, closing line, and beta copy on the landing page; no stale "personally"; no price mentions on any landing page
-- [ ] Mock shows the receive side (From X) and the send side (who's coming)
-- [ ] `/faq` page in the same design language (both moods, swatch persists), linked from the landing page
-- [ ] OG/Twitter tags + 1200×630 preview image on the landing and FAQ pages; noindex stays
-- [ ] `e2e/landing.spec.ts` updated and green on desktop Chrome and one mobile project
+- [x] New hero, How-it-works steps, closing line, and beta copy on the landing page; no stale "personally"; no price mentions on any landing page
+- [x] Mock shows the receive side (From X) and the send side (who's coming)
+- [x] `/faq` page in the same design language (both moods, swatch persists), linked from the landing page
+- [x] OG/Twitter tags + 1200×630 preview image on the landing and FAQ pages; noindex stays (image regenerates via `node scripts/generate-landing-og-image.mjs` after hero copy changes)
+- [x] `e2e/landing.spec.ts` updated and green on desktop Chrome, Mobile Safari, and Mobile Chrome
 - [ ] Preview deploy reviewed by the owner before production
 
 ---
