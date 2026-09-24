@@ -64,6 +64,7 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
 | [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins) | Implemented | Pulled the candidate's two-column hero + How-it-works section into the production landing page; seed artifacts stay behind. Shipped 2026-09-03. Live: https://events-landing.pages.dev |
+| [Landing Page Copy Refresh (Sender-First + FAQ)](#landing-page-copy-refresh-sender-first--faq) | In progress | Sender-first hero copy, How it works as real steps, a sender-side mock, a separate FAQ page, and link-preview tags. Owner-approved 2026-09-24; preview deploy for review. |
 | [Already-Added Contacts in Add People](#already-added-contacts-in-add-people) | Planned | Add People hides contacts already on My People. Show the full list; already-added should be marked (grayed out or similar). Not designed. |
 | [Circle Membership on My People](#circle-membership-on-my-people) | Planned | See how many / which circles someone is in from the people list; maybe add them to circles while scrolling. Not designed. |
 | [Link Autofill Polish](#link-autofill-polish) | Planned | Polish. Owner pasted a Luma link: title + description filled (description ended with …); date, time, and location did not; blur / keyboard-checkmark trigger feels untrustworthy. Not designed. |
@@ -2363,6 +2364,46 @@ The production landing page (`landing/` → https://events-landing.pages.dev) is
 
 - ~~Does How it works wear a dark second register or stay on the page ground?~~ Resolved 2026-09-03 (owner): page ground — a fixed dark band fights the theme swatch.
 - ~~Eyebrow copy ("Person-to-person events" or something else — owner words).~~ Resolved 2026-09-03 (owner): "Person-to-person events".
+
+---
+
+## Landing Page Copy Refresh (Sender-First + FAQ)
+
+**Status:** In progress — direction owner-approved 2026-09-24 ("stick with A… this is the launch"). Preview deploy for owner review; production deploy only on owner approval.
+
+### Problem
+
+The landing page's copy was accurate but pitched at the wrong reader. The headline ("A calendar of events your people share with you") casts the visitor as a receiver, while the product's pain is the sender's — texting fifteen people one by one about a show you're going to anyway — and the share SMS's invite line ("Want to invite your friends to things too?") sends people to the page with a sender promise. "Invites go out personally" went stale when the Beta Signup Pipeline automated fulfillment. "How it works" held values, not steps. The hero sub and principle 01 repeated each other verbatim, and install instructions sat above the fold before anyone had decided to sign up. Pasted links showed a bare "Events" with no preview card.
+
+### Solution (owner rulings 2026-09-24)
+
+- **Direction A, sender-first, generic enough to post publicly.** The page is for people arriving from the share text, friends the owner hands the link to, and possibly public posts — it is the launch page.
+- **Hero:** eyebrow, H1 with the italic accent phrase, and a sub that carries the no-app case. The agent writes final copy (owner: "I trust your judgment").
+- **How it works becomes the loop:** 01 find something, 02 pick your people, 03 hear who's in — plus one closing line carrying the old principles (nothing public, quiet by design).
+- **Beta block:** the stale "personally" line is replaced; the CTA stays "Get the beta" (2026-09-05 ruling); install guidance leaves the landing page (the signup confirmation already carries it).
+- **Mock:** may change — it now shows the sender side too (a shared event with who's coming), so the page tells both halves of the loop.
+- **FAQ on its own page** (`landing/faq.html` → `/faq`), linked quietly from the page, not in people's faces. Questions phrased the way a friend would ask them; answers two sentences at most.
+- **No price talk anywhere** (owner: "when you tell people it's free, they start asking why… it's just noise").
+- **"Who it's for" stays minimal** — at most a positively framed FAQ answer; the owner may reword it.
+- **Link previews:** Open Graph + Twitter card tags and a 1200×630 preview image on both pages.
+- **Stays noindex** until the store listings are public. **No Terms page** for now.
+
+### Technical Notes
+
+- Scope: `landing/index.html`, new `landing/faq.html`, new `landing/og-image.png`, `e2e/landing.spec.ts`. `landing/signup.html` and `landing-v2/` untouched.
+- The FAQ page reuses the landing page's tokens, swatch, and no-flash bootstrap (hand-port — if `constants/Colors.ts` moves, move these too). Questions are native `<details>`/`<summary>` — keyboard-accessible, no JS needed to open them.
+- `og:image` must be an absolute URL, so it points at the production host (`https://events-landing.pages.dev/og-image.png`); on a preview deploy the card image resolves only once production carries the file.
+- FAQ answers must stay true to the shipped product; the planned [Yes-Only Who's Coming](#yes-only-whos-coming) revision would change the answer model, so answer copy says "tell you if they're coming" rather than promising a no.
+- Deploy: `wrangler pages deploy landing --project-name=events-landing --branch=preview` for review; `npm run deploy:landing` only on owner approval and a green staging push.
+
+### Acceptance Criteria
+
+- [ ] New hero, How-it-works steps, closing line, and beta copy on the landing page; no stale "personally"; no price mentions on any landing page
+- [ ] Mock shows the receive side (From X) and the send side (who's coming)
+- [ ] `/faq` page in the same design language (both moods, swatch persists), linked from the landing page
+- [ ] OG/Twitter tags + 1200×630 preview image on the landing and FAQ pages; noindex stays
+- [ ] `e2e/landing.spec.ts` updated and green on desktop Chrome and one mobile project
+- [ ] Preview deploy reviewed by the owner before production
 
 ---
 
