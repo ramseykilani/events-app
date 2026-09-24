@@ -64,7 +64,8 @@ The core loop is shipped. Nothing in Planned is required to use the app or to te
 | [Receipt Page Polish (App Mirror)](#receipt-page-polish-app-mirror) | Planned | The receipt page mirrors the detail screen's content but not its look — e.g. the Add-to-calendar row is text links vs the app's labeled icon buttons. Owner wants a polish pass toward app parity (2026-09-03). |
 | [Landing Page Redesign (Three-One-Four)](#landing-page-redesign-three-one-four) | Implemented | New-design candidate from a random-seed creative direction, on its own Pages project; `landing/` untouched. Live: https://events-landing-v2.pages.dev |
 | [Landing Page Polish (Three-One-Four Pull-Ins)](#landing-page-polish-three-one-four-pull-ins) | Implemented | Pulled the candidate's two-column hero + How-it-works section into the production landing page; seed artifacts stay behind. Shipped 2026-09-03. Live: https://events-landing.pages.dev |
-| [Landing Page Copy Refresh (Sender-First + FAQ)](#landing-page-copy-refresh-sender-first--faq) | In progress | Sender-first hero copy, How it works as real steps, a sender-side mock, a separate FAQ page, and link-preview tags. Owner-approved 2026-09-24; preview deploy for review. |
+| [Landing Page Copy Refresh (Sender-First + FAQ)](#landing-page-copy-refresh-sender-first--faq) | Implemented | Sender-first hero copy, How it works as real steps, a sender-side mock, a separate FAQ page, and link-preview tags. Owner-approved and live 2026-09-24: https://events-landing.pages.dev |
+| [Landing Page Video + UX Pass](#landing-page-video--ux-pass) | Implemented | Hero CTA, click-to-load explainer video beside How it works, beta block closes the page. Owner confirmed the preview and approved production 2026-09-24. Live: https://events-landing.pages.dev |
 | [Already-Added Contacts in Add People](#already-added-contacts-in-add-people) | Planned | Add People hides contacts already on My People. Show the full list; already-added should be marked (grayed out or similar). Not designed. |
 | [Circle Membership on My People](#circle-membership-on-my-people) | Planned | See how many / which circles someone is in from the people list; maybe add them to circles while scrolling. Not designed. |
 | [Link Autofill Polish](#link-autofill-polish) | Planned | Polish. Owner pasted a Luma link: title + description filled (description ended with …); date, time, and location did not; blur / keyboard-checkmark trigger feels untrustworthy. Not designed. |
@@ -2369,7 +2370,7 @@ The production landing page (`landing/` → https://events-landing.pages.dev) is
 
 ## Landing Page Copy Refresh (Sender-First + FAQ)
 
-**Status:** In progress — direction owner-approved 2026-09-24 ("stick with A… this is the launch"). Built and on a preview deploy for owner review; production (`npm run deploy:landing`) only on owner approval.
+**Status:** Implemented (2026-09-24). Direction owner-approved 2026-09-24 ("stick with A… this is the launch"). The owner reviewed the preview that includes this copy plus the [Landing Page Video + UX Pass](#landing-page-video--ux-pass) ("it looks great") and approved the production deploy the same day. Live: https://events-landing.pages.dev
 
 ### Problem
 
@@ -2403,13 +2404,13 @@ The landing page's copy was accurate but pitched at the wrong reader. The headli
 - [x] `/faq` page in the same design language (both moods, swatch persists), linked from the landing page
 - [x] OG/Twitter tags + 1200×630 preview image on the landing and FAQ pages; noindex stays (image regenerates via `node scripts/generate-landing-og-image.mjs` after hero copy changes)
 - [x] `e2e/landing.spec.ts` updated and green on desktop Chrome, Mobile Safari, and Mobile Chrome
-- [ ] Preview deploy reviewed by the owner before production
+- [x] Preview deploy reviewed by the owner before production (owner 2026-09-24: "it looks great"; production deploy the same day)
 
 ---
 
 ## Landing Page Video + UX Pass
 
-**Status:** Implemented (2026-09-24) — on a preview deploy for owner review; production (`npm run deploy:landing`) only on owner approval. Follows [Landing Page Copy Refresh](#landing-page-copy-refresh-sender-first--faq); owner asked for a full copy + UX pass and the new explainer video (`https://youtu.be/sCRhrfuBjQo`) on the page ("change what you think could be improved").
+**Status:** Implemented (2026-09-24). Owner confirmed the preview looks good and approved production the same day. Live: https://events-landing.pages.dev. Follows [Landing Page Copy Refresh](#landing-page-copy-refresh-sender-first--faq); owner asked for a full copy + UX pass and the new explainer video (`https://youtu.be/sCRhrfuBjQo`) on the page ("change what you think could be improved").
 
 ### Problem
 
@@ -2429,7 +2430,7 @@ On a phone the only CTA sat below the hero's full-height mock, so a visitor scro
 - [x] Video beside the steps (stacked on phones), 16:9, click-to-load, zero third-party requests on page open
 - [x] Beta block after How it works with the next-step line and a one-line email fallback
 - [x] `e2e/landing.spec.ts` updated (new click-to-load test) and green on desktop + mobile Chrome locally; CI runs all three browsers
-- [ ] Preview deploy reviewed by the owner before production
+- [x] Preview deploy reviewed by the owner before production (owner 2026-09-24: "the landing video and UX pass looks good"; production deploy the same day)
 
 ### Open Questions
 
