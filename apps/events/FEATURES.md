@@ -2379,7 +2379,7 @@ The landing page's copy was accurate but pitched at the wrong reader. The headli
 ### Solution (owner rulings 2026-09-24)
 
 - **Direction A, sender-first, generic enough to post publicly.** The page is for people arriving from the share text, friends the owner hands the link to, and possibly public posts — it is the launch page.
-- **Hero:** eyebrow, H1 with the italic accent phrase, and a sub that carries the no-app case. The agent writes final copy (owner: "I trust your judgment"). Eyebrow revised after preview review (owner 2026-09-24: "For things you're going to anyway" felt too prominent, in your face): it is a quiet label — "Shows · games · openings" — and the sub drops its own copy of that list.
+- **Hero:** eyebrow, H1 with the italic accent phrase, and a sub that carries the no-app case. The agent writes final copy (owner: "I trust your judgment"). Eyebrow revised after preview review (owner 2026-09-24: "For things you're going to anyway" felt too prominent, in your face): it is a quiet label — "Shows · games · openings" — and the sub drops its own copy of that list. Owner 2026-09-25: the italic accent in the H1 is "once", not "Tell your people".
 - **How it works becomes the loop:** 01 find something, 02 pick your people, 03 hear who's in — plus one closing line carrying the old principles (nothing public, quiet by design).
 - **Beta block:** the stale "personally" line is replaced; the CTA stays "Get the beta" (2026-09-05 ruling); install guidance leaves the landing page (the signup confirmation already carries it).
 - **Mock:** may change — it now shows the sender side too (a shared event with who's coming), so the page tells both halves of the loop.

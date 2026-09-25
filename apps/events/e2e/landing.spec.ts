@@ -83,9 +83,10 @@ test('renders Paper by default with the mock, signup CTA, fallback, and footer',
     'rgb(150, 104, 10)'
   );
 
-  // The key phrase is italic in the accent.
+  // The accent word is italic (owner 2026-09-25: emphasize "once",
+  // not "Tell your people").
   const em = hero.locator('.em');
-  await expect(em).toHaveText('Tell your people');
+  await expect(em).toHaveText('once');
   expect(await em.evaluate((el) => getComputedStyle(el).fontStyle)).toBe('italic');
   expect(await em.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(150, 104, 10)');
 
