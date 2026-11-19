@@ -1,4 +1,7 @@
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// Shared plumbing for I Love You's edge functions. No remote imports on
+// purpose: the functions talk to Auth and PostgREST with plain fetch, so a
+// cold start never waits on (or fails at) a module CDN, and the local stack
+// boots them offline.
 
 // supabase-js always sends apikey and x-client-info alongside Authorization;
 // all four must be allowed or the browser preflight blocks the call (the
@@ -16,11 +19,14 @@ export function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-export type Authed = { callerId: string; db: SupabaseClient };
+export type Rpc = (name: string, args: Record<string, unknown>) => Promise<unknown>;
+export type Authed = { callerId: string; rpc: Rpc };
 
-// Verifies the caller's JWT with the anon client and hands back a
-// service-role client for the definer-only claim functions. Response = the
-// request is answered already (preflight, misconfiguration, 401).
+const BACKSTOP_MS = 10_000;
+
+// Verifies the caller's JWT against Auth (/auth/v1/user) and hands back an
+// rpc() bound to the service role, for the definer-only claim functions.
+// A Response = the request is already answered (preflight, 405, 500, 401).
 export async function authenticate(req: Request): Promise<Authed | Response> {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
@@ -32,13 +38,35 @@ export async function authenticate(req: Request): Promise<Authed | Response> {
     return jsonResponse({ error: 'Server misconfigured' }, 500);
   }
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return jsonResponse({ error: 'Unauthorized' }, 401);
+  if (!authHeader?.startsWith('Bearer ')) return jsonResponse({ error: 'Unauthorized' }, 401);
 
-  const authClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user }, error } = await authClient.auth.getUser();
-  if (error || !user) return jsonResponse({ error: 'Unauthorized' }, 401);
+  let callerId: string | undefined;
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: anonKey, Authorization: authHeader },
+      signal: AbortSignal.timeout(BACKSTOP_MS),
+    });
+    if (res.ok) callerId = (await res.json())?.id;
+  } catch {
+    // fall through to 401
+  }
+  if (!callerId) return jsonResponse({ error: 'Unauthorized' }, 401);
 
-  return { callerId: user.id, db: createClient(supabaseUrl, serviceRoleKey) };
+  const rpc: Rpc = async (name, args) => {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${name}`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(args),
+      signal: AbortSignal.timeout(BACKSTOP_MS),
+    });
+    if (!res.ok) throw new Error(`rpc ${name} failed: ${res.status} ${await res.text()}`);
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  };
+
+  return { callerId, rpc };
 }

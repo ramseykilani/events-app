@@ -33,12 +33,14 @@ Deno.serve(async (req) => {
   let message: PushMessage | null = null;
   if (body.kind === 'message') {
     if (typeof body.messageId !== 'string') return jsonResponse({ error: 'messageId is required' }, 400);
-    const { data, error } = await auth.db.rpc('claim_message_push', {
-      p_message_id: body.messageId,
-      p_caller: auth.callerId,
-    });
-    if (error) return jsonResponse({ error: 'Claim failed' }, 500);
-    const row = Array.isArray(data) ? data[0] : null;
+    let row;
+    try {
+      const data = await auth.rpc('claim_message_push', { p_message_id: body.messageId, p_caller: auth.callerId });
+      row = Array.isArray(data) ? data[0] : null;
+    } catch (err) {
+      console.error(err);
+      return jsonResponse({ error: 'Claim failed' }, 500);
+    }
     if (!row) return jsonResponse({ sent: 0 });
     message = buildMessagePush({
       token: row.partner_token,
@@ -48,9 +50,14 @@ Deno.serve(async (req) => {
       settings: row.partner_settings ?? {},
     });
   } else if (body.kind === 'ring') {
-    const { data, error } = await auth.db.rpc('claim_ring_push', { p_caller: auth.callerId });
-    if (error) return jsonResponse({ error: 'Claim failed' }, 500);
-    const row = Array.isArray(data) ? data[0] : null;
+    let row;
+    try {
+      const data = await auth.rpc('claim_ring_push', { p_caller: auth.callerId });
+      row = Array.isArray(data) ? data[0] : null;
+    } catch (err) {
+      console.error(err);
+      return jsonResponse({ error: 'Claim failed' }, 500);
+    }
     if (!row) return jsonResponse({ sent: 0 });
     message = buildRingPush(row.partner_token, row.caller_name);
   } else {
@@ -68,7 +75,7 @@ Deno.serve(async (req) => {
     });
     const result = await res.json();
     if (result?.data?.[0]?.details?.error === 'DeviceNotRegistered') {
-      await auth.db.rpc('clear_push_token', { p_token: message.to });
+      await auth.rpc('clear_push_token', { p_token: message.to }).catch(() => {});
     }
     return jsonResponse({ sent: 1 });
   } catch (err) {

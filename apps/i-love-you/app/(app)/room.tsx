@@ -88,9 +88,9 @@ export default function RoomScreen() {
       : call.phase === 'reconnecting'
         ? 'Reconnecting…'
         : call.partnerPresent
-          ? call.partnerMicOn
-            ? `With ${partnerName}`
-            : `With ${partnerName} · ${partnerName} is muted`
+          ? call.partnerMuted
+            ? `With ${partnerName} · ${partnerName} is muted`
+            : `With ${partnerName}`
           : `Waiting for ${partnerName}…`;
 
   const Control = ({ icon, label, on, onPress }: { icon: IoniconName; label: string; on: boolean; onPress: () => void }) => (

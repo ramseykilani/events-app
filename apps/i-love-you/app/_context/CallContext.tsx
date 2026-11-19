@@ -42,7 +42,9 @@ export type CallState = {
   cameraOn: boolean;
   screenOn: boolean;
   partnerPresent: boolean;
-  partnerMicOn: boolean;
+  // True only when the partner's mic is published and muted — a track that
+  // has not arrived yet is not "muted".
+  partnerMuted: boolean;
   partnerSpeaking: boolean;
   meSpeaking: boolean;
   partnerVideo: VideoTrack | null;
@@ -69,7 +71,7 @@ const INITIAL: CallState = {
   cameraOn: false,
   screenOn: false,
   partnerPresent: false,
-  partnerMicOn: false,
+  partnerMuted: false,
   partnerSpeaking: false,
   meSpeaking: false,
   partnerVideo: null,
@@ -105,7 +107,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       cameraOn: local.isCameraEnabled,
       screenOn: local.isScreenShareEnabled,
       partnerPresent: !!partner,
-      partnerMicOn: !!partnerMic && !partnerMic.isMuted,
+      partnerMuted: !!partnerMic && partnerMic.isMuted,
       partnerSpeaking: !!partner?.isSpeaking,
       meSpeaking: local.isSpeaking,
       partnerVideo: partnerCam && !partnerCam.isMuted ? ((partnerCam.track as VideoTrack | undefined) ?? null) : null,

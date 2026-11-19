@@ -23,16 +23,21 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Calls are not configured' }, 503);
   }
 
-  const { data, error } = await auth.db.rpc('room_for_member', { p_caller: auth.callerId });
-  if (error) return jsonResponse({ error: 'Lookup failed' }, 500);
-  const row = Array.isArray(data) ? data[0] : null;
+  let row: { room?: string; display_name?: string } | null = null;
+  try {
+    const data = await auth.rpc('room_for_member', { p_caller: auth.callerId });
+    row = Array.isArray(data) ? data[0] : null;
+  } catch (err) {
+    console.error(err);
+    return jsonResponse({ error: 'Lookup failed' }, 500);
+  }
   if (!row?.room) return jsonResponse({ error: 'Not paired' }, 403);
 
   const token = await signLiveKitToken({
     apiKey,
     apiSecret,
     identity: auth.callerId,
-    name: row.display_name,
+    name: row.display_name ?? 'Partner',
     room: row.room,
     ttlSeconds: LIVEKIT_TOKEN_TTL_SECONDS,
   });
