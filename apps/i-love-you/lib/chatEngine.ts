@@ -100,6 +100,10 @@ export class ChatEngine {
   // arrive meanwhile (live, own sends, a channel page) say nothing about
   // what was missed, so they must not move the cursor past it.
   private gapOpen = true;
+  // Bumped by every local channel write and every live channel row. A
+  // get_channels read that started before a bump may predate that change,
+  // so its answer is read again instead of overwriting newer state.
+  private channelEpoch = 0;
   private flushing = false;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -244,7 +248,12 @@ export class ChatEngine {
   // ----- reads -----
   async refreshChannels(): Promise<void> {
     try {
-      const channels = await this.deps.api.getChannels();
+      let channels: Channel[];
+      for (let attempt = 0; ; attempt++) {
+        const epoch = this.channelEpoch;
+        channels = await this.deps.api.getChannels();
+        if (epoch === this.channelEpoch || attempt >= 2) break;
+      }
       this.set({ channels, refreshFailed: false });
       this.deps.cache.saveChannels(channels);
     } catch (err) {
@@ -385,6 +394,7 @@ export class ChatEngine {
   }
 
   private handleLiveChannel(row: Partial<Channel> & { id: string }, deleted: boolean): void {
+    this.channelEpoch++;
     if (deleted) {
       this.set({ channels: this.state.channels.filter((c) => c.id !== row.id) });
       return;
@@ -742,9 +752,11 @@ export class ChatEngine {
   async setSetting(channelId: string, key: string, value: SettingValue): Promise<void> {
     const before = this.state.channels.find((c) => c.id === channelId);
     if (!before) return;
+    this.channelEpoch++;
     this.set({ channels: this.state.channels.map((c) => (c.id === channelId ? withSetting(c, key, value) : c)) });
     try {
       await this.deps.api.setChannelSetting(channelId, key, value);
+      this.channelEpoch++;
       this.deps.cache.saveChannels(this.state.channels);
       if (key === 'read_receipts') void this.refreshPartnerReads();
     } catch (err) {
@@ -761,7 +773,9 @@ export class ChatEngine {
   }
 
   async updateChannel(id: string, fields: { name?: string; icon?: string }): Promise<void> {
+    this.channelEpoch++;
     await this.deps.api.updateChannel(id, fields);
+    this.channelEpoch++;
     this.set({ channels: this.state.channels.map((c) => (c.id === id ? { ...c, ...fields } : c)) });
   }
 
@@ -772,6 +786,7 @@ export class ChatEngine {
 
   async reorder(ids: string[]): Promise<void> {
     const before = this.state.channels;
+    this.channelEpoch++;
     const pos = new Map(ids.map((id, i) => [id, i + 1]));
     this.set({
       channels: [...before]
@@ -780,6 +795,8 @@ export class ChatEngine {
     });
     try {
       await this.deps.api.reorderChannels(ids);
+      this.channelEpoch++;
+      this.deps.cache.saveChannels(this.state.channels);
     } catch (err) {
       this.set({ channels: before });
       throw err;

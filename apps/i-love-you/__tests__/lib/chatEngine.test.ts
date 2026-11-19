@@ -317,6 +317,25 @@ describe('ChatEngine', () => {
     expect(saved.cursor).toBe('2026-11-18T13:00:00.000Z');
   });
 
+  it('a channel list read that started before a reorder does not undo it', async () => {
+    const { engine, api, handlers } = setup();
+    await engine.start();
+    let resolveStale!: (v: Channel[]) => void;
+    api.getChannels.mockReturnValueOnce(new Promise((r) => (resolveStale = r)));
+    const refreshing = engine.refreshChannels();
+    // The person moves ch2 up while that read is in flight; the write and its
+    // Realtime echo land first.
+    (api as unknown as { reorderChannels: jest.Mock }).reorderChannels = jest.fn().mockResolvedValue(undefined);
+    await engine.reorder(['ch2', 'ch1']);
+    handlers().onChannel({ id: 'ch2', position: 1 } as Partial<Channel> & { id: string }, false);
+    handlers().onChannel({ id: 'ch1', position: 2 } as Partial<Channel> & { id: string }, false);
+    api.getChannels.mockResolvedValue([channel('ch2', { position: 1 }), channel('ch1', { position: 2 })]);
+    resolveStale([channel('ch1', { position: 1 }), channel('ch2', { position: 2 })]);
+    await refreshing;
+    await flush();
+    expect(engine.state.channels.map((c) => c.id)).toEqual(['ch2', 'ch1']);
+  });
+
   it('opening one channel does not move the catch-up cursor past other channels’ changes', async () => {
     const T0 = '2026-11-18T10:00:00.000Z';
     const { engine, api, handlers } = setup({ snapshot: { couple: COUPLE, cursor: T0 } });
