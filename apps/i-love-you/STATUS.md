@@ -34,8 +34,9 @@ Verified in the cloud VM on 2026-11-19:
   get_channels read issued before a reorder could answer after it and put
   the old order back, so the spec's "before" snapshot could be stale. Fixed
   in the engine (a read that straddles a local channel write or a live
-  channel row is re-read; Jest pins it); 40+ further reorder steps at both
-  widths did not reproduce it.
+  channel row is re-read; Jest pins it). The e2e flake itself was not
+  reproduced in ~40 scripted reorder steps at both widths, so the link
+  between it and this race is inferred, not observed.
 - Desktop shell: Linux debug build compiled and launched under Xvfb. **No
   macOS or Windows build.**
 
