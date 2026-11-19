@@ -53,11 +53,17 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit -p apps/events
 
+      - name: Type check (I Love You)
+        run: npx tsc --noEmit -p apps/i-love-you
+
       - name: Convention checks
         run: npm run test:conventions
 
       - name: Jest suite
         run: npm test --workspace=apps/events -- --runInBand --ci
+
+      - name: Jest suite (I Love You)
+        run: npm test --workspace=apps/i-love-you -- --runInBand --ci
 
       - name: Set up PostgreSQL
         run: |
@@ -69,6 +75,12 @@ jobs:
 
       - name: SQL semantics suite
         run: bash apps/events/supabase/tests/run_local.sh
+
+      # Runs after Events' suite: its runner drops/recreates the shared
+      # anon/authenticated roles, and this one drops its own scratch DB on
+      # exit so the two never block each other.
+      - name: SQL semantics suite (I Love You)
+        run: bash apps/i-love-you/supabase/tests/run_local.sh
 
   e2e-browsers:
     # Explicit name keeps the per-leg check names free of the matrix phone

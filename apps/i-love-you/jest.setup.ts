@@ -76,3 +76,12 @@ jest.mock('expo-notifications', () => ({
 }));
 
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(() => Promise.resolve(true)) }));
+
+jest.mock('expo-audio', () => ({
+  useAudioPlayer: jest.fn(() => ({ play: jest.fn(), pause: jest.fn(), seekTo: jest.fn() })),
+  useAudioPlayerStatus: jest.fn(() => ({ playing: false, currentTime: 0, duration: 0, didJustFinish: false })),
+  useAudioRecorder: jest.fn(() => ({ prepareToRecordAsync: jest.fn(), record: jest.fn(), stop: jest.fn(), uri: null })),
+  RecordingPresets: { HIGH_QUALITY: {} },
+  requestRecordingPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  setAudioModeAsync: jest.fn(() => Promise.resolve()),
+}));

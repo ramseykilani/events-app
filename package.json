@@ -16,17 +16,24 @@
     "deploy:receipt": "npm run deploy:receipt --workspace=apps/events",
     "deploy:landing": "npm run deploy:landing --workspace=apps/events",
     "deploy:landing-v2": "npm run deploy:landing-v2 --workspace=apps/events",
-    "test": "npm test --workspace=apps/events",
+    "test": "npm test --workspace=apps/events --workspace=apps/i-love-you",
     "test:watch": "npm run test:watch --workspace=apps/events",
     "test:coverage": "npm run test:coverage --workspace=apps/events",
     "test:e2e": "npm run test:e2e --workspace=apps/events",
     "test:e2e:mobile": "npm run test:e2e:mobile --workspace=apps/events",
     "test:conventions": "node scripts/check-conventions.mjs",
-    "test:sql": "bash apps/events/supabase/tests/run_local.sh",
-    "typecheck": "npx tsc --noEmit -p apps/events",
+    "test:sql": "bash apps/events/supabase/tests/run_local.sh && bash apps/i-love-you/supabase/tests/run_local.sh",
+    "typecheck": "npx tsc --noEmit -p apps/events && npx tsc --noEmit -p apps/i-love-you",
     "serve:web": "npm run serve:web --workspace=apps/events",
     "test:manual": "bash ./scripts/manual-test-suite.sh",
     "test:manual:strict": "bash ./scripts/manual-test-suite.sh --strict",
-    "test:manual:start": "bash ./scripts/manual-test-suite.sh --strict --start"
+    "test:manual:start": "bash ./scripts/manual-test-suite.sh --strict --start",
+    "start:ily": "npm run start --workspace=apps/i-love-you",
+    "web:ily": "npm run web --workspace=apps/i-love-you",
+    "build:web:ily": "npm run build:web --workspace=apps/i-love-you",
+    "test:ily": "npm test --workspace=apps/i-love-you",
+    "test:sql:ily": "bash apps/i-love-you/supabase/tests/run_local.sh",
+    "test:e2e:ily": "npm run test:e2e --workspace=apps/i-love-you",
+    "typecheck:ily": "npx tsc --noEmit -p apps/i-love-you"
   }
 }

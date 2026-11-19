@@ -39,6 +39,10 @@ export function compareMessages(a: Pick<Message, 'created_at' | 'id'>, b: Pick<M
 function supersedes(existing: TimelineMessage, incoming: TimelineMessage): boolean {
   if (existing.local && !incoming.local) return true;
   if (!existing.local && incoming.local) return false;
+  // The same row again (Realtime echo of a row the catch-up already
+  // delivered): Postgres timestamps carry microseconds, so equal raw strings
+  // mean nothing changed.
+  if (incoming.updated_at === existing.updated_at && !existing.local) return false;
   return ts(incoming.updated_at) >= ts(existing.updated_at);
 }
 
