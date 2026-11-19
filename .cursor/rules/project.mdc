@@ -70,6 +70,8 @@ apps/events/
   receipt/             Who's Coming receipt page (static, one page) — deployed to the events-reply Pages project via npm run deploy:receipt
   landing/             Landing page, FAQ, and the beta signup form (static, three pages; og-image.png via scripts/generate-landing-og-image.mjs) — live at events-landing.pages.dev via npm run deploy:landing (agent-run, no CI; deploy only on a green staging push)
   landing-v2/          Three-One-Four landing redesign candidate (static, no JS) — events-landing-v2.pages.dev via npm run deploy:landing-v2 (same rules; FEATURES.md → Landing Page Redesign)
+apps/i-love-you/       I Love You — two-person messaging + calls (own README/FEATURES/STATUS/SETUP; design note at root docs/i-love-you-design.md)
+desktop/i-love-you/    Tauri v2 shell around I Love You's web build (Rust, outside the npm workspaces)
 packages/
   design/              @family/design — Colors.ts role-token palettes + theme registry, ThemeContext, useTheme, applyWebBrowserChrome, navigationTheme, and the primitives (AppHeader, the three button tiers, IconButton, ThemedSwitch, Chip)
   infra/               @family/infra — supabase.ts, timeoutSignal.ts, dialogs.ts, showError.ts, authErrors.ts, reservedPhone.ts

@@ -60,3 +60,29 @@ test('history survives a reload and a sent message is never duplicated', async (
   await page.reload();
   await expect(messageText(page, tag)).toHaveCount(1);
 });
+
+test('move a message to the channel it belongs in, keeping its author', async ({ page, browser }, testInfo) => {
+  const tag = `move-${testInfo.project.name}-${Date.now()}`;
+  const ctxB = await newExtraContext(browser, testInfo, AUTH_FILE_B);
+  const b = await ctxB.newPage();
+  await b.goto('/');
+  await openChannel(b, 'Everyday');
+  await send(b, `I've been thinking about us ${tag}`);
+
+  // A moves B's message into Heart-to-heart.
+  await page.goto('/');
+  await openChannel(page, 'Everyday');
+  await messageText(page, tag).hover();
+  await page.getByRole('button', { name: 'Message actions' }).click();
+  await page.getByRole('button', { name: 'Move to another channel', exact: true }).click();
+  await page.getByRole('button', { name: 'Move to Heart-to-heart' }).click();
+  await expect(messageText(page, tag)).toHaveCount(0);
+
+  // It lives in Heart-to-heart now, for both, still B's, marked as moved.
+  if (testInfo.project.name === 'mobile-chrome') await page.getByRole('button', { name: 'Back to Channels' }).click();
+  await openChannel(page, 'Heart-to-heart');
+  await expect(messageText(page, tag)).toBeVisible();
+  await expect(page.getByText(/Moved from Everyday/).filter({ visible: true }).first()).toBeVisible();
+  await expect(messageText(b, tag)).toHaveCount(0);
+  await ctxB.close();
+});

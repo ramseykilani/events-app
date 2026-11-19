@@ -14,6 +14,17 @@ This is a React Native (Expo SDK 54) events-sharing app. The backend is a remote
 
 **Strategy (2026-08-09):** the native app is the product; the web build is the dev/staging/CI surface and is never promoted to users. See `docs/distribution-strategy.md`. Beta distribution is TestFlight internal + Play internal testing; native builds are EAS-run (`docs/development-workflow.md` → Native builds). Agents test via the web build (`cd apps/events && npx expo start --web --port 8081`) — the only option in a headless cloud VM — but user-facing design decisions should assume native.
 
+### I Love You (`apps/i-love-you`, added 2026-11-19)
+
+A second app lives beside Events: a two-person messaging and calling app. Its own docs are the source of truth — `apps/i-love-you/README.md`, `FEATURES.md`, `STATUS.md`, `SETUP.md`, and `docs/i-love-you-design.md` (root). What differs from Events, so nobody "fixes" it back:
+
+- **Realtime is used** (the deliberate exception to pull-not-push, with the same timeout / last-good / never-blank rules around it — design note §5).
+- **Its backend runs locally for tests.** `apps/i-love-you/e2e/stack.sh` brings up the Supabase CLI stack (Docker) plus a LiveKit dev server; the Playwright suite and SQL suites need no hosted project and no secrets. Local test numbers `+15555550200`–`0209` with code `246810` exist only in that local stack's `supabase/config.toml`.
+- **Desktop web is a product surface** (installable PWA + `desktop/i-love-you` Tauri shell), so it does ask for desktop-notification permission — explainer-gated, once.
+- No hosted Supabase/LiveKit/EAS project exists for it yet (`apps/i-love-you/STATUS.md`).
+
+Root scripts: `npm run typecheck`, `npm test`, `npm run test:sql` cover both apps; `*:ily` scripts (`test:ily`, `test:sql:ily`, `test:e2e:ily`, `build:web:ily`, `web:ily`) target I Love You alone.
+
 ### Running the app (web mode)
 
 ```bash

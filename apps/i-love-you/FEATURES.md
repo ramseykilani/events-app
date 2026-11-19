@@ -20,7 +20,7 @@ native build on a phone; none exists yet (`STATUS.md`).
 | [Channel Settings](#channel-settings) | Implemented | SQL + Jest + e2e |
 | [Messaging](#messaging) | Implemented | SQL + Jest + e2e |
 | [Photos and Voice Notes](#photos-and-voice-notes) | Implemented | e2e (web); device pending |
-| [Move a Message](#move-a-message) | Implemented | SQL + Jest; e2e not yet |
+| [Move a Message](#move-a-message) | Implemented | SQL + Jest + e2e |
 | [Needs You Now](#needs-you-now) | Implemented | SQL + Jest; push delivery device pending |
 | [Notifications](#notifications) | Implemented | SQL + Jest; push delivery device pending |
 | [Calls and the Drop-in Room](#calls-and-the-drop-in-room) | Implemented | e2e with real WebRTC (web); native device pending |
@@ -212,7 +212,8 @@ Realtime and the engine re-files the row (`applyToTimelines`).
 ### Acceptance Criteria
 - [x] Author/time preserved, origin recorded, no-op when already there
   (SQL T10); the engine moves it between timelines (Jest).
-- [ ] An e2e spec for the move flow (not written yet).
+- [x] A message moved from Everyday shows up in Heart-to-heart for both,
+  still the author's, marked "Moved from Everyday" (e2e `messaging.spec.ts`).
 
 ## Needs You Now
 
