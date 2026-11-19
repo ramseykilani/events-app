@@ -65,3 +65,6 @@ apps/*/android/
 # Supabase CLI local stack state and local edge-function env (per app)
 **/supabase/.branches/
 **/supabase/functions/.env
+
+# Local e2e stack state (e2e/stack.sh): env files, web build, logs
+**/.e2e/

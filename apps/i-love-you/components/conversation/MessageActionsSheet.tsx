@@ -45,7 +45,7 @@ export function MessageActionsSheet(props: Props) {
   const targets = props.channels.filter((c) => !c.archived_at && c.id !== m.channel_id);
 
   const Row = ({ icon, label, onPress, tone }: { icon: IoniconName; label: string; onPress: () => void; tone?: 'destructive' }) => (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.6} accessibilityRole="button">
+    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.6} accessibilityRole="button" accessibilityLabel={label}>
       <Ionicons name={icon} size={20} color={tone ? theme.destructiveLink : theme.textSecondary} />
       <Text style={[styles.rowText, { color: tone ? theme.destructiveLink : theme.textPrimary }]}>{label}</Text>
     </TouchableOpacity>

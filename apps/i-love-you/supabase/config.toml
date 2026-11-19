@@ -269,7 +269,7 @@ max_frequency = "5s"
 
 # Use pre-defined map of phone number to OTP for testing.
 # Keys are the phone number with country code and without the + prefix.
-# LOCAL STACK ONLY: the e2e suite (e2e/README in apps/i-love-you/e2e/stack.sh) signs
+# LOCAL STACK ONLY: the e2e suite (apps/i-love-you/e2e/stack.sh) signs
 # in these fictional NANP-555 numbers against `supabase start`. This file
 # configures the local CLI stack, never the hosted project — the hosted
 # project's test numbers live in its dashboard (SETUP.md), and no real
@@ -278,6 +278,13 @@ max_frequency = "5s"
 15555550200 = "246810"
 15555550201 = "246810"
 15555550202 = "246810"
+15555550203 = "246810"
+15555550204 = "246810"
+15555550205 = "246810"
+15555550206 = "246810"
+15555550207 = "246810"
+15555550208 = "246810"
+15555550209 = "246810"
 
 # Configure logged in session timeouts.
 # [auth.sessions]

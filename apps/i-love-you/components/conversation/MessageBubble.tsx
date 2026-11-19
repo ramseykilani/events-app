@@ -70,7 +70,13 @@ function BubbleImpl(props: BubbleProps) {
   if (m.edited_at && !deleted) metaParts.push('edited');
 
   return (
-    <View style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}>
+    // Hover belongs to the whole row (bubble + its action button), so moving
+    // onto the button keeps it, and only one row is ever in hover.
+    <View
+      style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}
+      onPointerEnter={() => setHover(true)}
+      onPointerLeave={() => setHover(false)}
+    >
       {completable && !deleted && !status ? (
         <TouchableOpacity
           style={styles.doneButton}
@@ -103,8 +109,6 @@ function BubbleImpl(props: BubbleProps) {
         ) : null}
         <Pressable
           onLongPress={() => !status && !deleted && props.onActions(m)}
-          onHoverIn={() => setHover(true)}
-          onHoverOut={() => setHover(false)}
           delayLongPress={350}
           accessibilityRole="button"
           accessibilityHint="Long press for message actions"
@@ -219,7 +223,6 @@ function BubbleImpl(props: BubbleProps) {
         <TouchableOpacity
           style={[styles.more, { backgroundColor: theme.surfaceSecondary }]}
           onPress={() => props.onActions(m)}
-          onPressIn={() => setHover(true)}
           activeOpacity={0.6}
           accessibilityRole="button"
           accessibilityLabel="Message actions"

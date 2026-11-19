@@ -36,6 +36,7 @@ export function Composer(props: Props) {
   const [text, setText] = useState('');
   const [urgent, setUrgent] = useState(false);
   const [height, setHeight] = useState(44);
+  const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const voice = useVoiceRecorder();
   const allowUrgent = isOn(channel, 'allow_urgent');
@@ -224,8 +225,17 @@ export function Composer(props: Props) {
           ref={inputRef}
           style={[
             styles.input,
-            { borderColor: theme.border, color: theme.textPrimary, height: Math.min(MAX_INPUT_HEIGHT, Math.max(44, height)) },
+            {
+              // Focus shows on the border itself (a role token), in place of
+              // the browser's heavy default ring, which ignores the theme.
+              borderColor: focused ? theme.textSecondary : theme.border,
+              color: theme.textPrimary,
+              height: Math.min(MAX_INPUT_HEIGHT, Math.max(44, height)),
+            },
+            Platform.OS === 'web' && styles.noRing,
           ]}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           value={text}
           onChangeText={(t) => {
             setText(t);
@@ -298,6 +308,7 @@ const styles = StyleSheet.create({
   },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   dimmed: { opacity: 0.5 },
+  noRing: { outlineWidth: 0 },
   recDot: { width: 10, height: 10, borderRadius: 5, marginLeft: 12, alignSelf: 'center' },
   recText: { flex: 1, fontSize: 16, alignSelf: 'center' },
   textButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
