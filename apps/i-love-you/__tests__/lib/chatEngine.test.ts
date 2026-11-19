@@ -278,6 +278,58 @@ describe('ChatEngine', () => {
     expect(engine.state.timelines.ch1.messages.map((m) => m.id)).toContain('missed');
   });
 
+  it('a send while the socket is down does not move the catch-up cursor past what was missed', async () => {
+    // The partner's message committed at 10:30 while this device's socket
+    // was silently dead; this device then sent at 11:00 over REST. The
+    // reconnect catch-up must still start before 10:30.
+    const T0 = '2026-11-18T10:00:00.000Z';
+    const { engine, api, handlers } = setup({ snapshot: { couple: COUPLE, cursor: T0 } });
+    api.sendMessage.mockImplementation((input: { id: string; channelId: string; body: string }) =>
+      Promise.resolve(row(input.id, { channel_id: input.channelId, body: input.body, updated_at: '2026-11-18T11:00:00.000Z' }))
+    );
+    await engine.start();
+    handlers().onStatus('live');
+    await flush();
+    handlers().onStatus('offline');
+    engine.send('ch1', { body: 'still there?' });
+    await flush();
+    await flush();
+    api.getMessageChanges.mockClear();
+    handlers().onStatus('live');
+    await flush();
+    expect(api.getMessageChanges).toHaveBeenCalledWith(T0, 200);
+  });
+
+  it('live rows move the cursor only once the catch-up after a subscribe has run', async () => {
+    const T0 = '2026-11-18T10:00:00.000Z';
+    const { engine, api, handlers, saved } = setup({ snapshot: { couple: COUPLE, cursor: T0 } });
+    let release!: (rows: Message[]) => void;
+    await engine.start();
+    api.getMessageChanges.mockReturnValueOnce(new Promise((r) => (release = r)));
+    handlers().onStatus('live');
+    // A live row lands while the catch-up read is still in flight.
+    handlers().onMessage(row('live1', { sender_id: PARTNER, updated_at: '2026-11-18T12:00:00.000Z' }));
+    expect(saved.cursor).toBeUndefined();
+    release([row('missed', { sender_id: PARTNER, updated_at: '2026-11-18T11:00:00.000Z' })]);
+    await flush();
+    expect(saved.cursor).toBe('2026-11-18T11:00:00.000Z');
+    handlers().onMessage(row('live2', { sender_id: PARTNER, updated_at: '2026-11-18T13:00:00.000Z' }));
+    expect(saved.cursor).toBe('2026-11-18T13:00:00.000Z');
+  });
+
+  it('opening one channel does not move the catch-up cursor past other channels’ changes', async () => {
+    const T0 = '2026-11-18T10:00:00.000Z';
+    const { engine, api, handlers } = setup({ snapshot: { couple: COUPLE, cursor: T0 } });
+    await engine.start();
+    api.getMessages.mockResolvedValueOnce([row('newest', { updated_at: '2026-11-18T12:00:00.000Z' })]);
+    await engine.openChannel('ch1');
+    api.getMessageChanges.mockClear();
+    handlers().onStatus('offline');
+    handlers().onStatus('live');
+    await flush();
+    expect(api.getMessageChanges).toHaveBeenCalledWith(T0, 200);
+  });
+
   it('markRead clears the dot, writes the position, and broadcasts only with receipts on', async () => {
     const { engine, api, live, handlers } = setup();
     api.getChannels.mockResolvedValue([

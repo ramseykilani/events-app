@@ -96,6 +96,10 @@ export class ChatEngine {
   private liveCoupleId: string | null = null;
   private outbox: OutboxEntry[] = [];
   private cursor: string | null = null;
+  // True from a (re)subscribe until the catch-up feed has run: rows that
+  // arrive meanwhile (live, own sends, a channel page) say nothing about
+  // what was missed, so they must not move the cursor past it.
+  private gapOpen = true;
   private flushing = false;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -219,6 +223,7 @@ export class ChatEngine {
       onPresence: (members) => this.handlePresence(members),
       onStatus: (status) => {
         const was = this.state.live;
+        if (status !== 'live') this.gapOpen = true;
         this.set({ live: status });
         // Every (re)subscribe re-reads what was missed.
         if (status === 'live' && was !== 'live' && this.state.phase === 'paired') {
@@ -290,7 +295,9 @@ export class ChatEngine {
         fresh: true,
         hasOlder: page.length === PAGE ? tl.hasOlder : tl.messages.length > page.length && tl.hasOlder,
       });
-      this.advanceCursor(page);
+      // One channel's newest page says nothing about the others: it only
+      // starts a cursor that does not exist yet.
+      if (!this.cursor) this.advanceCursor(page);
       this.persistTimeline(channelId);
     } catch (err) {
       console.error('messages load failed:', err);
@@ -328,11 +335,18 @@ export class ChatEngine {
 
   // The catch-up feed: every change in the couple since the cursor.
   async catchUp(): Promise<void> {
-    if (!this.cursor) return;
+    const liveAtStart = this.state.live === 'live';
+    if (!this.cursor) {
+      if (liveAtStart) this.gapOpen = false;
+      return;
+    }
+    let since = this.cursor;
     let fetched = 0;
     try {
       for (;;) {
-        const rows = await this.deps.api.getMessageChanges(this.cursor, CATCH_UP_PAGE);
+        // Pages follow this feed's own position, not this.cursor, which
+        // other paths may have moved meanwhile.
+        const rows = await this.deps.api.getMessageChanges(since, CATCH_UP_PAGE);
         fetched += rows.length;
         if (fetched > CATCH_UP_LIMIT) {
           // Too far behind to patch: start the timelines over.
@@ -343,9 +357,16 @@ export class ChatEngine {
           if (this.activeChannelId) await this.openChannel(this.activeChannelId);
           return;
         }
-        if (rows.length > 0) this.mergeRows(rows, true);
+        if (rows.length > 0) {
+          this.mergeRows(rows, false);
+          since = maxUpdatedAt(rows, since) ?? since;
+          this.advanceCursor(rows);
+        }
         if (rows.length < CATCH_UP_PAGE) break;
       }
+      // Everything up to the subscribe that started this read is in: live
+      // rows may move the cursor again.
+      if (liveAtStart && this.state.live === 'live') this.gapOpen = false;
     } catch (err) {
       console.error('catch-up failed:', err);
     }
@@ -354,7 +375,7 @@ export class ChatEngine {
   // ----- live handlers -----
   private handleLiveMessage(row: Message): void {
     const known = Object.values(this.state.timelines).some((tl) => tl.messages.some((m) => m.id === row.id));
-    this.mergeRows([row], true);
+    this.mergeRows([row], !this.gapOpen);
     if (!known && row.sender_id !== this.deps.userId && !row.deleted_at) {
       // A new partner message: they are not typing anymore.
       this.clearTyping(row.channel_id);
@@ -579,7 +600,9 @@ export class ChatEngine {
             urgent: entry.urgent,
           });
           this.dropEntry(entry.id);
-          this.mergeRows([{ ...row, previewUri: entry.upload?.uri } as TimelineMessage], true);
+          // Not a cursor move: the partner's changes before this row may not
+          // have reached this device yet (catchUp owns the cursor).
+          this.mergeRows([{ ...row, previewUri: entry.upload?.uri } as TimelineMessage], false);
           this.deps.api.notifyMessage(row.id);
         } catch (err) {
           if (isRefusal(err)) {
@@ -650,7 +673,7 @@ export class ChatEngine {
     if (!text) throw new Error('Message is empty');
     await this.optimistic(id, { body: text, edited_at: new Date(this.now()).toISOString() }, async () => {
       const row = await this.deps.api.editMessage(id, text);
-      this.mergeRows([row], true);
+      this.mergeRows([row], false);
     });
   }
 
