@@ -21,18 +21,21 @@ and update it when any of it changes. Specs: `FEATURES.md`. Setup steps:
 Verified in the cloud VM on 2026-11-19:
 
 - `npm run typecheck`, `npm run test:conventions`: clean for both apps.
-- Jest: I Love You 14 suites / 74 tests; Events unchanged at 41 / 354.
+- Jest: I Love You 14 suites / 79 tests; Events unchanged at 41 / 354.
 - SQL semantics (scratch Postgres 16): pairing 15, channels 13, messages 15,
-  push claims 8 assertions — all pass; Events' SQL suite still passes.
+  push claims 8, pairing races 2 (two real sessions via dblink) — all
+  pass; Events' SQL suite still passes.
 - Migrations also applied cleanly to the Supabase CLI local stack
   (Postgres 17, with the real `realtime` and `storage` schemas).
 - Playwright (`e2e/`, Chromium, local stack + LiveKit dev server): setup +
   13 specs × desktop-chrome/mobile-chrome — last full run 25 passed, 2
-  layout-specific skips by design. One earlier full run had a single failure
-  in the mobile reorder step of `channels.spec.ts` (an up-move landed at the
-  top instead of one place up) that did not reproduce in two isolated runs or
-  the next full run — treat channel reordering under concurrent Realtime
-  echoes as not yet trusted.
+  layout-specific skips by design. The one-off reorder failure seen earlier
+  (an up-move landing one place too high) traced to a real race: a
+  get_channels read issued before a reorder could answer after it and put
+  the old order back, so the spec's "before" snapshot could be stale. Fixed
+  in the engine (a read that straddles a local channel write or a live
+  channel row is re-read; Jest pins it); 40+ further reorder steps at both
+  widths did not reproduce it.
 - Desktop shell: Linux debug build compiled and launched under Xvfb. **No
   macOS or Windows build.**
 
