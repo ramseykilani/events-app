@@ -24,17 +24,38 @@ type Handlers = {
 let handlers: Handlers | null = null;
 let activeChannelId: string | null = null;
 
+// Inside the desktop shell (desktop/i-love-you, Tauri v2 with
+// withGlobalTauri) the OS notification goes through
+// tauri-plugin-notification — the system webviews (WKWebView, WebKitGTK,
+// WebView2) do not back the web Notification API with OS notifications.
+type TauriNotification = {
+  isPermissionGranted: () => Promise<boolean>;
+  requestPermission: () => Promise<'granted' | 'denied' | 'default'>;
+  sendNotification: (o: { title: string; body?: string; silent?: boolean }) => void;
+};
+function tauri(): TauriNotification | null {
+  const t = (globalThis as { __TAURI__?: { notification?: TauriNotification } }).__TAURI__;
+  return t?.notification ?? null;
+}
+
 function supported(): boolean {
-  return typeof window !== 'undefined' && 'Notification' in window;
+  return typeof window !== 'undefined' && ('Notification' in window || !!tauri());
 }
 
 export async function getPermission(): Promise<PermissionState> {
+  const shell = tauri();
+  if (shell) return (await shell.isPermissionGranted()) ? 'granted' : 'undetermined';
   if (!supported()) return 'unsupported';
   const p = Notification.permission;
   return p === 'default' ? 'undetermined' : p;
 }
 
 export async function requestPermission(): Promise<PermissionState> {
+  const shell = tauri();
+  if (shell) {
+    const r = await shell.requestPermission();
+    return r === 'default' ? 'undetermined' : r;
+  }
   if (!supported()) return 'unsupported';
   const result = await Notification.requestPermission();
   return result === 'default' ? 'undetermined' : result;
@@ -61,7 +82,8 @@ export function setupResponseHandling(next: Handlers): () => void {
 }
 
 export function presentIncoming(message: Message, channel: Channel | undefined, partnerName: string): void {
-  if (!supported() || Notification.permission !== 'granted' || !channel) return;
+  const shell = tauri();
+  if (!channel || !supported() || (!shell && Notification.permission !== 'granted')) return;
   const visible = typeof document !== 'undefined' && document.visibilityState === 'visible' && document.hasFocus();
   if (visible && activeChannelId === message.channel_id) return;
   const payload = buildMessagePush({
@@ -72,6 +94,11 @@ export function presentIncoming(message: Message, channel: Channel | undefined, 
     settings: channel.my_settings,
   });
   if (!payload) return;
+  if (shell) {
+    // The shell's window comes forward from the tray on click (lib.rs).
+    shell.sendNotification({ title: payload.title, body: payload.body, silent: payload.sound === null });
+    return;
+  }
   try {
     const n = new Notification(payload.title, {
       body: payload.body,

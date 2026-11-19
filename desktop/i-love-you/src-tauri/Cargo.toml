@@ -1,0 +1,21 @@
+[package]
+name = "i-love-you-desktop"
+version = "0.1.0"
+description = "I Love You — the desktop shell around the web build"
+edition = "2021"
+publish = false
+
+[lib]
+name = "i_love_you_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
