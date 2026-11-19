@@ -61,3 +61,7 @@ test-results/
 # generated native folders (per app workspace)
 apps/*/ios/
 apps/*/android/
+
+# Supabase CLI local stack state and local edge-function env (per app)
+**/supabase/.branches/
+**/supabase/functions/.env
