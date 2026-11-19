@@ -245,15 +245,28 @@ describe('ChatEngine', () => {
     engine.onIncoming(incoming);
     handlers().onTyping('ch1', PARTNER);
     expect(engine.state.typing.ch1).toBeGreaterThan(Date.now());
-    handlers().onMessage(row('p1', { sender_id: PARTNER, body: 'hi' }));
+    handlers().onMessage(row('p1', { sender_id: PARTNER, body: 'hi' }), true);
     expect(engine.state.timelines.ch1.messages.map((m) => m.id)).toEqual(['p1']);
     expect(engine.state.typing.ch1).toBeUndefined();
     expect(incoming).toHaveBeenCalledTimes(1);
     // An update to the same row (an edit) is not a new message.
-    handlers().onMessage(row('p1', { sender_id: PARTNER, body: 'hi!', updated_at: '2026-11-18T10:01:00.000Z' }));
+    handlers().onMessage(row('p1', { sender_id: PARTNER, body: 'hi!', updated_at: '2026-11-18T10:01:00.000Z' }), false);
     expect(incoming).toHaveBeenCalledTimes(1);
     expect(engine.state.timelines.ch1.messages[0].body).toBe('hi!');
     engine.stop();
+  });
+
+  it('an update to an old message this device never loaded is not a new message', async () => {
+    const { engine, handlers } = setup();
+    await engine.start();
+    const incoming = jest.fn();
+    engine.onIncoming(incoming);
+    // The partner reacts to (or marks done, or moves) a message from last month.
+    handlers().onMessage(
+      row('old', { sender_id: PARTNER, created_at: '2026-10-01T10:00:00.000Z', reactions: { heart: [PARTNER] } }),
+      false
+    );
+    expect(incoming).not.toHaveBeenCalled();
   });
 
   it('typing is ignored where the shared typing_indicator setting is off', async () => {
@@ -308,12 +321,12 @@ describe('ChatEngine', () => {
     api.getMessageChanges.mockReturnValueOnce(new Promise((r) => (release = r)));
     handlers().onStatus('live');
     // A live row lands while the catch-up read is still in flight.
-    handlers().onMessage(row('live1', { sender_id: PARTNER, updated_at: '2026-11-18T12:00:00.000Z' }));
+    handlers().onMessage(row('live1', { sender_id: PARTNER, updated_at: '2026-11-18T12:00:00.000Z' }), true);
     expect(saved.cursor).toBeUndefined();
     release([row('missed', { sender_id: PARTNER, updated_at: '2026-11-18T11:00:00.000Z' })]);
     await flush();
     expect(saved.cursor).toBe('2026-11-18T11:00:00.000Z');
-    handlers().onMessage(row('live2', { sender_id: PARTNER, updated_at: '2026-11-18T13:00:00.000Z' }));
+    handlers().onMessage(row('live2', { sender_id: PARTNER, updated_at: '2026-11-18T13:00:00.000Z' }), true);
     expect(saved.cursor).toBe('2026-11-18T13:00:00.000Z');
   });
 
@@ -355,7 +368,7 @@ describe('ChatEngine', () => {
       channel('ch1', { unread: true, last_message_at: '2026-11-18T10:00:00.000Z', last_message_sender: PARTNER }),
     ]);
     await engine.start();
-    handlers().onMessage(row('p1', { sender_id: PARTNER }));
+    handlers().onMessage(row('p1', { sender_id: PARTNER }), true);
     engine.markRead('ch1');
     expect(engine.state.channels[0].unread).toBe(false);
     expect(api.markChannelRead).toHaveBeenCalledWith('ch1', '2026-11-18T10:00:00.000Z');
@@ -375,7 +388,7 @@ describe('ChatEngine', () => {
   it('reactions toggle per person, optimistically', async () => {
     const { engine, api, handlers } = setup();
     await engine.start();
-    handlers().onMessage(row('m1', { sender_id: PARTNER, reactions: { heart: [PARTNER] } }));
+    handlers().onMessage(row('m1', { sender_id: PARTNER, reactions: { heart: [PARTNER] } }), true);
     await engine.toggleReaction('m1', 'heart');
     expect(api.setReaction).toHaveBeenCalledWith('m1', 'heart', true);
     expect(engine.state.timelines.ch1.messages[0].reactions.heart).toEqual([PARTNER, ME]);
@@ -387,7 +400,7 @@ describe('ChatEngine', () => {
   it('moving a message takes it out of one timeline and into the other', async () => {
     const { engine, handlers } = setup();
     await engine.start();
-    handlers().onMessage(row('m1', { sender_id: PARTNER }));
+    handlers().onMessage(row('m1', { sender_id: PARTNER }), true);
     await engine.move('m1', 'ch2');
     expect(engine.state.timelines.ch1.messages).toHaveLength(0);
     expect(engine.state.timelines.ch2.messages[0]).toMatchObject({ id: 'm1', moved_from_channel_id: 'ch1' });

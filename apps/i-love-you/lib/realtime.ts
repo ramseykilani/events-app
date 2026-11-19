@@ -20,7 +20,8 @@ export type LiveStatus = 'connecting' | 'live' | 'offline';
 export type RoomPresence = { userId: string; inRoom: boolean; since: string };
 
 export type LiveHandlers = {
-  onMessage: (row: Message) => void;
+  // inserted: a new row, not an edit/reaction/move/done of an existing one.
+  onMessage: (row: Message, inserted: boolean) => void;
   onChannel: (row: Partial<Channel> & { id: string }, deleted: boolean) => void;
   onPrefs: () => void;
   onMembers: () => void;
@@ -60,7 +61,7 @@ export const connectLive: LiveFactory = (coupleId, userId, handlers) => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages', filter: `couple_id=eq.${coupleId}` },
         (payload) => {
-          if (payload.eventType !== 'DELETE') handlers.onMessage(payload.new as Message);
+          if (payload.eventType !== 'DELETE') handlers.onMessage(payload.new as Message, payload.eventType === 'INSERT');
         }
       )
       .on(

@@ -218,7 +218,7 @@ export class ChatEngine {
     this.stopLive();
     this.liveCoupleId = coupleId;
     this.live = this.deps.connectLive(coupleId, this.deps.userId, {
-      onMessage: (row) => this.handleLiveMessage(row),
+      onMessage: (row, inserted) => this.handleLiveMessage(row, inserted),
       onChannel: (row, deleted) => this.handleLiveChannel(row, deleted),
       onPrefs: () => this.scheduleChannelRefresh(),
       onMembers: () => void this.refresh(),
@@ -382,10 +382,12 @@ export class ChatEngine {
   }
 
   // ----- live handlers -----
-  private handleLiveMessage(row: Message): void {
+  private handleLiveMessage(row: Message, inserted: boolean): void {
     const known = Object.values(this.state.timelines).some((tl) => tl.messages.some((m) => m.id === row.id));
     this.mergeRows([row], !this.gapOpen);
-    if (!known && row.sender_id !== this.deps.userId && !row.deleted_at) {
+    // Only a new row is a new message: an update to one this device has not
+    // loaded (a reaction, done, edit or move of an old message) is not.
+    if (inserted && !known && row.sender_id !== this.deps.userId && !row.deleted_at) {
       // A new partner message: they are not typing anymore.
       this.clearTyping(row.channel_id);
       const channel = this.state.channels.find((c) => c.id === row.channel_id);
