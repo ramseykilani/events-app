@@ -404,6 +404,10 @@ const rel = (path) => relative(ROOT, path);
 const ruleRel = (path) => relative(ROOT, path).split(sep).slice(2).join(sep);
 
 for (const appRoot of SCAN_ROOTS) {
+  // Rule messages carry app-relative paths (stable allowlists per app); the
+  // report prefixes the owning app/package so a hit in one of several apps
+  // is unambiguous (apps/events, apps/i-love-you, packages/*).
+  const before = violations.length;
   for (const dir of SCAN_DIRS) {
     const scanRoot = join(appRoot, dir);
     if (!existsSync(scanRoot)) continue;
@@ -426,6 +430,10 @@ for (const appRoot of SCAN_ROOTS) {
       checkVisualTokens(path, source, text);
       checkBareBackButtons(path, source, text);
     }
+  }
+  const owner = relative(ROOT, appRoot);
+  for (let i = before; i < violations.length; i++) {
+    if (!violations[i].startsWith(owner)) violations[i] = `${owner}/${violations[i]}`;
   }
 }
 

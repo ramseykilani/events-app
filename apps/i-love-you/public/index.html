@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" style="background-color: #faf7f0">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+    <title>I Love You</title>
+    <!--
+      The web shell for single-page output (Expo reads public/index.html as
+      the template). Paper's background before React hydrates, so first paint
+      is never white; applyWebBrowserChrome keeps it in step with the chosen
+      mood afterwards. The manifest, icons and sw.js make it an installable
+      desktop app (FEATURES.md -> Desktop).
+    -->
+    <meta name="application-name" content="I Love You" />
+    <meta name="apple-mobile-web-app-title" content="I Love You" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#faf7f0" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <style id="expo-reset">
+      html, body { height: 100%; background-color: #faf7f0; }
+      body { overflow: hidden; }
+      #root { display: flex; height: 100%; flex: 1; }
+    </style>
+    <script>
+      // The service worker only registers on a served build: never on the
+      // Metro dev server (port 8091), where a cached shell would serve a
+      // stale bundle, and never when ?nosw is present (e2e).
+      if ('serviceWorker' in navigator && location.port !== '8091' && !location.search.includes('nosw')) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <noscript>I Love You needs JavaScript.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
